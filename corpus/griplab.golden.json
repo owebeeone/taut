@@ -1,0 +1,46 @@
+{
+  "ByteOp/replace": {
+    "cbor": "a40102020303020443007879",
+    "message": "ByteOp"
+  },
+  "ChatMessage/first": {
+    "cbor": "a301000263616e6e03626869",
+    "message": "ChatMessage"
+  },
+  "CmdSession/mixed": {
+    "cbor": "a30169736573732d30303031028263676974667374617475730382a40165616c7068610200037267697420737461747573204020616c70686104f6a401646265746102020360046e626574613a206578697465642032",
+    "message": "CmdSession"
+  },
+  "PeerPresence/online": {
+    "cbor": "a5016270310263416e6e030304f505634e5943",
+    "message": "PeerPresence"
+  },
+  "RepoRun/err": {
+    "cbor": "a401646265746102020360046e626574613a206578697465642032",
+    "message": "RepoRun"
+  },
+  "RepoRun/ok": {
+    "cbor": "a40165616c7068610200037267697420737461747573204020616c70686104f6",
+    "message": "RepoRun"
+  },
+  "TerminalChunk/ls": {
+    "cbor": "a201667465726d2d31024524206c730a",
+    "message": "TerminalChunk"
+  },
+  "TerminalOpened/alpha": {
+    "cbor": "a401667465726d2d310265616c706861031878041828",
+    "message": "TerminalOpened"
+  },
+  "swmr/delta-1": {
+    "cbor": "a5016e66696c653a6e6f7465732e747874020103020481a40100020b0300044121050c",
+    "message": "FileDelta"
+  },
+  "swmr/delta-2": {
+    "cbor": "a5016e66696c653a6e6f7465732e747874020203030481a401010200030504400507",
+    "message": "FileDelta"
+  },
+  "swmr/snapshot": {
+    "cbor": "a5016e66696c653a6e6f7465732e7478740201034b68656c6c6f20776f726c6404000520",
+    "message": "FileSnapshot"
+  }
+}

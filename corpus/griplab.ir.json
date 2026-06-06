@@ -1,0 +1,867 @@
+{
+  "version": 1,
+  "shapes": {
+    "atom": {
+      "payload": "whole-state",
+      "history": "latest",
+      "initiation": "pull|push",
+      "writers": "single",
+      "events": [
+        "replace"
+      ]
+    },
+    "log": {
+      "payload": "whole",
+      "history": "append-only",
+      "initiation": "pull|push",
+      "writers": "source",
+      "events": [
+        "append"
+      ]
+    },
+    "stream": {
+      "payload": "whole-or-delta",
+      "history": "none",
+      "initiation": "push",
+      "writers": "source",
+      "events": [
+        "event"
+      ]
+    },
+    "swmr": {
+      "payload": "delta",
+      "history": "reconstructible",
+      "initiation": "push",
+      "writers": "single",
+      "events": [
+        "delta",
+        "reset",
+        "snapshot"
+      ]
+    },
+    "snapshot_delta": {
+      "payload": "delta",
+      "history": "reconstructible",
+      "initiation": "push",
+      "writers": "single",
+      "events": [
+        "delta",
+        "snapshot"
+      ]
+    },
+    "crdt": {
+      "payload": "ops",
+      "history": "reconstructible",
+      "initiation": "push-bidi",
+      "writers": "multi-merge",
+      "events": [
+        "op",
+        "sync"
+      ]
+    }
+  },
+  "enums": [
+    {
+      "name": "PresenceStatus",
+      "members": {
+        "configured": 0,
+        "offline": 1,
+        "starting": 2,
+        "online": 3,
+        "error": 4
+      }
+    },
+    {
+      "name": "OpKind",
+      "members": {
+        "insert": 0,
+        "delete": 1,
+        "replace": 2
+      }
+    }
+  ],
+  "messages": [
+    {
+      "name": "PeerPresence",
+      "fields": [
+        {
+          "name": "id",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "name",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "status",
+          "tag": 3,
+          "type": {
+            "k": "enum",
+            "name": "PresenceStatus"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "online",
+          "tag": 4,
+          "type": {
+            "k": "scalar",
+            "scalar": "bool"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "location",
+          "tag": 5,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        }
+      ]
+    },
+    {
+      "name": "ByteOp",
+      "fields": [
+        {
+          "name": "op",
+          "tag": 1,
+          "type": {
+            "k": "enum",
+            "name": "OpKind"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "offset",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "length",
+          "tag": 3,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "data",
+          "tag": 4,
+          "type": {
+            "k": "scalar",
+            "scalar": "bytes"
+          },
+          "optional": false,
+          "transient": false
+        }
+      ]
+    },
+    {
+      "name": "FileSnapshot",
+      "fields": [
+        {
+          "name": "resource_id",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "resume_seq",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "content",
+          "tag": 3,
+          "type": {
+            "k": "scalar",
+            "scalar": "bytes"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "window_start",
+          "tag": 4,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "window_end",
+          "tag": 5,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "preview",
+          "tag": 6,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": true
+        }
+      ]
+    },
+    {
+      "name": "FileDelta",
+      "fields": [
+        {
+          "name": "resource_id",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "base_seq",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "seq",
+          "tag": 3,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "ops",
+          "tag": 4,
+          "type": {
+            "k": "list",
+            "elem": {
+              "k": "msg",
+              "name": "ByteOp"
+            }
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "result_size",
+          "tag": 5,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        }
+      ]
+    },
+    {
+      "name": "ChatMessage",
+      "fields": [
+        {
+          "name": "id",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "sender_id",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "text",
+          "tag": 3,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        }
+      ]
+    },
+    {
+      "name": "TerminalChunk",
+      "fields": [
+        {
+          "name": "session_id",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "data",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "bytes"
+          },
+          "optional": false,
+          "transient": false
+        }
+      ]
+    },
+    {
+      "name": "TerminalOpened",
+      "fields": [
+        {
+          "name": "session_id",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "repo",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "cols",
+          "tag": 3,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "rows",
+          "tag": 4,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        }
+      ]
+    },
+    {
+      "name": "RepoTarget",
+      "fields": [
+        {
+          "name": "repo",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "fail_with",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        }
+      ]
+    },
+    {
+      "name": "RepoRun",
+      "fields": [
+        {
+          "name": "repo",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "exit_code",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "output",
+          "tag": 3,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "error",
+          "tag": 4,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": true,
+          "transient": false
+        }
+      ]
+    },
+    {
+      "name": "CmdSession",
+      "fields": [
+        {
+          "name": "session_id",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "argv",
+          "tag": 2,
+          "type": {
+            "k": "list",
+            "elem": {
+              "k": "scalar",
+              "scalar": "str"
+            }
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "targets",
+          "tag": 3,
+          "type": {
+            "k": "list",
+            "elem": {
+              "k": "msg",
+              "name": "RepoRun"
+            }
+          },
+          "optional": false,
+          "transient": false
+        },
+        {
+          "name": "started_monotonic",
+          "tag": 4,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": true
+        }
+      ]
+    }
+  ],
+  "services": [
+    {
+      "name": "GripLab",
+      "methods": [
+        {
+          "name": "presence.subscribe",
+          "kind": "server_stream",
+          "role": "out",
+          "params": [],
+          "output": null,
+          "shape": "atom",
+          "events": [
+            {
+              "event": "replace",
+              "type": {
+                "k": "list",
+                "elem": {
+                  "k": "msg",
+                  "name": "PeerPresence"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "presence.get",
+          "kind": "unary",
+          "role": "out",
+          "params": [],
+          "output": {
+            "k": "list",
+            "elem": {
+              "k": "msg",
+              "name": "PeerPresence"
+            }
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "chat.subscribe",
+          "kind": "server_stream",
+          "role": "out",
+          "params": [],
+          "output": null,
+          "shape": "log",
+          "events": [
+            {
+              "event": "append",
+              "type": {
+                "k": "msg",
+                "name": "ChatMessage"
+              }
+            }
+          ]
+        },
+        {
+          "name": "chat.post",
+          "kind": "unary",
+          "role": "in",
+          "params": [
+            {
+              "name": "sender_id",
+              "type": {
+                "k": "scalar",
+                "scalar": "str"
+              }
+            },
+            {
+              "name": "text",
+              "type": {
+                "k": "scalar",
+                "scalar": "str"
+              }
+            }
+          ],
+          "output": {
+            "k": "msg",
+            "name": "ChatMessage"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "file.subscribe",
+          "kind": "server_stream",
+          "role": "out",
+          "params": [],
+          "output": null,
+          "shape": "swmr",
+          "events": [
+            {
+              "event": "snapshot",
+              "type": {
+                "k": "msg",
+                "name": "FileSnapshot"
+              }
+            },
+            {
+              "event": "delta",
+              "type": {
+                "k": "msg",
+                "name": "FileDelta"
+              }
+            }
+          ]
+        },
+        {
+          "name": "file.window.update",
+          "kind": "unary",
+          "role": "ctl",
+          "params": [
+            {
+              "name": "start",
+              "type": {
+                "k": "scalar",
+                "scalar": "int"
+              }
+            },
+            {
+              "name": "end",
+              "type": {
+                "k": "scalar",
+                "scalar": "int"
+              }
+            }
+          ],
+          "output": {
+            "k": "scalar",
+            "scalar": "bool"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "term.open",
+          "kind": "unary",
+          "role": "hdl",
+          "params": [
+            {
+              "name": "repo",
+              "type": {
+                "k": "scalar",
+                "scalar": "str"
+              }
+            },
+            {
+              "name": "cols",
+              "type": {
+                "k": "scalar",
+                "scalar": "int"
+              }
+            },
+            {
+              "name": "rows",
+              "type": {
+                "k": "scalar",
+                "scalar": "int"
+              }
+            }
+          ],
+          "output": {
+            "k": "msg",
+            "name": "TerminalOpened"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "session.output.subscribe",
+          "kind": "server_stream",
+          "role": "out",
+          "params": [
+            {
+              "name": "session_id",
+              "type": {
+                "k": "scalar",
+                "scalar": "str"
+              }
+            }
+          ],
+          "output": null,
+          "shape": "stream",
+          "events": [
+            {
+              "event": "event",
+              "type": {
+                "k": "msg",
+                "name": "TerminalChunk"
+              }
+            }
+          ]
+        },
+        {
+          "name": "term.input",
+          "kind": "unary",
+          "role": "ctl",
+          "params": [
+            {
+              "name": "session_id",
+              "type": {
+                "k": "scalar",
+                "scalar": "str"
+              }
+            },
+            {
+              "name": "data",
+              "type": {
+                "k": "scalar",
+                "scalar": "bytes"
+              }
+            }
+          ],
+          "output": {
+            "k": "scalar",
+            "scalar": "bool"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "term.resize",
+          "kind": "unary",
+          "role": "ctl",
+          "params": [
+            {
+              "name": "session_id",
+              "type": {
+                "k": "scalar",
+                "scalar": "str"
+              }
+            },
+            {
+              "name": "cols",
+              "type": {
+                "k": "scalar",
+                "scalar": "int"
+              }
+            },
+            {
+              "name": "rows",
+              "type": {
+                "k": "scalar",
+                "scalar": "int"
+              }
+            }
+          ],
+          "output": {
+            "k": "scalar",
+            "scalar": "bool"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "term.close",
+          "kind": "unary",
+          "role": "td",
+          "params": [
+            {
+              "name": "session_id",
+              "type": {
+                "k": "scalar",
+                "scalar": "str"
+              }
+            }
+          ],
+          "output": {
+            "k": "scalar",
+            "scalar": "bool"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "cmd.run",
+          "kind": "unary",
+          "role": "in",
+          "params": [
+            {
+              "name": "argv",
+              "type": {
+                "k": "list",
+                "elem": {
+                  "k": "scalar",
+                  "scalar": "str"
+                }
+              }
+            },
+            {
+              "name": "targets",
+              "type": {
+                "k": "list",
+                "elem": {
+                  "k": "msg",
+                  "name": "RepoTarget"
+                }
+              }
+            }
+          ],
+          "output": {
+            "k": "msg",
+            "name": "CmdSession"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "sessions.query",
+          "kind": "unary",
+          "role": "out",
+          "params": [
+            {
+              "name": "peer_id",
+              "type": {
+                "k": "scalar",
+                "scalar": "str"
+              }
+            }
+          ],
+          "output": {
+            "k": "list",
+            "elem": {
+              "k": "msg",
+              "name": "CmdSession"
+            }
+          },
+          "shape": null,
+          "events": []
+        }
+      ]
+    }
+  ]
+}
