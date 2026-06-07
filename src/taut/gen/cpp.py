@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..ir.model import EnumRef, ListOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from ..wire import codec
 
 _TAUT = Path(__file__).resolve().parents[3]      # .../glial-dev/taut
@@ -60,6 +60,8 @@ def _base_type(t: TypeRef) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"std::vector<{_base_type(t.elem)}>"
+    if isinstance(t, MapOf):
+        return f"std::map<{_base_type(t.key)}, {_base_type(t.value)}>"
     raise TypeError(t)
 
 
@@ -101,6 +103,10 @@ def _field_encode_lines(f) -> list[str]:
     if isinstance(f.type, ListOf):
         return [f"    b.array({f.name}.size());",
                 f"    for (const auto& x : {f.name}) {{ {_encode_scalar(f.type.elem, 'x')} }}"]
+    if isinstance(f.type, MapOf):  # std::map iterates in ascending key order
+        mk, mv = _encode_scalar(f.type.key, "k"), _encode_scalar(f.type.value, "v")
+        return [f"    b.array({f.name}.size());",
+                f"    for (const auto& [k, v] : {f.name}) {{ b.map(2); b.uint(1); {mk} b.uint(2); {mv} }}"]
     return [f"    {_encode_scalar(f.type, f.name)}"]
 
 
@@ -113,6 +119,9 @@ def _emit_from_cbor(msg, forward_compat: bool = False) -> list[str]:
             lines.append(f"    {{ const auto& f = c.get({f.tag}); if (!f.is_null()) v.{f.name} = {_decode_expr(f.type, 'f')}; }}")
         elif isinstance(f.type, ListOf):
             lines.append(f"    for (const auto& x : c.get({f.tag}).as_array()) v.{f.name}.push_back({_decode_expr(f.type.elem, 'x')});")
+        elif isinstance(f.type, MapOf):
+            dk, dv = _decode_expr(f.type.key, "e.get(1)"), _decode_expr(f.type.value, "e.get(2)")
+            lines.append(f"    for (const auto& e : c.get({f.tag}).as_array()) v.{f.name}[{dk}] = {dv};")
         else:
             lines.append(f"    v.{f.name} = {_decode_expr(f.type, f'c.get({f.tag})')};")
     if forward_compat:
@@ -150,9 +159,11 @@ def _emit_to_cbor(msg, forward_compat: bool = False) -> list[str]:
 
 
 def _emit_types(schema: Schema, forward_compat: bool = False) -> str:
+    has_map = any(isinstance(f.type, MapOf) for m in schema.messages.values() for f in m.fields)
     lines = [
         "// GENERATED native C++ types by taut/src/taut/gen/cpp.py — do not edit.",
         "#pragma once",
+        *(["#include <map>"] if has_map else []),
         "#include <optional>",
         "#include <string_view>",
         "#include <utility>",

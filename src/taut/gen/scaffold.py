@@ -21,7 +21,7 @@ from . import js as _js
 from . import kotlin as _kotlin
 from . import rust as _rust
 from . import swift as _swift
-from ..ir.model import EnumRef, ListOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef
+from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef
 
 # Compiled targets whose generated code imports an external CBOR runtime module.
 # Maps lang -> (output path relative to its lang dir, vendored resource file).
@@ -59,6 +59,8 @@ def _py_ty(t: TypeRef | None) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"list[{_py_ty(t.elem)}]"
+    if isinstance(t, MapOf):
+        return f"dict[{_py_ty(t.key)}, {_py_ty(t.value)}]"
     raise TypeError(t)
 
 
@@ -140,6 +142,8 @@ def _ts_ty(t: TypeRef | None) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"{_ts_ty(t.elem)}[]"
+    if isinstance(t, MapOf):
+        return f"Record<string, {_ts_ty(t.value)}>"
     raise TypeError(t)
 
 
@@ -219,6 +223,8 @@ def _rs_ty(t: TypeRef | None) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"Vec<{_rs_ty(t.elem)}>"
+    if isinstance(t, MapOf):
+        return f"std::collections::BTreeMap<{_rs_ty(t.key)}, {_rs_ty(t.value)}>"
     raise TypeError(t)
 
 
@@ -277,6 +283,8 @@ def _cpp_ty(t: TypeRef | None) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"std::vector<{_cpp_ty(t.elem)}>"
+    if isinstance(t, MapOf):
+        return f"std::map<{_cpp_ty(t.key)}, {_cpp_ty(t.value)}>"
     raise TypeError(t)
 
 
@@ -326,6 +334,8 @@ def _swift_ty(t: TypeRef | None) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"[{_swift_ty(t.elem)}]"
+    if isinstance(t, MapOf):
+        return f"[{_swift_ty(t.key)}: {_swift_ty(t.value)}]"
     raise TypeError(t)
 
 
@@ -369,6 +379,8 @@ def _go_ty(t: TypeRef | None) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"[]{_go_ty(t.elem)}"
+    if isinstance(t, MapOf):
+        return f"map[{_go_ty(t.key)}]{_go_ty(t.value)}"
     raise TypeError(t)
 
 
@@ -411,6 +423,8 @@ def _kt_ty(t: TypeRef | None) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"List<{_kt_ty(t.elem)}>"
+    if isinstance(t, MapOf):
+        return f"Map<{_kt_ty(t.key)}, {_kt_ty(t.value)}>"
     raise TypeError(t)
 
 
@@ -479,6 +493,8 @@ def _java_ty(t: TypeRef | None) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"java.util.List<{_java_ty(t.elem)}>"
+    if isinstance(t, MapOf):
+        return f"java.util.Map<{_java_ty(t.key)}, {_java_ty(t.value)}>"
     raise TypeError(t)
 
 

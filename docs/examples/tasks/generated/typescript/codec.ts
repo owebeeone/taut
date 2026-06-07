@@ -19,6 +19,12 @@ function toWire(schema: SchemaIndex, t: TypeRef, value: Native): CborValue {
       return schema.enumDef(t.name).members[value as string];
     case "list":
       return (value as Native[]).map((v) => toWire(schema, t.elem, v));
+    case "map": {
+      const entries = [...(value as Map<Native, Native>).entries()]
+        .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)); // ascending keys
+      return entries.map(([k, v]) =>
+        new Map<number, CborValue>([[1, toWire(schema, t.key, k)], [2, toWire(schema, t.value, v)]]));
+    }
     case "msg": {
       const m = schema.message(t.name);
       const out = new Map<number, CborValue>();
@@ -45,6 +51,14 @@ function fromWire(schema: SchemaIndex, t: TypeRef, cv: CborValue): Native {
     }
     case "list":
       return (cv as CborValue[]).map((v) => fromWire(schema, t.elem, v));
+    case "map": {
+      const out = new Map<Native, Native>();
+      for (const e of cv as CborValue[]) {
+        const em = e as Map<number, CborValue>;
+        out.set(fromWire(schema, t.key, em.get(1)!), fromWire(schema, t.value, em.get(2)!));
+      }
+      return out;
+    }
     case "msg": {
       const m = schema.message(t.name);
       const map = cv as Map<number, CborValue>;

@@ -54,7 +54,7 @@ the rest:
 Because the IR is data — not a Turing-complete program — taut can *diff* two
 versions of a contract and tell you mechanically what broke.
 
-**What taut deliberately doesn't have (yet):** `map` and `oneof` types,
+**What taut deliberately doesn't have (yet):** `oneof` types,
 well-known types (`Timestamp`/`Any`/`Duration`), a canonical JSON profile
 (deferred), descriptor/reflection services, and — above all — proto's ecosystem
 maturity, scale hardening, and gRPC's battle-tested multi-language RPC runtime.
@@ -92,7 +92,8 @@ SCHEMA = schema(
 
 - **Fields** carry an explicit integer `tag`, a type, and flags (`optional`,
   `transient`, CRDT `merge`). Types are a closed set: scalars (`int/str/bytes/
-  bool`), enum/message refs, and `List`.
+  bool`), enum/message refs, `List`, and `Map` (a key-sorted, deterministic
+  keyed collection — `K` scalar, `V` scalar/enum/message).
 - **`reserved` + `next_id`** are first-class, validated message features (not
   comments) — retired tags/names can never be reused, and `next_id` is checked.
 - **Methods are the minimal contract `(name, in, out, shape)`.** `shape` is the

@@ -9,7 +9,7 @@ Field/enum names are PascalCased (Go requires capitalized identifiers to export)
 
 from __future__ import annotations
 
-from ..ir.model import EnumRef, FieldDef, ListOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 
 def _pascal(name: str) -> str:
@@ -23,7 +23,13 @@ def _go_ty(t: TypeRef) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"[]{_go_ty(t.elem)}"
+    if isinstance(t, MapOf):
+        return f"map[{_go_ty(t.key)}]{_go_ty(t.value)}"
     raise TypeError(t)
+
+
+def _has_map(schema: Schema) -> bool:
+    return any(isinstance(f.type, MapOf) for m in schema.messages.values() for f in m.fields)
 
 
 def _field_type(f: FieldDef) -> str:
@@ -80,6 +86,15 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
             val = f"func() Cbor {{ if {fn} != nil {{ return {_enc(f.type, '(*' + fn + ')')} }}; return CNull() }}()"
         elif isinstance(f.type, ListOf):
             val = (f"func() Cbor {{ a := []Cbor{{}}; for _, e := range {fn} {{ a = append(a, {_enc(f.type.elem, 'e')}) }}; return CArr(a) }}()")
+        elif isinstance(f.type, MapOf):
+            kt = _go_ty(f.type.key)
+            less = ("!ks[i] && ks[j]" if isinstance(f.type.key, Scalar) and f.type.key.kind == "bool"
+                    else "ks[i] < ks[j]")
+            enck, encv = _enc(f.type.key, "k"), _enc(f.type.value, f"{fn}[k]")
+            val = (f"func() Cbor {{ ks := make([]{kt}, 0, len({fn})); for k := range {fn} {{ ks = append(ks, k) }}; "
+                   f"sort.Slice(ks, func(i, j int) bool {{ return {less} }}); a := []Cbor{{}}; "
+                   f"for _, k := range ks {{ a = append(a, CMap([]KV{{{{K: 1, V: {enck}}}, {{K: 2, V: {encv}}}}})) }}; "
+                   f"return CArr(a) }}()")
         else:
             val = _enc(f.type, fn)
         out.append(f"\t\t{{K: {f.tag}, V: {val}}},")
@@ -100,6 +115,11 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
             out.append(f"\tif fv := c.Get({f.tag}); !fv.IsNull() {{ t := {_dec(f.type, 'fv')}; {fn} = &t }}")
         elif isinstance(f.type, ListOf):
             out.append(f"\tfor _, e := range c.Get({f.tag}).Array() {{ {fn} = append({fn}, {_dec(f.type.elem, 'e')}) }}")
+        elif isinstance(f.type, MapOf):
+            kt, vt = _go_ty(f.type.key), _go_ty(f.type.value)
+            deck, decv = _dec(f.type.key, "e.Get(1)"), _dec(f.type.value, "e.Get(2)")
+            out.append(f"\t{fn} = map[{kt}]{vt}{{}}")
+            out.append(f"\tfor _, e := range c.Get({f.tag}).Array() {{ {fn}[{deck}] = {decv} }}")
         else:
             out.append(f"\t{fn} = {_dec(f.type, f'c.Get({f.tag})')}")
     if forward_compat:
@@ -114,6 +134,8 @@ def emit_types(schema: Schema, forward_compat: bool = False) -> str:
     out = ["// GENERATED native Go types + codec — do not edit.",
            "// Pairs with the vendored cbor.go runtime (same package).",
            "package taut", ""]
+    if _has_map(schema):
+        out += ['import "sort"', ""]
     for e in schema.enums.values():
         out += _emit_enum(e.name, e.members) + [""]
     for m in schema.messages.values():

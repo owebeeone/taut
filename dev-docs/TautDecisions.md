@@ -197,6 +197,21 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
     compile/run-verified with cross-version forward-compat.)*
   *(DECIDED — sequencing locked with the user; JSON profile already BUILT)*
 
+## Type system
+
+- **D24. `map<K,V>`** — keyed collection. **Wire = a key-SORTED array of
+  `{1: key, 2: value}` entries** (protobuf's wire model, but *deterministic* —
+  native maps are unordered; taut's wire is not). `K` ∈ scalar {int, str, bool};
+  `V` ∈ scalar/enum/message (not list/map). Native types: ordered maps where the
+  language has one (Rust `BTreeMap`, C++ `std::map`) so iteration is sorted; else
+  sort on encode (Go keys+`sort`, Kotlin `toSortedMap`, Swift/JS sorted, Java
+  `TreeMap`, Python `sorted`). JSON profile: a JSON object with string keys
+  (proto3 convention). **BUILT across all nine targets**, each compile/run-verified
+  with byte-parity to the Python reference. *(BUILT)*
+- **`oneof`** — a discriminated union. Deferred: every language models unions
+  differently (enum/sealed/variant/interface/discriminated-union), so it wants a
+  real consumer to pin the per-language shape. *(OPEN — only when needed)*
+
 ## Already-built foundation (for reference)
 
 Delivery shapes (atom/log/stream/swmr/snapshot_delta/crdt) + validator;

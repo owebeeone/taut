@@ -7,7 +7,7 @@ encode sorts map keys). Integers are JS numbers (safe to 2^53, like the TS codec
 
 from __future__ import annotations
 
-from ..ir.model import EnumRef, FieldDef, ListOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 
 def _enc(t: TypeRef, expr: str) -> str:
@@ -20,6 +20,9 @@ def _enc(t: TypeRef, expr: str) -> str:
         return f"{expr}.toCbor()"
     if isinstance(t, ListOf):
         return f"CArr({expr}.map((e) => {_enc(t.elem, 'e')}))"
+    if isinstance(t, MapOf):  # Map -> key-sorted array of {1:k, 2:v}
+        return (f"CArr([...{expr}.entries()].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)"
+                f".map(([k, v]) => CMap([[1, {_enc(t.key, 'k')}], [2, {_enc(t.value, 'v')}]])))")
     raise TypeError(t)
 
 
@@ -33,6 +36,9 @@ def _dec(t: TypeRef, expr: str) -> str:
         return f"{t.name}.fromCbor({expr})"
     if isinstance(t, ListOf):
         return f"{expr}.arr.map((e) => {_dec(t.elem, 'e')})"
+    if isinstance(t, MapOf):
+        return (f"new Map({expr}.arr.map((e) => "
+                f"[{_dec(t.key, 'cget(e, 1)')}, {_dec(t.value, 'cget(e, 2)')}]))")
     raise TypeError(t)
 
 

@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 
 from ..ir.load import load_schema
-from ..ir.model import EnumRef, FieldDef, ListOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 _TAUT = Path(__file__).resolve().parents[3]      # .../glial-dev/taut
 _REPO = _TAUT.parent                              # .../glial-dev (trial/ is a sibling)
@@ -39,6 +39,20 @@ def _rust_type(t: TypeRef) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"Vec<{_rust_type(t.elem)}>"
+    if isinstance(t, MapOf):
+        return f"std::collections::BTreeMap<{_rust_type(t.key)}, {_rust_type(t.value)}>"
+    raise TypeError(t)
+
+
+def _encode_ref(t: TypeRef, e: str) -> str:
+    """Encode a value bound by reference (map iteration gives &K / &V)."""
+    if isinstance(t, Scalar):
+        return {"int": f"Cbor::Int(*{e})", "bool": f"Cbor::Bool(*{e})",
+                "str": f"Cbor::Text({e}.clone())", "bytes": f"Cbor::Bytes({e}.clone())"}[t.kind]
+    if isinstance(t, EnumRef):
+        return f"Cbor::Int({e}.wire())"
+    if isinstance(t, MsgRef):
+        return f"{e}.to_cbor()"
     raise TypeError(t)
 
 
@@ -61,6 +75,9 @@ def _encode(t: TypeRef, expr: str) -> str:
         return f"{expr}.to_cbor()"
     if isinstance(t, ListOf):
         return f"Cbor::Array({expr}.iter().map(|x| {_encode(t.elem, 'x')}).collect())"
+    if isinstance(t, MapOf):  # BTreeMap iterates in ascending key order -> deterministic
+        return (f"Cbor::Array({expr}.iter().map(|(k, v)| "
+                f"Cbor::Map(vec![(1, {_encode_ref(t.key, 'k')}), (2, {_encode_ref(t.value, 'v')})])).collect())")
     raise TypeError(t)
 
 
@@ -78,6 +95,9 @@ def _decode(t: TypeRef, expr: str) -> str:
         return f"{t.name}::from_cbor({expr})"
     if isinstance(t, ListOf):
         return f"{expr}.array().iter().map(|x| {_decode(t.elem, 'x')}).collect()"
+    if isinstance(t, MapOf):
+        return (f"{expr}.array().iter().map(|e| "
+                f"({_decode(t.key, 'e.get(1)')}, {_decode(t.value, 'e.get(2)')})).collect()")
     raise TypeError(t)
 
 

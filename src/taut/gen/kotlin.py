@@ -11,7 +11,7 @@ just rides along (no merge).
 
 from __future__ import annotations
 
-from ..ir.model import EnumRef, FieldDef, ListOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 _KT_KEYWORDS = frozenset("""
 as as? break class continue do else false for fun if in in? interface is is! null
@@ -33,6 +33,8 @@ def _kt_ty(t: TypeRef) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"List<{_kt_ty(t.elem)}>"
+    if isinstance(t, MapOf):
+        return f"Map<{_kt_ty(t.key)}, {_kt_ty(t.value)}>"
     raise TypeError(t)
 
 
@@ -59,6 +61,9 @@ def _enc(t: TypeRef, expr: str) -> str:
         return f"{expr}.toCbor()"
     if isinstance(t, ListOf):
         return f"Cbor.arr({expr}.map {{ {_enc(t.elem, 'it')} }})"
+    if isinstance(t, MapOf):  # toSortedMap -> ascending keys
+        return (f"Cbor.arr({expr}.toSortedMap().map {{ "
+                f"Cbor.map(listOf(1L to {_enc(t.key, 'it.key')}, 2L to {_enc(t.value, 'it.value')})) }})")
     raise TypeError(t)
 
 
@@ -72,6 +77,9 @@ def _dec(t: TypeRef, expr: str) -> str:
         return f"{t.name}.fromCbor({expr})"
     if isinstance(t, ListOf):
         return f"{expr}.arrVal.map {{ {_dec(t.elem, 'it')} }}"
+    if isinstance(t, MapOf):
+        return (f"{expr}.arrVal.associate {{ "
+                f"{_dec(t.key, 'it.get(1)')} to {_dec(t.value, 'it.get(2)')} }}")
     raise TypeError(t)
 
 

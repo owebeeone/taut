@@ -6,7 +6,7 @@ residual just rides along (no merge needed, unlike C++).
 
 from __future__ import annotations
 
-from ..ir.model import EnumRef, FieldDef, ListOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 # Swift reserved words — field names / enum cases that collide get backtick-escaped
 # (e.g. razel's `VersionInfo.protocol`).
@@ -30,6 +30,8 @@ def _swift_ty(t: TypeRef) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"[{_swift_ty(t.elem)}]"
+    if isinstance(t, MapOf):
+        return f"[{_swift_ty(t.key)}: {_swift_ty(t.value)}]"
     raise TypeError(t)
 
 
@@ -62,6 +64,11 @@ def _encode(t: TypeRef, expr: str) -> str:
         return f"{expr}.toCbor()"
     if isinstance(t, ListOf):
         return f"Cbor.array({expr}.map {{ {_encode(t.elem, '$0')} }})"
+    if isinstance(t, MapOf):
+        cmp = ("(($0.key ? 1 : 0) < ($1.key ? 1 : 0))"
+               if isinstance(t.key, Scalar) and t.key.kind == "bool" else "$0.key < $1.key")
+        return (f"Cbor.array({expr}.sorted {{ {cmp} }}.map {{ "
+                f"Cbor.map([(1, {_encode(t.key, '$0.key')}), (2, {_encode(t.value, '$0.value')})]) }})")
     raise TypeError(t)
 
 
@@ -79,6 +86,9 @@ def _decode(t: TypeRef, expr: str) -> str:
         return f"{t.name}.fromCbor({expr})"
     if isinstance(t, ListOf):
         return f"{expr}.arrayVal.map {{ {_decode(t.elem, '$0')} }}"
+    if isinstance(t, MapOf):
+        return (f"Dictionary(uniqueKeysWithValues: {expr}.arrayVal.map {{ "
+                f"({_decode(t.key, '$0.get(1)')}, {_decode(t.value, '$0.get(2)')}) }})")
     raise TypeError(t)
 
 

@@ -12,7 +12,7 @@ the backtick languages.
 
 from __future__ import annotations
 
-from ..ir.model import EnumRef, FieldDef, ListOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 
 def _java_ty(t: TypeRef, boxed: bool = False) -> str:
@@ -24,6 +24,8 @@ def _java_ty(t: TypeRef, boxed: bool = False) -> str:
         return t.name
     if isinstance(t, ListOf):
         return f"java.util.List<{_java_ty(t.elem, boxed=True)}>"
+    if isinstance(t, MapOf):
+        return f"java.util.Map<{_java_ty(t.key, boxed=True)}, {_java_ty(t.value, boxed=True)}>"
     raise TypeError(t)
 
 
@@ -41,6 +43,10 @@ def _enc(t: TypeRef, expr: str) -> str:
         return f"{expr}.toCbor()"
     if isinstance(t, ListOf):
         return f"Cbor.arr({expr}.stream().map(e -> {_enc(t.elem, 'e')}).toList())"
+    if isinstance(t, MapOf):  # TreeMap -> ascending keys
+        return (f"Cbor.arr(new java.util.TreeMap<>({expr}).entrySet().stream().map(e -> "
+                f"Cbor.map(java.util.List.of(new KV(1, {_enc(t.key, 'e.getKey()')}), "
+                f"new KV(2, {_enc(t.value, 'e.getValue()')})))).toList())")
     raise TypeError(t)
 
 
@@ -54,6 +60,10 @@ def _dec(t: TypeRef, expr: str) -> str:
         return f"{t.name}.fromCbor({expr})"
     if isinstance(t, ListOf):
         return f"{expr}.arr.stream().map(e -> {_dec(t.elem, 'e')}).toList()"
+    if isinstance(t, MapOf):
+        return (f"{expr}.arr.stream().collect(java.util.stream.Collectors.toMap("
+                f"e -> {_dec(t.key, 'e.get(1)')}, e -> {_dec(t.value, 'e.get(2)')}, "
+                f"(a, b) -> b, java.util.LinkedHashMap::new))")
     raise TypeError(t)
 
 

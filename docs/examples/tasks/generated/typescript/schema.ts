@@ -6,7 +6,8 @@ export type TypeRef =
   | { k: "scalar"; scalar: "int" | "str" | "bytes" | "bool" }
   | { k: "enum"; name: string }
   | { k: "msg"; name: string }
-  | { k: "list"; elem: TypeRef };
+  | { k: "list"; elem: TypeRef }
+  | { k: "map"; key: TypeRef; value: TypeRef };
 
 export interface FieldDef {
   name: string;
