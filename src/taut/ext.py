@@ -4,7 +4,7 @@ wire bytes, knowing only the extension's schema (never the host's).
 An extension is a typed message bound to a band tag (>= shapes.BAND_START). Infra
 piggybacks it on any message; the host app's schema doesn't include the tag, so
 the host ignores it and preserves it (forward-compat). These operate on the
-top-level CBOR map, so they work on *any* Prism message generically.
+top-level CBOR map, so they work on *any* taut message generically.
 """
 
 from __future__ import annotations

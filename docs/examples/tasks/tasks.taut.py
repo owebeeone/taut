@@ -8,10 +8,10 @@ Log streaming endpoint, and the `reserved` / `next_id` evolution features.
 import sys
 from pathlib import Path
 
-# make the prism builder importable when loaded by path
+# make the taut builder importable when loaded by path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-from prism.ir.dsl import BOOL, INT, STR, Enum, F, List, Msg, Ref, method, schema, service
+from taut.ir.dsl import BOOL, INT, STR, Enum, F, List, Msg, Ref, method, schema, service
 
 SCHEMA = schema(
     Enum("TaskState", open=0, doing=1, done=2),

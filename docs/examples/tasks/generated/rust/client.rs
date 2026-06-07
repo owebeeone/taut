@@ -1,4 +1,4 @@
-// GENERATED typed client over the generic prism Client.
+// GENERATED typed client over the generic taut Client.
 use crate::api::*;
 use crate::client::Client;
 use crate::cbor::Cbor;

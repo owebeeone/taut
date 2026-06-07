@@ -2,7 +2,7 @@
 #pragma once
 #include "api.hpp"
 
-namespace prism::tasks {
+namespace taut::tasks {
 
 // create: (std::string_view title) -> Task   [transport.call("create", ...)]
 // comment: (long long task_id, User author, std::string_view text) -> Comment   [transport.call("comment", ...)]

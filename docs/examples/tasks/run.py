@@ -8,20 +8,20 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parents[2] / "src"))   # docs/examples/tasks -> prism/src
+sys.path.insert(0, str(HERE.parents[2] / "src"))   # docs/examples/tasks -> taut/src
 
-from prism import ext
-from prism.ir import compat
-from prism.ir.dsl import INT, STR, F, Msg, extension, schema as mk_schema
-from prism.ir.export import export_to
-from prism.ir.load import load_schema, schema_from_json
-from prism.ir.shapes import BAND_START
-from prism.ir.validate import validate_or_raise
-from prism.wire import codec
+from taut import ext
+from taut.ir import compat
+from taut.ir.dsl import INT, STR, F, Msg, extension, schema as mk_schema
+from taut.ir.export import export_to
+from taut.ir.load import load_schema, schema_from_json
+from taut.ir.shapes import BAND_START
+from taut.ir.validate import validate_or_raise
+from taut.wire import codec
 
 
 def main() -> None:
-    schema = load_schema(HERE / "tasks.prism.py")
+    schema = load_schema(HERE / "tasks.taut.py")
     validate_or_raise(schema)
     methods = sum(len(s.methods) for s in schema.services.values())
     print(f"valid IR: {len(schema.messages)} messages, {len(schema.enums)} enum(s), {methods} methods")
@@ -31,7 +31,7 @@ def main() -> None:
 
     # a composed value: Task embeds an optional User and a list of Comment
     task = {
-        "id": 1, "title": "ship prism", "state": "doing",
+        "id": 1, "title": "ship taut", "state": "doing",
         "assignee": {"id": 7, "name": "ann"},
         "comments": [
             {"author": {"id": 7, "name": "ann"}, "text": "started"},

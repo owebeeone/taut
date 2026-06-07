@@ -20,10 +20,10 @@ from ..ir.validate import validate_or_raise
 from ..wire import codec
 
 # Repo-relative paths.
-_PRISM = Path(__file__).resolve().parents[3]
-IR_PATH = _PRISM / "ir" / "griplab.prism.py"
-GOLDEN_PATH = _PRISM / "corpus" / "griplab.golden.json"
-IR_JSON_PATH = _PRISM / "corpus" / "griplab.ir.json"
+_TAUT = Path(__file__).resolve().parents[3]
+IR_PATH = _TAUT / "ir" / "griplab.taut.py"
+GOLDEN_PATH = _TAUT / "corpus" / "griplab.golden.json"
+IR_JSON_PATH = _TAUT / "corpus" / "griplab.ir.json"
 
 
 # Reference values: name -> (message, native-dict). Enums as member-name strings;

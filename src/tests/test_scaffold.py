@@ -1,8 +1,8 @@
 """The scaffold generators emit per-language API types + client/server stubs."""
 
-from prism.corpus.build import IR_PATH
-from prism.gen import scaffold
-from prism.ir.load import load_schema
+from taut.corpus.build import IR_PATH
+from taut.gen import scaffold
+from taut.ir.load import load_schema
 
 S = load_schema(IR_PATH)
 

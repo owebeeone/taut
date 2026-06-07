@@ -1,6 +1,6 @@
-# Prism — Overview
+# taut — Overview
 
-Prism lets you define **data shapes**, **service endpoints (web APIs)**, and
+taut lets you define **data shapes**, **service endpoints (web APIs)**, and
 **data-delivery shapes** once, in one tiny declarative source, and derive native
 types, codecs, service stubs, and shape-aware sync for **Python, TypeScript,
 Rust, and C++** — verified against a golden conformance corpus.
@@ -12,7 +12,7 @@ Rust, and C++** — verified against a golden conformance corpus.
 ## What you write vs what you get
 
 ```
-  one .prism.py  ──►  neutral IR (JSON)  ──►  native types · codec · service stubs
+  one .taut.py  ──►  neutral IR (JSON)  ──►  native types · codec · service stubs
    (you author)        (generated)              shape clients · docs · corpus
                                                   for Py / TS / Rust / C++
 ```
@@ -21,7 +21,7 @@ You govern the IR (small enough to read whole). Everything downstream is
 regenerated and never hand-edited; a regeneration gate fails CI if generated
 files drift, and a breaking-change gate rejects incompatible IR edits.
 
-## A "web API" in Prism
+## A "web API" in taut
 
 A web API is a **`service`** — a set of **methods**. Each method is either:
 
@@ -29,7 +29,7 @@ A web API is a **`service`** — a set of **methods**. Each method is either:
 - **server_stream** — a subscription whose behavior is a **delivery shape**.
 
 You don't hand-roll request/response plumbing or streaming semantics. You pick a
-delivery shape per streaming endpoint and Prism gives you the idiomatic API +
+delivery shape per streaming endpoint and taut gives you the idiomatic API +
 sync for it. The closed set:
 
 | Shape | Use it for | Reader sees |
@@ -46,7 +46,7 @@ later) and the sync machinery are derived, not written per endpoint. Building a
 server is then just writing handlers (plain functions) and registering them
 against the contract — see [Server.md](Server.md).
 
-## What Prism decouples (and never fuses)
+## What taut decouples (and never fuses)
 
 Wire format · in-memory representation · access/mutation API · service contract ·
 transport binding · delivery shape. Each is a separate concern. A field's native
@@ -57,13 +57,13 @@ is a derived projection of the tagged subset.
 
 | Piece | Where |
 | --- | --- |
-| IR authoring DSL | `prism.ir.dsl` (Python-as-DSL) |
-| Validator + breaking-change gate | `prism.ir.validate`, `prism.ir.compat` |
-| Wire codec (deterministic CBOR) | `prism.wire.codec` / `prism.wire.cbor` |
-| Per-language generators | `prism.gen.rust`, `prism.gen.cpp` |
-| Golden corpus | `prism/corpus/` |
+| IR authoring DSL | `taut.ir.dsl` (Python-as-DSL) |
+| Validator + breaking-change gate | `taut.ir.validate`, `taut.ir.compat` |
+| Wire codec (deterministic CBOR) | `taut.wire.codec` / `taut.wire.cbor` |
+| Per-language generators | `taut.gen.rust`, `taut.gen.cpp` |
+| Golden corpus | `taut/corpus/` |
 | Reference slices + clients/servers | the `trial/` repo (`py/ ts/ rs/ cpp/`) |
-| CRDT reference engine + slot | `prism.crdt` |
+| CRDT reference engine + slot | `taut.crdt` |
 
 ## Status
 

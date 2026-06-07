@@ -176,7 +176,7 @@ def check_or_raise(old: Schema, new: Schema) -> None:
 
 
 def main() -> None:
-    """CLI: prism.ir.compat <baseline.ir.json> <new.ir.json> — exit 1 on breaking."""
+    """CLI: taut.ir.compat <baseline.ir.json> <new.ir.json> — exit 1 on breaking."""
     base, new = sys.argv[1], sys.argv[2]
     old_s = schema_from_json(json.loads(open(base).read()))
     new_s = schema_from_json(json.loads(open(new).read()))

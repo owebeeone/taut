@@ -4,13 +4,13 @@ idempotent; unsupported merge types hit the empty engine slot."""
 
 import pytest
 
-from prism.corpus.build import IR_PATH
-from prism.crdt import EngineNotBound, ReferenceDoc
-from prism.crdt.engine import op_from_wire, op_to_wire
-from prism.ir.dsl import INT, STR, F, Msg, schema as mk_schema
-from prism.ir.load import load_schema
-from prism.ir.validate import validate
-from prism.wire import codec
+from taut.corpus.build import IR_PATH
+from taut.crdt import EngineNotBound, ReferenceDoc
+from taut.crdt.engine import op_from_wire, op_to_wire
+from taut.ir.dsl import INT, STR, F, Msg, schema as mk_schema
+from taut.ir.load import load_schema
+from taut.ir.validate import validate
+from taut.wire import codec
 
 SCHEMA = load_schema(IR_PATH)
 TITLE, VOTES = 1, 2  # Board field tags (lww str, counter int)

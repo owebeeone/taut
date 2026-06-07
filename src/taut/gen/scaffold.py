@@ -3,7 +3,7 @@
 Rust, and C++. Used to populate docs examples' `generated/` trees.
 
 What's actually per-API generated is the **types**. Clients and servers in
-Prism's design are *generic* runtime that read the IR (one ~100-line client/
+taut's design are *generic* runtime that read the IR (one ~100-line client/
 server per language, zero per-method code — see dev-docs/CodeShape.md); the
 client/server here are thin *typed convenience stubs* over that runtime. The
 type emitters reuse the byte-exact-proven Rust/C++ generators.
@@ -61,7 +61,7 @@ def python_api(schema: Schema) -> str:
 
 
 def python_client(schema: Schema, svc: ServiceDef) -> str:
-    out = ['"""GENERATED typed client over a generic Prism transport (call/subscribe)."""',
+    out = ['"""GENERATED typed client over a generic taut transport (call/subscribe)."""',
            "from __future__ import annotations",
            "from .api import *  # noqa: F401,F403", "",
            f"class {svc.name}Client:",
@@ -136,12 +136,12 @@ def ts_api(schema: Schema) -> str:
 
 
 def ts_client(schema: Schema, svc: ServiceDef) -> str:
-    out = ["// GENERATED typed client over the generic PrismClient (call/subscribe).",
-           'import type { PrismClient } from "../../../../trial/ts/src/client.ts";',
+    out = ["// GENERATED typed client over the generic tautClient (call/subscribe).",
+           'import type { tautClient } from "../../../../trial/ts/src/client.ts";',
            "import type * as api from \"./api.ts\";", "",
            f"export class {svc.name}Client {{",
-           "  private c: PrismClient;",
-           "  constructor(c: PrismClient) { this.c = c; }"]
+           "  private c: tautClient;",
+           "  constructor(c: tautClient) { this.c = c; }"]
     for meth in svc.methods:
         args = ", ".join(f"{pn}: {_ts_ty(pt)}" for pn, pt in meth.params)
         obj = "{ " + ", ".join(pn for pn, _ in meth.params) + " }" if meth.params else "{}"
@@ -209,7 +209,7 @@ def rust_api(schema: Schema) -> str:
 
 
 def rust_client(schema: Schema, svc: ServiceDef) -> str:
-    out = ["// GENERATED typed client over the generic prism Client.",
+    out = ["// GENERATED typed client over the generic taut Client.",
            "use crate::api::*;", "use crate::client::Client;", "use crate::cbor::Cbor;", "",
            f"pub struct {svc.name}Client<'a> {{ c: &'a Client }}", "",
            f"impl<'a> {svc.name}Client<'a> {{",
@@ -263,7 +263,7 @@ def cpp_api(schema: Schema) -> str:
 def cpp_client(schema: Schema, svc: ServiceDef) -> str:
     out = ["// GENERATED typed client stub over a generic transport.",
            '#pragma once', '#include "api.hpp"', "",
-           f"namespace prism::{svc.name.lower()} {{", ""]
+           f"namespace taut::{svc.name.lower()} {{", ""]
     for meth in svc.methods:
         if meth.kind == "unary":
             args = ", ".join(f"{_cpp_ty(pt)} {pn}" for pn, pt in meth.params)

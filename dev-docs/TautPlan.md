@@ -1,12 +1,12 @@
-# Prism — Build Plan
+# taut — Build Plan
 
 Status: working draft (Phase 0 plan)
 Owner: Gianni
-Companion specs: the "Prism" build prompt (north-star brief);
+Companion specs: the "taut" build prompt (north-star brief);
 `../../dev-docs/glade/GladeSurfacePrecis.md` (the model);
 `../../grip-lab/` (the pressure).
 
-> **One-line thesis.** Prism is the cross-language mechanism layer under Glade's
+> **One-line thesis.** taut is the cross-language mechanism layer under Glade's
 > declarative surface: author one tiny declarative IR, generate native types +
 > codecs + service stubs + shape-aware sync for Py/TS/Rust/C++, and pin
 > correctness with a golden conformance corpus. We **discover** the IR by
@@ -20,7 +20,7 @@ These are not two unrelated inputs. They are the *consumer* and the *lens* of th
 same thing.
 
 **GripLab is the pressure** — a live app whose client/server boundary already
-carries the full mix of data-flow semantics Prism must serve. Today that boundary
+carries the full mix of data-flow semantics taut must serve. Today that boundary
 is hand-written:
 
 - One transport: WebSocket carrying a JSON `ServiceEnvelope`
@@ -31,17 +31,17 @@ is hand-written:
   file — `parsePeerPresence`, `parsePeerHealth`, `parseServiceStreamEvent`, … —
   re-implemented again on the Python side
   (`grip-lab/services/griplab_service/.../protocol/envelope.py`).
-- Stream events already speak Prism's shape vocabulary in stringly-typed form:
+- Stream events already speak taut's shape vocabulary in stringly-typed form:
   `event ∈ {snapshot, delta, reset, …}` + a `seq` counter
   (`protocol.ts:236`), and the file feed carries byte-level `ByteOp[]` deltas
   with `fileVersion` / `windowVersion` resume tokens
   (`grip-lab/services/filedelta-ts/src/model.ts`).
 
 This is precisely the "denormalized DB of code" / boilerplate-as-smell that the
-north star calls out. **Every one of those `parse*` functions is mechanism Prism
+north star calls out. **Every one of those `parse*` functions is mechanism taut
 generates from intent.**
 
-**Glade is the model** — `GladeSurfacePrecis.md` already states Prism's design as
+**Glade is the model** — `GladeSurfacePrecis.md` already states taut's design as
 the three-axis declaration:
 
 ```
@@ -49,10 +49,10 @@ declare( value-type  ×  flow-type  ×  scope )  →  a tap (substrate hidden & 
 ```
 
 with the flow-type set **atom / log / editable-blob(CRDT) / stream**
-(`GladeSurfacePrecis.md:60`). That is Prism's delivery-shape closed set, minus the
-codegen + cross-language + oracle machinery Prism adds. The mapping is near 1:1:
+(`GladeSurfacePrecis.md:60`). That is taut's delivery-shape closed set, minus the
+codegen + cross-language + oracle machinery taut adds. The mapping is near 1:1:
 
-| Prism shape (build prompt §4) | Glade flow-type | GripLab feed (the proof) |
+| taut shape (build prompt §4) | Glade flow-type | GripLab feed (the proof) |
 | --- | --- | --- |
 | **Atom** (whole-state, latest, LWW) | `atom` | `peer.presence.subscribe`, `workspace.status.subscribe` |
 | **Log** (append-only, replay-from-cursor) | `log` ≈ `model:AppendLog` | `chat.subscribe`, `sessions.subscribe` |
@@ -60,17 +60,17 @@ codegen + cross-language + oracle machinery Prism adds. The mapping is near 1:1:
 | **SWMR / Snapshot+Delta** (snapshot+offset, then deltas) | `atom`+`log` composed over one source | `file.subscribe` (ByteOp deltas, window resume) |
 | **CRDT** (multi-writer merge) | `editable blob` ≈ `model:CrdtText` | *not yet in GripLab* — contract-only |
 
-Glade even pre-states Prism's hardest correctness point: *"one source often
+Glade even pre-states taut's hardest correctness point: *"one source often
 composes two flow types"* (`GladeSurfacePrecis.md:71`) — a terminal is a live
 **stream** and a durable **log** over one handle. That is the Snapshot+Delta
 handoff the build prompt warns is "where naive implementations silently miss or
 double-apply edits."
 
-**Conclusion that governs the plan:** Prism is not a fork of Glade — it is the
+**Conclusion that governs the plan:** taut is not a fork of Glade — it is the
 **mechanism tier** Glade's surface always assumed but never built. We extract
-Prism's IR *backwards* from GripLab's real protocol, validate it against Glade's
+taut's IR *backwards* from GripLab's real protocol, validate it against Glade's
 flow-type taxonomy, and prove it by regenerating GripLab's boundary and passing a
-byte-exact corpus across languages. `.glade` stays the thinking artifact; Prism's
+byte-exact corpus across languages. `.glade` stays the thinking artifact; taut's
 IR is the machine-checkable contract beneath it.
 
 ---
@@ -78,14 +78,14 @@ IR is the machine-checkable contract beneath it.
 ## 2. Repository structure
 
 ```
-prism/
+taut/
   dev-docs/
-    PrismPlan.md              # this file
-    PrismIR.md                # (P1) the IR meta-schema, frozen append-only
-    PrismWire.md              # (P1) wire substrate decision + frozen vocabulary
-    PrismShapes.md            # (P2) the closed delivery-shape set + validator rules
+    TautPlan.md              # this file
+    TautIR.md                # (P1) the IR meta-schema, frozen append-only
+    TautWire.md              # (P1) wire substrate decision + frozen vocabulary
+    TautShapes.md            # (P2) the closed delivery-shape set + validator rules
   src/                        # the BUILDER infrastructure — Python (intent → mechanism)
-    prism/
+    taut/
       ir/                     # IR model (pydantic), loader, validator (declarative-only gate)
       wire/                   # codec strategy + canonical-bytes reference
       shapes/                 # delivery-shape definitions, axis validator
@@ -95,11 +95,11 @@ prism/
         rust/
         cpp/
       corpus/                 # golden-vector generator (value→bytes, request→frame)
-      cli.py                  # `prism gen <lang>`, `prism corpus`, `prism check`
+      cli.py                  # `taut gen <lang>`, `taut corpus`, `taut check`
     pyproject.toml
     tests/
   ir/                         # AUTHORED IR modules (the only governed artifact)
-    griplab.prism.py          # GripLab surface as Python-as-DSL declarations
+    griplab.taut.py          # GripLab surface as Python-as-DSL declarations
   corpus/                     # generated golden vectors (committed; the oracle)
   trial/                      # GENERATED + hand-wired target slices (one per language)
     py/                       # reference implementation (defines truth)
@@ -154,7 +154,7 @@ with rationale, **your call to ratify:**
 
 - **Phase 0:** stay on **canonical JSON**, byte-for-byte mirroring GripLab's
   current envelope. Zero new codec; lets the slice prove the *shapes and IR*, and
-  lets a Prism-generated client talk to the *real, unmodified* GripLab server as
+  lets a taut-generated client talk to the *real, unmodified* GripLab server as
   an interop check.
 - **Phase 1 (freeze here):** ride **CBOR** (RFC 8949 deterministic encoding) as
   the frozen substrate. Rationale: (a) no N hand-written codecs — "reuse over
@@ -177,7 +177,7 @@ CLAUDE.md ("probably no codegen, ever; build the runtime as code-as-declaration"
 the Python reference codec is a generic CBOR encoder/decoder *driven by the IR
 data* — no `.py` is emitted. Text codegen is introduced only at P3, where adding
 TypeScript actually forces it (and where drift between decl and runtime would
-first bite). This keeps Prism from becoming a compiler front-end prematurely.
+first bite). This keeps taut from becoming a compiler front-end prematurely.
 
 ---
 
@@ -231,7 +231,7 @@ Generated from the Python reference (`trial/py/`) alongside the IR:
 - **value → exact bytes** per message (round-trip + canonical encoding).
 - **request → exact frame** per method, and **canonical event sequences** per
   shape (esp. the SWMR snapshot+resume-offset+delta handoff).
-- Committed under `prism/corpus/`. Every implemented language reproduces it
+- Committed under `taut/corpus/`. Every implemented language reproduces it
   byte-for-byte in CI. **C++ additionally compiles the vectors into
   `static_assert`s** for anything compile-time-known (build prompt §5a).
 
@@ -252,7 +252,7 @@ work and **must not block the foundation**.
   output), **SWMR** (file snapshot+delta), plus the **`cmd.run` fan-out+error
   DAG**. No codegen. JSON wire mirroring GripLab. **Goal: discover the real shapes
   of types, service, orchestration, delivery.** *(This plan's immediate target.)*
-- **P1 — Extract the data layer.** Types → IR (`ir/griplab.prism.py`); generate
+- **P1 — Extract the data layer.** Types → IR (`ir/griplab.taut.py`); generate
   the Python codec; emit golden vectors; round-trip validate. **Freeze the wire
   vocabulary here**, including CRDT op/state representation (no engine).
 - **P2 — Extract service contract + shape API.** IR service/stream defs +
@@ -300,7 +300,7 @@ Definition of done for P0:
    functions over native types — no transport/shape/DI logic inside them.
 4. A throwaway in-process "client" exercises all four shapes and the fan-out
    error path, so the delivery semantics are observable and testable.
-5. Notes captured in `PrismIR.md` / `PrismShapes.md` stubs: which field/service/
+5. Notes captured in `TautIR.md` / `TautShapes.md` stubs: which field/service/
    shape shapes actually emerged, ready to extract in P1.
 
 Explicitly **out of P0 scope:** any codegen, the frozen wire, the IR validator,

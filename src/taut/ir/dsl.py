@@ -1,6 +1,6 @@
 """The Python-as-DSL surface for authoring IR — a restricted declarative subset.
 
-No logic, no control flow: an `.prism.py` module composes these helpers into a
+No logic, no control flow: an `.taut.py` module composes these helpers into a
 `SCHEMA`. A validator (later) enforces the restriction; for now the helpers are
 the surface. Loaded by `load.py`.
 """

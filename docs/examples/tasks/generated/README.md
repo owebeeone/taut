@@ -1,6 +1,6 @@
 # Generated code — Tasks API
 
-Generated from [`../tasks.prism.py`](../tasks.prism.py) by
+Generated from [`../tasks.taut.py`](../tasks.taut.py) by
 [`../generate.py`](../generate.py) (regenerate with `python generate.py`). One
 directory per language, each with three files:
 
@@ -24,7 +24,7 @@ same ones whose output is proven byte-for-byte by the conformance corpus
 (`trial/rs`, `trial/cpp`). The Python `api.py` imports and constructs cleanly
 (incl. nested/optional/list-of-message composition).
 
-The **client** and **server** are *typed convenience stubs*. In Prism's design
+The **client** and **server** are *typed convenience stubs*. In taut's design
 the client and server runtimes are **generic** — one ~100-line client and one
 server loop per language that read the IR and need **zero per-method code** (see
 [../../../dev-docs/CodeShape.md](../../../dev-docs/CodeShape.md)). These stubs are

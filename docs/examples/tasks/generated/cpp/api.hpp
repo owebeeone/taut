@@ -1,11 +1,11 @@
-// GENERATED native C++ types by prism/src/prism/gen/cpp.py — do not edit.
+// GENERATED native C++ types by taut/src/taut/gen/cpp.py — do not edit.
 #pragma once
 #include <optional>
 #include <string_view>
 #include <vector>
-#include "prism/cbor.hpp"
+#include "taut/cbor.hpp"
 
-namespace prism {
+namespace taut {
 
 enum class TaskState : long long {
   Open = 0,
@@ -43,7 +43,7 @@ struct Comment {
   }
   static constexpr Comment from_cbor(const Cbor& c) {
     Comment v{};
-    v.author = prism::User::from_cbor(c.get(1));
+    v.author = taut::User::from_cbor(c.get(1));
     v.text = c.get(2).as_text();
     return v;
   }
@@ -74,8 +74,8 @@ struct Task {
     v.id = c.get(1).as_int();
     v.title = c.get(2).as_text();
     v.state = static_cast<TaskState>(c.get(3).as_int());
-    { const auto& f = c.get(4); if (!f.is_null()) v.assignee = prism::User::from_cbor(f); }
-    for (const auto& x : c.get(5).as_array()) v.comments.push_back(prism::Comment::from_cbor(x));
+    { const auto& f = c.get(4); if (!f.is_null()) v.assignee = taut::User::from_cbor(f); }
+    for (const auto& x : c.get(5).as_array()) v.comments.push_back(taut::Comment::from_cbor(x));
     return v;
   }
 };
@@ -98,4 +98,4 @@ struct Event {
   }
 };
 
-} // namespace prism
+} // namespace taut

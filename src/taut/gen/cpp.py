@@ -21,8 +21,8 @@ from pathlib import Path
 from ..ir.model import EnumRef, ListOf, MsgRef, Scalar, Schema, TypeRef
 from ..wire import codec
 
-_PRISM = Path(__file__).resolve().parents[3]      # .../glial-dev/prism
-_REPO = _PRISM.parent                              # trial/ is a sibling
+_TAUT = Path(__file__).resolve().parents[3]      # .../glial-dev/taut
+_REPO = _TAUT.parent                              # trial/ is a sibling
 _GEN = _REPO / "trial" / "cpp" / "generated"
 TYPES_PATH = _GEN / "types.hpp"
 CORPUS_PATH = _GEN / "corpus.hpp"
@@ -90,7 +90,7 @@ def _decode_expr(t: TypeRef, acc: str) -> str:
     if isinstance(t, EnumRef):
         return f"static_cast<{t.name}>({acc}.as_int())"
     if isinstance(t, MsgRef):
-        return f"prism::{t.name}::from_cbor({acc})"
+        return f"taut::{t.name}::from_cbor({acc})"
     raise TypeError(t)
 
 
@@ -128,14 +128,14 @@ def _emit_to_cbor(msg) -> list[str]:
 
 def _emit_types(schema: Schema) -> str:
     lines = [
-        "// GENERATED native C++ types by prism/src/prism/gen/cpp.py — do not edit.",
+        "// GENERATED native C++ types by taut/src/taut/gen/cpp.py — do not edit.",
         "#pragma once",
         "#include <optional>",
         "#include <string_view>",
         "#include <vector>",
-        '#include "prism/cbor.hpp"',
+        '#include "taut/cbor.hpp"',
         "",
-        "namespace prism {",
+        "namespace taut {",
         "",
     ]
     for e in schema.enums.values():
@@ -152,7 +152,7 @@ def _emit_types(schema: Schema) -> str:
         lines.extend(_emit_from_cbor(m))
         lines.append("};")
         lines.append("")
-    lines.append("} // namespace prism")
+    lines.append("} // namespace taut")
     return "\n".join(lines) + "\n"
 
 
@@ -168,7 +168,7 @@ def _render(schema: Schema, t: TypeRef, v) -> str:
             return _lit(v.encode("utf-8"))
         return _lit(v)  # bytes
     if isinstance(t, EnumRef):
-        return f"prism::{t.name}::{_variant(v)}"
+        return f"taut::{t.name}::{_variant(v)}"
     if isinstance(t, MsgRef):
         return _render_struct(schema, t.name, v)
     if isinstance(t, ListOf):
@@ -186,17 +186,17 @@ def _render_struct(schema: Schema, msg_name: str, value: dict) -> str:
             parts.append("std::nullopt" if value[f.name] is None else _render(schema, f.type, value[f.name]))
         else:
             parts.append(_render(schema, f.type, value[f.name]))
-    return f"prism::{msg_name}{{{', '.join(parts)}}}"
+    return f"taut::{msg_name}{{{', '.join(parts)}}}"
 
 
 def _emit_corpus(schema: Schema, references: dict[str, tuple[str, dict]]) -> str:
     lines = [
-        "// GENERATED compile-time corpus oracle by prism/src/prism/gen/cpp.py — do not edit.",
+        "// GENERATED compile-time corpus oracle by taut/src/taut/gen/cpp.py — do not edit.",
         "// Each static_assert constructs the native value and proves its encoding at COMPILE TIME.",
         "#pragma once",
         '#include "types.hpp"',
         "",
-        "namespace prism::corpus {",
+        "namespace taut::corpus {",
         "",
     ]
     count = 0
@@ -206,23 +206,23 @@ def _emit_corpus(schema: Schema, references: dict[str, tuple[str, dict]]) -> str
         fn = _ident(name)
         lines.append(f"// {name} ({message})")
         # encode: construct the native value, prove its bytes == golden
-        lines.append(f"consteval prism::Buf encode_{fn}() {{")
+        lines.append(f"consteval taut::Buf encode_{fn}() {{")
         lines.append(f"  auto v = {_render_struct(schema, message, value)};")
-        lines.append("  prism::Buf b; v.to_cbor(b); return b;")
+        lines.append("  taut::Buf b; v.to_cbor(b); return b;")
         lines.append("}")
-        lines.append(f'static_assert(prism::eq_hex(encode_{fn}(), "{encoded.hex()}"), "{name} encode");')
+        lines.append(f'static_assert(taut::eq_hex(encode_{fn}(), "{encoded.hex()}"), "{name} encode");')
         # round-trip: parse golden -> from_cbor -> to_cbor, prove == golden
-        lines.append(f"consteval prism::Buf roundtrip_{fn}() {{")
+        lines.append(f"consteval taut::Buf roundtrip_{fn}() {{")
         lines.append(f"  std::string_view src = {_lit(encoded)};")
-        lines.append(f"  auto v = prism::{message}::from_cbor(prism::parse(src));")
-        lines.append("  prism::Buf b; v.to_cbor(b); return b;")
+        lines.append(f"  auto v = taut::{message}::from_cbor(taut::parse(src));")
+        lines.append("  taut::Buf b; v.to_cbor(b); return b;")
         lines.append("}")
-        lines.append(f'static_assert(prism::eq(roundtrip_{fn}(), {_lit(encoded)}), "{name} roundtrip");')
+        lines.append(f'static_assert(taut::eq(roundtrip_{fn}(), {_lit(encoded)}), "{name} roundtrip");')
         lines.append("")
         count += 1
     lines.append(f"inline constexpr int VECTOR_COUNT = {count};")
     lines.append("")
-    lines.append("} // namespace prism::corpus")
+    lines.append("} // namespace taut::corpus")
     return "\n".join(lines) + "\n"
 
 

@@ -1,4 +1,4 @@
-"""GENERATED typed client over a generic Prism transport (call/subscribe)."""
+"""GENERATED typed client over a generic taut transport (call/subscribe)."""
 from __future__ import annotations
 from .api import *  # noqa: F401,F403
 

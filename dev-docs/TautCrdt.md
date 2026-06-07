@@ -1,4 +1,4 @@
-# Prism CRDT surface
+# taut CRDT surface
 
 Status: wire + API surface + type vocabulary DONE; reference engine for lww +
 counter DONE; sequence/set engines are a pluggable slot (deferred).
@@ -7,7 +7,7 @@ Per the build prompt §4: CRDT must be representable **from day one** — ops/st
 on the wire, `local-apply` / `merge-remote` / `sync` in the contract — while a
 working convergence engine is **not** a per-platform deliverable.
 
-## Type vocabulary (resolves PrismPlan §10.4)
+## Type vocabulary (resolves tautPlan §10.4)
 
 v1 CRDT field-merge types, declared in the IR per field:
 
@@ -22,7 +22,7 @@ v1** — declaring such a field and using the reference engine raises
 `EngineNotBound` (the slot is unbound). Validator enforces: merge ∈ {lww,counter},
 scalar-only, counter⇒int.
 
-Example doc (`ir/griplab.prism.py`):
+Example doc (`ir/griplab.taut.py`):
 ```
 Msg("Board",
     F("title", 1, STR, merge="lww"),
@@ -58,7 +58,7 @@ prompt prescribes).
 
 ## Reference engine
 
-`prism/crdt/engine.py`: `CrdtEngine` is the slot (Protocol); `ReferenceDoc`
+`taut/crdt/engine.py`: `CrdtEngine` is the slot (Protocol); `ReferenceDoc`
 implements lww+counter. Properties proven in `tests/test_crdt.py`:
 - **convergence** — two replicas making concurrent ops, exchanged in different
   orders, materialize to the same state;

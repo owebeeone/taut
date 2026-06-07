@@ -3,11 +3,11 @@ side-channel extensions."""
 
 import pytest
 
-from prism import ext
-from prism.ir.dsl import INT, STR, F, Msg, extension, schema as mk_schema
-from prism.ir.shapes import BAND_START
-from prism.ir.validate import validate
-from prism.wire import cbor, codec
+from taut import ext
+from taut.ir.dsl import INT, STR, F, Msg, extension, schema as mk_schema
+from taut.ir.shapes import BAND_START
+from taut.ir.validate import validate
+from taut.wire import cbor, codec
 
 S = mk_schema(
     Msg("Host", F("id", 1, INT), F("name", 2, STR)),

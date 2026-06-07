@@ -1,4 +1,4 @@
-"""Generate Rust native types + codec from the IR — Prism's text codegen for a
+"""Generate Rust native types + codec from the IR — taut's text codegen for a
 compiled target (P5). Emits `trial/rs/src/generated.rs`:
 
   - one Rust enum per IR enum (with wire()/from_wire())
@@ -19,10 +19,10 @@ from pathlib import Path
 from ..ir.load import load_schema
 from ..ir.model import EnumRef, FieldDef, ListOf, MsgRef, Scalar, Schema, TypeRef
 
-_PRISM = Path(__file__).resolve().parents[3]      # .../glial-dev/prism
-_REPO = _PRISM.parent                              # .../glial-dev (trial/ is a sibling)
-IR_PATH = _PRISM / "ir" / "griplab.prism.py"
-GOLDEN_PATH = _PRISM / "corpus" / "griplab.golden.json"
+_TAUT = Path(__file__).resolve().parents[3]      # .../glial-dev/taut
+_REPO = _TAUT.parent                              # .../glial-dev (trial/ is a sibling)
+IR_PATH = _TAUT / "ir" / "griplab.taut.py"
+GOLDEN_PATH = _TAUT / "corpus" / "griplab.golden.json"
 OUT_PATH = _REPO / "trial" / "rs" / "src" / "generated.rs"
 
 
@@ -138,7 +138,7 @@ def _emit_message(msg) -> list[str]:
 
 def _emit(schema: Schema, golden: dict) -> str:
     lines = [
-        "// GENERATED from prism/ir + corpus by prism/src/prism/gen/rust.py — do not edit.",
+        "// GENERATED from taut/ir + corpus by taut/src/taut/gen/rust.py — do not edit.",
         "#![allow(dead_code)]",
         "use crate::cbor::Cbor;",
         "",

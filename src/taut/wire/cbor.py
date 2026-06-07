@@ -11,7 +11,7 @@ emitted in ascending order. Supported major types:
   5    map (integer keys only — field tags)
   7    simple: false (0xf4), true (0xf5), null (0xf6)
 
-This is the whole vocabulary Prism freezes. No floats, no tags, no indefinite
+This is the whole vocabulary taut freezes. No floats, no tags, no indefinite
 lengths, no big-nums. Other languages bind to the *same* subset; the corpus is
 byte-exact across all of them. Hand-rolled (no dependency) so the bytes are
 fully under our control and pinned by the RFC vectors in the tests.

@@ -2,7 +2,7 @@
 
 Status: captured from the working `trial/py/` slice (no codegen).
 Purpose: record the shapes that actually emerged, ready to extract into the IR in
-Phase 1. Build-prompt §8.0 / PrismPlan §9 DoD item 5.
+Phase 1. Build-prompt §8.0 / tautPlan §9 DoD item 5.
 
 The slice runs and is green: `cd trial/py && python3 -m pytest tests/` → 14 passed.
 
@@ -54,7 +54,7 @@ A hand-wired GripLab terminal slice over an in-process JSON `ServiceEnvelope`:
    does **not** abort siblings; the gather turns it into a per-target `RepoRun`
    with an error. **P4 implication:** the portable orchestration spec needs at
    minimum: task key, deps, and a per-task error policy (here: isolate-and-report).
-   Retry/timeout/fallback are the next knobs to add — surfaced in PrismPlan §10.3.
+   Retry/timeout/fallback are the next knobs to add — surfaced in tautPlan §10.3.
 
 5. **Envelope shape (lifted from GripLab `protocol.ts:16`).** `Envelope{message_id,
    kind, method?, stream_id?, seq, event?, payload, error?}` with
@@ -109,17 +109,17 @@ native-richness proof).
 - **No real socket.** The JSON envelope round-trips through `json.dumps/loads` in
   `transport.py`, exercising the wire shape, but no WebSocket is opened. A socket
   binding is a later, generated transport adapter (build prompt: transport binding
-  is a separate concern). PrismPlan §9 DoD item 1 said "over WebSocket+JSON" — the
+  is a separate concern). tautPlan §9 DoD item 1 said "over WebSocket+JSON" — the
   faithful Phase-0 reading is "the JSON envelope, transport-seam in-process."
 - **No codegen, no IR, no validator, no CRDT, no TS/Rust/C++.** All deferred to
   P1+ by design — discover first, abstract backward.
 
 ## P1 status (data layer — DONE)
 
-Extracted backward into [../ir/griplab.prism.py](../ir/griplab.prism.py) (2 enums,
-9 messages). Wire frozen as deterministic CBOR ([../src/prism/wire/cbor.py](../src/prism/wire/cbor.py),
+Extracted backward into [../ir/griplab.taut.py](../ir/griplab.taut.py) (2 enums,
+9 messages). Wire frozen as deterministic CBOR ([../src/taut/wire/cbor.py](../src/taut/wire/cbor.py),
 pinned to RFC 8949 vectors). Codec is **IR-driven at runtime**, not text-emitted
-(CLAUDE.md: "probably no codegen, ever") — [../src/prism/wire/codec.py](../src/prism/wire/codec.py).
+(CLAUDE.md: "probably no codegen, ever") — [../src/taut/wire/codec.py](../src/taut/wire/codec.py).
 Golden corpus committed at [../corpus/griplab.golden.json](../corpus/griplab.golden.json)
 (11 vectors incl. the SWMR snapshot→delta→delta handoff). **P1b done:** the live
 slice's reflective JSON codec was retired — `trial/py` now rides the IR/CBOR codec
@@ -131,7 +131,7 @@ text codegen, CRDT, Rust/C++.
 ## P3 data-gate (cross-language — DONE)
 
 The IR is now a neutral serialized artifact ([../corpus/griplab.ir.json](../corpus/griplab.ir.json),
-exported by [../src/prism/ir/export.py](../src/prism/ir/export.py)) and the golden
+exported by [../src/taut/ir/export.py](../src/taut/ir/export.py)) and the golden
 corpus is self-describing (each vector carries its message name). A TypeScript
 codec ([../../trial/ts](../../trial/ts)) — its own CBOR + IR codec, driven by the
 *same* IR JSON, **no schema re-declared** — reproduces all 11 golden vectors
@@ -151,16 +151,16 @@ interfaces stays deferred until a target actually requires ahead-of-time types
 The IR gained the service layer, modeled per the discovery finding: a method is
 **(source × shape × role-typed verb)**.
 
-- **Closed delivery-shape set** as built-in data ([../src/prism/ir/shapes.py](../src/prism/ir/shapes.py)):
+- **Closed delivery-shape set** as built-in data ([../src/taut/ir/shapes.py](../src/taut/ir/shapes.py)):
   atom / log / stream / swmr / snapshot_delta / crdt, each a point in the axes
   (payload/history/initiation/writers) with `events` = its derived streaming-kind.
   `snapshot_delta` + `crdt` are registered contract surfaces, unused by GripLab
   (no multi-writer feed); CRDT is wire/contract only, no engine.
-- **Service decls in the IR** ([../ir/griplab.prism.py](../ir/griplab.prism.py)):
+- **Service decls in the IR** ([../ir/griplab.taut.py](../ir/griplab.taut.py)):
   13 GripLab methods. Lean modeling — method I/O uses TypeRefs + named params over
   *existing* messages (no synthetic args-messages), and stream outputs are an
   event-name→type map that matches the slice's `(event_name, obj)` exactly.
-- **Validator** ([../src/prism/ir/validate.py](../src/prism/ir/validate.py)):
+- **Validator** ([../src/taut/ir/validate.py](../src/taut/ir/validate.py)):
   refs resolve, tags unique, enum values unique, and every server_stream's events
   ⊆ its shape's allowed events (e.g. an `atom` stream emitting `delta` is rejected).
   `build` validates before emitting. 9 validator tests incl. rejection cases.
@@ -221,16 +221,16 @@ client talking to a live Python server across every implemented shape.**
 
 Deferred (honest scope): CRDT engine; a binary-CBOR-envelope transport profile
 (today JSON envelope + CBOR payload); Rust/C++ targets (P5/P6); an AST-level
-declarative-only check of `.prism.py` (today the DSL helpers enforce
+declarative-only check of `.taut.py` (today the DSL helpers enforce
 non-executability and the validator checks the resulting data).
 
 ## P4 — orchestration formalization (DONE)
 
 The task-DAG scheduler is now a formalized execution spec with a declarative
 per-task error policy ([../../trial/py/griplab_slice/scheduler.py](../../trial/py/griplab_slice/scheduler.py),
-normative semantics in [PrismOrchestration.md](PrismOrchestration.md)):
+normative semantics in [TautOrchestration.md](TautOrchestration.md)):
 
-- **Error-policy vocabulary (v1, resolves PrismPlan §10.3):** `retries`, `timeout`
+- **Error-policy vocabulary (v1, resolves tautPlan §10.3):** `retries`, `timeout`
   (per-attempt), `on_error` ∈ {isolate, fail, fallback}, `fallback`, `teardown`.
 - **Structured cancellation:** `on_error="fail"` cancels in-flight siblings *and*
   all downstream waves; `cmd.run` uses `on_error="isolate"` so one repo's failure
@@ -248,18 +248,18 @@ A hand-written deterministic CBOR codec in Rust ([../../trial/rs](../../trial/rs
 reproduces the golden corpus **byte-for-byte** — the third language (after Python
 and TypeScript) to validate the frozen wire. Zero dependencies: Rust has no std
 JSON parser, so the corpus is **generated as Rust data** by
-[../src/prism/gen/rust.py](../src/prism/gen/rust.py) (the first place Prism's text
+[../src/taut/gen/rust.py](../src/taut/gen/rust.py) (the first place taut's text
 codegen earns its keep — ahead-of-time data for a compiled target, exactly as
 planned). `cargo test --offline`: 2 green.
 
 ### P5 Rust — finished (IR-aware codec + tokio scheduler)
 
-- **Generated native types + codec** ([../src/prism/gen/rust.py](../src/prism/gen/rust.py)
+- **Generated native types + codec** ([../src/taut/gen/rust.py](../src/taut/gen/rust.py)
   → [../../trial/rs/src/generated.rs](../../trial/rs/src/generated.rs)): one Rust
   enum per IR enum (wire()/from_wire()), one struct per message (to_cbor/from_cbor),
   transient fields present-but-off-the-wire, a `roundtrip` dispatcher. The IR-aware
   codec reproduces the golden corpus **byte-for-byte** over native structs (not
-  just the CBOR substrate). This is Prism's text codegen finally earning its place
+  just the CBOR substrate). This is taut's text codegen finally earning its place
   — a compiled target wants ahead-of-time types.
 - **Tokio scheduler binding** ([../../trial/rs/src/scheduler.rs](../../trial/rs/src/scheduler.rs)):
   the Rust mirror of the Python sdax scheduler — waves, per-task error policy
@@ -292,7 +292,7 @@ matching (Node's `WebSocket` sends a different header case than the canonical
 one); and `Vec::splice` arms had incompatible types (used `drain` for delete).
 
 **64 tests:** 16 builder + 25 slice + 13 TS (3 corpus + 5 TS↔Python + 5 TS↔Rust)
-+ 10 Rust. Prism now has **two interoperable servers (Python, Rust)** and a TS
++ 10 Rust. taut now has **two interoperable servers (Python, Rust)** and a TS
 client that talks to both, all from one IR; the wire is proven in three languages;
 orchestration is a formal spec with two runtime bindings.
 
@@ -321,7 +321,7 @@ one generic client, corpus-verified.
 Generated **native C++ types** ([../../trial/cpp/generated/types.hpp](../../trial/cpp/generated/types.hpp)):
 `enum class` per IR enum, `struct` per message with `constexpr to_cbor()` **and**
 `from_cbor()` (a `constexpr` CBOR parser lives in
-[cbor.hpp](../../trial/cpp/include/prism/cbor.hpp)). Transient fields present but
+[cbor.hpp](../../trial/cpp/include/taut/cbor.hpp)). Transient fields present but
 off the wire (M3), same shape as the Rust structs. The corpus oracle
 ([../../trial/cpp/generated/corpus.hpp](../../trial/cpp/generated/corpus.hpp))
 proves **both directions** per vector at compile time: construct→`to_cbor`==golden,
@@ -337,7 +337,7 @@ Apple clang 21 / C++23; no P2996 reflection needed.)
 - **Regeneration-reproduces-the-tree gate** ([../src/tests/test_regen.py](../src/tests/test_regen.py)):
   ir.json, golden.json, generated.rs, and corpus.hpp must byte-match fresh
   generator output — hand-edits to generated files fail CI.
-- One-command runners (cross-platform Python, no shell): `prism/run_tests.py`
+- One-command runners (cross-platform Python, no shell): `taut/run_tests.py`
   (regenerate + suite) and `trial/run_tests.py` (rust → py → ts → c++, builds the
   server first). `ALL GREEN`.
 
@@ -348,7 +348,7 @@ formalized with two runtime bindings.
 
 ### P7 breaking-change gate (DONE; OCI publish deferred)
 
-[../src/prism/ir/compat.py](../src/prism/ir/compat.py) diffs a new IR against the
+[../src/taut/ir/compat.py](../src/taut/ir/compat.py) diffs a new IR against the
 prior version and rejects incompatible changes under the same major (changed
 tag/wire-type, removed-or-renamed field, optional→required, new required field,
 removed/renumbered enum member, method kind/shape/param/output/event changes);
@@ -356,13 +356,13 @@ adds (message/enum/method/optional-field/event) are compatible. CLI exits 1 on
 breaking. **DoD met:** rejects `PeerPresence.name str→int` (exit 1), accepts an
 added optional field (exit 0). Relies on lossless IR-JSON round-trip
 (`schema_from_json(schema_json(s)) == s`). 9 tests. Full write-up:
-[PrismDistribution.md](PrismDistribution.md). This is the declarative-IR payoff —
+[TautDistribution.md](TautDistribution.md). This is the declarative-IR payoff —
 governance is a structural diff, possible *because* the IR isn't Turing-complete.
 
 ### CRDT surface (DONE — wire + API + types + reference engine for lww/counter)
 
-Full write-up: [PrismCrdt.md](PrismCrdt.md). Closes the "CRDT from day one" gap:
-- **Type vocabulary** (PrismPlan §10.4 resolved): per-field `merge` ∈ {lww, counter},
+Full write-up: [TautCrdt.md](TautCrdt.md). Closes the "CRDT from day one" gap:
+- **Type vocabulary** (tautPlan §10.4 resolved): per-field `merge` ∈ {lww, counter},
   validated (scalar-only; counter⇒int); `Board` declares `title: lww`, `votes: counter`.
 - **Wire**: `CrdtOp` / `VersionEntry` / `CrdtState` are IR messages → generated
   native types in all four languages, **byte-exact in the corpus** (incl. the C++
@@ -372,13 +372,13 @@ Full write-up: [PrismCrdt.md](PrismCrdt.md). Closes the "CRDT from day one" gap:
   `merge` / `sync` (shape=crdt), declared + validated; contract-only for the
   deployed app (the live GripLab slice doesn't serve it — surface present, engine
   slot empty, per the build prompt).
-- **Reference engine** ([../src/prism/crdt/engine.py](../src/prism/crdt/engine.py)):
+- **Reference engine** ([../src/taut/crdt/engine.py](../src/taut/crdt/engine.py)):
   `CrdtEngine` Protocol = the slot; `ReferenceDoc` implements lww+counter and is
   proven to **converge** (concurrent ops, any order), be **idempotent**, and be
   **reconstructible** from a snapshot. text/sequence raise `EngineNotBound` —
   bind Automerge/Yjs to the same Protocol, nothing else changes. 7 CRDT tests.
 
-prism builder suite: **36 passed**. Full sweep green; C++ proves 14 vectors at
+taut builder suite: **36 passed**. Full sweep green; C++ proves 14 vectors at
 compile time.
 
 Remaining: OCI publish (rest of P7 — needs a registry; also severs the deferred

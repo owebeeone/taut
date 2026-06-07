@@ -1,4 +1,4 @@
-# Prism — Code Shape Analysis
+# taut — Code Shape Analysis
 
 Status: snapshot after closing the client×server matrix. The reason the trials
 exist: to see, concretely, what the code *shape* becomes when intent is tiny and
@@ -19,13 +19,13 @@ language boundary is tested:
 All six cells are exercised (TS has no server, so the TS row has no diagonal).
 Every language both **serves** and **consumes** the same contract. The Rust↔Rust
 test runs the server in-process via the lib's `server::serve` — the same dispatch
-the `prism-server` binary uses.
+the `taut-server` binary uses.
 
 ## What you author vs what the machine produces
 
 | Category | Lines | Hand-authored? |
 | --- | ---: | --- |
-| **IR (authored intent)** `ir/griplab.prism.py` | **119** | YES — the only governed artifact |
+| **IR (authored intent)** `ir/griplab.taut.py` | **119** | YES — the only governed artifact |
 | IR JSON (neutral, exported) | 867 | generated from the 119 |
 | Golden corpus | 46 | generated |
 | Rust types + codec `generated.rs` | 335 | generated from the IR |

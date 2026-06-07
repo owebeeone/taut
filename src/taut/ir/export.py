@@ -2,7 +2,7 @@
 
 The IR stops being Python objects and becomes a flat, portable document any
 language can read (the same artifact that would be published as an OCI blob).
-TypeScript/Rust/C++ bindings consume this, not the `.prism.py` source.
+TypeScript/Rust/C++ bindings consume this, not the `.taut.py` source.
 """
 
 from __future__ import annotations

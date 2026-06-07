@@ -1,6 +1,6 @@
-# Prism — Building a Server
+# taut — Building a Server
 
-This shows how to stand up a server for a Prism service: write handlers, back the
+This shows how to stand up a server for a taut service: write handlers, back the
 streaming endpoints with delivery-shape engines, **register them against the IR**
 (so `kind`/params come from the contract, not by hand), and serve.
 
@@ -145,7 +145,7 @@ Any client — [Reference.md](Reference.md) §12 — talks to it generically:
 
 ```python
 client = await WsClient.connect(f"ws://127.0.0.1:{port}")
-task = await client.call("create", Task, title="ship prism")   # unary
+task = await client.call("create", Task, title="ship taut")   # unary
 async for event, value in await client.subscribe("tasks.subscribe"):
     ...                                                          # 'replace' -> the task list
 ```
@@ -159,7 +159,7 @@ Generic and reusable: the shape engines, the IR-driven transport/registration,
 the WebSocket server loop, the wire. Currently bound to one IR: the codec's
 **native-type binding** (`griplab_slice/wire.py` loads a specific schema and maps
 its messages to dataclasses). To serve *your* API today you point that binding at
-your schema and types; turning it into a point-at-any-IR `prism.serve(schema,
+your schema and types; turning it into a point-at-any-IR `taut.serve(schema,
 handlers)` library is a noted next step.
 
 The runnable, tested reference is the GripLab server — see

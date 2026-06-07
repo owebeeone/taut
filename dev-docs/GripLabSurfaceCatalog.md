@@ -2,7 +2,7 @@
 
 Status: lifted from `grip-lab/services/griplab_service/src/griplab_service/
 local_client/app.py:438` (`handle_protocol_message`) + the stream dataclasses
-below it. This is the authoritative inventory Prism's IR must be able to express.
+below it. This is the authoritative inventory taut's IR must be able to express.
 
 ## The finding the full surface reveals
 
@@ -75,7 +75,7 @@ internals — they are transport/ops concerns, not delivery-shape structure.
 
 `term.ticket` is catalog-but-important: it rebinds one source's view to a
 *different transport profile* (iroh instead of the websocket output stream).
-That is a direct illustration of Prism's "transport binding is a separate concern"
+That is a direct illustration of taut's "transport binding is a separate concern"
 thesis — the same source, a different generated adapter. Flagged for P2.
 
 ## Shapes exercised (the closed set, now fully evidenced)

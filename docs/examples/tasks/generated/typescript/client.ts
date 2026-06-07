@@ -1,10 +1,10 @@
-// GENERATED typed client over the generic PrismClient (call/subscribe).
-import type { PrismClient } from "../../../../trial/ts/src/client.ts";
+// GENERATED typed client over the generic tautClient (call/subscribe).
+import type { tautClient } from "../../../../trial/ts/src/client.ts";
 import type * as api from "./api.ts";
 
 export class TasksClient {
-  private c: PrismClient;
-  constructor(c: PrismClient) { this.c = c; }
+  private c: tautClient;
+  constructor(c: tautClient) { this.c = c; }
   create(title: string): Promise<api.Task> {
     return this.c.call("create", { title }) as Promise<api.Task>;
   }

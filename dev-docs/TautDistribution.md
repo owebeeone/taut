@@ -1,4 +1,4 @@
-# Prism Distribution & Governance (P7)
+# taut Distribution & Governance (P7)
 
 Status: breaking-change gate DONE; OCI publish deferred.
 
@@ -8,12 +8,12 @@ can mechanically gate breaking changes, which is the hard part of distribution.
 
 ## Breaking-change gate (done)
 
-[../src/prism/ir/compat.py](../src/prism/ir/compat.py) diffs a new IR against the
+[../src/taut/ir/compat.py](../src/taut/ir/compat.py) diffs a new IR against the
 prior version and classifies each change. Under the same major, breaking changes
 are rejected.
 
 ```
-python3 -m prism.ir.compat <baseline.ir.json> <new.ir.json>   # exit 1 on breaking
+python3 -m taut.ir.compat <baseline.ir.json> <new.ir.json>   # exit 1 on breaking
 ```
 
 Compatibility model (frozen wire = CBOR maps keyed by field tag):
@@ -40,6 +40,6 @@ compared field-for-field.
 The remaining P7 piece: publish each IR version + its golden corpus as a
 content-addressed **OCI artifact**; consumers pin by digest, fetch, and generate
 locally. This also severs the cross-repo filesystem coupling (the deferred #1) —
-`trial` would pin a prism IR digest instead of reading a sibling checkout. It
+`trial` would pin a taut IR digest instead of reading a sibling checkout. It
 needs `oras`/a registry (network), so it is out of scope for the offline trials;
 the gate above is the governance logic it would run in CI at publish time.

@@ -7,15 +7,15 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parents[2] / "src"))   # docs/examples/tasks -> prism/src
+sys.path.insert(0, str(HERE.parents[2] / "src"))   # docs/examples/tasks -> taut/src
 
-from prism.gen import scaffold
-from prism.ir.load import load_schema
-from prism.ir.validate import validate_or_raise
+from taut.gen import scaffold
+from taut.ir.load import load_schema
+from taut.ir.validate import validate_or_raise
 
 
 def main() -> None:
-    schema = load_schema(HERE / "tasks.prism.py")
+    schema = load_schema(HERE / "tasks.taut.py")
     validate_or_raise(schema)
     written = scaffold.emit_all(schema, "Tasks", HERE / "generated")
     print(f"generated {len(written)} files:")

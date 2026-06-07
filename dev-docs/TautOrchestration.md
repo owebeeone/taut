@@ -1,4 +1,4 @@
-# Prism Orchestration — execution spec (P4)
+# taut Orchestration — execution spec (P4)
 
 Status: working draft. Normative (`MUST`/`SHOULD`/`MAY`).
 Reference impl: `trial/py/griplab_slice/scheduler.py` (sdax-style, asyncio).
@@ -12,7 +12,7 @@ language. Sagas / compensation are explicitly deferred.
 ## Model
 
 - **Task** = `key`, `deps` (keys), `run` (the work), `policy`.
-- **ErrorPolicy** (v1 vocabulary — resolves PrismPlan §10.3):
+- **ErrorPolicy** (v1 vocabulary — resolves tautPlan §10.3):
   - `retries: int` — extra attempts on failure/timeout (total attempts = retries+1).
   - `timeout: float | None` — per-attempt deadline in seconds.
   - `on_error: "isolate" | "fail" | "fallback"`.

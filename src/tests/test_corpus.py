@@ -5,9 +5,9 @@ will reproduce byte-for-byte."""
 
 import json
 
-from prism.corpus.build import GOLDEN_PATH, IR_PATH, reference_values
-from prism.ir.load import load_schema
-from prism.wire import codec
+from taut.corpus.build import GOLDEN_PATH, IR_PATH, reference_values
+from taut.ir.load import load_schema
+from taut.wire import codec
 
 
 def test_golden_bytes_reproduced_and_roundtrip():

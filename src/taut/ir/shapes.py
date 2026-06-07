@@ -1,4 +1,4 @@
-"""The closed delivery-shape set — built into Prism, referenced by name in the IR.
+"""The closed delivery-shape set — built into taut, referenced by name in the IR.
 
 Each shape is a validated point in the axes (payload / history / initiation /
 writers). `events` is the derived streaming-kind: the only event names a

@@ -5,11 +5,11 @@ import json
 
 import pytest
 
-from prism.corpus.build import IR_JSON_PATH, IR_PATH
-from prism.ir import compat
-from prism.ir.dsl import BOOL, INT, STR, Enum, F, Msg, Ref, method, schema, service
-from prism.ir.export import schema_json
-from prism.ir.load import load_schema, schema_from_json
+from taut.corpus.build import IR_JSON_PATH, IR_PATH
+from taut.ir import compat
+from taut.ir.dsl import BOOL, INT, STR, Enum, F, Msg, Ref, method, schema, service
+from taut.ir.export import schema_json
+from taut.ir.load import load_schema, schema_from_json
 
 
 def _details(changes):

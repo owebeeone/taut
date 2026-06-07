@@ -1,7 +1,7 @@
 """The frozen CBOR subset, pinned to RFC 8949 Appendix A vectors. This is the
 substrate oracle — every language's codec must agree with these exact bytes."""
 
-from prism.wire import cbor
+from taut.wire import cbor
 
 VECTORS = [
     (0, "00"), (1, "01"), (10, "0a"), (23, "17"), (24, "1818"), (100, "1864"),

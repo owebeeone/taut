@@ -1,22 +1,22 @@
-# Prism — Getting Started
+# taut — Getting Started
 
 We'll define a small web API — a shared **task board** — from scratch: composed
 data shapes, a service with unary calls and two streaming endpoints (an Atom list
 and a Log feed), then validate it, export the neutral IR, and encode a value.
 
-Prerequisite: the `prism` package importable (the repo's `prism/src` on
+Prerequisite: the `taut` package importable (the repo's `taut/src` on
 `PYTHONPATH`, or run from there). Python ≥ 3.10.
 
 > **Runnable version:** everything below is a working example at
 > [`examples/tasks/`](examples/tasks/) — `cd docs/examples/tasks && python3 run.py`.
 
-## 1. Author the API (`tasks.prism.py`)
+## 1. Author the API (`tasks.taut.py`)
 
 The IR is authored in a restricted, declarative Python DSL — no logic, just
 declarations:
 
 ```python
-from prism.ir.dsl import BOOL, INT, STR, Enum, F, List, Msg, Ref, method, schema, service
+from taut.ir.dsl import BOOL, INT, STR, Enum, F, List, Msg, Ref, method, schema, service
 
 SCHEMA = schema(
     # an enum — integer wire values, idiomatic native names per language
@@ -73,12 +73,12 @@ in a screen.
 ## 2. Load, validate, export
 
 ```python
-from prism.ir.load import load_schema
-from prism.ir.validate import validate_or_raise
-from prism.ir.export import export_to
-from prism.wire import codec
+from taut.ir.load import load_schema
+from taut.ir.validate import validate_or_raise
+from taut.ir.export import export_to
+from taut.wire import codec
 
-schema = load_schema("tasks.prism.py")     # run the DSL, get a Schema
+schema = load_schema("tasks.taut.py")     # run the DSL, get a Schema
 validate_or_raise(schema)                  # reject incoherent IR (see below)
 export_to(schema, "tasks.ir.json")         # the neutral artifact every language reads
 ```
@@ -95,7 +95,7 @@ messages are dicts, lists of messages are lists of dicts:
 
 ```python
 task = {
-    "id": 1, "title": "ship prism", "state": "doing",
+    "id": 1, "title": "ship taut", "state": "doing",
     "assignee": {"id": 7, "name": "ann"},                 # nested message
     "comments": [                                          # list of messages
         {"author": {"id": 7, "name": "ann"}, "text": "started"},
@@ -141,7 +141,7 @@ When you change the API, the breaking-change gate diffs the new IR against the
 prior version and rejects incompatible edits under the same major:
 
 ```sh
-python3 -m prism.ir.compat tasks.ir.json.prev tasks.ir.json
+python3 -m taut.ir.compat tasks.ir.json.prev tasks.ir.json
 # [compatible] Task.due (tag 5) added        → exit 0
 # [breaking]  Task.title wire-type changed    → exit 1
 ```
@@ -170,4 +170,4 @@ See [Reference.md](Reference.md) §4 for the rules.
   registration from the IR, serving.
 - [Reference.md](Reference.md) — every DSL primitive, the delivery-shape catalog,
   CRDT fields, and the toolchain.
-- [Overview.md](Overview.md) — the model and what Prism decouples.
+- [Overview.md](Overview.md) — the model and what taut decouples.

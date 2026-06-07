@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prism builder: regenerate artifacts, then run the test suite (CBOR, corpus,
+"""taut builder: regenerate artifacts, then run the test suite (CBOR, corpus,
 validator, regen gate, compat gate, CRDT). Cross-platform. Run: python run_tests.py"""
 
 import subprocess
@@ -15,7 +15,7 @@ def run(cmd: list[str]) -> None:
 
 
 def main() -> None:
-    run([sys.executable, "-m", "prism.corpus.build"])
+    run([sys.executable, "-m", "taut.corpus.build"])
     run([sys.executable, "-m", "pytest", "tests", "-q"])
 
 

@@ -1,11 +1,11 @@
-# Prism Modules, Compatibility & Extensions — design
+# taut Modules, Compatibility & Extensions — design
 
 Status: **forward-compat + extensions are built** (pre-alpha+); the **module /
 namespace system is specified here for the next build** — it's deferred as its
 own pass because it ripples through every language consumer and the regen gate,
 and shouldn't be rushed into the byte-exact path.
 
-What we're optimizing for (recap): Prism is the **substrate under Glade**, not a
+What we're optimizing for (recap): taut is the **substrate under Glade**, not a
 product. So this takes the genuinely-useful protobuf features (packages/imports,
 forward-compat, extensions) at a fraction of the weight, keeps the IR small, and
 stays wire-neutral where it can.
@@ -44,7 +44,7 @@ MODULE = module("acme.orders", version="1.0.0",
 
 ```jsonc
 {
-  "prism": 1, "module": "acme.orders", "version": "1.0.0",
+  "taut": 1, "module": "acme.orders", "version": "1.0.0",
   "langs": { /* per target */ },
   "imports": [ {"module": "acme.geo", "version": "1.0.0"}, /* … */ ],
   "enums": [], "messages": [
@@ -58,12 +58,12 @@ MODULE = module("acme.orders", version="1.0.0",
 ```
 Refs are **fully resolved at export** (`{module, name}`), so a consumer never
 re-resolves aliases — the collision is already disambiguated in the bytes. The
-shape registry is a Prism built-in, not embedded per module.
+shape registry is a taut built-in, not embedded per module.
 
 ### Workspace lock (reproducible build / distribution)
 
 ```jsonc
-{ "prism": 1, "modules": {
+{ "taut": 1, "modules": {
     "acme.geo":    {"version": "1.0.0", "digest": "sha256:…"},
     "acme.orders": {"version": "1.0.0", "digest": "sha256:…"} } }
 ```
@@ -108,7 +108,7 @@ everything trivially; this covers the decode-reencode middlebox.)
 - Mirrors protobuf's own history (proto3 dropped unknowns in 3.0, restored in 3.5
   because it broke proxies).
 
-`prism/src/prism/wire/codec.py`; tests in `test_forward_compat.py`.
+`taut/src/taut/wire/codec.py`; tests in `test_forward_compat.py`.
 
 > Note: the *core codec* (neutral dict/struct) preserves unknowns. Carrying them
 > through a language's *typed binding* (a dataclass/struct field) is a per-binding
@@ -126,7 +126,7 @@ without the app knowing — proto2's genuinely-useful "extensions", made minimal
   infra piggybacking never collide.
 - **Declared, typed**: `extension("Decision", tag=0x100001)` binds a message to a
   band tag. Validator checks band + uniqueness + message exists.
-- **Generic accessors** (`prism/ext.py`) operate on the host's **wire bytes**
+- **Generic accessors** (`taut/ext.py`) operate on the host's **wire bytes**
   knowing only the extension schema, never the host's:
   ```python
   raw = ext_set(schema, raw, "Decision", tag, {"backend": "b7", "hops": 1})
@@ -139,7 +139,7 @@ without the app knowing — proto2's genuinely-useful "extensions", made minimal
 `test_forward_compat.py` covers attach/read/clear + host-obliviousness + the band.
 
 This is the right *layer*: load-balancing/routing are infra (Glial-tier) concerns
-riding the Prism wire, decoupled from the app schema and handler.
+riding the taut wire, decoupled from the app schema and handler.
 
 ---
 

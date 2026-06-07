@@ -1,6 +1,6 @@
-# Prism — Reference
+# taut — Reference
 
-The complete authoring surface (the `prism.ir.dsl` DSL), the delivery-shape
+The complete authoring surface (the `taut.ir.dsl` DSL), the delivery-shape
 catalog, the wire, validation rules, and the toolchain. See
 [GettingStarted.md](GettingStarted.md) for a tutorial and
 [Overview.md](Overview.md) for the model.
@@ -10,17 +10,17 @@ catalog, the wire, validation rules, and the toolchain. See
 ## 1. An IR module
 
 An IR module is a Python file that builds a `SCHEMA` from the declarative DSL.
-It is loaded by path (the conventional extension is `*.prism.py`), so it must
+It is loaded by path (the conventional extension is `*.taut.py`), so it must
 define a top-level `SCHEMA: Schema`:
 
 ```python
-from prism.ir.dsl import (BOOL, INT, STR, BYTES, Enum, F, List, Msg, Ref,
+from taut.ir.dsl import (BOOL, INT, STR, BYTES, Enum, F, List, Msg, Ref,
                           method, schema, service)
 
 SCHEMA = schema( ... declarations ... )
 ```
 
-`load_schema("x.prism.py")` runs it and returns the `Schema`. The DSL is
+`load_schema("x.taut.py")` runs it and returns the `Schema`. The DSL is
 *declarative only* — helpers compose data; no control flow or logic belongs in an
 IR module.
 
@@ -123,7 +123,7 @@ To **implement** a service (handlers + serving), see [Server.md](Server.md).
 
 A streaming method's `shape` selects behavior + sync; its `events` must be a
 subset of the shape's allowed events (the derived streaming-kind). The closed set
-(`prism.ir.shapes.SHAPES`):
+(`taut.ir.shapes.SHAPES`):
 
 | shape | payload · history · initiation · writers | allowed events | intended API |
 | --- | --- | --- | --- |
@@ -143,7 +143,7 @@ Rules:
 
 ## 7. CRDT fields
 
-A CRDT document is a message whose fields declare a `merge` type (PrismPlan §10.4
+A CRDT document is a message whose fields declare a `merge` type (tautPlan §10.4
 vocabulary):
 
 | merge | meaning | reference merge |
@@ -160,13 +160,13 @@ Msg("Board",
 The wire carries CRDT from day one via built-in messages `CrdtOp`,
 `VersionEntry`, `CrdtState` (representable in every language). The API surface is
 the `crdt` shape (`local-apply` / `merge-remote` / `sync`). The **convergence
-engine is a pluggable slot** (`prism.crdt.CrdtEngine`): `ReferenceDoc` implements
+engine is a pluggable slot** (`taut.crdt.CrdtEngine`): `ReferenceDoc` implements
 lww+counter; `text`/sequence/set bind an external engine (Automerge/Yjs) and raise
-`EngineNotBound` until bound. See [../dev-docs/PrismCrdt.md](../dev-docs/PrismCrdt.md).
+`EngineNotBound` until bound. See [../dev-docs/TautCrdt.md](../dev-docs/TautCrdt.md).
 
 ## 8. The wire
 
-Deterministic **CBOR**, a deliberately tiny frozen subset (`prism.wire.cbor`):
+Deterministic **CBOR**, a deliberately tiny frozen subset (`taut.wire.cbor`):
 int, bytes, text, array, integer-keyed map, bool, null. Core deterministic
 encoding — definite lengths, shortest-form ints, ascending map keys. Messages are
 maps keyed by field tag; enums are their integer value; transient fields are
@@ -189,7 +189,7 @@ tags are `< BAND_START` (2^20); extensions sit at/above it.
 ```python
 extension("Decision", tag=0x100001)   # bind a message to a band tag
 ```
-Generic accessors (`prism.ext`) operate on a host message's *wire bytes* knowing
+Generic accessors (`taut.ext`) operate on a host message's *wire bytes* knowing
 only the extension's schema, never the host's:
 ```python
 raw = ext_set(schema, raw, "Decision", tag, {"backend": "b7", "hops": 1})
@@ -198,7 +198,7 @@ raw = ext_clear(raw, tag)
 ```
 The host decodes/handles/re-encodes obliviously; the extension rides in
 `__unknown__` and survives. Almost free given forward-compat. Full design:
-[../dev-docs/PrismModules.md](../dev-docs/PrismModules.md).
+[../dev-docs/TautModules.md](../dev-docs/TautModules.md).
 
 ## 9. Validation rules
 
@@ -219,16 +219,16 @@ raises on any error. It enforces:
 ## 10. Toolchain / library API
 
 ```python
-from prism.ir.load import load_schema, schema_from_json
-from prism.ir.validate import validate, validate_or_raise
-from prism.ir.export import export_to, schema_json
-from prism.wire import codec
-from prism.ir import compat
+from taut.ir.load import load_schema, schema_from_json
+from taut.ir.validate import validate, validate_or_raise
+from taut.ir.export import export_to, schema_json
+from taut.wire import codec
+from taut.ir import compat
 ```
 
 | call | does |
 | --- | --- |
-| `load_schema(path)` | run a `*.prism.py`, return `Schema` |
+| `load_schema(path)` | run a `*.taut.py`, return `Schema` |
 | `schema_json(schema)` / `export_to(schema, path)` | the neutral IR JSON (dict / file) |
 | `schema_from_json(data)` | inverse — load `Schema` from IR JSON (lossless round-trip) |
 | `validate(schema)` / `validate_or_raise(schema)` | coherence check |
@@ -239,24 +239,24 @@ from prism.ir import compat
 
 **Breaking-change gate (CLI):**
 ```sh
-python3 -m prism.ir.compat <baseline.ir.json> <new.ir.json>   # exit 1 on breaking
+python3 -m taut.ir.compat <baseline.ir.json> <new.ir.json>   # exit 1 on breaking
 ```
 
-**Per-language generators** (`prism.gen.rust`, `prism.gen.cpp`) emit native types
+**Per-language generators** (`taut.gen.rust`, `taut.gen.cpp`) emit native types
 + codec for compiled targets. They currently write into the `trial/` slices
 (`trial/rs/src/generated.rs`, `trial/cpp/generated/{types,corpus}.hpp`); point
 them at your own tree to target your API.
 
-**The project's own build** (worked example): `python3 -m prism.corpus.build`
-validates the GripLab IR (`prism/ir/griplab.prism.py`), exports
+**The project's own build** (worked example): `python3 -m taut.corpus.build`
+validates the GripLab IR (`taut/ir/griplab.taut.py`), exports
 `corpus/griplab.ir.json`, and writes the golden corpus + Rust + C++ artifacts.
 
 ## 11. Conformance corpus & gates
 
-- `prism/corpus/griplab.golden.json` — value→exact-bytes vectors. Every language
+- `taut/corpus/griplab.golden.json` — value→exact-bytes vectors. Every language
   reproduces them byte-for-byte (Python/TS/Rust at runtime; C++ via `static_assert`
   at compile time).
-- **Regeneration gate** (`prism/src/tests/test_regen.py`): generated files must
+- **Regeneration gate** (`taut/src/tests/test_regen.py`): generated files must
   byte-match fresh generator output — hand-edits fail CI.
 - **Breaking-change gate** (§10) — governs API evolution.
 

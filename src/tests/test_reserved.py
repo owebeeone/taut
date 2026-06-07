@@ -1,11 +1,11 @@
 """`reserved` and `next_id` as first-class IR features: the validator enforces
 them; the breaking-change gate treats un-reserving as breaking."""
 
-from prism.ir import compat
-from prism.ir.dsl import INT, STR, F, Msg, schema
-from prism.ir.export import schema_json
-from prism.ir.load import schema_from_json
-from prism.ir.validate import validate
+from taut.ir import compat
+from taut.ir.dsl import INT, STR, F, Msg, schema
+from taut.ir.export import schema_json
+from taut.ir.load import schema_from_json
+from taut.ir.validate import validate
 
 
 def test_reserved_tag_and_name_rejected():

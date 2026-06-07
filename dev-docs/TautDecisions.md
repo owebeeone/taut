@@ -1,28 +1,30 @@
-# Prism — Decisions Log
+# taut — Decisions Log
 
 Pinned design rulings from the refinement pass, so the next build is unambiguous.
 Status tags: **BUILT** (in code + tested) · **DECIDED** (agreed, not yet built) ·
 **SPEC** (designed in another doc, not built) · **DEFERRED** (intentionally later)
 · **OPEN** (still needs a call).
 
-Cross-refs: module system → [PrismModules.md](PrismModules.md); CRDT →
-[PrismCrdt.md](PrismCrdt.md); orchestration → [PrismOrchestration.md](PrismOrchestration.md);
-distribution/gate → [PrismDistribution.md](PrismDistribution.md); code shape →
+Cross-refs: module system → [TautModules.md](TautModules.md); CRDT →
+[TautCrdt.md](TautCrdt.md); orchestration → [TautOrchestration.md](TautOrchestration.md);
+distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
 [CodeShape.md](CodeShape.md).
 
 ---
 
 ## Scope & direction
 
-- **D1. Prism is the substrate under Glade, not a product.** Optimize for "the
+- **D1. taut is the substrate under Glade, not a product.** Optimize for "the
   smallest thing that lets Glade/Glial be built on the GripLab golden path," not
   feature-completeness. *(DECIDED, lean)*
-- **D2. Name = `taut`** (brand / CLI), **`taut_proto`** for the unambiguous form
-  (package/import names, and anywhere `taut` alone collides — e.g. npm/Go/GitHub-org,
-  per the availability scan). The codename "prism" is retired; no `prism` string in
-  identifiers. The repo dir is already renamed `prism/` → `taut/`; the remaining
-  mechanical pass is the in-code rename (`prism` package → `taut_proto`, codename →
-  `taut`) + re-tag. *(DECIDED — name; in-code rename PENDING)*
+- **D2. Name = `taut`** everywhere in-code (brand, CLI, Python package, Rust crate,
+  C++ namespace, IR file extension `.taut.py`). PyPI and crates.io `taut` are both
+  **free** (availability scan), so no disambiguation is needed for the package/crate.
+  **`taut_proto` is reserved** purely as the fallback for the channels where `taut`
+  alone is taken — **npm, Go module, GitHub org** — to be used at publish time, not
+  in the codebase. The codename "prism" is fully retired: no `prism` string remains
+  in either repo's source (build artifacts excepted), all suites green post-rename.
+  *(BUILT — in-code rename done; `taut_proto` reserved for npm/Go/GitHub publish)*
 
 ## Field model
 
@@ -109,7 +111,7 @@ distribution/gate → [PrismDistribution.md](PrismDistribution.md); code shape �
   import handle** (`org.Ref("Address")`), resolved to `{module, name}` at export;
   one JSON artifact per module; workspace lock pins digests; the breaking-change
   gate runs per module. "multi-inheritance" = import DAG (fan-in), not OO
-  inheritance. *(SPEC — [PrismModules.md](PrismModules.md); the next big build)*
+  inheritance. *(SPEC — [TautModules.md](TautModules.md); the next big build)*
 
 ## Already-built foundation (for reference)
 
@@ -123,10 +125,11 @@ types, Python/TS/scaffold). All **BUILT** and green.
 
 ## Open questions (decision needed)
 
-1. **Direction** — more Prism (modules, Go target, JSON profile) vs pivot to
+1. **Direction** — more taut (modules, Go target, JSON profile) vs pivot to
    **Glade/Glial** (where the risk lives). *Lean: small closeouts, then pivot.*
 2. **Casing policy** (D7) — verbatim vs idiomatic per language.
 3. **Build order** — finish forward-compat in the generators (`wire_residual` +
    `collect` + the flag/build-error gate + `wire_` reservation) and the minimal
    RPC surface, *then* the module system. *Lean: yes, that order.*
-4. **Rename** (D2) — settle the name before or after the next build pass.
+
+*(Rename — D2 — resolved: in-code rename to `taut` done, all suites green.)*

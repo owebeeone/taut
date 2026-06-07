@@ -1,6 +1,6 @@
-"""Load an authored `.prism.py` IR module by path and return its SCHEMA.
+"""Load an authored `.taut.py` IR module by path and return its SCHEMA.
 
-The authored IR uses an unusual double extension (`griplab.prism.py`) and is not
+The authored IR uses an unusual double extension (`griplab.taut.py`) and is not
 a normal import target, so it is loaded explicitly here — appropriate, since the
 loader is exactly the thing that consumes authored intent.
 """
@@ -28,7 +28,7 @@ from .model import (
 
 def load_schema(path: str | Path) -> Schema:
     path = Path(path)
-    spec = importlib.util.spec_from_file_location("_prism_ir_module", path)
+    spec = importlib.util.spec_from_file_location("_taut_ir_module", path)
     if spec is None or spec.loader is None:
         raise ImportError(f"cannot load IR module: {path}")
     module = importlib.util.module_from_spec(spec)

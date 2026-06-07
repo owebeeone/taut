@@ -1,6 +1,6 @@
-# Prism
+# taut
 
-Cross-language data + service protocol mechanism under the Glade declarative surface. See [dev-docs/PrismPlan.md](dev-docs/PrismPlan.md).
+Cross-language data + service protocol mechanism under the Glade declarative surface. See [dev-docs/TautPlan.md](dev-docs/TautPlan.md).
 
 - `src/` — the builder (Python): IR model, validator, generators, corpus.
 - `ir/` — authored IR modules (the only governed artifact).

@@ -4,10 +4,10 @@ without review."""
 
 import pytest
 
-from prism.corpus.build import IR_PATH
-from prism.ir.dsl import BOOL, INT, STR, Enum, F, Msg, Ref, method, schema, service
-from prism.ir.load import load_schema
-from prism.ir.validate import validate, validate_or_raise
+from taut.corpus.build import IR_PATH
+from taut.ir.dsl import BOOL, INT, STR, Enum, F, Msg, Ref, method, schema, service
+from taut.ir.load import load_schema
+from taut.ir.validate import validate, validate_or_raise
 
 
 def test_griplab_ir_is_valid():

@@ -1,4 +1,4 @@
-"""GripLab surface — the authored Prism IR (the only governed artifact).
+"""GripLab surface — the authored taut IR (the only governed artifact).
 
 Extracted backward from the working Phase-0 slice (../trial/py) and the GripLab
 surface catalog (../dev-docs/GripLabSurfaceCatalog.md). Declarative only: enums +
@@ -12,10 +12,10 @@ native-only (M3 richness) and never cross the wire.
 import sys
 from pathlib import Path
 
-# Make the prism builder importable when this file is loaded by path.
+# Make the taut builder importable when this file is loaded by path.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from prism.ir.dsl import BOOL, BYTES, F, INT, STR, Enum, List, Msg, Ref, method, schema, service
+from taut.ir.dsl import BOOL, BYTES, F, INT, STR, Enum, List, Msg, Ref, method, schema, service
 
 SCHEMA = schema(
     # --- enums (integer wire values) ---
