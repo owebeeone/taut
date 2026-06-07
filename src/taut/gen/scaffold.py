@@ -15,6 +15,7 @@ from importlib import resources
 from pathlib import Path
 
 from . import cpp as _cpp
+from . import go as _go
 from . import rust as _rust
 from . import swift as _swift
 from ..ir.model import EnumRef, ListOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef
@@ -27,6 +28,7 @@ _RUNTIMES: dict[str, tuple[str, str]] = {
     "rust": ("cbor.rs", "cbor.rs"),          # generated api.rs: `use crate::cbor::Cbor`
     "cpp": ("taut/cbor.hpp", "cbor.hpp"),    # generated api.hpp: `#include "taut/cbor.hpp"`
     "swift": ("cbor.swift", "cbor.swift"),   # same-module Cbor / encode / decode
+    "go": ("cbor.go", "cbor.go"),            # same-package Cbor / Encode / Decode
 }
 
 
@@ -349,6 +351,48 @@ def swift_server(schema: Schema, svc: ServiceDef) -> str:
 
 
 # =============================================================================
+# Go
+# =============================================================================
+
+def _go_ty(t: TypeRef | None) -> str:
+    if t is None:
+        return ""
+    if isinstance(t, Scalar):
+        return {"int": "int64", "str": "string", "bytes": "[]byte", "bool": "bool"}[t.kind]
+    if isinstance(t, (EnumRef, MsgRef)):
+        return t.name
+    if isinstance(t, ListOf):
+        return f"[]{_go_ty(t.elem)}"
+    raise TypeError(t)
+
+
+def go_api(schema: Schema, forward_compat: bool = False) -> str:
+    return _go.emit_types(schema, forward_compat)
+
+
+def go_client(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED typed client stub over a generic transport.", "package taut", ""]
+    for meth in svc.methods:
+        args = ", ".join(f"{pn} {_go_ty(pt)}" for pn, pt in meth.params)
+        kind = "call" if not meth.streams() else f'subscribe ("{meth.shape}")'
+        out.append(f"// {_go._pascal(meth.name)}({args}) {_go_ty(meth.output)}  [{kind}]")
+    return "\n".join(out) + "\n"
+
+
+def go_server(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED server handler interface stub.", "package taut", "",
+           f"type {svc.name}Handlers interface {{"]
+    for meth in svc.methods:
+        args = ", ".join(f"{pn} {_go_ty(pt)}" for pn, pt in meth.params)
+        if not meth.streams():
+            out.append(f"\t{_go._pascal(meth.name)}({args}) {_go_ty(meth.output)}")
+        else:
+            out.append(f"\t// {_go._pascal(meth.name)}: subscription ({meth.shape})")
+    out.append("}")
+    return "\n".join(out) + "\n"
+
+
+# =============================================================================
 # driver
 # =============================================================================
 
@@ -358,6 +402,7 @@ _LANGS = {
     "rust":       ("rs",    rust_api,   rust_client,   rust_server),
     "cpp":        ("hpp",   cpp_api,    cpp_client,    cpp_server),
     "swift":      ("swift", swift_api,  swift_client,  swift_server),
+    "go":         ("go",    go_api,     go_client,     go_server),
 }
 
 
@@ -391,10 +436,10 @@ def emit(
     unknown = [l for l in lang_keys if l not in _LANGS]
     if unknown:
         raise ValueError(f"unknown lang(s) {unknown}; known: {sorted(_LANGS)}")
-    if schema.extensions and not forward_compat and ({"rust", "cpp", "swift"} & set(lang_keys)):
+    if schema.extensions and not forward_compat and ({"rust", "cpp", "swift", "go"} & set(lang_keys)):
         raise ValueError(
-            "this IR declares extensions; generating Rust/C++/Swift requires forward_compat "
-            "(extensions ride the unknown-field/residual space) — pass --forward-compat"
+            "this IR declares extensions; generating a compiled target (rust/cpp/swift/go) "
+            "requires forward_compat (extensions ride the residual space) — pass --forward-compat"
         )
     svc_names = list(services) if services is not None else list(schema.services)
     missing = [s for s in svc_names if s not in schema.services]

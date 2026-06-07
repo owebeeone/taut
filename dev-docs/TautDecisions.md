@@ -175,7 +175,11 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
     enums + codec + public init; forward-compat residual [encode sorts, no merge];
     Swift-keyword backtick-escaping [e.g. razel's `protocol` field]. swiftc-verified:
     griplab + razel typecheck, cross-version forward-compat round-trip byte-exact.
-    Go deferred — toolchain not installed here. Java last.)*
+    **Go BUILT**: `gen/go.py` + vendored `cbor.go`; PascalCase exported fields
+    (sidesteps Go keywords), typed-const enums, pointer optionals, forward-compat
+    residual [Encode sorts]. go-verified: griplab + razel + the docs Tasks example
+    build, cross-version round-trip byte-exact. **JS** next (TS runtime is
+    JS-compatible), **Java last**.)*
   *(DECIDED — sequencing locked with the user; JSON profile already BUILT)*
 
 ## Already-built foundation (for reference)

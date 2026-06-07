@@ -1,7 +1,7 @@
 # taut
 
 **One tiny declarative contract → native types, a deterministic wire codec, and
-service stubs across Python, TypeScript, Rust, C++, and Swift — verified byte-for-byte
+service stubs across Python, TypeScript, Rust, C++, Swift, and Go — verified byte-for-byte
 by a shared golden corpus.**
 
 taut is a cross-language data + service protocol mechanism: protobuf's essential
@@ -12,7 +12,7 @@ schema is authored as a small, restricted Python DSL — or any `.ir.json` — a
 everything else is *projected* from it.
 
 > Status: **alpha**. The model, codec, generators, corpus, and evolution gate are
-> built and tested end-to-end across four languages (57 tests green); APIs may
+> built and tested end-to-end across six languages (85 tests green); APIs may
 > still move.
 
 ```
@@ -40,7 +40,7 @@ the rest:
 | **Schema source** | `.proto` DSL + `protoc` + a plugin per language | a few lines of typed Python, or `.ir.json` |
 | **Toolchain** | `protoc` compiler + language plugins | one `pip install`; `tautc` for compiled targets |
 | **Wire format** | varint tag-length-value; **not guaranteed canonical** across implementations (maps are explicitly unordered) | frozen **deterministic** CBOR (RFC 8949 §4.2) — byte-identical everywhere, corpus-pinned |
-| **Codegen required?** | yes for most languages (or descriptor-based reflection) | **no** for Python/TS (IR-driven runtime codec); generated for Rust/C++ |
+| **Codegen required?** | yes for most languages (or descriptor-based reflection) | **no** for Python/TS (IR-driven runtime codec); generated for the compiled targets (Rust/C++/Swift/Go) |
 | **Runtime dependency** | a protobuf runtime per language | **none** (stdlib; hand-rolled codec per target) |
 | **Field presence** | scalars had none; `optional` presence re-added in **3.15** | `optional` → null; presence is clean (fields always emitted) |
 | **`required`** | removed in proto3 | kept as a *governance assertion*, enforced by the evolution gate (never a decode error) |
@@ -113,7 +113,7 @@ A hand-rolled, frozen **deterministic CBOR** subset: definite-length, shortest-
 form integers, ascending integer map keys. The same value encodes to the same
 bytes in every language — pinned by a **golden conformance corpus** (value →
 exact hex). Python and TypeScript run a fully **IR-driven codec** (instantiate a
-client or server from JSON alone, zero codegen); Rust, C++, and Swift get **generated
+client or server from JSON alone, zero codegen); Rust, C++, Swift, and Go get **generated
 native types with encoders/decoders** (compiled targets need types ahead of
 time). The C++ corpus is a wall of `static_assert`s — *compiling is the test*.
 
