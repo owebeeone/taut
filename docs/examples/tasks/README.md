@@ -35,5 +35,8 @@ breaking changes vs export: 0
 - **Evolution features** — `Task` declares `reserved=[6, "priority"]` (a retired
   tag + name that can never be reused) and `next_id=7` (the next tag to allocate,
   validated to be above every used/reserved tag).
+- **Forward-compat + side-channel** — `run.py` straps a `Trace` extension (from a
+  *separate infra schema*) onto a `Task`'s bytes; the app decodes its Task
+  obliviously and the side-channel survives in the unknown bag.
 
 To turn this into a running server, see [../../Server.md](../../Server.md).

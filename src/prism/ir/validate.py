@@ -11,7 +11,7 @@ combinations and anything outside the closed set, before any mechanism is derive
 from __future__ import annotations
 
 from .model import EnumRef, ListOf, MsgRef, Scalar, Schema, TypeRef
-from .shapes import KINDS, ROLES, SHAPES
+from .shapes import BAND_START, KINDS, ROLES, SHAPES
 
 
 def validate(schema: Schema) -> list[str]:
@@ -40,6 +40,8 @@ def validate(schema: Schema) -> list[str]:
         for f in m.fields:
             if f.tag <= 0:
                 errors.append(f"{m.name}.{f.name}: tag must be positive")
+            if f.tag >= BAND_START:
+                errors.append(f"{m.name}.{f.name}: tag {f.tag} is in the extension band (>= {BAND_START})")
             if f.tag in tags:
                 errors.append(f"{m.name}.{f.name}: duplicate tag {f.tag}")
             tags.add(f.tag)
@@ -66,6 +68,17 @@ def validate(schema: Schema) -> list[str]:
     for e in schema.enums.values():
         if len(set(e.members.values())) != len(e.members):
             errors.append(f"enum {e.name}: duplicate wire values")
+
+    # --- extensions (side-channels in the band) ---
+    ext_tags: set[int] = set()
+    for ext in schema.extensions:
+        if ext.message not in schema.messages:
+            errors.append(f"extension: dangling message ref {ext.message!r}")
+        if ext.tag < BAND_START:
+            errors.append(f"extension {ext.message}: tag {ext.tag} below the band (< {BAND_START})")
+        if ext.tag in ext_tags:
+            errors.append(f"extension: duplicate tag {ext.tag}")
+        ext_tags.add(ext.tag)
 
     # --- services ---
     for svc in schema.services.values():

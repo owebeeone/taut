@@ -10,6 +10,7 @@ from __future__ import annotations
 from .model import (
     EnumDef,
     EnumRef,
+    ExtensionDef,
     FieldDef,
     ListOf,
     MessageDef,
@@ -80,6 +81,11 @@ def service(name: str, *methods: MethodDef) -> ServiceDef:
     return ServiceDef(name=name, methods=tuple(methods))
 
 
+def extension(message: str, *, tag: int) -> ExtensionDef:
+    """Declare a side-channel: `message` rides any host message at band `tag`."""
+    return ExtensionDef(message=message, tag=tag)
+
+
 def _resolve(tref: TypeRef, enum_names: set[str]) -> TypeRef:
     """Author writes Ref(name) for both enums and messages; resolve enum refs."""
     if isinstance(tref, MsgRef):
@@ -117,4 +123,5 @@ def schema(*decls) -> Schema:
         if isinstance(d, ServiceDef):
             methods = tuple(_resolve_method(m, enum_names) for m in d.methods)
             services[d.name] = ServiceDef(d.name, methods)
-    return Schema(enums=enums, messages=messages, services=services)
+    extensions = tuple(d for d in decls if isinstance(d, ExtensionDef))
+    return Schema(enums=enums, messages=messages, services=services, extensions=extensions)

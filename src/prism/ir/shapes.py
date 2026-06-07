@@ -42,3 +42,8 @@ SHAPES: dict[str, dict] = {
 
 ROLES: set[str] = {"out", "in", "ctl", "td", "hdl", "query", "dx"}
 KINDS: set[str] = {"unary", "server_stream"}
+
+# Tag-space partition: app fields use tags below the band; infrastructure
+# extensions (side-channels) use tags at/above it. Keeps app evolution and infra
+# piggybacking from ever colliding.
+BAND_START: int = 1 << 20  # 1048576

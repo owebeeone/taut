@@ -51,6 +51,9 @@ def _to_wire(schema: Schema, tref: TypeRef, value: Any) -> Any:
         for f in msg.wire_fields():
             fv = value.get(f.name)
             out[f.tag] = None if fv is None else _to_wire(schema, f.type, fv)
+        # forward-compat: re-emit fields this schema doesn't know (preserved raw)
+        for tag, raw in value.get("__unknown__", {}).items():
+            out[int(tag)] = raw
         return out
     raise TypeError(f"unknown type ref {tref!r}")
 
@@ -67,8 +70,14 @@ def _from_wire(schema: Schema, tref: TypeRef, cv: Any) -> Any:
     if isinstance(tref, MsgRef):
         msg = schema.messages[tref.name]
         out: dict[str, Any] = {}
+        known: set[int] = set()
         for f in msg.wire_fields():
+            known.add(f.tag)
             raw = cv.get(f.tag)
             out[f.name] = None if raw is None else _from_wire(schema, f.type, raw)
+        # forward-compat: capture tags this schema doesn't know (raw, preserved)
+        unknown = {tag: val for tag, val in cv.items() if tag not in known}
+        if unknown:
+            out["__unknown__"] = unknown
         return out
     raise TypeError(f"unknown type ref {tref!r}")

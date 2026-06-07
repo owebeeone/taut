@@ -95,7 +95,19 @@ class ServiceDef:
 
 
 @dataclass(frozen=True)
+class ExtensionDef:
+    """A side-channel: a message attachable to any host message at a band tag.
+
+    Infra reads/writes it on the wire; the app's schema doesn't include it, so the
+    app ignores it (and preserves it via unknown-field forwarding)."""
+
+    message: str
+    tag: int
+
+
+@dataclass(frozen=True)
 class Schema:
     enums: dict[str, EnumDef]
     messages: dict[str, MessageDef]
     services: dict[str, ServiceDef] = field(default_factory=dict)
+    extensions: tuple[ExtensionDef, ...] = ()

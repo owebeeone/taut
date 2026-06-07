@@ -13,6 +13,7 @@ from pathlib import Path
 from .model import (
     EnumDef,
     EnumRef,
+    ExtensionDef,
     FieldDef,
     ListOf,
     MessageDef,
@@ -81,4 +82,5 @@ def schema_from_json(data: dict) -> Schema:
             for m in s["methods"]
         )
         services[s["name"]] = ServiceDef(s["name"], methods)
-    return Schema(enums=enums, messages=messages, services=services)
+    extensions = tuple(ExtensionDef(e["message"], e["tag"]) for e in data.get("extensions", []))
+    return Schema(enums=enums, messages=messages, services=services, extensions=extensions)

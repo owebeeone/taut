@@ -70,6 +70,7 @@ def schema_json(schema: Schema) -> dict:
             {"name": s.name, "methods": [_method_json(m) for m in s.methods]}
             for s in schema.services.values()
         ],
+        "extensions": [{"message": e.message, "tag": e.tag} for e in schema.extensions],
     }
 
 

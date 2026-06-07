@@ -172,6 +172,34 @@ encoding — definite lengths, shortest-form ints, ascending map keys. Messages 
 maps keyed by field tag; enums are their integer value; transient fields are
 absent. The same bytes are produced by every language (the corpus proves it).
 
+### Forward compatibility (unknown-field preservation, default-on)
+
+A decoder captures tags it doesn't recognize as raw CBOR (under `__unknown__`) and
+re-emits them on encode (canonical order). So a node that **decodes → modifies →
+re-encodes** a *newer* message doesn't drop the fields it doesn't understand —
+critical for proxies and store-and-forward. Nested unknowns are preserved too. A
+message with no unknown tags encodes/decodes identically (corpus-safe).
+
+### Extensions (side-channels)
+
+Infrastructure can piggyback metadata (load-balancing, tracing, routing) on any
+message without the app's schema knowing. The tag space is partitioned: app field
+tags are `< BAND_START` (2^20); extensions sit at/above it.
+
+```python
+extension("Decision", tag=0x100001)   # bind a message to a band tag
+```
+Generic accessors (`prism.ext`) operate on a host message's *wire bytes* knowing
+only the extension's schema, never the host's:
+```python
+raw = ext_set(schema, raw, "Decision", tag, {"backend": "b7", "hops": 1})
+d   = ext_get(schema, raw, "Decision", tag)    # -> dict | None
+raw = ext_clear(raw, tag)
+```
+The host decodes/handles/re-encodes obliviously; the extension rides in
+`__unknown__` and survives. Almost free given forward-compat. Full design:
+[../dev-docs/PrismModules.md](../dev-docs/PrismModules.md).
+
 ## 9. Validation rules
 
 `validate(schema) -> list[str]` (errors; empty == valid); `validate_or_raise`
@@ -181,6 +209,8 @@ raises on any error. It enforces:
 - field tags positive and unique within a message;
 - enum wire values unique;
 - `merge` ∈ {lww, counter}, on scalar fields only, counter ⇒ int;
+- app field tags stay below the extension band (`2^20`); extension tags sit at/
+  above it and are unique; an extension's message exists;
 - unary methods have an `output` and no `shape`/`events`;
 - server_stream methods have a known `shape`, non-empty `events` ⊆ the shape's
   allowed events, and no `output`;

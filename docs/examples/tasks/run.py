@@ -10,9 +10,12 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[2] / "src"))   # docs/examples/tasks -> prism/src
 
+from prism import ext
 from prism.ir import compat
+from prism.ir.dsl import INT, STR, F, Msg, extension, schema as mk_schema
 from prism.ir.export import export_to
 from prism.ir.load import load_schema, schema_from_json
+from prism.ir.shapes import BAND_START
 from prism.ir.validate import validate_or_raise
 from prism.wire import codec
 
@@ -47,6 +50,23 @@ def main() -> None:
     # the breaking-change gate against the export we just wrote: nothing changed
     baseline = schema_from_json(json.loads((HERE / "tasks.ir.json").read_text()))
     print(f"breaking changes vs export: {len(compat.breaking(baseline, schema))}")
+
+    # --- forward-compat + a side-channel extension --------------------------
+    # An *infra* schema (separate from the app) declares a Trace side-channel.
+    infra = mk_schema(
+        Msg("Trace", F("trace_id", 1, STR), F("hop", 2, INT)),
+        extension("Trace", tag=BAND_START + 7),
+    )
+    trace_tag = BAND_START + 7
+
+    blob = codec.encode(schema, "Task", task)
+    tagged = ext.ext_set(infra, blob, "Trace", trace_tag, {"trace_id": "abc123", "hop": 1})
+    print(f"infra reads its side-channel: {ext.ext_get(infra, tagged, 'Trace', trace_tag)}")
+
+    # the app decodes its Task, oblivious to the Trace, and preserves it
+    back = codec.decode(schema, "Task", tagged)
+    print(f"app sees its own fields (title={back['title']!r}); "
+          f"side-channel preserved: {trace_tag in back.get('__unknown__', {})}")
 
 
 if __name__ == "__main__":
