@@ -136,6 +136,30 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
   gate runs per module. "multi-inheritance" = import DAG (fan-in), not OO
   inheritance. *(SPEC — [TautModules.md](TautModules.md); the next big build)*
 
+## Roadmap
+
+- **D23. v0.2.0 = platform hardening + JSON profile (together), then languages
+  (0.3+).** Driven by razel's real integration, which had to *hand-port* `cbor.rs`
+  from `wire/cbor.py` and *hand-roll* a corpus/parity kit (`wire/corpus.py` +
+  `vectors.rs` + a `corpus_byte_parity` test it labels "Gap 1"), and whose
+  generated Rust drops unknown fields. So before fanning out to 5 languages, make
+  codegen self-contained and verifiable:
+  - **Emit the per-language CBOR runtime** alongside the types (kills the hand-port).
+  - **Conformance kit** — `tautc corpus` emits golden vectors + a per-language
+    parity test, so no consumer rewrites `vectors.rs`.
+  - **Forward-compat residual in the generators** (D10–D12: `wire_residual` +
+    flag/gate + `wire_` reservation) so compiled targets stop dropping unknowns.
+  - **JSON profile** — *(BUILT in 0.2.0 dev)* IR-driven CBOR↔JSON (`taut.wire.
+    jsoncodec`: proto3-style int64→string, bytes→base64, enum→name, canonical
+    sorted-key JSON; CBOR→JSON→CBOR byte-identical for residual-free values). The
+    onboarding enabler ("JSON is ubiquitous") + debug/gateway format. (D8's
+    deferred JSON profile, now started.)
+  - **Then 0.3+: language generators** — **Go**, **JS/TS**, **Java** and **Kotlin
+    as *distinct* generators** (Kotlin uses data classes / null-safety / sealed
+    types Java can't express), **Swift**. Each becomes "codec emitter + shipped
+    runtime + shipped corpus kit"; JSON-capable langs get a lighter path.
+  *(DECIDED — sequencing locked with the user; JSON profile already BUILT)*
+
 ## Already-built foundation (for reference)
 
 Delivery shapes (atom/log/stream/swmr/snapshot_delta/crdt) + validator;
@@ -148,11 +172,8 @@ types, Python/TS/scaffold). All **BUILT** and green.
 
 ## Open questions (decision needed)
 
-1. **Direction** — more taut (modules, Go target, JSON profile) vs pivot to
-   **Glade/Glial** (where the risk lives). *Lean: small closeouts, then pivot.*
-2. **Casing policy** (D7) — verbatim vs idiomatic per language.
-3. **Build order** — finish forward-compat in the generators (`wire_residual` +
-   `collect` + the flag/build-error gate + `wire_` reservation) and the minimal
-   RPC surface, *then* the module system. *Lean: yes, that order.*
+1. **Casing policy** (D7) — verbatim vs idiomatic per language. Becomes concrete
+   with the 0.3+ language generators (Go/JVM/Swift want idiomatic casing).
 
-*(Rename — D2 — resolved: in-code rename to `taut` done, all suites green.)*
+*(Resolved: **D2** rename done · **build order** locked as **D23** (platform +
+JSON profile, then languages) · **JSON profile** built.)*
