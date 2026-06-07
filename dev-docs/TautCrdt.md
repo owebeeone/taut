@@ -47,10 +47,10 @@ the corpus (Python/TS/Rust + C++ `static_assert`):
 
 local-apply / merge-remote / sync, plus a snapshot:
 ```
-board.snapshot    unary        -> CrdtState
-board.local_apply unary  (actor, field, value) -> CrdtOp     # apply local change, get op to broadcast
-board.merge       unary  (op: CrdtOp)           -> bool       # incorporate a remote op
-board.sync        server_stream  shape=crdt, events {op}      # the op feed
+board.snapshot    shape=unary  -> CrdtState
+board.local_apply shape=unary  (actor, field, value) -> CrdtOp   # apply local change, get op to broadcast
+board.merge       shape=unary  (op: CrdtOp)           -> bool     # incorporate a remote op
+board.sync        shape=crdt   out {op}                          # the op feed
 ```
 Declared and validated; the live GripLab slice does not serve it (CRDT is
 contract-only for that app — surface present, engine slot empty, as the build

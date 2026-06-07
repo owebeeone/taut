@@ -43,24 +43,25 @@ SCHEMA = schema(
         F("ts", 1, INT),
         F("text", 2, STR)),
 
-    # the web API: a service of methods
+    # the web API: a service of methods. Each method is (name, in, out, shape);
+    # `shape` is the sole discriminator and defaults to `unary` (delivered once).
     service("Tasks",
-        # unary: request -> response. params can themselves be messages.
-        method("create", kind="unary", role="in",
-               params=[("title", STR)], output=Ref("Task")),
-        method("comment", kind="unary", role="in",
+        # unary (default shape): request -> response. params can be messages.
+        method("create", role="in",
+               params=[("title", STR)], out=Ref("Task")),
+        method("comment", role="in",
                params=[("task_id", INT), ("author", Ref("User")), ("text", STR)],
-               output=Ref("Comment")),
-        method("set_state", kind="unary", role="ctl",
-               params=[("id", INT), ("state", Ref("TaskState"))], output=BOOL),
+               out=Ref("Comment")),
+        method("set_state", role="ctl",
+               params=[("id", INT), ("state", Ref("TaskState"))], out=BOOL),
 
         # Atom: the whole task list, latest-wins, pushed on every change
-        method("tasks.subscribe", kind="server_stream", role="out", shape="atom",
-               events={"replace": List(Ref("Task"))}),
+        method("tasks.subscribe", role="out", shape="atom",
+               out=List(Ref("Task"))),
 
         # Log: an append-only activity feed (replay then tail)
-        method("activity.subscribe", kind="server_stream", role="out", shape="log",
-               events={"append": Ref("Event")}),
+        method("activity.subscribe", role="out", shape="log",
+               out=Ref("Event")),
     ),
 )
 ```
@@ -68,7 +69,8 @@ SCHEMA = schema(
 That file *is* the governed artifact — four messages (composed: `Task` embeds an
 optional `User` and a list of `Comment`, each `Comment` embeds a `User`), one
 enum, and a service of three unary calls and two streaming endpoints, read whole
-in a screen.
+in a screen. (`out=` is a bare type for single-slot shapes — bound to the shape's
+slot; multi-slot shapes like `swmr` take `out={"snapshot": …, "delta": …}`.)
 
 ## 2. Load, validate, export
 
@@ -83,9 +85,9 @@ validate_or_raise(schema)                  # reject incoherent IR (see below)
 export_to(schema, "tasks.ir.json")         # the neutral artifact every language reads
 ```
 
-The validator enforces coherence: refs resolve, tags are unique, and a
-streaming method's `events` must be allowed for its shape (an `atom` emitting a
-`delta` is rejected — try it and see the error).
+The validator enforces coherence: refs resolve, tags are unique, and a method's
+`out` slots must be allowed for its shape (an `atom` binding a `delta` slot is
+rejected — try it and see the error).
 
 ## 3. Encode / decode a value
 
@@ -125,8 +127,9 @@ The contract is enough to generate/derive the rest:
 - **Clients are generic** — one ~100-line client per language exposes
   `call(method, args)` and `subscribe(method, args)`; there is **no per-method
   code**. Adding a method to the IR needs no client change.
-- **Servers** dispatch by reading the IR: a method's `kind` decides
-  request-vs-stream, and the handler is a plain function over native types.
+- **Servers** dispatch by reading the IR: a method's `shape` decides
+  request-vs-stream (`unary` = once), and the handler is a plain function over
+  native types.
 
 **[Server.md](Server.md)** walks through building a server for this exact Tasks
 API: write handlers (plain functions), back the streaming endpoints with shape

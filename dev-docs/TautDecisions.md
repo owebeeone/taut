@@ -87,6 +87,20 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
 
 ## RPC surface
 
+- **D22. Method = `(name, in, out, shape)`; `shape` is the sole discriminator.**
+  Dropped `kind` — it was redundant with `shape` and only kept consistent by a
+  prose rule, so the `kind=unary`+`shape=set` illegal state was representable.
+  Now `unary` is a registered shape (the degenerate "delivered once" member) and
+  `out` is a uniform slot→type binding over the shape's slots (`output`+`events`
+  merged: unary binds `value`, swmr binds `{snapshot, delta}`, …). `kind`/
+  `output`/`events` survive only as **derived views** (computed from `shape`+`out`),
+  so they can never disagree — illegal states are unrepresentable, not policed.
+  Consequence: since shape *is* method-kind, the shape set must stay an **open
+  registry** (`register_shape`), never a sealed enum, or taut reinherits
+  protobuf's closed-taxonomy problem; the honest caveat is that a shape carries
+  behaviour + per-target impl, so it's open to *implemented* shapes only. Applied
+  across model/dsl/validate/export/load + the IR + the generic TS client + docs;
+  all suites green. *(BUILT)*
 - **D17. What we unify = the contract (IR) + the wire protocol** (envelope +
   codec + delivery-shape dispatch). **Not** a per-service class. *(DECIDED)*
 - **D18. Floor (always, every language):** a generic IR-driven **client**

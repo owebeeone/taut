@@ -1,6 +1,16 @@
 {
   "version": 1,
   "shapes": {
+    "unary": {
+      "payload": "whole",
+      "history": "none",
+      "initiation": "pull",
+      "writers": "single",
+      "events": [
+        "value"
+      ],
+      "delivery": "once"
+    },
     "atom": {
       "payload": "whole-state",
       "history": "latest",
@@ -8,7 +18,8 @@
       "writers": "single",
       "events": [
         "replace"
-      ]
+      ],
+      "delivery": "stream"
     },
     "log": {
       "payload": "whole",
@@ -17,7 +28,8 @@
       "writers": "source",
       "events": [
         "append"
-      ]
+      ],
+      "delivery": "stream"
     },
     "stream": {
       "payload": "whole-or-delta",
@@ -26,7 +38,8 @@
       "writers": "source",
       "events": [
         "event"
-      ]
+      ],
+      "delivery": "stream"
     },
     "swmr": {
       "payload": "delta",
@@ -37,7 +50,8 @@
         "delta",
         "reset",
         "snapshot"
-      ]
+      ],
+      "delivery": "stream"
     },
     "snapshot_delta": {
       "payload": "delta",
@@ -47,7 +61,8 @@
       "events": [
         "delta",
         "snapshot"
-      ]
+      ],
+      "delivery": "stream"
     },
     "crdt": {
       "payload": "ops",
@@ -57,7 +72,8 @@
       "events": [
         "op",
         "sync"
-      ]
+      ],
+      "delivery": "stream"
     }
   },
   "enums": [
@@ -776,14 +792,12 @@
       "methods": [
         {
           "name": "presence.subscribe",
-          "kind": "server_stream",
           "role": "out",
-          "params": [],
-          "output": null,
           "shape": "atom",
-          "events": [
+          "params": [],
+          "out": [
             {
-              "event": "replace",
+              "slot": "replace",
               "type": {
                 "k": "list",
                 "elem": {
@@ -796,29 +810,30 @@
         },
         {
           "name": "presence.get",
-          "kind": "unary",
           "role": "out",
+          "shape": "unary",
           "params": [],
-          "output": {
-            "k": "list",
-            "elem": {
-              "k": "msg",
-              "name": "PeerPresence"
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "list",
+                "elem": {
+                  "k": "msg",
+                  "name": "PeerPresence"
+                }
+              }
             }
-          },
-          "shape": null,
-          "events": []
+          ]
         },
         {
           "name": "chat.subscribe",
-          "kind": "server_stream",
           "role": "out",
-          "params": [],
-          "output": null,
           "shape": "log",
-          "events": [
+          "params": [],
+          "out": [
             {
-              "event": "append",
+              "slot": "append",
               "type": {
                 "k": "msg",
                 "name": "ChatMessage"
@@ -828,8 +843,8 @@
         },
         {
           "name": "chat.post",
-          "kind": "unary",
           "role": "in",
+          "shape": "unary",
           "params": [
             {
               "name": "sender_id",
@@ -846,30 +861,31 @@
               }
             }
           ],
-          "output": {
-            "k": "msg",
-            "name": "ChatMessage"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "msg",
+                "name": "ChatMessage"
+              }
+            }
+          ]
         },
         {
           "name": "file.subscribe",
-          "kind": "server_stream",
           "role": "out",
-          "params": [],
-          "output": null,
           "shape": "swmr",
-          "events": [
+          "params": [],
+          "out": [
             {
-              "event": "snapshot",
+              "slot": "snapshot",
               "type": {
                 "k": "msg",
                 "name": "FileSnapshot"
               }
             },
             {
-              "event": "delta",
+              "slot": "delta",
               "type": {
                 "k": "msg",
                 "name": "FileDelta"
@@ -879,8 +895,8 @@
         },
         {
           "name": "file.window.update",
-          "kind": "unary",
           "role": "ctl",
+          "shape": "unary",
           "params": [
             {
               "name": "start",
@@ -897,17 +913,20 @@
               }
             }
           ],
-          "output": {
-            "k": "scalar",
-            "scalar": "bool"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "scalar",
+                "scalar": "bool"
+              }
+            }
+          ]
         },
         {
           "name": "term.open",
-          "kind": "unary",
           "role": "hdl",
+          "shape": "unary",
           "params": [
             {
               "name": "repo",
@@ -931,17 +950,20 @@
               }
             }
           ],
-          "output": {
-            "k": "msg",
-            "name": "TerminalOpened"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "msg",
+                "name": "TerminalOpened"
+              }
+            }
+          ]
         },
         {
           "name": "session.output.subscribe",
-          "kind": "server_stream",
           "role": "out",
+          "shape": "stream",
           "params": [
             {
               "name": "session_id",
@@ -951,11 +973,9 @@
               }
             }
           ],
-          "output": null,
-          "shape": "stream",
-          "events": [
+          "out": [
             {
-              "event": "event",
+              "slot": "event",
               "type": {
                 "k": "msg",
                 "name": "TerminalChunk"
@@ -965,8 +985,8 @@
         },
         {
           "name": "term.input",
-          "kind": "unary",
           "role": "ctl",
+          "shape": "unary",
           "params": [
             {
               "name": "session_id",
@@ -983,17 +1003,20 @@
               }
             }
           ],
-          "output": {
-            "k": "scalar",
-            "scalar": "bool"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "scalar",
+                "scalar": "bool"
+              }
+            }
+          ]
         },
         {
           "name": "term.resize",
-          "kind": "unary",
           "role": "ctl",
+          "shape": "unary",
           "params": [
             {
               "name": "session_id",
@@ -1017,17 +1040,20 @@
               }
             }
           ],
-          "output": {
-            "k": "scalar",
-            "scalar": "bool"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "scalar",
+                "scalar": "bool"
+              }
+            }
+          ]
         },
         {
           "name": "term.close",
-          "kind": "unary",
           "role": "td",
+          "shape": "unary",
           "params": [
             {
               "name": "session_id",
@@ -1037,17 +1063,20 @@
               }
             }
           ],
-          "output": {
-            "k": "scalar",
-            "scalar": "bool"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "scalar",
+                "scalar": "bool"
+              }
+            }
+          ]
         },
         {
           "name": "cmd.run",
-          "kind": "unary",
           "role": "in",
+          "shape": "unary",
           "params": [
             {
               "name": "argv",
@@ -1070,17 +1099,20 @@
               }
             }
           ],
-          "output": {
-            "k": "msg",
-            "name": "CmdSession"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "msg",
+                "name": "CmdSession"
+              }
+            }
+          ]
         },
         {
           "name": "sessions.query",
-          "kind": "unary",
           "role": "out",
+          "shape": "unary",
           "params": [
             {
               "name": "peer_id",
@@ -1090,15 +1122,18 @@
               }
             }
           ],
-          "output": {
-            "k": "list",
-            "elem": {
-              "k": "msg",
-              "name": "CmdSession"
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "list",
+                "elem": {
+                  "k": "msg",
+                  "name": "CmdSession"
+                }
+              }
             }
-          },
-          "shape": null,
-          "events": []
+          ]
         }
       ]
     },
@@ -1107,20 +1142,23 @@
       "methods": [
         {
           "name": "board.snapshot",
-          "kind": "unary",
           "role": "out",
+          "shape": "unary",
           "params": [],
-          "output": {
-            "k": "msg",
-            "name": "CrdtState"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "msg",
+                "name": "CrdtState"
+              }
+            }
+          ]
         },
         {
           "name": "board.local_apply",
-          "kind": "unary",
           "role": "in",
+          "shape": "unary",
           "params": [
             {
               "name": "actor",
@@ -1144,17 +1182,20 @@
               }
             }
           ],
-          "output": {
-            "k": "msg",
-            "name": "CrdtOp"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "msg",
+                "name": "CrdtOp"
+              }
+            }
+          ]
         },
         {
           "name": "board.merge",
-          "kind": "unary",
           "role": "ctl",
+          "shape": "unary",
           "params": [
             {
               "name": "op",
@@ -1164,23 +1205,24 @@
               }
             }
           ],
-          "output": {
-            "k": "scalar",
-            "scalar": "bool"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "scalar",
+                "scalar": "bool"
+              }
+            }
+          ]
         },
         {
           "name": "board.sync",
-          "kind": "server_stream",
           "role": "out",
-          "params": [],
-          "output": null,
           "shape": "crdt",
-          "events": [
+          "params": [],
+          "out": [
             {
-              "event": "op",
+              "slot": "op",
               "type": {
                 "k": "msg",
                 "name": "CrdtOp"

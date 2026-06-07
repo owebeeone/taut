@@ -89,23 +89,24 @@ Msg("Task",
 
 ```python
 service("Tasks",
-    method("create", kind="unary", role="in",
-           params=[("title", STR)], output=Ref("Task")),
-    method("tasks.subscribe", kind="server_stream", role="out", shape="atom",
-           events={"replace": List(Ref("Task"))}),
+    method("create", role="in",
+           params=[("title", STR)], out=Ref("Task")),
+    method("tasks.subscribe", role="out", shape="atom",
+           out=List(Ref("Task"))),
 )
 ```
 
-`method(name, *, kind, role, params=(), output=None, shape=None, events=None)`:
+`method(name, *, role, shape="unary", params=(), out=None)` — the minimal contract
+`(name, in, out, shape)`. **`shape` is the sole discriminator** (`unary` is the
+degenerate "delivered once" member); `kind`/`output`/`events` are derived from
+`shape`+`out`, so they can never disagree:
 
 | arg | meaning |
 | --- | --- |
-| `kind` | `"unary"` (request→response) or `"server_stream"` (subscription) |
 | `role` | semantic verb role (see legend) |
-| `params` | ordered `[(name, TypeRef), …]` — the inputs; map 1:1 to a handler's args |
-| `output` | the response `TypeRef` — **unary only** |
-| `shape` | the delivery shape (§6) — **server_stream only** |
-| `events` | `{event_name: TypeRef}` for the stream — **server_stream only** |
+| `shape` | the delivery shape (§6); defaults to `unary` (request→response) |
+| `params` | `in` — ordered `[(name, TypeRef), …]`; map 1:1 to a handler's args |
+| `out` | a bare `TypeRef` (bound to the shape's sole slot) **or** `{slot: TypeRef}` for multi-slot shapes (`swmr`/`crdt`) |
 
 `service(name, *methods)` groups them. A schema may declare several services.
 
@@ -121,12 +122,14 @@ To **implement** a service (handlers + serving), see [Server.md](Server.md).
 
 ## 6. Delivery-shape catalog
 
-A streaming method's `shape` selects behavior + sync; its `events` must be a
-subset of the shape's allowed events (the derived streaming-kind). The closed set
-(`taut.ir.shapes.SHAPES`):
+A method's `shape` selects behavior + sync; its `out` slots must be a subset of
+the shape's slots (`events`). The shape set is an **open registry**
+(`taut.ir.shapes.SHAPES` + `register_shape`) — since shape is the discriminator,
+adding a shape *is* adding a method-kind, so it is deliberately not a sealed enum:
 
-| shape | payload · history · initiation · writers | allowed events | intended API |
+| shape | payload · history · initiation · writers | out slots | intended API |
 | --- | --- | --- | --- |
+| `unary` | whole · none · pull · single | `value` | request → response (the default) |
 | `atom` | whole-state · latest · pull\|push · single | `replace` | get / set / subscribe-replace |
 | `log` | whole · append-only · pull\|push · source | `append` | append / read-from-offset / tail |
 | `stream` | whole-or-delta · none · push · source | `event` | subscribe (live only) |
@@ -211,9 +214,8 @@ raises on any error. It enforces:
 - `merge` ∈ {lww, counter}, on scalar fields only, counter ⇒ int;
 - app field tags stay below the extension band (`2^20`); extension tags sit at/
   above it and are unique; an extension's message exists;
-- unary methods have an `output` and no `shape`/`events`;
-- server_stream methods have a known `shape`, non-empty `events` ⊆ the shape's
-  allowed events, and no `output`;
+- every method has a known `shape` and a non-empty `out` whose slots ⊆ the
+  shape's slots (no duplicate slots); `unary` is the default once-delivered shape;
 - known `role` and `kind`.
 
 ## 10. Toolchain / library API

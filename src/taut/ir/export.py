@@ -27,14 +27,13 @@ def _typeref_json(t: TypeRef) -> dict:
 
 
 def _method_json(m: MethodDef) -> dict:
+    # The minimal contract (D22): name, role, shape (sole discriminator), in, out.
     return {
         "name": m.name,
-        "kind": m.kind,
         "role": m.role,
-        "params": [{"name": pn, "type": _typeref_json(pt)} for pn, pt in m.params],
-        "output": _typeref_json(m.output) if m.output is not None else None,
         "shape": m.shape,
-        "events": [{"event": en, "type": _typeref_json(et)} for en, et in m.events],
+        "params": [{"name": pn, "type": _typeref_json(pt)} for pn, pt in m.params],
+        "out": [{"slot": slot, "type": _typeref_json(t)} for slot, t in m.out],
     }
 
 

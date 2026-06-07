@@ -29,16 +29,17 @@ def test_enum_duplicate_values():
     assert any("duplicate wire values" in e for e in errs)
 
 
-def test_unary_requires_output():
-    errs = validate(schema(service("S", method("m", kind="unary", role="out"))))
-    assert any("must declare output" in e for e in errs)
+def test_method_must_bind_out():
+    # A method (unary by default) with no `out` is rejected.
+    errs = validate(schema(service("S", method("m", role="out"))))
+    assert any("must bind out" in e for e in errs)
 
 
-def test_stream_event_must_match_shape():
+def test_out_slot_must_match_shape():
     s = schema(
         Msg("V", F("x", 1, STR)),
-        service("S", method("m", kind="server_stream", role="out", shape="atom",
-                            events={"delta": Ref("V")})),  # 'delta' is not an atom event
+        service("S", method("m", role="out", shape="atom",
+                            out={"delta": Ref("V")})),  # 'delta' is not an atom slot
     )
     assert any("not allowed for shape" in e for e in validate(s))
 
@@ -46,19 +47,23 @@ def test_stream_event_must_match_shape():
 def test_unknown_shape_rejected():
     s = schema(
         Msg("V", F("x", 1, STR)),
-        service("S", method("m", kind="server_stream", role="out", shape="bogus",
-                            events={"x": Ref("V")})),
+        service("S", method("m", role="out", shape="bogus", out={"x": Ref("V")})),
     )
     assert any("unknown delivery shape" in e for e in validate(s))
 
 
-def test_server_stream_must_not_have_output():
-    s = schema(
-        Msg("V", F("x", 1, STR)),
-        service("S", method("m", kind="server_stream", role="out", shape="atom",
-                            events={"replace": Ref("V")}, output=BOOL)),
-    )
-    assert any("must not declare output" in e for e in validate(s))
+def test_kind_is_derived_not_storable():
+    # D22: there is no `kind` to set, and unary-with-a-shape is unrepresentable.
+    # `out` as a bare type binds the shape's sole slot; kind/output/events derive.
+    m_unary = method("u", role="out", out=BOOL)
+    assert m_unary.shape == "unary" and not m_unary.streams()
+    assert m_unary.output == BOOL and m_unary.events == ()
+    m_stream = method("s", role="out", shape="atom", out=Ref("V"))
+    assert m_stream.streams() and m_stream.output is None
+    assert m_stream.events == (("replace", Ref("V")),)
+    # multi-slot shapes require an explicit {slot: type} map
+    with pytest.raises(ValueError):
+        method("bad", role="out", shape="swmr", out=Ref("V"))
 
 
 def test_validate_or_raise():

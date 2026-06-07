@@ -23,17 +23,21 @@ files drift, and a breaking-change gate rejects incompatible IR edits.
 
 ## A "web API" in taut
 
-A web API is a **`service`** — a set of **methods**. Each method is either:
+A web API is a **`service`** — a set of **methods**. Each method is the minimal
+contract `(name, in, out, shape)`, where **`shape` is the sole discriminator**:
 
-- **unary** — request → response (`create`, `set_state`, a query…), or
-- **server_stream** — a subscription whose behavior is a **delivery shape**.
+- **unary** — the degenerate "delivered once" shape: request → response
+  (`create`, `set_state`, a query…). This is the default.
+- any **streaming shape** — a subscription whose behavior *is* the shape.
 
-You don't hand-roll request/response plumbing or streaming semantics. You pick a
-delivery shape per streaming endpoint and taut gives you the idiomatic API +
-sync for it. The closed set:
+There's no separate "kind" axis: `unary` is just a member of the shape set, so
+illegal combinations can't be written. You don't hand-roll request/response
+plumbing or streaming semantics — you pick a shape and taut gives you the
+idiomatic API + sync for it. The (open, but implemented) set:
 
 | Shape | Use it for | Reader sees |
 | --- | --- | --- |
+| **unary** | request → response (the default) | one value |
 | **atom** | whole-state, latest-wins (presence, status, a list) | replacements |
 | **log** | append-only history (chat, an event feed) | replay then tail |
 | **stream** | live, ephemeral (terminal output, ticks) | live events, no replay |

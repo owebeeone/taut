@@ -123,8 +123,8 @@ def _diff_services(old: Schema, new: Schema, out: list[Change]) -> None:
             if nm is None:
                 out.append(Change("breaking", f"method {sname}.{mname} removed"))
                 continue
-            if nm.kind != om.kind:
-                out.append(Change("breaking", f"method {sname}.{mname} kind {om.kind}->{nm.kind}"))
+            # shape is the sole discriminator (D22) — it subsumes the old `kind`,
+            # so a unary->stream change is just a shape change.
             if nm.shape != om.shape:
                 out.append(Change("breaking", f"method {sname}.{mname} shape {om.shape}->{nm.shape}"))
             op = {pn: _wire(pt) for pn, pt in om.params}

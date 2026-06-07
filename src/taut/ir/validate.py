@@ -11,7 +11,7 @@ combinations and anything outside the closed set, before any mechanism is derive
 from __future__ import annotations
 
 from .model import EnumRef, ListOf, MsgRef, Scalar, Schema, TypeRef
-from .shapes import BAND_START, KINDS, ROLES, SHAPES
+from .shapes import BAND_START, ROLES, SHAPES
 
 
 def validate(schema: Schema) -> list[str]:
@@ -90,34 +90,30 @@ def validate(schema: Schema) -> list[str]:
             seen.add(meth.name)
             if meth.role not in ROLES:
                 errors.append(f"{ctx}: unknown role {meth.role!r}")
-            if meth.kind not in KINDS:
-                errors.append(f"{ctx}: unknown kind {meth.kind!r}")
             for pn, pt in meth.params:
                 check_ref(pt, f"{ctx} param {pn}")
 
-            if meth.kind == "unary":
-                if meth.output is None:
-                    errors.append(f"{ctx}: unary method must declare output")
-                else:
-                    check_ref(meth.output, f"{ctx} output")
-                if meth.shape is not None or meth.events:
-                    errors.append(f"{ctx}: unary method must not declare shape/events")
-            elif meth.kind == "server_stream":
-                if meth.shape not in SHAPES:
-                    errors.append(f"{ctx}: unknown delivery shape {meth.shape!r}")
-                elif not meth.events:
-                    errors.append(f"{ctx}: server_stream must declare events")
-                else:
-                    allowed = SHAPES[meth.shape]["events"]
-                    for en, et in meth.events:
-                        if en not in allowed:
-                            errors.append(
-                                f"{ctx}: event {en!r} not allowed for shape "
-                                f"{meth.shape!r} (allowed: {sorted(allowed)})"
-                            )
-                        check_ref(et, f"{ctx} event {en}")
-                if meth.output is not None:
-                    errors.append(f"{ctx}: server_stream must not declare output")
+            # shape is the sole discriminator; `out` binds the shape's slots.
+            if meth.shape not in SHAPES:
+                errors.append(f"{ctx}: unknown delivery shape {meth.shape!r}")
+            else:
+                allowed = SHAPES[meth.shape]["events"]
+                if not meth.out:
+                    errors.append(
+                        f"{ctx}: method must bind out (slots for {meth.shape!r}: "
+                        f"{sorted(allowed)})"
+                    )
+                bound: set[str] = set()
+                for slot, t in meth.out:
+                    if slot not in allowed:
+                        errors.append(
+                            f"{ctx}: out slot {slot!r} not allowed for shape "
+                            f"{meth.shape!r} (allowed: {sorted(allowed)})"
+                        )
+                    if slot in bound:
+                        errors.append(f"{ctx}: duplicate out slot {slot!r}")
+                    bound.add(slot)
+                    check_ref(t, f"{ctx} out[{slot}]")
 
     return errors
 

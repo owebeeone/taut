@@ -1,6 +1,16 @@
 {
   "version": 1,
   "shapes": {
+    "unary": {
+      "payload": "whole",
+      "history": "none",
+      "initiation": "pull",
+      "writers": "single",
+      "events": [
+        "value"
+      ],
+      "delivery": "once"
+    },
     "atom": {
       "payload": "whole-state",
       "history": "latest",
@@ -8,7 +18,8 @@
       "writers": "single",
       "events": [
         "replace"
-      ]
+      ],
+      "delivery": "stream"
     },
     "log": {
       "payload": "whole",
@@ -17,7 +28,8 @@
       "writers": "source",
       "events": [
         "append"
-      ]
+      ],
+      "delivery": "stream"
     },
     "stream": {
       "payload": "whole-or-delta",
@@ -26,7 +38,8 @@
       "writers": "source",
       "events": [
         "event"
-      ]
+      ],
+      "delivery": "stream"
     },
     "swmr": {
       "payload": "delta",
@@ -37,7 +50,8 @@
         "delta",
         "reset",
         "snapshot"
-      ]
+      ],
+      "delivery": "stream"
     },
     "snapshot_delta": {
       "payload": "delta",
@@ -47,7 +61,8 @@
       "events": [
         "delta",
         "snapshot"
-      ]
+      ],
+      "delivery": "stream"
     },
     "crdt": {
       "payload": "ops",
@@ -57,7 +72,8 @@
       "events": [
         "op",
         "sync"
-      ]
+      ],
+      "delivery": "stream"
     }
   },
   "enums": [
@@ -238,8 +254,8 @@
       "methods": [
         {
           "name": "create",
-          "kind": "unary",
           "role": "in",
+          "shape": "unary",
           "params": [
             {
               "name": "title",
@@ -249,17 +265,20 @@
               }
             }
           ],
-          "output": {
-            "k": "msg",
-            "name": "Task"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "msg",
+                "name": "Task"
+              }
+            }
+          ]
         },
         {
           "name": "comment",
-          "kind": "unary",
           "role": "in",
+          "shape": "unary",
           "params": [
             {
               "name": "task_id",
@@ -283,17 +302,20 @@
               }
             }
           ],
-          "output": {
-            "k": "msg",
-            "name": "Comment"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "msg",
+                "name": "Comment"
+              }
+            }
+          ]
         },
         {
           "name": "set_state",
-          "kind": "unary",
           "role": "ctl",
+          "shape": "unary",
           "params": [
             {
               "name": "id",
@@ -310,23 +332,24 @@
               }
             }
           ],
-          "output": {
-            "k": "scalar",
-            "scalar": "bool"
-          },
-          "shape": null,
-          "events": []
+          "out": [
+            {
+              "slot": "value",
+              "type": {
+                "k": "scalar",
+                "scalar": "bool"
+              }
+            }
+          ]
         },
         {
           "name": "tasks.subscribe",
-          "kind": "server_stream",
           "role": "out",
-          "params": [],
-          "output": null,
           "shape": "atom",
-          "events": [
+          "params": [],
+          "out": [
             {
-              "event": "replace",
+              "slot": "replace",
               "type": {
                 "k": "list",
                 "elem": {
@@ -339,14 +362,12 @@
         },
         {
           "name": "activity.subscribe",
-          "kind": "server_stream",
           "role": "out",
-          "params": [],
-          "output": null,
           "shape": "log",
-          "events": [
+          "params": [],
+          "out": [
             {
-              "event": "append",
+              "slot": "append",
               "type": {
                 "k": "msg",
                 "name": "Event"

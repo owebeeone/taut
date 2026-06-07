@@ -21,6 +21,7 @@ from .model import (
     ServiceDef,
     TypeRef,
 )
+from .shapes import sole_slot
 
 # scalars
 INT = Scalar("int")
@@ -59,22 +60,21 @@ def Msg(name: str, *fields: FieldDef, reserved=(), next_id: int | None = None) -
 def method(
     name: str,
     *,
-    kind: str,
     role: str,
+    shape: str = "unary",
     params: tuple = (),
-    output: TypeRef | None = None,
-    shape: str | None = None,
-    events: dict[str, TypeRef] | None = None,
+    out: "TypeRef | dict[str, TypeRef] | None" = None,
 ) -> MethodDef:
-    return MethodDef(
-        name=name,
-        kind=kind,
-        role=role,
-        params=tuple(params),
-        output=output,
-        shape=shape,
-        events=tuple((events or {}).items()),
-    )
+    """An endpoint `(name, in, out, shape)`. `shape` is the sole discriminator and
+    defaults to `unary` (delivered once). `out` may be a single type (bound to the
+    shape's sole slot) or a `{slot: type}` map for multi-slot shapes (swmr/crdt)."""
+    if out is None:
+        out_items: tuple = ()
+    elif isinstance(out, dict):
+        out_items = tuple(out.items())
+    else:  # a bare TypeRef -> bind to the shape's sole slot
+        out_items = ((sole_slot(shape), out),)
+    return MethodDef(name=name, role=role, shape=shape, out=out_items, params=tuple(params))
 
 
 def service(name: str, *methods: MethodDef) -> ServiceDef:
@@ -98,12 +98,10 @@ def _resolve(tref: TypeRef, enum_names: set[str]) -> TypeRef:
 def _resolve_method(m: MethodDef, enum_names: set[str]) -> MethodDef:
     return MethodDef(
         name=m.name,
-        kind=m.kind,
         role=m.role,
-        params=tuple((pn, _resolve(pt, enum_names)) for pn, pt in m.params),
-        output=_resolve(m.output, enum_names) if m.output is not None else None,
         shape=m.shape,
-        events=tuple((en, _resolve(et, enum_names)) for en, et in m.events),
+        out=tuple((slot, _resolve(t, enum_names)) for slot, t in m.out),
+        params=tuple((pn, _resolve(pt, enum_names)) for pn, pt in m.params),
     )
 
 

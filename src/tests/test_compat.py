@@ -79,25 +79,25 @@ def test_service_method_changes():
     base = schema(
         Msg("V", F("x", 1, STR)),
         service("S",
-                method("get", kind="unary", role="out", output=Ref("V")),
-                method("sub", kind="server_stream", role="out", shape="atom", events={"replace": Ref("V")})),
+                method("get", role="out", out=Ref("V")),
+                method("sub", role="out", shape="atom", out=Ref("V"))),
     )
     removed = schema(Msg("V", F("x", 1, STR)),
-                     service("S", method("sub", kind="server_stream", role="out", shape="atom", events={"replace": Ref("V")})))
-    kind_changed = schema(
+                     service("S", method("sub", role="out", shape="atom", out=Ref("V"))))
+    shape_changed = schema(
         Msg("V", F("x", 1, STR)),
         service("S",
-                method("get", kind="unary", role="out", output=Ref("V")),
-                method("sub", kind="unary", role="out", output=Ref("V"))),  # was server_stream
+                method("get", role="out", out=Ref("V")),
+                method("sub", role="out", out=Ref("V"))),  # was shape="atom" (now unary)
     )
     assert any("method S.get removed" in c.detail for c in compat.breaking(base, removed))
-    assert any("kind" in c.detail for c in compat.breaking(base, kind_changed))
+    assert any("shape" in c.detail for c in compat.breaking(base, shape_changed))
     # adding a method is compatible
     added = schema(
         Msg("V", F("x", 1, STR)),
         service("S",
-                method("get", kind="unary", role="out", output=Ref("V")),
-                method("sub", kind="server_stream", role="out", shape="atom", events={"replace": Ref("V")}),
-                method("ping", kind="unary", role="out", output=BOOL)),
+                method("get", role="out", out=Ref("V")),
+                method("sub", role="out", shape="atom", out=Ref("V")),
+                method("ping", role="out", out=BOOL)),
     )
     assert not compat.breaking(base, added)

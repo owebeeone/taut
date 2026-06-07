@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .shapes import is_streaming
+
 
 # --- type refs (closed set) ---------------------------------------------------
 
@@ -70,22 +72,41 @@ class MessageDef:
 
 @dataclass(frozen=True)
 class MethodDef:
-    """One endpoint. The IR unit is (source × shape × role-typed verb).
+    """One endpoint = the minimal contract `(name, in, out, shape)` (D22).
 
-    - unary methods carry `output` (a TypeRef) and no shape.
-    - server_stream methods carry a `shape` and `events` (event-name -> TypeRef),
-      the per-shape derived streaming-kind; no `output`.
-    `params` are the named inputs (matching the handler's kwargs), over existing
-    messages/scalars — no synthetic args-messages.
+    - `shape` is the **sole discriminator** (a name in the open shape registry);
+      `unary` is the degenerate "delivered once" shape.
+    - `params` is `in` — the named inputs (the handler's kwargs), over existing
+      messages/scalars; no synthetic args-messages.
+    - `out` binds a type to each of the shape's delivery slots (`SHAPES[shape]
+      ["events"]`). For `unary` that's the single return (slot `value`); for
+      `swmr` it's `{snapshot, delta}`; etc.
+
+    `kind`/`output`/`events` are **derived views**, not stored fields — computed
+    from `shape` + `out`, they can never disagree, so the old "unary-with-a-shape"
+    illegal state is unrepresentable rather than prose-policed.
     """
 
     name: str
-    kind: str                                   # "unary" | "server_stream"
-    role: str                                   # out | in | ctl | td | hdl | query | dx
-    params: tuple[tuple[str, TypeRef], ...] = ()
-    output: TypeRef | None = None               # unary
-    shape: str | None = None                    # server_stream
-    events: tuple[tuple[str, TypeRef], ...] = ()  # server_stream: event-name -> type
+    role: str                                    # out | in | ctl | td | hdl | query | dx
+    shape: str                                   # sole discriminator; "unary" = once
+    out: tuple[tuple[str, TypeRef], ...] = ()    # slot -> type, slots ⊆ SHAPES[shape]["events"]
+    params: tuple[tuple[str, TypeRef], ...] = () # `in`
+
+    def streams(self) -> bool:
+        return is_streaming(self.shape)
+
+    @property
+    def output(self) -> TypeRef | None:
+        """Derived: the single return type of a once-delivered (`unary`) method."""
+        if self.streams():
+            return None
+        return self.out[0][1] if self.out else None
+
+    @property
+    def events(self) -> tuple[tuple[str, TypeRef], ...]:
+        """Derived: the slot->type bindings of a streamed method (empty for unary)."""
+        return self.out if self.streams() else ()
 
 
 @dataclass(frozen=True)

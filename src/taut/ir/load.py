@@ -72,12 +72,10 @@ def schema_from_json(data: dict) -> Schema:
         methods = tuple(
             MethodDef(
                 name=m["name"],
-                kind=m["kind"],
                 role=m["role"],
-                params=tuple((p["name"], _typeref_from_json(p["type"])) for p in m["params"]),
-                output=_typeref_from_json(m["output"]) if m["output"] is not None else None,
                 shape=m["shape"],
-                events=tuple((e["event"], _typeref_from_json(e["type"])) for e in m["events"]),
+                out=tuple((o["slot"], _typeref_from_json(o["type"])) for o in m["out"]),
+                params=tuple((p["name"], _typeref_from_json(p["type"])) for p in m["params"]),
             )
             for m in s["methods"]
         )

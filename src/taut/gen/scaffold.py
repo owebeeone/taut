@@ -70,7 +70,7 @@ def python_client(schema: Schema, svc: ServiceDef) -> str:
     for meth in svc.methods:
         sig = "".join(f", {pn}: {_py_ty(pt)}" for pn, pt in meth.params)
         kwargs = "".join(f", {pn}={pn}" for pn, _ in meth.params)
-        if meth.kind == "unary":
+        if not meth.streams():
             ret = _py_ty(meth.output)
             out.append(f"    async def {_attr(meth.name)}(self{sig}) -> {ret}:")
             out.append(f'        return await self._t.call("{meth.name}", {ret}{kwargs})')
@@ -89,7 +89,7 @@ def python_server(schema: Schema, svc: ServiceDef) -> str:
            f"class {svc.name}Handlers(Protocol):"]
     for meth in svc.methods:
         sig = "".join(f", {pn}: {_py_ty(pt)}" for pn, pt in meth.params)
-        if meth.kind == "unary":
+        if not meth.streams():
             out.append(f"    async def {_attr(meth.name)}(self{sig}) -> {_py_ty(meth.output)}: ...")
         else:
             out.append(f"    def {_attr(meth.name)}(self{sig}): ...  # -> Subscription ({meth.shape})")
@@ -146,7 +146,7 @@ def ts_client(schema: Schema, svc: ServiceDef) -> str:
         args = ", ".join(f"{pn}: {_ts_ty(pt)}" for pn, pt in meth.params)
         obj = "{ " + ", ".join(pn for pn, _ in meth.params) + " }" if meth.params else "{}"
         nm = _attr(meth.name)
-        if meth.kind == "unary":
+        if not meth.streams():
             ret = _ts_ty(meth.output)
             out.append(f"  {nm}({args}): Promise<api.{ret}> {{")
             out.append(f'    return this.c.call("{meth.name}", {obj}) as Promise<api.{ret}>;')
@@ -165,7 +165,7 @@ def ts_server(schema: Schema, svc: ServiceDef) -> str:
            f"export interface {svc.name}Handlers {{"]
     for meth in svc.methods:
         args = ", ".join(f"{pn}: {_ts_ty(pt)}" for pn, pt in meth.params)
-        if meth.kind == "unary":
+        if not meth.streams():
             out.append(f"  {_attr(meth.name)}({args}): Promise<api.{_ts_ty(meth.output)}>;")
         else:
             out.append(f"  {_attr(meth.name)}({args}): unknown;  // Subscription ({meth.shape})")
@@ -215,7 +215,7 @@ def rust_client(schema: Schema, svc: ServiceDef) -> str:
            f"impl<'a> {svc.name}Client<'a> {{",
            f"    pub fn new(c: &'a Client) -> Self {{ Self {{ c }} }}"]
     for meth in svc.methods:
-        if meth.kind == "unary":
+        if not meth.streams():
             args = "".join(f", {pn}: {_rs_ty(pt)}" for pn, pt in meth.params)
             out.append(f"    // {meth.name}({', '.join(pn for pn,_ in meth.params)}) -> {_rs_ty(meth.output)}")
             out.append(f"    // self.c.call(\"{meth.name}\", &[..encode args..]).await -> {_rs_ty(meth.output)}::from_cbor(..)")
@@ -230,7 +230,7 @@ def rust_server(schema: Schema, svc: ServiceDef) -> str:
            "use crate::api::*;", "",
            f"pub trait {svc.name}Handlers {{"]
     for meth in svc.methods:
-        if meth.kind == "unary":
+        if not meth.streams():
             args = "".join(f", {pn}: {_rs_ty(pt)}" for pn, pt in meth.params)
             out.append(f"    fn {_attr(meth.name)}(&self{args}) -> {_rs_ty(meth.output)};")
         else:
@@ -265,7 +265,7 @@ def cpp_client(schema: Schema, svc: ServiceDef) -> str:
            '#pragma once', '#include "api.hpp"', "",
            f"namespace taut::{svc.name.lower()} {{", ""]
     for meth in svc.methods:
-        if meth.kind == "unary":
+        if not meth.streams():
             args = ", ".join(f"{_cpp_ty(pt)} {pn}" for pn, pt in meth.params)
             out.append(f"// {meth.name}: ({args}) -> {_cpp_ty(meth.output)}   [transport.call(\"{meth.name}\", ...)]")
         else:
@@ -279,7 +279,7 @@ def cpp_server(schema: Schema, svc: ServiceDef) -> str:
            '#pragma once', '#include "api.hpp"', "",
            f"struct {svc.name}Handlers {{"]
     for meth in svc.methods:
-        if meth.kind == "unary":
+        if not meth.streams():
             args = ", ".join(f"{_cpp_ty(pt)} {pn}" for pn, pt in meth.params)
             out.append(f"    virtual {_cpp_ty(meth.output)} {_attr(meth.name)}({args}) = 0;")
         else:

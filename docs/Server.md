@@ -2,7 +2,7 @@
 
 This shows how to stand up a server for a taut service: write handlers, back the
 streaming endpoints with delivery-shape engines, **register them against the IR**
-(so `kind`/params come from the contract, not by hand), and serve.
+(so `shape`/params come from the contract, not by hand), and serve.
 
 > The reusable runtime — shape engines, the IR-driven transport, the WebSocket
 > server loop — lives in the reference slice `trial/py/griplab_slice/` (files
@@ -13,12 +13,12 @@ streaming endpoints with delivery-shape engines, **register them against the IR*
 ## The handler contract
 
 A handler is a **plain function over native values** — no envelope, transport,
-codec, or shape logic inside it. Its form follows the method's `kind`:
+codec, or shape logic inside it. Its form follows the method's `shape`:
 
-| method `kind` | handler signature |
+| method `shape` | handler signature |
 | --- | --- |
-| `unary` | `async def(**params) -> value` (returns the `output` value) |
-| `server_stream` | `def(**params) -> Subscription` (returns a shape's open subscription) |
+| `unary` (delivered once) | `async def(**params) -> value` (returns the `out` value) |
+| any streaming shape | `def(**params) -> Subscription` (returns a shape's open subscription) |
 
 `params` are exactly the IR method's params, by name. The value types are the
 native types for your IR messages (the reference binding gives you typed
@@ -61,10 +61,10 @@ async def comment(task_id, author, text):      # unary -> Comment (a message par
     activity.append({"ts": _seq["n"], "text": f"comment on #{task_id}"})
     return c
 
-def tasks_subscribe() -> Subscription:         # server_stream (atom) -> Subscription
+def tasks_subscribe() -> Subscription:         # shape=atom -> Subscription
     return tasks.open()
 
-def activity_subscribe() -> Subscription:      # server_stream (log) -> Subscription
+def activity_subscribe() -> Subscription:      # shape=log -> Subscription
     return activity.open()
 ```
 
@@ -108,11 +108,11 @@ ensures you didn't forget a handler.
 ## 4. Serve
 
 The WebSocket loop ([`server.py`](../../trial/py/griplab_slice/server.py))
-dispatches purely from the contract — it reads the bound method's `kind`:
+dispatches purely from the contract — it reads the bound method's `shape`:
 
 - **unary** → `await transport.request(method, payload)` → send one response;
-- **server_stream** → `transport.open(method, payload)` → pump the shape's events
-  as `stream-event` frames until the client disconnects.
+- **streaming shape** → `transport.open(method, payload)` → pump the shape's
+  events as `stream-event` frames until the client disconnects.
 
 The envelope is JSON, message payloads are CBOR (the wire from
 [Reference.md](Reference.md) §8). Sketch:
@@ -126,7 +126,7 @@ async def handle(conn, transport):
     async for raw in conn:              # each text frame is a JSON envelope
         env = envelope_from_json(raw)
         bound = transport._methods[env.method]
-        if bound.mdef.kind == "server_stream":
+        if bound.mdef.streams():
             sub = transport.open(env.method, env.payload)
             async for ev in sub:        # snapshot/replace/append/delta… per the shape
                 await conn.send(envelope_to_json(ev_with_stream_id(ev, env.stream_id)))
