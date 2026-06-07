@@ -2,7 +2,7 @@
 # Import name stays `taut`:  pip install taut-proto  ->  import taut  ->  CLI `taut`.
 [project]
 name = "taut-proto"
-version = "0.1.0"
+version = "0.3.0"
 description = "taut — one declarative IR -> native types, deterministic CBOR wire, IR-driven codec + service contracts, verified by a golden conformance corpus (import: `taut`)"
 readme = "README.md"
 requires-python = ">=3.10"
