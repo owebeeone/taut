@@ -1,0 +1,37 @@
+# Distribution name is `taut-proto` (PyPI rejects `taut` as "isn't allowed").
+# Import name stays `taut`:  pip install taut-proto  ->  import taut  ->  CLI `taut`
+# (the Pillow->PIL pattern). Build/publish from this repo root: `python -m build`.
+[project]
+name = "taut-proto"
+version = "0.0.0"
+description = "taut — one declarative IR -> native types, deterministic CBOR wire, IR-driven codec + service contracts, verified by a golden conformance corpus (import: `taut`)"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Gianni", email = "gianni@everbility.com" }]
+keywords = ["idl", "protocol", "schema", "serialization", "cbor", "rpc", "contract"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: System :: Networking",
+]
+dependencies = []   # stdlib only (hand-rolled deterministic CBOR; no runtime deps)
+
+# license = "..."                       # TODO: set an SPDX license before publishing
+# [project.scripts]
+# taut = "taut.cli:main"                # TODO: wire a console entry point when the CLI lands
+# [project.urls]
+# Homepage = "https://..."              # TODO: set repo/homepage before publishing
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["taut*"]
+
+[tool.pytest.ini_options]
+testpaths = ["src/tests"]

@@ -17,14 +17,23 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
 - **D1. taut is the substrate under Glade, not a product.** Optimize for "the
   smallest thing that lets Glade/Glial be built on the GripLab golden path," not
   feature-completeness. *(DECIDED, lean)*
-- **D2. Name = `taut`** everywhere in-code (brand, CLI, Python package, Rust crate,
-  C++ namespace, IR file extension `.taut.py`). PyPI and crates.io `taut` are both
-  **free** (availability scan), so no disambiguation is needed for the package/crate.
-  **`taut_proto` is reserved** purely as the fallback for the channels where `taut`
-  alone is taken — **npm, Go module, GitHub org** — to be used at publish time, not
-  in the codebase. The codename "prism" is fully retired: no `prism` string remains
-  in either repo's source (build artifacts excepted), all suites green post-rename.
-  *(BUILT — in-code rename done; `taut_proto` reserved for npm/Go/GitHub publish)*
+- **D2. Name = `taut`** everywhere in-code (brand, CLI, **import** package, Rust
+  crate, C++ namespace, IR file extension `.taut.py`). The codename "prism" is
+  fully retired: no `prism` string remains in either repo's source (build artifacts
+  excepted), all suites green post-rename.
+  - **PyPI distribution name = `taut-proto`.** PyPI **rejects `taut`** at
+    registration ("This project name isn't allowed" — Warehouse's prohibited/
+    reserved path, *not* its "too similar" wording; a sibling project `tau` also
+    exists). **Correction of an earlier error:** the availability scan read
+    `pypi.org/pypi/taut/json` → 404 as "free," but a 404 only means *no released
+    project by that exact name* — it is **not** proof of registerability (reserved-
+    with-zero-releases also 404s). The only definitive test is an actual upload.
+  - Dist ≠ import: `pip install taut-proto` → `import taut` → CLI `taut` (the
+    Pillow→PIL pattern). Only `[project].name` carries `taut-proto`; nothing in
+    code changes. `taut_proto`/`taut-proto` also covers npm/Go/GitHub-org, where
+    `taut` is likewise taken.
+  *(BUILT — in-code rename done; dist name `taut-proto` set in pyproject, pending
+  the user's registration confirmation)*
 
 ## Field model
 
