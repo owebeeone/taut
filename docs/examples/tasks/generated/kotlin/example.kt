@@ -7,6 +7,7 @@ fun main() {
         id = 1, title = "ship taut", state = TaskState.done,
         assignee = User(id = 7, name = "ann"),
         comments = listOf(Comment(author = User(id = 2, name = "bob"), text = "lgtm")),
+        labels = mapOf("team" to "infra", "area" to "wire"),
     )
     val bytes = encode(task.toCbor())
     val back = Task.fromCbor(decode(bytes))

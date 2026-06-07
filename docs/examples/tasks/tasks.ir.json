@@ -155,7 +155,7 @@
       "reserved_names": [
         "priority"
       ],
-      "next_id": 7,
+      "next_id": 8,
       "fields": [
         {
           "name": "id",
@@ -209,6 +209,24 @@
             "elem": {
               "k": "msg",
               "name": "Comment"
+            }
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "labels",
+          "tag": 7,
+          "type": {
+            "k": "map",
+            "key": {
+              "k": "scalar",
+              "scalar": "str"
+            },
+            "value": {
+              "k": "scalar",
+              "scalar": "str"
             }
           },
           "optional": false,

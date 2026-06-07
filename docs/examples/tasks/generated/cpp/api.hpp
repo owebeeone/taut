@@ -1,5 +1,6 @@
 // GENERATED native C++ types by taut/src/taut/gen/cpp.py — do not edit.
 #pragma once
+#include <map>
 #include <optional>
 #include <string_view>
 #include <utility>
@@ -56,8 +57,9 @@ struct Task {
   TaskState state;
   std::optional<User> assignee;
   std::vector<Comment> comments;
+  std::map<std::string_view, std::string_view> labels;
   constexpr void to_cbor(Buf& b) const {
-    b.map(5);
+    b.map(6);
     b.uint(1);
     b.integer(id);
     b.uint(2);
@@ -69,6 +71,9 @@ struct Task {
     b.uint(5);
     b.array(comments.size());
     for (const auto& x : comments) { x.to_cbor(b); }
+    b.uint(7);
+    b.array(labels.size());
+    for (const auto& [k, v] : labels) { b.map(2); b.uint(1); b.text(k); b.uint(2); b.text(v); }
   }
   static constexpr Task from_cbor(const Cbor& c) {
     Task v{};
@@ -77,6 +82,7 @@ struct Task {
     v.state = static_cast<TaskState>(c.get(3).as_int());
     { const auto& f = c.get(4); if (!f.is_null()) v.assignee = taut::User::from_cbor(f); }
     for (const auto& x : c.get(5).as_array()) v.comments.push_back(taut::Comment::from_cbor(x));
+    for (const auto& e : c.get(7).as_array()) v.labels[e.get(1).as_text()] = e.get(2).as_text();
     return v;
   }
 };

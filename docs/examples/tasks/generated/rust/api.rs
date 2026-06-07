@@ -69,6 +69,7 @@ pub struct Task {
     pub state: TaskState,
     pub assignee: Option<User>,
     pub comments: Vec<Comment>,
+    pub labels: std::collections::BTreeMap<String, String>,
 }
 impl Task {
     pub fn to_cbor(&self) -> Cbor {
@@ -78,6 +79,7 @@ impl Task {
             (3, Cbor::Int(self.state.wire())),
             (4, match &self.assignee { Some(v) => v.to_cbor(), None => Cbor::Null }),
             (5, Cbor::Array(self.comments.iter().map(|x| x.to_cbor()).collect())),
+            (7, Cbor::Array(self.labels.iter().map(|(k, v)| Cbor::Map(vec![(1, Cbor::Text(k.clone())), (2, Cbor::Text(v.clone()))])).collect())),
         ])
     }
     pub fn from_cbor(c: &Cbor) -> Self {
@@ -87,6 +89,7 @@ impl Task {
             state: TaskState::from_wire(c.get(3).int()),
             assignee: { let v = c.get(4); if v.is_null() { None } else { Some(User::from_cbor(v)) } },
             comments: c.get(5).array().iter().map(|x| Comment::from_cbor(x)).collect(),
+            labels: c.get(7).array().iter().map(|e| (e.get(1).text(), e.get(2).text())).collect(),
         }
     }
 }

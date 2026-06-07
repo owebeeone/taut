@@ -5,7 +5,8 @@
         let task = Task(
             id: 1, title: "ship taut", state: .done,
             assignee: User(id: 7, name: "ann"),
-            comments: [Comment(author: User(id: 2, name: "bob"), text: "lgtm")]
+            comments: [Comment(author: User(id: 2, name: "bob"), text: "lgtm")],
+            labels: ["team": "infra", "area": "wire"]
         )
         let bytes = encode(task.toCbor())
         let back = Task.fromCbor(decode(bytes))

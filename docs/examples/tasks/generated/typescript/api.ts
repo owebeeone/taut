@@ -18,6 +18,7 @@ export interface Task {
   state: TaskState;
   assignee: User | null;
   comments: Comment[];
+  labels: Record<string, string>;
 }
 
 export interface Event {

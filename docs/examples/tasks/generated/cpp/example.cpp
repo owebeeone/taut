@@ -8,6 +8,7 @@ int main() {
     task.id = 1; task.title = "ship taut"; task.state = taut::TaskState::Done;
     task.assignee = taut::User{7, "ann"};
     task.comments = { taut::Comment{ taut::User{2, "bob"}, "lgtm" } };
+    task.labels = { {"team", "infra"}, {"area", "wire"} };
     taut::Buf b; task.to_cbor(b);
     auto parsed = taut::parse(std::string_view(reinterpret_cast<const char*>(b.d), b.n));
     taut::Buf b2; taut::Task::from_cbor(parsed).to_cbor(b2);

@@ -37,6 +37,7 @@ def main() -> None:
             {"author": {"id": 7, "name": "ann"}, "text": "started"},
             {"author": {"id": 9, "name": "bo"}, "text": "lgtm"},
         ],
+        "labels": {"team": "infra", "area": "wire"},   # a map<str, str> field
     }
     blob = codec.encode(schema, "Task", task)
     assert codec.decode(schema, "Task", blob) == task
@@ -44,7 +45,7 @@ def main() -> None:
     print(f"round-trips (incl. nested + list-of-messages): {codec.decode(schema, 'Task', blob) == task}")
 
     # an absent optional nested message decodes as None
-    later = {"id": 2, "title": "later", "state": "open", "assignee": None, "comments": []}
+    later = {"id": 2, "title": "later", "state": "open", "assignee": None, "comments": [], "labels": {}}
     assert codec.decode(schema, "Task", codec.encode(schema, "Task", later)) == later
 
     # the breaking-change gate against the export we just wrote: nothing changed

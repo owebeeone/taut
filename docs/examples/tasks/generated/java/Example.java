@@ -11,6 +11,7 @@ public class Example {
         Comment c = new Comment(); c.author = bob; c.text = "lgtm";
         Task t = new Task();
         t.id = 1; t.title = "ship taut"; t.state = TaskState.DONE; t.assignee = ann; t.comments = List.of(c);
+        t.labels = java.util.Map.of("team", "infra", "area", "wire");
         byte[] bytes = Cbor.encode(t.toCbor());
         Task back = Task.fromCbor(Cbor.decode(bytes));
         boolean ok = java.util.Arrays.equals(Cbor.encode(back.toCbor()), bytes);

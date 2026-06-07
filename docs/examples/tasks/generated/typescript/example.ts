@@ -11,6 +11,7 @@ const task = {
   id: 1, title: "ship taut", state: "done",
   assignee: { id: 7, name: "ann" },
   comments: [{ author: { id: 2, name: "bob" }, text: "lgtm" }],
+  labels: new Map([["team", "infra"], ["area", "wire"]]),
 };
 const bytes = encode(schema, "Task", task);
 const back = decode(schema, "Task", bytes);

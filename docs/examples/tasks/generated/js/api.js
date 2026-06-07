@@ -51,6 +51,7 @@ class Task {
     this.state = o.state;
     this.assignee = o.assignee;
     this.comments = o.comments;
+    this.labels = o.labels;
   }
   toCbor() {
     const m = [
@@ -59,6 +60,7 @@ class Task {
       [3, CInt(this.state)],
       [4, (this.assignee != null ? this.assignee.toCbor() : CNull())],
       [5, CArr(this.comments.map((e) => e.toCbor()))],
+      [7, CArr([...this.labels.entries()].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0).map(([k, v]) => CMap([[1, CText(k)], [2, CText(v)]])))],
     ];
     return CMap(m);
   }
@@ -69,6 +71,7 @@ class Task {
     v.state = cget(c, 3).i;
     { const f = cget(c, 4); v.assignee = isNull(f) ? null : User.fromCbor(f); }
     v.comments = cget(c, 5).arr.map((e) => Comment.fromCbor(e));
+    v.labels = new Map(cget(c, 7).arr.map((e) => [cget(e, 1).s, cget(e, 2).s]));
     return v;
   }
 }

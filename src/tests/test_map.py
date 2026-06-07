@@ -64,3 +64,10 @@ def test_json_profile_map_is_object():
 
 def test_export_reload():
     assert validate(schema_from_json(schema_json(S))) == []
+
+
+def test_compat_gate_sees_map_value_type_change():
+    from taut.ir import compat
+    base = mk(Msg("M", F("m", 1, Map(STR, INT))))
+    changed = mk(Msg("M", F("m", 1, Map(STR, STR))))   # value int -> str
+    assert compat.breaking(base, changed)

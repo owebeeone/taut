@@ -25,7 +25,7 @@ import sys
 from dataclasses import dataclass
 
 from .load import schema_from_json
-from .model import EnumRef, ListOf, MsgRef, Scalar, Schema, TypeRef
+from .model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 
 @dataclass(frozen=True)
@@ -43,6 +43,8 @@ def _wire(t: TypeRef) -> tuple:
         return ("msg", t.name)
     if isinstance(t, ListOf):
         return ("list", _wire(t.elem))
+    if isinstance(t, MapOf):
+        return ("map", _wire(t.key), _wire(t.value))
     raise TypeError(t)
 
 

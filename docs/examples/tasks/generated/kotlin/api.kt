@@ -47,9 +47,10 @@ data class Task(
     var state: TaskState,
     var assignee: User? = null,
     var comments: List<Comment>,
+    var labels: Map<String, String>,
 ) {
     fun toCbor(): Cbor {
-        return Cbor.map(listOf(1L to Cbor.int(id), 2L to Cbor.text(title), 3L to Cbor.int(state.wire), 4L to (assignee?.let { it.toCbor() } ?: Cbor.nul), 5L to Cbor.arr(comments.map { it.toCbor() })))
+        return Cbor.map(listOf(1L to Cbor.int(id), 2L to Cbor.text(title), 3L to Cbor.int(state.wire), 4L to (assignee?.let { it.toCbor() } ?: Cbor.nul), 5L to Cbor.arr(comments.map { it.toCbor() }), 7L to Cbor.arr(labels.toSortedMap().map { Cbor.map(listOf(1L to Cbor.text(it.key), 2L to Cbor.text(it.value))) })))
     }
     companion object {
         fun fromCbor(c: Cbor): Task {
@@ -59,6 +60,7 @@ data class Task(
                 state = TaskState.fromWire(c.get(3).intVal),
                 assignee = c.get(4).let { if (it.isNull) null else User.fromCbor(it) },
                 comments = c.get(5).arrVal.map { Comment.fromCbor(it) },
+                labels = c.get(7).arrVal.associate { it.get(1).textVal to it.get(2).textVal },
             )
         }
     }

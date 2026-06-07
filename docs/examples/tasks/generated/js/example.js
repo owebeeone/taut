@@ -8,6 +8,7 @@ const task = new Task({
   id: 1, title: "ship taut", state: TaskState.done,
   assignee: new User({ id: 7, name: "ann" }),
   comments: [new Comment({ author: new User({ id: 2, name: "bob" }), text: "lgtm" })],
+  labels: new Map([["team", "infra"], ["area", "wire"]]),
 });
 const bytes = encode(task.toCbor());
 const back = Task.fromCbor(decode(bytes));

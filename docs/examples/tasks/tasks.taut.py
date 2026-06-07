@@ -11,7 +11,7 @@ from pathlib import Path
 # make the taut builder importable when loaded by path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-from taut.ir.dsl import BOOL, INT, STR, Enum, F, List, Msg, Ref, method, schema, service
+from taut.ir.dsl import BOOL, INT, STR, Enum, F, List, Map, Msg, Ref, method, schema, service
 
 SCHEMA = schema(
     Enum("TaskState", open=0, doing=1, done=2),
@@ -32,9 +32,10 @@ SCHEMA = schema(
         F("state", 3, Ref("TaskState")),
         F("assignee", 4, Ref("User"), optional=True),  # nested message, optional
         F("comments", 5, List(Ref("Comment"))),        # list of messages
+        F("labels", 7, Map(STR, STR)),                 # keyed collection (e.g. {"team": "infra"})
         # tag 6 and the name "priority" were retired — never reuse them:
         reserved=[6, "priority"],
-        next_id=7),
+        next_id=8),
 
     Msg("Event",
         F("ts", 1, INT),

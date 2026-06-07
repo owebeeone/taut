@@ -9,6 +9,7 @@ func TestRoundtrip(t *testing.T) {
 		Id: 1, Title: "ship taut", State: TaskStateDone,
 		Assignee: &User{Id: 7, Name: "ann"},
 		Comments: []Comment{{Author: User{Id: 2, Name: "bob"}, Text: "lgtm"}},
+		Labels:   map[string]string{"team": "infra", "area": "wire"},
 	}
 	b := Encode(task.ToCbor())
 	back := TaskFromCbor(Decode(b))

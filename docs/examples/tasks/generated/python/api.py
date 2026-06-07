@@ -25,6 +25,7 @@ class Task:
     state: TaskState
     assignee: User | None
     comments: list[Comment]
+    labels: dict[str, str]
 
 @dataclass(slots=True)
 class Event:

@@ -12,6 +12,7 @@ fn main() {
         state: TaskState::Done,
         assignee: Some(User { id: 7, name: "ann".into() }),
         comments: vec![Comment { author: User { id: 2, name: "bob".into() }, text: "lgtm".into() }],
+        labels: std::collections::BTreeMap::from([("team".to_string(), "infra".to_string()), ("area".to_string(), "wire".to_string())]),
     };
     let bytes = encode(&task.to_cbor());
     let back = Task::from_cbor(&decode(&bytes));

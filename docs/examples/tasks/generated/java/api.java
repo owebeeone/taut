@@ -48,6 +48,7 @@ class Task {
     public TaskState state;
     public User assignee;
     public java.util.List<Comment> comments;
+    public java.util.Map<String, String> labels;
     Cbor toCbor() {
         java.util.List<KV> m = new java.util.ArrayList<>();
         m.add(new KV(1, Cbor.int_(id)));
@@ -55,6 +56,7 @@ class Task {
         m.add(new KV(3, Cbor.int_(state.wire)));
         m.add(new KV(4, assignee != null ? assignee.toCbor() : Cbor.NUL));
         m.add(new KV(5, Cbor.arr(comments.stream().map(e -> e.toCbor()).toList())));
+        m.add(new KV(7, Cbor.arr(new java.util.TreeMap<>(labels).entrySet().stream().map(e -> Cbor.map(java.util.List.of(new KV(1, Cbor.text(e.getKey())), new KV(2, Cbor.text(e.getValue()))))).toList())));
         return Cbor.map(m);
     }
     static Task fromCbor(Cbor c) {
@@ -64,6 +66,7 @@ class Task {
         v.state = TaskState.fromWire(c.get(3).i);
         { Cbor f = c.get(4); v.assignee = f.isNull() ? null : User.fromCbor(f); }
         v.comments = c.get(5).arr.stream().map(e -> Comment.fromCbor(e)).toList();
+        v.labels = c.get(7).arr.stream().collect(java.util.stream.Collectors.toMap(e -> e.get(1).s, e -> e.get(2).s, (a, b) -> b, java.util.LinkedHashMap::new));
         return v;
     }
 }
