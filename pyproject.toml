@@ -20,8 +20,10 @@ classifiers = [
 dependencies = []   # stdlib only (hand-rolled deterministic CBOR; no runtime deps)
 
 # license = "..."                       # TODO: set an SPDX license before publishing
-# [project.urls]
-# Homepage = "https://..."              # TODO: set repo/homepage before publishing
+
+[project.urls]
+Homepage = "https://github.com/owebeeone/taut"
+Repository = "https://github.com/owebeeone/taut"
 
 [project.scripts]
 tautc = "taut.cli:main"   # codegen CLI: `tautc gen IR --out DIR [--lang ...]`
