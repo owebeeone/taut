@@ -116,4 +116,37 @@ SCHEMA = schema(
         method("sessions.query", kind="unary", role="out",
                params=[("peer_id", STR)], output=List(Ref("CmdSession"))),
     ),
+
+    # --- CRDT surface (contract from day one; engine is a pluggable slot) ---
+    # Wire: ops + state are representable. CrdtOp.value is the opaque encoded
+    # field value; CrdtState is the reconstructible op log + version vector.
+    Msg("CrdtOp",
+        F("doc", 1, STR),
+        F("actor", 2, STR),
+        F("seq", 3, INT),
+        F("field", 4, INT),          # field tag within the CRDT doc
+        F("value", 5, BYTES)),       # CBOR of the field value (set for lww / delta for counter)
+    Msg("VersionEntry",
+        F("actor", 1, STR),
+        F("seq", 2, INT)),
+    Msg("CrdtState",
+        F("doc", 1, STR),
+        F("ops", 2, List(Ref("CrdtOp"))),
+        F("version", 3, List(Ref("VersionEntry")))),
+    # A CRDT document: each field declares its merge type (captured in the IR;
+    # merge is not implemented per platform). lww register + PN counter (v1).
+    Msg("Board",
+        F("title", 1, STR, merge="lww"),
+        F("votes", 2, INT, merge="counter")),
+
+    # The CRDT API surface: local-apply / merge-remote / sync (build prompt §4).
+    service("Collab",
+        method("board.snapshot", kind="unary", role="out", output=Ref("CrdtState")),
+        method("board.local_apply", kind="unary", role="in",
+               params=[("actor", STR), ("field", INT), ("value", BYTES)], output=Ref("CrdtOp")),
+        method("board.merge", kind="unary", role="ctl",
+               params=[("op", Ref("CrdtOp"))], output=BOOL),
+        method("board.sync", kind="server_stream", role="out", shape="crdt",
+               events={"op": Ref("CrdtOp")}),
+    ),
 )

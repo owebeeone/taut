@@ -316,6 +316,71 @@ of *identical, fully generic* code in three languages with zero per-method logic
 adding a method changes one file and no client; adding a language is one codec +
 one generic client, corpus-verified.
 
-Remaining: C++ (P6 — the compile-time showcase, `static_assert` corpus), OCI
-distribution + breaking-change gate (P7), the CRDT engine, and a binary-CBOR
-envelope profile.
+### P6 C++ — compile-time corpus oracle (DONE, data layer)
+
+Generated **native C++ types** ([../../trial/cpp/generated/types.hpp](../../trial/cpp/generated/types.hpp)):
+`enum class` per IR enum, `struct` per message with `constexpr to_cbor()` **and**
+`from_cbor()` (a `constexpr` CBOR parser lives in
+[cbor.hpp](../../trial/cpp/include/prism/cbor.hpp)). Transient fields present but
+off the wire (M3), same shape as the Rust structs. The corpus oracle
+([../../trial/cpp/generated/corpus.hpp](../../trial/cpp/generated/corpus.hpp))
+proves **both directions** per vector at compile time: construct→`to_cbor`==golden,
+and `parse(golden)`→`from_cbor`→`to_cbor`==golden. **Compiling is the test:** a
+successful `clang++ -std=c++23` build means all 11 vectors round-trip byte-for-byte
+in the compiler (zero runtime cost) — the §5a oracle. (Toolchain decision §10.5:
+Apple clang 21 / C++23; no P2996 reflection needed.)
+
+### Repo hygiene + DoD gates (DONE)
+
+- `.gitignore` for trial/py + trial/ts (+ trial/cpp build/); committed `__pycache__`
+  removed; top-level [../../trial/README.md](../../trial/README.md).
+- **Regeneration-reproduces-the-tree gate** ([../src/tests/test_regen.py](../src/tests/test_regen.py)):
+  ir.json, golden.json, generated.rs, and corpus.hpp must byte-match fresh
+  generator output — hand-edits to generated files fail CI.
+- One-command runners (cross-platform Python, no shell): `prism/run_tests.py`
+  (regenerate + suite) and `trial/run_tests.py` (rust → py → ts → c++, builds the
+  server first). `ALL GREEN`.
+
+**Status: 72 runtime tests** (20 builder · 27 py · 13 TS · 12 Rust) + the C++
+compile-time corpus. The wire is proven in **four languages** (Py/TS/Rust over
+native types; C++ at compile time); full client×server interop matrix; orchestration
+formalized with two runtime bindings.
+
+### P7 breaking-change gate (DONE; OCI publish deferred)
+
+[../src/prism/ir/compat.py](../src/prism/ir/compat.py) diffs a new IR against the
+prior version and rejects incompatible changes under the same major (changed
+tag/wire-type, removed-or-renamed field, optional→required, new required field,
+removed/renumbered enum member, method kind/shape/param/output/event changes);
+adds (message/enum/method/optional-field/event) are compatible. CLI exits 1 on
+breaking. **DoD met:** rejects `PeerPresence.name str→int` (exit 1), accepts an
+added optional field (exit 0). Relies on lossless IR-JSON round-trip
+(`schema_from_json(schema_json(s)) == s`). 9 tests. Full write-up:
+[PrismDistribution.md](PrismDistribution.md). This is the declarative-IR payoff —
+governance is a structural diff, possible *because* the IR isn't Turing-complete.
+
+### CRDT surface (DONE — wire + API + types + reference engine for lww/counter)
+
+Full write-up: [PrismCrdt.md](PrismCrdt.md). Closes the "CRDT from day one" gap:
+- **Type vocabulary** (PrismPlan §10.4 resolved): per-field `merge` ∈ {lww, counter},
+  validated (scalar-only; counter⇒int); `Board` declares `title: lww`, `votes: counter`.
+- **Wire**: `CrdtOp` / `VersionEntry` / `CrdtState` are IR messages → generated
+  native types in all four languages, **byte-exact in the corpus** (incl. the C++
+  compile-time `static_assert`). "Ops and state representable from day one" is now
+  literally true. 14 corpus vectors.
+- **API surface**: a `Collab` service exposes `board.snapshot` / `local_apply` /
+  `merge` / `sync` (shape=crdt), declared + validated; contract-only for the
+  deployed app (the live GripLab slice doesn't serve it — surface present, engine
+  slot empty, per the build prompt).
+- **Reference engine** ([../src/prism/crdt/engine.py](../src/prism/crdt/engine.py)):
+  `CrdtEngine` Protocol = the slot; `ReferenceDoc` implements lww+counter and is
+  proven to **converge** (concurrent ops, any order), be **idempotent**, and be
+  **reconstructible** from a snapshot. text/sequence raise `EngineNotBound` —
+  bind Automerge/Yjs to the same Protocol, nothing else changes. 7 CRDT tests.
+
+prism builder suite: **36 passed**. Full sweep green; C++ proves 14 vectors at
+compile time.
+
+Remaining: OCI publish (rest of P7 — needs a registry; also severs the deferred
+cross-repo path coupling); a binary-CBOR envelope profile; C++ client/server +
+scheduler binding; binding a real text/sequence CRDT engine.

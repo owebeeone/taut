@@ -1,4 +1,8 @@
 {
+  "Board/materialized": {
+    "cbor": "a20165776f726c640208",
+    "message": "Board"
+  },
   "ByteOp/replace": {
     "cbor": "a40102020303020443007879",
     "message": "ByteOp"
@@ -30,6 +34,14 @@
   "TerminalOpened/alpha": {
     "cbor": "a401667465726d2d310265616c706861031878041828",
     "message": "TerminalOpened"
+  },
+  "crdt/op": {
+    "cbor": "a50167626f6172643a3102614103010402054103",
+    "message": "CrdtOp"
+  },
+  "crdt/state": {
+    "cbor": "a30167626f6172643a310282a50167626f6172643a3102614103010402054103a50167626f6172643a31026142030104010545776f726c640382a20161410201a20161420201",
+    "message": "CrdtState"
   },
   "swmr/delta-1": {
     "cbor": "a5016e66696c653a6e6f7465732e747874020103020481a40100020b0300044121050c",

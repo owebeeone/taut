@@ -1,0 +1,360 @@
+{
+  "version": 1,
+  "shapes": {
+    "atom": {
+      "payload": "whole-state",
+      "history": "latest",
+      "initiation": "pull|push",
+      "writers": "single",
+      "events": [
+        "replace"
+      ]
+    },
+    "log": {
+      "payload": "whole",
+      "history": "append-only",
+      "initiation": "pull|push",
+      "writers": "source",
+      "events": [
+        "append"
+      ]
+    },
+    "stream": {
+      "payload": "whole-or-delta",
+      "history": "none",
+      "initiation": "push",
+      "writers": "source",
+      "events": [
+        "event"
+      ]
+    },
+    "swmr": {
+      "payload": "delta",
+      "history": "reconstructible",
+      "initiation": "push",
+      "writers": "single",
+      "events": [
+        "delta",
+        "reset",
+        "snapshot"
+      ]
+    },
+    "snapshot_delta": {
+      "payload": "delta",
+      "history": "reconstructible",
+      "initiation": "push",
+      "writers": "single",
+      "events": [
+        "delta",
+        "snapshot"
+      ]
+    },
+    "crdt": {
+      "payload": "ops",
+      "history": "reconstructible",
+      "initiation": "push-bidi",
+      "writers": "multi-merge",
+      "events": [
+        "op",
+        "sync"
+      ]
+    }
+  },
+  "enums": [
+    {
+      "name": "TaskState",
+      "members": {
+        "open": 0,
+        "doing": 1,
+        "done": 2
+      }
+    }
+  ],
+  "messages": [
+    {
+      "name": "User",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": 3,
+      "fields": [
+        {
+          "name": "id",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "name",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        }
+      ]
+    },
+    {
+      "name": "Comment",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": 3,
+      "fields": [
+        {
+          "name": "author",
+          "tag": 1,
+          "type": {
+            "k": "msg",
+            "name": "User"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "text",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        }
+      ]
+    },
+    {
+      "name": "Task",
+      "reserved_tags": [
+        6
+      ],
+      "reserved_names": [
+        "priority"
+      ],
+      "next_id": 7,
+      "fields": [
+        {
+          "name": "id",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "title",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "state",
+          "tag": 3,
+          "type": {
+            "k": "enum",
+            "name": "TaskState"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "assignee",
+          "tag": 4,
+          "type": {
+            "k": "msg",
+            "name": "User"
+          },
+          "optional": true,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "comments",
+          "tag": 5,
+          "type": {
+            "k": "list",
+            "elem": {
+              "k": "msg",
+              "name": "Comment"
+            }
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        }
+      ]
+    },
+    {
+      "name": "Event",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": 3,
+      "fields": [
+        {
+          "name": "ts",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "text",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        }
+      ]
+    }
+  ],
+  "services": [
+    {
+      "name": "Tasks",
+      "methods": [
+        {
+          "name": "create",
+          "kind": "unary",
+          "role": "in",
+          "params": [
+            {
+              "name": "title",
+              "type": {
+                "k": "scalar",
+                "scalar": "str"
+              }
+            }
+          ],
+          "output": {
+            "k": "msg",
+            "name": "Task"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "comment",
+          "kind": "unary",
+          "role": "in",
+          "params": [
+            {
+              "name": "task_id",
+              "type": {
+                "k": "scalar",
+                "scalar": "int"
+              }
+            },
+            {
+              "name": "author",
+              "type": {
+                "k": "msg",
+                "name": "User"
+              }
+            },
+            {
+              "name": "text",
+              "type": {
+                "k": "scalar",
+                "scalar": "str"
+              }
+            }
+          ],
+          "output": {
+            "k": "msg",
+            "name": "Comment"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "set_state",
+          "kind": "unary",
+          "role": "ctl",
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "k": "scalar",
+                "scalar": "int"
+              }
+            },
+            {
+              "name": "state",
+              "type": {
+                "k": "enum",
+                "name": "TaskState"
+              }
+            }
+          ],
+          "output": {
+            "k": "scalar",
+            "scalar": "bool"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "tasks.subscribe",
+          "kind": "server_stream",
+          "role": "out",
+          "params": [],
+          "output": null,
+          "shape": "atom",
+          "events": [
+            {
+              "event": "replace",
+              "type": {
+                "k": "list",
+                "elem": {
+                  "k": "msg",
+                  "name": "Task"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "activity.subscribe",
+          "kind": "server_stream",
+          "role": "out",
+          "params": [],
+          "output": null,
+          "shape": "log",
+          "events": [
+            {
+              "event": "append",
+              "type": {
+                "k": "msg",
+                "name": "Event"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

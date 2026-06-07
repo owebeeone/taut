@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from ..gen import cpp as cpp_gen
 from ..gen import rust as rust_gen
 from ..ir.export import export_to
 from ..ir.load import load_schema
@@ -51,6 +52,18 @@ def reference_values() -> dict[str, tuple[str, dict]]:
         "RepoRun/err": ("RepoRun", repo_err),
         "CmdSession/mixed": ("CmdSession",
             {"session_id": "sess-0001", "argv": ["git", "status"], "targets": [repo_ok, repo_err]}),
+        # CRDT wire surface (representable from day one)
+        "crdt/op": ("CrdtOp",
+            {"doc": "board:1", "actor": "A", "seq": 1, "field": 2, "value": b"\x03"}),
+        "crdt/state": ("CrdtState", {
+            "doc": "board:1",
+            "ops": [
+                {"doc": "board:1", "actor": "A", "seq": 1, "field": 2, "value": b"\x03"},
+                {"doc": "board:1", "actor": "B", "seq": 1, "field": 1, "value": b"world"},
+            ],
+            "version": [{"actor": "A", "seq": 1}, {"actor": "B", "seq": 1}],
+        }),
+        "Board/materialized": ("Board", {"title": "world", "votes": 8}),
         # The SWMR handoff sequence — base_seq of each delta == prior seq.
         "swmr/snapshot": ("FileSnapshot", snapshot),
         "swmr/delta-1": ("FileDelta", delta1),
@@ -73,7 +86,8 @@ def main() -> None:
     golden = generate_golden(schema)
     GOLDEN_PATH.write_text(json.dumps(golden, indent=2, sort_keys=True) + "\n")
     rust_gen.emit()
-    print(f"wrote IR to {IR_JSON_PATH}, {len(golden)} vectors to {GOLDEN_PATH}, and the Rust corpus")
+    cpp_gen.emit(schema, reference_values())
+    print(f"wrote IR to {IR_JSON_PATH}, {len(golden)} vectors to {GOLDEN_PATH}, and the Rust + C++ corpora")
 
 
 if __name__ == "__main__":

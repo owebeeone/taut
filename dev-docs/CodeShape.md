@@ -29,20 +29,25 @@ the `prism-server` binary uses.
 | IR JSON (neutral, exported) | 867 | generated from the 119 |
 | Golden corpus | 46 | generated |
 | Rust types + codec `generated.rs` | 335 | generated from the IR |
+| C++ native types `cpp/generated/types.hpp` | ~130 | generated from the IR |
+| C++ compile-time corpus `cpp/generated/corpus.hpp` | ~110 | generated from the IR |
 
 ~1250 lines of derived artifact from **119 lines of authored intent**. You
 govern the 119; everything in this block is regenerated and never hand-edited.
 
 ## Mechanism — write-once-per-language, same shape everywhere
 
-| Piece | Py | TS | Rust |
-| --- | ---: | ---: | ---: |
-| CBOR substrate | 150 | 143 | 194 |
-| IR codec | 74 | 73 | (in generated.rs) |
+| Piece | Py | TS | Rust | C++ |
+| --- | ---: | ---: | ---: | ---: |
+| CBOR substrate | 150 | 143 | 194 | 74 (`constexpr`) |
+| IR codec | 74 | 73 | (in generated.rs) | (in generated corpus) |
 
 The codec is ~the same size and structure in every language and is validated
 **byte-identical** by the corpus. It is the only place the wire is implemented per
-language, and it is pinned by an oracle — so it can be trusted without review.
+language, and it is pinned by an oracle — so it can be trusted without review. The
+C++ codec is `constexpr`: the corpus is proven at **compile time** by a
+`static_assert` wall (`generated/corpus.hpp`, 224 lines generated), so the bytes
+are verified by the compiler with zero runtime cost.
 
 ## Clients — uniformly thin, fully generic
 

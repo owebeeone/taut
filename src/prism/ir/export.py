@@ -49,6 +49,9 @@ def schema_json(schema: Schema) -> dict:
         "messages": [
             {
                 "name": m.name,
+                "reserved_tags": list(m.reserved_tags),
+                "reserved_names": list(m.reserved_names),
+                "next_id": m.next_id,
                 "fields": [
                     {
                         "name": f.name,
@@ -56,6 +59,7 @@ def schema_json(schema: Schema) -> dict:
                         "type": _typeref_json(f.type),
                         "optional": f.optional,
                         "transient": f.transient,
+                        "merge": f.merge,
                     }
                     for f in m.fields
                 ],

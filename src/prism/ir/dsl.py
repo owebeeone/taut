@@ -40,12 +40,19 @@ def List(elem: TypeRef) -> ListOf:
     return ListOf(elem)
 
 
-def F(name: str, tag: int, type: TypeRef, *, optional: bool = False, transient: bool = False) -> FieldDef:
-    return FieldDef(name=name, tag=tag, type=type, optional=optional, transient=transient)
+def F(name: str, tag: int, type: TypeRef, *, optional: bool = False, transient: bool = False,
+      merge: str | None = None) -> FieldDef:
+    return FieldDef(name=name, tag=tag, type=type, optional=optional, transient=transient, merge=merge)
 
 
-def Msg(name: str, *fields: FieldDef) -> MessageDef:
-    return MessageDef(name=name, fields=tuple(fields))
+def Msg(name: str, *fields: FieldDef, reserved=(), next_id: int | None = None) -> MessageDef:
+    """A message. `reserved` mixes retired tags (int) and names (str), like
+    protobuf's `reserved`; `next_id` is the next tag to allocate (validated to be
+    above every used/reserved tag)."""
+    rtags = tuple(r for r in reserved if isinstance(r, int) and not isinstance(r, bool))
+    rnames = tuple(r for r in reserved if isinstance(r, str))
+    return MessageDef(name=name, fields=tuple(fields), reserved_tags=rtags,
+                      reserved_names=rnames, next_id=next_id)
 
 
 def method(
@@ -101,10 +108,10 @@ def schema(*decls) -> Schema:
     for d in decls:
         if isinstance(d, MessageDef):
             fields = tuple(
-                FieldDef(f.name, f.tag, _resolve(f.type, enum_names), f.optional, f.transient)
+                FieldDef(f.name, f.tag, _resolve(f.type, enum_names), f.optional, f.transient, f.merge)
                 for f in d.fields
             )
-            messages[d.name] = MessageDef(d.name, fields)
+            messages[d.name] = MessageDef(d.name, fields, d.reserved_tags, d.reserved_names, d.next_id)
     services = {}
     for d in decls:
         if isinstance(d, ServiceDef):

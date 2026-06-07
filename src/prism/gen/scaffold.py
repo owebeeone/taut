@@ -1,0 +1,318 @@
+"""Scaffold generator — emit, for any schema + service, the per-language
+**API types**, a typed **client**, and **server** stubs, for Python, TypeScript,
+Rust, and C++. Used to populate docs examples' `generated/` trees.
+
+What's actually per-API generated is the **types**. Clients and servers in
+Prism's design are *generic* runtime that read the IR (one ~100-line client/
+server per language, zero per-method code — see dev-docs/CodeShape.md); the
+client/server here are thin *typed convenience stubs* over that runtime. The
+type emitters reuse the byte-exact-proven Rust/C++ generators.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from . import cpp as _cpp
+from . import rust as _rust
+from ..ir.model import EnumRef, ListOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef
+
+
+def _attr(name: str) -> str:
+    return name.replace(".", "_")
+
+
+# =============================================================================
+# Python
+# =============================================================================
+
+def _py_ty(t: TypeRef | None) -> str:
+    if t is None:
+        return "None"
+    if isinstance(t, Scalar):
+        return {"int": "int", "str": "str", "bytes": "bytes", "bool": "bool"}[t.kind]
+    if isinstance(t, (EnumRef, MsgRef)):
+        return t.name
+    if isinstance(t, ListOf):
+        return f"list[{_py_ty(t.elem)}]"
+    raise TypeError(t)
+
+
+def python_api(schema: Schema) -> str:
+    out = ['"""GENERATED native Python types — do not edit."""',
+           "from __future__ import annotations",
+           "from dataclasses import dataclass",
+           "from enum import Enum", ""]
+    for e in schema.enums.values():
+        out.append(f"class {e.name}(Enum):")
+        for m, v in e.members.items():
+            out.append(f"    {m} = {v}")
+        out.append("")
+    for m in schema.messages.values():
+        out.append("@dataclass")
+        out.append(f"class {m.name}:")
+        if not m.fields:
+            out.append("    pass")
+        for f in m.fields:
+            ann = f"{_py_ty(f.type)} | None" if f.optional else _py_ty(f.type)
+            out.append(f"    {f.name}: {ann}")
+        out.append("")
+    return "\n".join(out) + "\n"
+
+
+def python_client(schema: Schema, svc: ServiceDef) -> str:
+    out = ['"""GENERATED typed client over a generic Prism transport (call/subscribe)."""',
+           "from __future__ import annotations",
+           "from .api import *  # noqa: F401,F403", "",
+           f"class {svc.name}Client:",
+           "    def __init__(self, transport):",
+           "        self._t = transport", ""]
+    for meth in svc.methods:
+        sig = "".join(f", {pn}: {_py_ty(pt)}" for pn, pt in meth.params)
+        kwargs = "".join(f", {pn}={pn}" for pn, _ in meth.params)
+        if meth.kind == "unary":
+            ret = _py_ty(meth.output)
+            out.append(f"    async def {_attr(meth.name)}(self{sig}) -> {ret}:")
+            out.append(f'        return await self._t.call("{meth.name}", {ret}{kwargs})')
+        else:
+            out.append(f"    def {_attr(meth.name)}(self{sig}):  # {meth.shape} stream")
+            out.append(f'        return self._t.subscribe("{meth.name}"{kwargs})')
+        out.append("")
+    return "\n".join(out) + "\n"
+
+
+def python_server(schema: Schema, svc: ServiceDef) -> str:
+    out = ['"""GENERATED server stubs: a handler Protocol + IR-driven registration."""',
+           "from __future__ import annotations",
+           "from typing import Protocol",
+           "from .api import *  # noqa: F401,F403", "",
+           f"class {svc.name}Handlers(Protocol):"]
+    for meth in svc.methods:
+        sig = "".join(f", {pn}: {_py_ty(pt)}" for pn, pt in meth.params)
+        if meth.kind == "unary":
+            out.append(f"    async def {_attr(meth.name)}(self{sig}) -> {_py_ty(meth.output)}: ...")
+        else:
+            out.append(f"    def {_attr(meth.name)}(self{sig}): ...  # -> Subscription ({meth.shape})")
+    out += ["", f'def register(transport, schema, handlers: "{svc.name}Handlers") -> None:',
+            "    bind = {"]
+    for meth in svc.methods:
+        out.append(f'        "{meth.name}": handlers.{_attr(meth.name)},')
+    out += ["    }",
+            f'    for m in schema.services["{svc.name}"].methods:',
+            "        transport.register_method(m, bind[m.name])"]
+    return "\n".join(out) + "\n"
+
+
+# =============================================================================
+# TypeScript
+# =============================================================================
+
+def _ts_ty(t: TypeRef | None) -> str:
+    if t is None:
+        return "void"
+    if isinstance(t, Scalar):
+        return {"int": "number", "str": "string", "bytes": "Uint8Array", "bool": "boolean"}[t.kind]
+    if isinstance(t, (EnumRef, MsgRef)):
+        return t.name
+    if isinstance(t, ListOf):
+        return f"{_ts_ty(t.elem)}[]"
+    raise TypeError(t)
+
+
+def ts_api(schema: Schema) -> str:
+    out = ["// GENERATED native TypeScript types — do not edit.", ""]
+    for e in schema.enums.values():
+        members = " | ".join(f'"{m}"' for m in e.members)
+        out.append(f"export type {e.name} = {members};")
+    out.append("")
+    for m in schema.messages.values():
+        out.append(f"export interface {m.name} {{")
+        for f in m.fields:
+            ty = f"{_ts_ty(f.type)} | null" if f.optional else _ts_ty(f.type)
+            out.append(f"  {f.name}: {ty};")
+        out.append("}")
+        out.append("")
+    return "\n".join(out) + "\n"
+
+
+def ts_client(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED typed client over the generic PrismClient (call/subscribe).",
+           'import type { PrismClient } from "../../../../trial/ts/src/client.ts";',
+           "import type * as api from \"./api.ts\";", "",
+           f"export class {svc.name}Client {{",
+           "  private c: PrismClient;",
+           "  constructor(c: PrismClient) { this.c = c; }"]
+    for meth in svc.methods:
+        args = ", ".join(f"{pn}: {_ts_ty(pt)}" for pn, pt in meth.params)
+        obj = "{ " + ", ".join(pn for pn, _ in meth.params) + " }" if meth.params else "{}"
+        nm = _attr(meth.name)
+        if meth.kind == "unary":
+            ret = _ts_ty(meth.output)
+            out.append(f"  {nm}({args}): Promise<api.{ret}> {{")
+            out.append(f'    return this.c.call("{meth.name}", {obj}) as Promise<api.{ret}>;')
+            out.append("  }")
+        else:
+            out.append(f"  {nm}({args + ', ' if args else ''}onEvent: (event: string, value: unknown) => void): () => void {{  // {meth.shape}")
+            out.append(f'    return this.c.subscribe("{meth.name}", {obj}, onEvent);')
+            out.append("  }")
+    out.append("}")
+    return "\n".join(out) + "\n"
+
+
+def ts_server(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED server stubs: a handler interface + IR-driven registration.",
+           "import type * as api from \"./api.ts\";", "",
+           f"export interface {svc.name}Handlers {{"]
+    for meth in svc.methods:
+        args = ", ".join(f"{pn}: {_ts_ty(pt)}" for pn, pt in meth.params)
+        if meth.kind == "unary":
+            out.append(f"  {_attr(meth.name)}({args}): Promise<api.{_ts_ty(meth.output)}>;")
+        else:
+            out.append(f"  {_attr(meth.name)}({args}): unknown;  // Subscription ({meth.shape})")
+    out.append("}")
+    out.append("")
+    out.append(f"// Register against the IR (the transport reads kind/params from the contract):")
+    out.append(f"export function register(transport: any, schema: any, h: {svc.name}Handlers): void {{")
+    out.append(f'  const bind: Record<string, unknown> = {{')
+    for meth in svc.methods:
+        out.append(f'    "{meth.name}": h.{_attr(meth.name)}.bind(h),')
+    out.append("  };")
+    out.append(f'  for (const m of schema.services["{svc.name}"].methods) transport.registerMethod(m, bind[m.name]);')
+    out.append("}")
+    return "\n".join(out) + "\n"
+
+
+# =============================================================================
+# Rust  (API reuses the byte-exact-proven type generator)
+# =============================================================================
+
+def _rs_ty(t: TypeRef | None) -> str:
+    if t is None:
+        return "()"
+    if isinstance(t, Scalar):
+        return {"int": "i64", "str": "String", "bytes": "Vec<u8>", "bool": "bool"}[t.kind]
+    if isinstance(t, (EnumRef, MsgRef)):
+        return t.name
+    if isinstance(t, ListOf):
+        return f"Vec<{_rs_ty(t.elem)}>"
+    raise TypeError(t)
+
+
+def rust_api(schema: Schema) -> str:
+    out = ["// GENERATED native Rust types + codec — do not edit.", "#![allow(dead_code)]",
+           "use crate::cbor::Cbor;", ""]
+    for e in schema.enums.values():
+        out += _rust._emit_enum(e.name, e.members) + [""]
+    for m in schema.messages.values():
+        out += _rust._emit_message(m) + [""]
+    return "\n".join(out) + "\n"
+
+
+def rust_client(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED typed client over the generic prism Client.",
+           "use crate::api::*;", "use crate::client::Client;", "use crate::cbor::Cbor;", "",
+           f"pub struct {svc.name}Client<'a> {{ c: &'a Client }}", "",
+           f"impl<'a> {svc.name}Client<'a> {{",
+           f"    pub fn new(c: &'a Client) -> Self {{ Self {{ c }} }}"]
+    for meth in svc.methods:
+        if meth.kind == "unary":
+            args = "".join(f", {pn}: {_rs_ty(pt)}" for pn, pt in meth.params)
+            out.append(f"    // {meth.name}({', '.join(pn for pn,_ in meth.params)}) -> {_rs_ty(meth.output)}")
+            out.append(f"    // self.c.call(\"{meth.name}\", &[..encode args..]).await -> {_rs_ty(meth.output)}::from_cbor(..)")
+        else:
+            out.append(f"    // {meth.name}: subscribe (\"{meth.shape}\") -> stream of {[(e) for e,_ in meth.events]}")
+    out.append("}")
+    return "\n".join(out) + "\n"
+
+
+def rust_server(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED server handler trait + registration sketch.",
+           "use crate::api::*;", "",
+           f"pub trait {svc.name}Handlers {{"]
+    for meth in svc.methods:
+        if meth.kind == "unary":
+            args = "".join(f", {pn}: {_rs_ty(pt)}" for pn, pt in meth.params)
+            out.append(f"    fn {_attr(meth.name)}(&self{args}) -> {_rs_ty(meth.output)};")
+        else:
+            out.append(f"    // {meth.name}: returns a subscription ({meth.shape})")
+    out.append("}")
+    out.append("// register(): for m in schema.services[\"%s\"].methods { transport.register_method(m, ..) }" % svc.name)
+    return "\n".join(out) + "\n"
+
+
+# =============================================================================
+# C++  (API reuses the compile-time-proven type generator)
+# =============================================================================
+
+def _cpp_ty(t: TypeRef | None) -> str:
+    if t is None:
+        return "void"
+    if isinstance(t, Scalar):
+        return {"int": "long long", "str": "std::string_view", "bytes": "std::string_view", "bool": "bool"}[t.kind]
+    if isinstance(t, (EnumRef, MsgRef)):
+        return t.name
+    if isinstance(t, ListOf):
+        return f"std::vector<{_cpp_ty(t.elem)}>"
+    raise TypeError(t)
+
+
+def cpp_api(schema: Schema) -> str:
+    return _cpp._emit_types(schema)  # enums + structs + constexpr to_cbor/from_cbor
+
+
+def cpp_client(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED typed client stub over a generic transport.",
+           '#pragma once', '#include "api.hpp"', "",
+           f"namespace prism::{svc.name.lower()} {{", ""]
+    for meth in svc.methods:
+        if meth.kind == "unary":
+            args = ", ".join(f"{_cpp_ty(pt)} {pn}" for pn, pt in meth.params)
+            out.append(f"// {meth.name}: ({args}) -> {_cpp_ty(meth.output)}   [transport.call(\"{meth.name}\", ...)]")
+        else:
+            out.append(f"// {meth.name}: subscribe (\"{meth.shape}\")")
+    out += ["", "} // namespace"]
+    return "\n".join(out) + "\n"
+
+
+def cpp_server(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED server handler interface stub.",
+           '#pragma once', '#include "api.hpp"', "",
+           f"struct {svc.name}Handlers {{"]
+    for meth in svc.methods:
+        if meth.kind == "unary":
+            args = ", ".join(f"{_cpp_ty(pt)} {pn}" for pn, pt in meth.params)
+            out.append(f"    virtual {_cpp_ty(meth.output)} {_attr(meth.name)}({args}) = 0;")
+        else:
+            out.append(f"    // {_attr(meth.name)}: subscription ({meth.shape})")
+    out.append("};")
+    return "\n".join(out) + "\n"
+
+
+# =============================================================================
+# driver
+# =============================================================================
+
+_LANGS = {
+    "python":     ("py",  python_api, python_client, python_server),
+    "typescript": ("ts",  ts_api,     ts_client,     ts_server),
+    "rust":       ("rs",  rust_api,   rust_client,   rust_server),
+    "cpp":        ("hpp", cpp_api,    cpp_client,    cpp_server),
+}
+
+
+def emit_all(schema: Schema, service_name: str, out_dir: Path) -> list[Path]:
+    svc = schema.services[service_name]
+    written = []
+    for lang, (ext, api_fn, client_fn, server_fn) in _LANGS.items():
+        d = out_dir / lang
+        d.mkdir(parents=True, exist_ok=True)
+        for stem, fn, needs_svc in (("api", api_fn, False), ("client", client_fn, True), ("server", server_fn, True)):
+            text = fn(schema, svc) if needs_svc else fn(schema)
+            path = d / f"{stem}.{ext}"
+            path.write_text(text)
+            written.append(path)
+    # Python output is a package (client/server use relative imports).
+    init = out_dir / "python" / "__init__.py"
+    init.write_text("from .api import *  # noqa: F401,F403\n")
+    written.append(init)
+    return written

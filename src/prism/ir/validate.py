@@ -35,13 +35,32 @@ def validate(schema: Schema) -> list[str]:
     # --- messages ---
     for m in schema.messages.values():
         tags: set[int] = set()
+        reserved_tags = set(m.reserved_tags)
+        reserved_names = set(m.reserved_names)
         for f in m.fields:
             if f.tag <= 0:
                 errors.append(f"{m.name}.{f.name}: tag must be positive")
             if f.tag in tags:
                 errors.append(f"{m.name}.{f.name}: duplicate tag {f.tag}")
             tags.add(f.tag)
+            if f.tag in reserved_tags:
+                errors.append(f"{m.name}.{f.name}: uses reserved tag {f.tag}")
+            if f.name in reserved_names:
+                errors.append(f"{m.name}.{f.name}: uses reserved name {f.name!r}")
             check_ref(f.type, f"{m.name}.{f.name}")
+            if f.merge is not None:
+                if f.merge not in ("lww", "counter"):
+                    errors.append(f"{m.name}.{f.name}: unknown CRDT merge {f.merge!r} (v1: lww | counter)")
+                elif not isinstance(f.type, Scalar):
+                    errors.append(f"{m.name}.{f.name}: CRDT merge only allowed on scalar fields")
+                elif f.merge == "counter" and f.type.kind != "int":
+                    errors.append(f"{m.name}.{f.name}: counter merge requires an int field")
+        if m.next_id is not None:
+            if m.next_id <= 0:
+                errors.append(f"{m.name}: next_id must be positive")
+            for t in tags | reserved_tags:
+                if t >= m.next_id:
+                    errors.append(f"{m.name}: tag {t} >= next_id {m.next_id}")
 
     # --- enums ---
     for e in schema.enums.values():

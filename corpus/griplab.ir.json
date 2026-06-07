@@ -83,6 +83,9 @@
   "messages": [
     {
       "name": "PeerPresence",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
       "fields": [
         {
           "name": "id",
@@ -92,7 +95,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "name",
@@ -102,7 +106,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "status",
@@ -112,7 +117,8 @@
             "name": "PresenceStatus"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "online",
@@ -122,7 +128,8 @@
             "scalar": "bool"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "location",
@@ -132,12 +139,16 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         }
       ]
     },
     {
       "name": "ByteOp",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
       "fields": [
         {
           "name": "op",
@@ -147,7 +158,8 @@
             "name": "OpKind"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "offset",
@@ -157,7 +169,8 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "length",
@@ -167,7 +180,8 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "data",
@@ -177,12 +191,16 @@
             "scalar": "bytes"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         }
       ]
     },
     {
       "name": "FileSnapshot",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
       "fields": [
         {
           "name": "resource_id",
@@ -192,7 +210,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "resume_seq",
@@ -202,7 +221,8 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "content",
@@ -212,7 +232,8 @@
             "scalar": "bytes"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "window_start",
@@ -222,7 +243,8 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "window_end",
@@ -232,7 +254,8 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "preview",
@@ -242,12 +265,16 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": true
+          "transient": true,
+          "merge": null
         }
       ]
     },
     {
       "name": "FileDelta",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
       "fields": [
         {
           "name": "resource_id",
@@ -257,7 +284,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "base_seq",
@@ -267,7 +295,8 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "seq",
@@ -277,7 +306,8 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "ops",
@@ -290,7 +320,8 @@
             }
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "result_size",
@@ -300,12 +331,16 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         }
       ]
     },
     {
       "name": "ChatMessage",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
       "fields": [
         {
           "name": "id",
@@ -315,7 +350,8 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "sender_id",
@@ -325,7 +361,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "text",
@@ -335,12 +372,16 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         }
       ]
     },
     {
       "name": "TerminalChunk",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
       "fields": [
         {
           "name": "session_id",
@@ -350,7 +391,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "data",
@@ -360,12 +402,16 @@
             "scalar": "bytes"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         }
       ]
     },
     {
       "name": "TerminalOpened",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
       "fields": [
         {
           "name": "session_id",
@@ -375,7 +421,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "repo",
@@ -385,7 +432,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "cols",
@@ -395,7 +443,8 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "rows",
@@ -405,12 +454,16 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         }
       ]
     },
     {
       "name": "RepoTarget",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
       "fields": [
         {
           "name": "repo",
@@ -420,7 +473,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "fail_with",
@@ -430,12 +484,16 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         }
       ]
     },
     {
       "name": "RepoRun",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
       "fields": [
         {
           "name": "repo",
@@ -445,7 +503,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "exit_code",
@@ -455,7 +514,8 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "output",
@@ -465,7 +525,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "error",
@@ -475,12 +536,16 @@
             "scalar": "str"
           },
           "optional": true,
-          "transient": false
+          "transient": false,
+          "merge": null
         }
       ]
     },
     {
       "name": "CmdSession",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
       "fields": [
         {
           "name": "session_id",
@@ -490,7 +555,8 @@
             "scalar": "str"
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "argv",
@@ -503,7 +569,8 @@
             }
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "targets",
@@ -516,7 +583,8 @@
             }
           },
           "optional": false,
-          "transient": false
+          "transient": false,
+          "merge": null
         },
         {
           "name": "started_monotonic",
@@ -526,7 +594,178 @@
             "scalar": "int"
           },
           "optional": false,
-          "transient": true
+          "transient": true,
+          "merge": null
+        }
+      ]
+    },
+    {
+      "name": "CrdtOp",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
+      "fields": [
+        {
+          "name": "doc",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "actor",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "seq",
+          "tag": 3,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "field",
+          "tag": 4,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "value",
+          "tag": 5,
+          "type": {
+            "k": "scalar",
+            "scalar": "bytes"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        }
+      ]
+    },
+    {
+      "name": "VersionEntry",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
+      "fields": [
+        {
+          "name": "actor",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "seq",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        }
+      ]
+    },
+    {
+      "name": "CrdtState",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
+      "fields": [
+        {
+          "name": "doc",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "ops",
+          "tag": 2,
+          "type": {
+            "k": "list",
+            "elem": {
+              "k": "msg",
+              "name": "CrdtOp"
+            }
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "version",
+          "tag": 3,
+          "type": {
+            "k": "list",
+            "elem": {
+              "k": "msg",
+              "name": "VersionEntry"
+            }
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        }
+      ]
+    },
+    {
+      "name": "Board",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
+      "fields": [
+        {
+          "name": "title",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "str"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": "lww"
+        },
+        {
+          "name": "votes",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": "counter"
         }
       ]
     }
@@ -860,6 +1099,94 @@
           },
           "shape": null,
           "events": []
+        }
+      ]
+    },
+    {
+      "name": "Collab",
+      "methods": [
+        {
+          "name": "board.snapshot",
+          "kind": "unary",
+          "role": "out",
+          "params": [],
+          "output": {
+            "k": "msg",
+            "name": "CrdtState"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "board.local_apply",
+          "kind": "unary",
+          "role": "in",
+          "params": [
+            {
+              "name": "actor",
+              "type": {
+                "k": "scalar",
+                "scalar": "str"
+              }
+            },
+            {
+              "name": "field",
+              "type": {
+                "k": "scalar",
+                "scalar": "int"
+              }
+            },
+            {
+              "name": "value",
+              "type": {
+                "k": "scalar",
+                "scalar": "bytes"
+              }
+            }
+          ],
+          "output": {
+            "k": "msg",
+            "name": "CrdtOp"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "board.merge",
+          "kind": "unary",
+          "role": "ctl",
+          "params": [
+            {
+              "name": "op",
+              "type": {
+                "k": "msg",
+                "name": "CrdtOp"
+              }
+            }
+          ],
+          "output": {
+            "k": "scalar",
+            "scalar": "bool"
+          },
+          "shape": null,
+          "events": []
+        },
+        {
+          "name": "board.sync",
+          "kind": "server_stream",
+          "role": "out",
+          "params": [],
+          "output": null,
+          "shape": "crdt",
+          "events": [
+            {
+              "event": "op",
+              "type": {
+                "k": "msg",
+                "name": "CrdtOp"
+              }
+            }
+          ]
         }
       ]
     }

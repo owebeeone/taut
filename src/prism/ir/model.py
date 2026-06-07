@@ -50,12 +50,17 @@ class FieldDef:
     type: TypeRef
     optional: bool = False
     transient: bool = False    # present in the native type, never on the wire
+    merge: str | None = None   # CRDT merge type for this field: "lww" | "counter"
+                               # (design metadata; does not affect the wire encoding)
 
 
 @dataclass(frozen=True)
 class MessageDef:
     name: str
     fields: tuple[FieldDef, ...]
+    reserved_tags: tuple[int, ...] = ()    # retired tags — never reusable
+    reserved_names: tuple[str, ...] = ()   # retired field names — never reusable
+    next_id: int | None = None             # declared next tag to allocate (> every used/reserved tag)
 
     def wire_fields(self) -> tuple[FieldDef, ...]:
         return tuple(f for f in self.fields if not f.transient)
