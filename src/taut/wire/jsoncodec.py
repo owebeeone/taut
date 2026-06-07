@@ -26,7 +26,7 @@ import base64
 import json
 from typing import Any
 
-from ..ir.model import EnumRef, ListOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from . import codec
 
 
@@ -43,10 +43,27 @@ def _to_json(schema: Schema, tref: TypeRef, value: Any) -> Any:
         return value                                   # member-name string
     if isinstance(tref, ListOf):
         return [_to_json(schema, tref.elem, v) for v in value]
+    if isinstance(tref, MapOf):
+        # JSON object: keys are strings (proto3 JSON convention)
+        return {_key_str(k): _to_json(schema, tref.value, v) for k, v in value.items()}
     if isinstance(tref, MsgRef):
         msg = schema.messages[tref.name]
         return {f.name: _to_json(schema, f.type, value.get(f.name)) for f in msg.wire_fields()}
     raise TypeError(f"unknown type ref {tref!r}")
+
+
+def _key_str(k: Any) -> str:
+    if isinstance(k, bool):
+        return "true" if k else "false"
+    return str(k)
+
+
+def _key_parse(kt: TypeRef, s: str) -> Any:
+    if isinstance(kt, Scalar) and kt.kind == "int":
+        return int(s)
+    if isinstance(kt, Scalar) and kt.kind == "bool":
+        return s == "true"
+    return s
 
 
 def _from_json(schema: Schema, tref: TypeRef, jv: Any) -> Any:
@@ -62,6 +79,8 @@ def _from_json(schema: Schema, tref: TypeRef, jv: Any) -> Any:
         return jv
     if isinstance(tref, ListOf):
         return [_from_json(schema, tref.elem, v) for v in jv]
+    if isinstance(tref, MapOf):
+        return {_key_parse(tref.key, k): _from_json(schema, tref.value, v) for k, v in jv.items()}
     if isinstance(tref, MsgRef):
         msg = schema.messages[tref.name]
         obj = jv or {}

@@ -16,6 +16,7 @@ from .model import (
     ExtensionDef,
     FieldDef,
     ListOf,
+    MapOf,
     MessageDef,
     MethodDef,
     MsgRef,
@@ -49,6 +50,8 @@ def _typeref_from_json(d: dict) -> TypeRef:
         return MsgRef(d["name"])
     if k == "list":
         return ListOf(_typeref_from_json(d["elem"]))
+    if k == "map":
+        return MapOf(_typeref_from_json(d["key"]), _typeref_from_json(d["value"]))
     raise ValueError(f"unknown type ref {d!r}")
 
 

@@ -10,7 +10,7 @@ combinations and anything outside the closed set, before any mechanism is derive
 
 from __future__ import annotations
 
-from .model import EnumRef, ListOf, MsgRef, Scalar, Schema, TypeRef
+from .model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from .shapes import BAND_START, ROLES, SHAPES
 
 
@@ -29,6 +29,13 @@ def validate(schema: Schema) -> list[str]:
                 errors.append(f"{ctx}: dangling message ref {t.name!r}")
         elif isinstance(t, ListOf):
             check_ref(t.elem, ctx)
+        elif isinstance(t, MapOf):
+            if not (isinstance(t.key, Scalar) and t.key.kind in ("int", "str", "bool")):
+                errors.append(f"{ctx}: map key must be int/str/bool, got {t.key!r}")
+            if isinstance(t.value, (ListOf, MapOf)):
+                errors.append(f"{ctx}: map value cannot be a list or map ({t.value!r})")
+            check_ref(t.key, ctx)
+            check_ref(t.value, ctx)
         else:
             errors.append(f"{ctx}: unknown type ref {t!r}")
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..ir.model import EnumRef, ListOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from . import cbor
 
 
@@ -45,6 +45,12 @@ def _to_wire(schema: Schema, tref: TypeRef, value: Any) -> Any:
         return schema.enums[tref.name].members[value]   # member name -> int
     if isinstance(tref, ListOf):
         return [_to_wire(schema, tref.elem, v) for v in value]
+    if isinstance(tref, MapOf):
+        # key-sorted array of {1: key, 2: value} — deterministic, like a message list
+        return [
+            {1: _to_wire(schema, tref.key, k), 2: _to_wire(schema, tref.value, value[k])}
+            for k in sorted(value)
+        ]
     if isinstance(tref, MsgRef):
         msg = schema.messages[tref.name]
         out: dict[int, Any] = {}
@@ -67,6 +73,11 @@ def _from_wire(schema: Schema, tref: TypeRef, cv: Any) -> Any:
         return reverse[cv]                               # int -> member name
     if isinstance(tref, ListOf):
         return [_from_wire(schema, tref.elem, v) for v in cv]
+    if isinstance(tref, MapOf):
+        return {
+            _from_wire(schema, tref.key, e[1]): _from_wire(schema, tref.value, e[2])
+            for e in cv
+        }
     if isinstance(tref, MsgRef):
         msg = schema.messages[tref.name]
         out: dict[str, Any] = {}

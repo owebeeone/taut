@@ -34,7 +34,13 @@ class ListOf:
     elem: "TypeRef"
 
 
-TypeRef = Scalar | EnumRef | MsgRef | ListOf
+@dataclass(frozen=True)
+class MapOf:
+    key: "TypeRef"     # scalar int | str | bool
+    value: "TypeRef"   # scalar | enum | message (not list/map)
+
+
+TypeRef = Scalar | EnumRef | MsgRef | ListOf | MapOf
 
 
 # --- declarations -------------------------------------------------------------

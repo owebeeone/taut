@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .model import EnumRef, ListOf, MethodDef, MsgRef, Scalar, Schema, TypeRef
+from .model import EnumRef, ListOf, MapOf, MethodDef, MsgRef, Scalar, Schema, TypeRef
 from .shapes import SHAPES
 
 
@@ -23,6 +23,8 @@ def _typeref_json(t: TypeRef) -> dict:
         return {"k": "msg", "name": t.name}
     if isinstance(t, ListOf):
         return {"k": "list", "elem": _typeref_json(t.elem)}
+    if isinstance(t, MapOf):
+        return {"k": "map", "key": _typeref_json(t.key), "value": _typeref_json(t.value)}
     raise TypeError(f"unknown type ref {t!r}")
 
 

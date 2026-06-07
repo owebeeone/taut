@@ -13,6 +13,7 @@ from .model import (
     ExtensionDef,
     FieldDef,
     ListOf,
+    MapOf,
     MessageDef,
     MethodDef,
     MsgRef,
@@ -40,6 +41,12 @@ def Ref(name: str) -> MsgRef:
 
 def List(elem: TypeRef) -> ListOf:
     return ListOf(elem)
+
+
+def Map(key: TypeRef, value: TypeRef) -> MapOf:
+    """A keyed collection. `key` is a scalar (int/str/bool); `value` is any scalar,
+    enum, or message. Wire: a key-sorted array of {1: key, 2: value} entries."""
+    return MapOf(key, value)
 
 
 def F(name: str, tag: int, type: TypeRef, *, optional: bool = False, transient: bool = False,
@@ -92,6 +99,8 @@ def _resolve(tref: TypeRef, enum_names: set[str]) -> TypeRef:
         return EnumRef(tref.name) if tref.name in enum_names else tref
     if isinstance(tref, ListOf):
         return ListOf(_resolve(tref.elem, enum_names))
+    if isinstance(tref, MapOf):
+        return MapOf(_resolve(tref.key, enum_names), _resolve(tref.value, enum_names))
     return tref
 
 
