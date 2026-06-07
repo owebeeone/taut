@@ -178,8 +178,12 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
     **Go BUILT**: `gen/go.py` + vendored `cbor.go`; PascalCase exported fields
     (sidesteps Go keywords), typed-const enums, pointer optionals, forward-compat
     residual [Encode sorts]. go-verified: griplab + razel + the docs Tasks example
-    build, cross-version round-trip byte-exact. **JS** next (TS runtime is
-    JS-compatible), **Java last**.)*
+    build, cross-version round-trip byte-exact. **Kotlin BUILT**: `gen/kotlin.py`
+    + vendored `cbor.kt`; mutable `var` data classes (default equals — ByteArray
+    nuance deferred to ~0.5), `enum class` w/ wire value, nullable optionals,
+    keyword backticks, forward-compat residual. kotlinc-verified (Android Studio
+    JBR 21): griplab + razel typecheck, cross-version round-trip byte-exact.
+    **JS** next (TS runtime is JS-compatible), **Java last**.)*
   *(DECIDED — sequencing locked with the user; JSON profile already BUILT)*
 
 ## Already-built foundation (for reference)

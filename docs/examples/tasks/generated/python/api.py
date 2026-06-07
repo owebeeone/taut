@@ -8,17 +8,17 @@ class TaskState(Enum):
     doing = 1
     done = 2
 
-@dataclass
+@dataclass(slots=True)
 class User:
     id: int
     name: str
 
-@dataclass
+@dataclass(slots=True)
 class Comment:
     author: User
     text: str
 
-@dataclass
+@dataclass(slots=True)
 class Task:
     id: int
     title: str
@@ -26,7 +26,7 @@ class Task:
     assignee: User | None
     comments: list[Comment]
 
-@dataclass
+@dataclass(slots=True)
 class Event:
     ts: int
     text: str

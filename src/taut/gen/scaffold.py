@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import cpp as _cpp
 from . import go as _go
+from . import kotlin as _kotlin
 from . import rust as _rust
 from . import swift as _swift
 from ..ir.model import EnumRef, ListOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef
@@ -29,6 +30,7 @@ _RUNTIMES: dict[str, tuple[str, str]] = {
     "cpp": ("taut/cbor.hpp", "cbor.hpp"),    # generated api.hpp: `#include "taut/cbor.hpp"`
     "swift": ("cbor.swift", "cbor.swift"),   # same-module Cbor / encode / decode
     "go": ("cbor.go", "cbor.go"),            # same-package Cbor / Encode / Decode
+    "kotlin": ("cbor.kt", "cbor.kt"),        # same-package Cbor / encode / decode
 }
 
 
@@ -67,7 +69,7 @@ def python_api(schema: Schema, forward_compat: bool = False) -> str:
             out.append(f"    {m} = {v}")
         out.append("")
     for m in schema.messages.values():
-        out.append("@dataclass")
+        out.append("@dataclass(slots=True)")
         out.append(f"class {m.name}:")
         if not m.fields:
             out.append("    pass")
@@ -393,6 +395,48 @@ def go_server(schema: Schema, svc: ServiceDef) -> str:
 
 
 # =============================================================================
+# Kotlin
+# =============================================================================
+
+def _kt_ty(t: TypeRef | None) -> str:
+    if t is None:
+        return "Unit"
+    if isinstance(t, Scalar):
+        return {"int": "Long", "str": "String", "bytes": "ByteArray", "bool": "Boolean"}[t.kind]
+    if isinstance(t, (EnumRef, MsgRef)):
+        return t.name
+    if isinstance(t, ListOf):
+        return f"List<{_kt_ty(t.elem)}>"
+    raise TypeError(t)
+
+
+def kotlin_api(schema: Schema, forward_compat: bool = False) -> str:
+    return _kotlin.emit_types(schema, forward_compat)
+
+
+def kotlin_client(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED typed client stub over a generic transport.", "package taut", ""]
+    for meth in svc.methods:
+        args = ", ".join(f"{pn}: {_kt_ty(pt)}" for pn, pt in meth.params)
+        kind = "call" if not meth.streams() else f'subscribe ("{meth.shape}")'
+        out.append(f"// {_attr(meth.name)}({args}): {_kt_ty(meth.output)}  [{kind}]")
+    return "\n".join(out) + "\n"
+
+
+def kotlin_server(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED server handler interface stub.", "package taut", "",
+           f"interface {svc.name}Handlers {{"]
+    for meth in svc.methods:
+        args = ", ".join(f"{pn}: {_kt_ty(pt)}" for pn, pt in meth.params)
+        if not meth.streams():
+            out.append(f"    fun {_attr(meth.name)}({args}): {_kt_ty(meth.output)}")
+        else:
+            out.append(f"    // {_attr(meth.name)}: subscription ({meth.shape})")
+    out.append("}")
+    return "\n".join(out) + "\n"
+
+
+# =============================================================================
 # driver
 # =============================================================================
 
@@ -403,6 +447,7 @@ _LANGS = {
     "cpp":        ("hpp",   cpp_api,    cpp_client,    cpp_server),
     "swift":      ("swift", swift_api,  swift_client,  swift_server),
     "go":         ("go",    go_api,     go_client,     go_server),
+    "kotlin":     ("kt",    kotlin_api, kotlin_client, kotlin_server),
 }
 
 
@@ -436,10 +481,11 @@ def emit(
     unknown = [l for l in lang_keys if l not in _LANGS]
     if unknown:
         raise ValueError(f"unknown lang(s) {unknown}; known: {sorted(_LANGS)}")
-    if schema.extensions and not forward_compat and ({"rust", "cpp", "swift", "go"} & set(lang_keys)):
+    if schema.extensions and not forward_compat and ({"rust", "cpp", "swift", "go", "kotlin"} & set(lang_keys)):
         raise ValueError(
-            "this IR declares extensions; generating a compiled target (rust/cpp/swift/go) "
-            "requires forward_compat (extensions ride the residual space) — pass --forward-compat"
+            "this IR declares extensions; generating a compiled target "
+            "(rust/cpp/swift/go/kotlin) requires forward_compat (extensions ride the "
+            "residual space) — pass --forward-compat"
         )
     svc_names = list(services) if services is not None else list(schema.services)
     missing = [s for s in svc_names if s not in schema.services]
