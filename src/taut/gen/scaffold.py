@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import cpp as _cpp
 from . import go as _go
+from . import js as _js
 from . import kotlin as _kotlin
 from . import rust as _rust
 from . import swift as _swift
@@ -31,6 +32,7 @@ _RUNTIMES: dict[str, tuple[str, str]] = {
     "swift": ("cbor.swift", "cbor.swift"),   # same-module Cbor / encode / decode
     "go": ("cbor.go", "cbor.go"),            # same-package Cbor / Encode / Decode
     "kotlin": ("cbor.kt", "cbor.kt"),        # same-package Cbor / encode / decode
+    "js": ("cbor.js", "cbor.js"),            # require("./cbor.js")
 }
 
 
@@ -437,6 +439,32 @@ def kotlin_server(schema: Schema, svc: ServiceDef) -> str:
 
 
 # =============================================================================
+# JavaScript
+# =============================================================================
+
+def js_api(schema: Schema, forward_compat: bool = False) -> str:
+    return _js.emit_types(schema, forward_compat)
+
+
+def js_client(schema: Schema, svc: ServiceDef) -> str:
+    out = ['"use strict";', "// GENERATED typed client stub over a generic transport.", ""]
+    for meth in svc.methods:
+        args = ", ".join(pn for pn, _ in meth.params)
+        kind = "call" if not meth.streams() else f'subscribe ("{meth.shape}")'
+        out.append(f"// {_attr(meth.name)}({args})  [{kind}]")
+    return "\n".join(out) + "\n"
+
+
+def js_server(schema: Schema, svc: ServiceDef) -> str:
+    out = ['"use strict";', "// GENERATED server handler shape (implement these as a name->fn map):"]
+    for meth in svc.methods:
+        args = ", ".join(pn for pn, _ in meth.params)
+        tag = "" if not meth.streams() else f"  // subscription ({meth.shape})"
+        out.append(f"//   {meth.name}: ({args}) => ...{tag}")
+    return "\n".join(out) + "\n"
+
+
+# =============================================================================
 # driver
 # =============================================================================
 
@@ -448,6 +476,7 @@ _LANGS = {
     "swift":      ("swift", swift_api,  swift_client,  swift_server),
     "go":         ("go",    go_api,     go_client,     go_server),
     "kotlin":     ("kt",    kotlin_api, kotlin_client, kotlin_server),
+    "js":         ("js",    js_api,     js_client,     js_server),
 }
 
 
@@ -481,11 +510,11 @@ def emit(
     unknown = [l for l in lang_keys if l not in _LANGS]
     if unknown:
         raise ValueError(f"unknown lang(s) {unknown}; known: {sorted(_LANGS)}")
-    if schema.extensions and not forward_compat and ({"rust", "cpp", "swift", "go", "kotlin"} & set(lang_keys)):
+    if schema.extensions and not forward_compat and ({"rust", "cpp", "swift", "go", "kotlin", "js"} & set(lang_keys)):
         raise ValueError(
-            "this IR declares extensions; generating a compiled target "
-            "(rust/cpp/swift/go/kotlin) requires forward_compat (extensions ride the "
-            "residual space) — pass --forward-compat"
+            "this IR declares extensions; generating a typed target "
+            "(rust/cpp/swift/go/kotlin/js) requires forward_compat (extensions ride "
+            "the residual space) — pass --forward-compat"
         )
     svc_names = list(services) if services is not None else list(schema.services)
     missing = [s for s in svc_names if s not in schema.services]

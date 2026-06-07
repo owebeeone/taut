@@ -183,7 +183,10 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
     nuance deferred to ~0.5), `enum class` w/ wire value, nullable optionals,
     keyword backticks, forward-compat residual. kotlinc-verified (Android Studio
     JBR 21): griplab + razel typecheck, cross-version round-trip byte-exact.
-    **JS** next (TS runtime is JS-compatible), **Java last**.)*
+    **JS BUILT**: `gen/js.py` + vendored `cbor.js` (CommonJS); ES classes + frozen
+    enum objects + codec, nullable optionals, forward-compat residual (encode
+    sorts). node-verified: griplab + razel load, cross-version round-trip
+    byte-exact. **Java last** (records-or-classes TBD).)*
   *(DECIDED — sequencing locked with the user; JSON profile already BUILT)*
 
 ## Already-built foundation (for reference)

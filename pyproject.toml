@@ -37,7 +37,7 @@ include = ["taut*"]
 
 [tool.setuptools.package-data]
 # vendored per-language CBOR runtimes emitted by `tautc gen --with-runtime`
-"taut.gen.runtime" = ["*.rs", "*.hpp", "*.swift", "*.go", "*.kt"]
+"taut.gen.runtime" = ["*.rs", "*.hpp", "*.swift", "*.go", "*.kt", "*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["src/tests"]
