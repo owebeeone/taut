@@ -176,8 +176,7 @@ companion `trial/` repo, each validated against this repo's corpus.
 python run_tests.py        # regenerate the corpus, run the suite
 ```
 
-taut sits at the mechanism tier beneath **Glade**, a declarative share-kernel for
-distributed/server state; see [dev-docs/TautPlan.md](dev-docs/TautPlan.md).
+Design notes and the decisions log live in [dev-docs/](dev-docs/).
 
 ## License
 
