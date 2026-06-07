@@ -16,6 +16,9 @@ from ..ir.model import EnumRef, FieldDef, ListOf, MsgRef, Scalar, Schema, TypeRe
 _KT_KEYWORDS = frozenset("""
 as as? break class continue do else false for fun if in in? interface is is! null
 object package return super this throw true try typealias typeof val var when while
+open data sealed inner companion annotation abstract final override public private
+protected internal lateinit vararg const inline operator infix external suspend
+tailrec reified crossinline noinline expect actual enum
 """.split())
 
 

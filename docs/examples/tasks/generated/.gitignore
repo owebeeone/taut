@@ -1,0 +1,5 @@
+# build artifacts from running the per-language examples
+*/example
+*/example.jar
+*/out/
+*.class

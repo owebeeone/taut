@@ -65,7 +65,7 @@ struct Task {
     b.uint(3);
     b.integer(static_cast<long long>(state));
     b.uint(4);
-    if (assignee.has_value()) { *assignee.to_cbor(b); } else { b.null_(); }
+    if (assignee.has_value()) { (*assignee).to_cbor(b); } else { b.null_(); }
     b.uint(5);
     b.array(comments.size());
     for (const auto& x : comments) { x.to_cbor(b); }

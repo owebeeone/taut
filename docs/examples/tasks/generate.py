@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the per-language code for the Tasks API into ./generated/ :
-api (types), client, and server stubs for Python, TypeScript, Rust, and C++.
-Run: python generate.py"""
+"""Generate the per-language code for the Tasks API into ./generated/ : api
+(types + codec), client, and server stubs, plus the vendored CBOR runtime for each
+compiled target — so every generated/<lang>/ is self-contained and the per-language
+examples (example.*) run as-is. Run: python generate.py"""
 
 import sys
 from pathlib import Path
@@ -17,7 +18,7 @@ from taut.ir.validate import validate_or_raise
 def main() -> None:
     schema = load_schema(HERE / "tasks.taut.py")
     validate_or_raise(schema)
-    written = scaffold.emit_all(schema, "Tasks", HERE / "generated")
+    written = scaffold.emit(schema, HERE / "generated", services=["Tasks"], runtime=True)
     print(f"generated {len(written)} files:")
     for p in written:
         print(" ", p.relative_to(HERE))

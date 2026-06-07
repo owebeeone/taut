@@ -96,7 +96,8 @@ def _decode_expr(t: TypeRef, acc: str) -> str:
 
 def _field_encode_lines(f) -> list[str]:
     if f.optional:
-        return [f"    if ({f.name}.has_value()) {{ {_encode_scalar(f.type, '*' + f.name)} }} else {{ b.null_(); }}"]
+        # parenthesize the deref: `(*x).to_cbor(b)`, not `*x.to_cbor(b)` (precedence)
+        return [f"    if ({f.name}.has_value()) {{ {_encode_scalar(f.type, '(*' + f.name + ')')} }} else {{ b.null_(); }}"]
     if isinstance(f.type, ListOf):
         return [f"    b.array({f.name}.size());",
                 f"    for (const auto& x : {f.name}) {{ {_encode_scalar(f.type.elem, 'x')} }}"]

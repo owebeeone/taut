@@ -3,7 +3,7 @@
 package taut
 
 enum class TaskState(val wire: Long) {
-    open(0), doing(1), done(2);
+    `open`(0), doing(1), done(2);
     companion object { fun fromWire(v: Long) = values().first { it.wire == v } }
 }
 
