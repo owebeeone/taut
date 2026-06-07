@@ -2,6 +2,7 @@
 #pragma once
 #include <optional>
 #include <string_view>
+#include <utility>
 #include <vector>
 #include "taut/cbor.hpp"
 
