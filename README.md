@@ -147,7 +147,10 @@ tautc gen IR --out DIR [--lang python,typescript,rust,cpp] [--service A,B] [--ap
 Loads a `.taut.py` or `.ir.json`, validates it, and emits per language:
 `api` (native types + encoders/decoders), plus `client`/`server` stubs per
 service. `--api-only` emits just the struct defs + codec — the drop-in for a
-build script on a compiled target. Example: razel (a Rust build daemon) authors
+build script on a compiled target. `--with-runtime` additionally emits the
+vendored CBOR runtime for compiled targets (`rust` → `cbor.rs`, `cpp` →
+`taut/cbor.hpp`), so the generated output compiles **standalone** — no
+hand-vendoring. Example: razel (a Rust build daemon) authors
 `ir/razel.taut.py` and generates its Rust wire layer with
 `tautc gen ir/razel.taut.py -o razel/gen --lang rust --api-only`.
 

@@ -11,11 +11,25 @@ type emitters reuse the byte-exact-proven Rust/C++ generators.
 
 from __future__ import annotations
 
+from importlib import resources
 from pathlib import Path
 
 from . import cpp as _cpp
 from . import rust as _rust
 from ..ir.model import EnumRef, ListOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef
+
+# Compiled targets whose generated code imports an external CBOR runtime module.
+# Maps lang -> (output path relative to its lang dir, vendored resource file).
+# Python/TS use the IR-driven runtime codec (the installed package), so they have
+# nothing to emit here.
+_RUNTIMES: dict[str, tuple[str, str]] = {
+    "rust": ("cbor.rs", "cbor.rs"),          # generated api.rs: `use crate::cbor::Cbor`
+    "cpp": ("taut/cbor.hpp", "cbor.hpp"),    # generated api.hpp: `#include "taut/cbor.hpp"`
+}
+
+
+def _runtime_source(resource: str) -> str:
+    return resources.files("taut.gen.runtime").joinpath(resource).read_text(encoding="utf-8")
 
 
 def _attr(name: str) -> str:
@@ -306,6 +320,7 @@ def emit(
     *,
     langs: list[str] | None = None,
     services: list[str] | None = None,
+    runtime: bool = False,
 ) -> list[Path]:
     """Generate per-language code from an IR (the engine behind the `tautc` CLI).
 
@@ -313,6 +328,9 @@ def emit(
     - `services`: services to emit client/server for; default = every service in
       the schema. Pass `[]` for **api only** (native types + encoders/decoders,
       no RPC stubs) — the common build-script case for compiled targets.
+    - `runtime`: when True, also emit the vendored CBOR runtime for compiled
+      targets (`rust` -> `cbor.rs`, `cpp` -> `taut/cbor.hpp`) so the generated
+      code is self-contained. Off by default — emitted only on demand.
 
     `api.{ext}` (types + codec) is always written per language; client/server are
     `client.{ext}` for a lone service, `client_{svc}.{ext}` when several.
@@ -334,6 +352,12 @@ def emit(
         api_path = d / f"api.{ext}"
         api_path.write_text(api_fn(schema))
         written.append(api_path)
+        if runtime and lang in _RUNTIMES:
+            rel, resource = _RUNTIMES[lang]
+            rt_path = d / rel
+            rt_path.parent.mkdir(parents=True, exist_ok=True)
+            rt_path.write_text(_runtime_source(resource))
+            written.append(rt_path)
         for sname in svc_names:
             svc = schema.services[sname]
             suffix = f"_{sname}" if multi else ""
