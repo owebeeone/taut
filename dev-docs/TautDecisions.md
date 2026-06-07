@@ -152,13 +152,17 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
     golden byte-identical. C++/other harnesses ride their generators in 0.3+.)*
   - **Forward-compat residual in the generators** (D10–D12: `wire_residual` +
     flag/gate + `wire_` reservation) so compiled targets stop dropping unknowns.
-    *(BUILT for **Rust**: `tautc gen --forward-compat` adds a `wire_residual` field
-    [Vec<(i64,Cbor)>] that captures + re-emits unknown tags; `cbor.rs` gains
-    `map_entries`; validator reserves `wire_`; extensions-without-flag is a Rust
-    build error [D14]. Cross-version round-trip — v1 struct reads v2 bytes,
-    preserves the unknown field byte-for-byte through edit + re-encode — verified
-    in Python [runtime] and compile-run-verified in generated Rust. **C++** raises
-    NotImplemented for now; **TS** runtime pending.)*
+    *(BUILT for **all four langs**. `tautc gen --forward-compat` adds a
+    `wire_residual` field that captures + re-emits unknown tags: **Rust**
+    [Vec<(i64,Cbor)>, cbor.rs gains `map_entries`], **C++** [vector<pair<long
+    long,Cbor>>; cbor.hpp gains a generic `encode_value`; to_cbor merge-emits so
+    residual interleaves with known tags in canonical order]. **Python**/**TS**
+    runtime codecs preserve unknowns (`__unknown__`) default-on. Validator reserves
+    `wire_`; extensions-without-flag is a Rust/C++ build error [D14]. The
+    cross-version property — a v1 struct reads v2 bytes and preserves the unknown
+    field byte-for-byte through edit + re-encode (incl. a tag interleaved between
+    known tags) — is tested in Python, compile-run-verified in generated Rust + C++,
+    and tested in TS.)*
   - **JSON profile** — *(BUILT in 0.2.0 dev)* IR-driven CBOR↔JSON (`taut.wire.
     jsoncodec`: proto3-style int64→string, bytes→base64, enum→name, canonical
     sorted-key JSON; CBOR→JSON→CBOR byte-identical for residual-free values). The

@@ -171,9 +171,10 @@ canonical codec → `golden.json`) plus a per-language byte-parity harness (Rust
 - **Forward-compatibility** — unknown-field preservation: a decoder keeps
   unrecognized tags as raw CBOR and re-emits them in canonical order, so an old
   reader relaying a new message loses nothing. Default-on in the Python/TS runtime
-  codec; opt-in for generated structs via `tautc gen --forward-compat` (a
-  `wire_residual` field — Rust today, C++/others next). Proven by a cross-version
-  test: a v1 struct round-trips a v2-only field **byte-for-byte**.
+  codec; opt-in for generated structs (Rust + C++) via `tautc gen --forward-compat`
+  (a `wire_residual` field). Proven across all four languages by a cross-version
+  test: a v1 struct round-trips a v2-only field **byte-for-byte** — even when the
+  unknown tag interleaves between known ones.
 - **Extensions** — declared, typed side-channels at a reserved tag band
   (`BAND_START = 2^20`); infrastructure reads/writes them on the wire without the
   app schema knowing.

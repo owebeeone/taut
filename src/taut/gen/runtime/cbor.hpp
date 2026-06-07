@@ -152,4 +152,31 @@ constexpr std::pair<Cbor, std::size_t> decode_at(std::string_view d, std::size_t
 
 constexpr Cbor parse(std::string_view d) { return decode_at(d, 0).first; }
 
+// Re-emit an arbitrary decoded value canonically (ascending map keys). Used by
+// forward-compat: residual fields a schema doesn't name are carried as raw Cbor
+// and written back with this.
+constexpr void encode_value(Buf& b, const Cbor& c) {
+    switch (c.k) {
+        case Cbor::K::Int: b.integer(c.i); break;
+        case Cbor::K::Bytes: b.bytes(c.s); break;
+        case Cbor::K::Text: b.text(c.s); break;
+        case Cbor::K::Bool: b.boolean(c.i != 0); break;
+        case Cbor::K::Null: b.null_(); break;
+        case Cbor::K::Arr:
+            b.array(c.arr.size());
+            for (const auto& e : c.arr) encode_value(b, e);
+            break;
+        case Cbor::K::Map: {
+            auto m = c.map;  // copy to sort ascending (canonical)
+            for (std::size_t i = 1; i < m.size(); ++i)
+                for (std::size_t j = i; j > 0 && m[j - 1].first > m[j].first; --j) {
+                    auto t = m[j - 1]; m[j - 1] = m[j]; m[j] = t;
+                }
+            b.map(m.size());
+            for (const auto& kv : m) { b.uint(static_cast<unsigned long long>(kv.first)); encode_value(b, kv.second); }
+            break;
+        }
+    }
+}
+
 } // namespace taut

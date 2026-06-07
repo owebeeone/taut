@@ -271,7 +271,8 @@ def _cpp_ty(t: TypeRef | None) -> str:
 
 
 def cpp_api(schema: Schema, forward_compat: bool = False) -> str:
-    return _cpp._emit_types(schema)  # enums + structs + constexpr to_cbor/from_cbor
+    # enums + structs + constexpr to_cbor/from_cbor (+ wire_residual when forward_compat)
+    return _cpp._emit_types(schema, forward_compat)
 
 
 def cpp_client(schema: Schema, svc: ServiceDef) -> str:
@@ -344,11 +345,9 @@ def emit(
     unknown = [l for l in lang_keys if l not in _LANGS]
     if unknown:
         raise ValueError(f"unknown lang(s) {unknown}; known: {sorted(_LANGS)}")
-    if forward_compat and "cpp" in lang_keys:
-        raise NotImplementedError("forward-compat codegen is Rust-only for now (C++ residual is a follow-up)")
-    if schema.extensions and not forward_compat and "rust" in lang_keys:
+    if schema.extensions and not forward_compat and ({"rust", "cpp"} & set(lang_keys)):
         raise ValueError(
-            "this IR declares extensions; generating Rust requires forward_compat "
+            "this IR declares extensions; generating Rust/C++ requires forward_compat "
             "(extensions ride the unknown-field/residual space) — pass --forward-compat"
         )
     svc_names = list(services) if services is not None else list(schema.services)

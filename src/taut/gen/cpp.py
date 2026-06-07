@@ -94,7 +94,16 @@ def _decode_expr(t: TypeRef, acc: str) -> str:
     raise TypeError(t)
 
 
-def _emit_from_cbor(msg) -> list[str]:
+def _field_encode_lines(f) -> list[str]:
+    if f.optional:
+        return [f"    if ({f.name}.has_value()) {{ {_encode_scalar(f.type, '*' + f.name)} }} else {{ b.null_(); }}"]
+    if isinstance(f.type, ListOf):
+        return [f"    b.array({f.name}.size());",
+                f"    for (const auto& x : {f.name}) {{ {_encode_scalar(f.type.elem, 'x')} }}"]
+    return [f"    {_encode_scalar(f.type, f.name)}"]
+
+
+def _emit_from_cbor(msg, forward_compat: bool = False) -> list[str]:
     lines = [f"  static constexpr {msg.name} from_cbor(const Cbor& c) {{", f"    {msg.name} v{{}};"]
     for f in msg.fields:
         if f.transient:
@@ -105,33 +114,47 @@ def _emit_from_cbor(msg) -> list[str]:
             lines.append(f"    for (const auto& x : c.get({f.tag}).as_array()) v.{f.name}.push_back({_decode_expr(f.type.elem, 'x')});")
         else:
             lines.append(f"    v.{f.name} = {_decode_expr(f.type, f'c.get({f.tag})')};")
+    if forward_compat:
+        known = " && ".join(f"kv.first != {f.tag}" for f in msg.wire_fields()) or "true"
+        lines.append(f"    for (const auto& kv : c.map) if ({known}) v.wire_residual.push_back(kv);")
     lines.append("    return v;")
     lines.append("  }")
     return lines
 
 
-def _emit_to_cbor(msg) -> list[str]:
+def _emit_to_cbor(msg, forward_compat: bool = False) -> list[str]:
     wire = sorted(msg.wire_fields(), key=lambda f: f.tag)
-    lines = ["  constexpr void to_cbor(Buf& b) const {", f"    b.map({len(wire)});"]
-    for f in wire:
-        lines.append(f"    b.uint({f.tag});")
-        if f.optional:
-            lines.append(f"    if ({f.name}.has_value()) {{ {_encode_scalar(f.type, '*' + f.name)} }} else {{ b.null_(); }}")
-        elif isinstance(f.type, ListOf):
-            lines.append(f"    b.array({f.name}.size());")
-            lines.append(f"    for (const auto& x : {f.name}) {{ {_encode_scalar(f.type.elem, 'x')} }}")
-        else:
-            lines.append(f"    {_encode_scalar(f.type, f.name)}")
+    lines = ["  constexpr void to_cbor(Buf& b) const {"]
+    if forward_compat:
+        # merge residual (ascending) with known fields (ascending) -> canonical order
+        lines.append(f"    b.map({len(wire)} + wire_residual.size());")
+        lines.append("    std::size_t __ri = 0;")
+        flush = ("    while (__ri < wire_residual.size() && wire_residual[__ri].first < {tag}) "
+                 "{{ b.uint(static_cast<unsigned long long>(wire_residual[__ri].first)); "
+                 "encode_value(b, wire_residual[__ri].second); ++__ri; }}")
+        for f in wire:
+            lines.append(flush.format(tag=f.tag))
+            lines.append(f"    b.uint({f.tag});")
+            lines += _field_encode_lines(f)
+        lines.append("    while (__ri < wire_residual.size()) "
+                     "{ b.uint(static_cast<unsigned long long>(wire_residual[__ri].first)); "
+                     "encode_value(b, wire_residual[__ri].second); ++__ri; }")
+    else:
+        lines.append(f"    b.map({len(wire)});")
+        for f in wire:
+            lines.append(f"    b.uint({f.tag});")
+            lines += _field_encode_lines(f)
     lines.append("  }")
     return lines
 
 
-def _emit_types(schema: Schema) -> str:
+def _emit_types(schema: Schema, forward_compat: bool = False) -> str:
     lines = [
         "// GENERATED native C++ types by taut/src/taut/gen/cpp.py — do not edit.",
         "#pragma once",
         "#include <optional>",
         "#include <string_view>",
+        "#include <utility>",
         "#include <vector>",
         '#include "taut/cbor.hpp"',
         "",
@@ -148,8 +171,10 @@ def _emit_types(schema: Schema) -> str:
         lines.append(f"struct {m.name} {{")
         for f in m.fields:
             lines.append(f"  {_field_type(f)} {f.name};")
-        lines.extend(_emit_to_cbor(m))
-        lines.extend(_emit_from_cbor(m))
+        if forward_compat:
+            lines.append("  std::vector<std::pair<long long, Cbor>> wire_residual;")
+        lines.extend(_emit_to_cbor(m, forward_compat))
+        lines.extend(_emit_from_cbor(m, forward_compat))
         lines.append("};")
         lines.append("")
     lines.append("} // namespace taut")

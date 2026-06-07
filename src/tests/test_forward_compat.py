@@ -81,9 +81,11 @@ def test_extensions_require_forward_compat_for_rust(tmp_path):
     scaffold.emit(S, tmp_path, langs=["rust"], services=[], forward_compat=True)  # ok with the flag
 
 
-def test_cpp_forward_compat_not_yet(tmp_path):
-    with pytest.raises(NotImplementedError):
-        scaffold.emit(S, tmp_path, langs=["cpp"], services=[], forward_compat=True)
+def test_cpp_forward_compat_emits_residual():
+    hpp = scaffold.cpp_api(S, forward_compat=True)
+    assert "std::vector<std::pair<long long, Cbor>> wire_residual;" in hpp
+    assert "encode_value(b" in hpp                       # residual re-emitted
+    assert "wire_residual" not in scaffold.cpp_api(S)    # off by default
 
 
 # --- extensions (side-channels) ----------------------------------------------
