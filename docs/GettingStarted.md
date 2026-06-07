@@ -16,7 +16,7 @@ The IR is authored in a restricted, declarative Python DSL — no logic, just
 declarations:
 
 ```python
-from taut.ir.dsl import BOOL, INT, STR, Enum, F, List, Msg, Ref, method, schema, service
+from taut.ir.dsl import BOOL, INT, STR, Enum, F, List, Map, Msg, Ref, method, schema, service
 
 SCHEMA = schema(
     # an enum — integer wire values, idiomatic native names per language
@@ -37,7 +37,10 @@ SCHEMA = schema(
         F("title", 2, STR),
         F("state", 3, Ref("TaskState")),       # enum field
         F("assignee", 4, Ref("User"), optional=True),  # nested message, optional
-        F("comments", 5, List(Ref("Comment")))),       # list of messages
+        F("comments", 5, List(Ref("Comment"))),        # list of messages
+        F("labels", 7, Map(STR, STR)),                 # map<str,str> — a keyed collection
+        reserved=[6, "priority"],   # tag 6 / "priority" retired (see §5) — never reusable
+        next_id=8),
 
     Msg("Event",
         F("ts", 1, INT),
@@ -67,10 +70,11 @@ SCHEMA = schema(
 ```
 
 That file *is* the governed artifact — four messages (composed: `Task` embeds an
-optional `User` and a list of `Comment`, each `Comment` embeds a `User`), one
-enum, and a service of three unary calls and two streaming endpoints, read whole
-in a screen. (`out=` is a bare type for single-slot shapes — bound to the shape's
-slot; multi-slot shapes like `swmr` take `out={"snapshot": …, "delta": …}`.)
+optional `User`, a list of `Comment`, and a `map<str,str>` of `labels`; each
+`Comment` embeds a `User`), one enum, and a service of three unary calls and two
+streaming endpoints, read whole in a screen. (`out=` is a bare type for
+single-slot shapes — bound to the shape's slot; multi-slot shapes like `swmr` take
+`out={"snapshot": …, "delta": …}`.)
 
 ## 2. Load, validate, export
 
@@ -93,7 +97,8 @@ rejected — try it and see the error).
 
 The codec is driven by the IR. A "value" is a plain dict keyed by field name
 (enums as their member-name string); **composed messages just nest** — embedded
-messages are dicts, lists of messages are lists of dicts:
+messages are dicts, lists of messages are lists of dicts, and **maps are dicts**
+(emitted key-sorted on the wire, so the bytes are deterministic):
 
 ```python
 task = {
@@ -103,12 +108,14 @@ task = {
         {"author": {"id": 7, "name": "ann"}, "text": "started"},
         {"author": {"id": 9, "name": "bo"},  "text": "lgtm"},
     ],
+    "labels": {"team": "infra", "area": "wire"},          # map<str, str>
 }
 blob = codec.encode(schema, "Task", task)      # deterministic CBOR bytes
 assert codec.decode(schema, "Task", blob) == task
 
-# an optional nested message that's absent decodes as None
-later = {"id": 2, "title": "later", "state": "open", "assignee": None, "comments": []}
+# an optional nested message that's absent decodes as None; an empty map is just {}
+later = {"id": 2, "title": "later", "state": "open",
+         "assignee": None, "comments": [], "labels": {}}
 assert codec.decode(schema, "Task", codec.encode(schema, "Task", later)) == later
 ```
 
@@ -162,8 +169,9 @@ validated message features (the example uses them on `Task`):
 Msg("Task",
     F("id", 1, INT), F("title", 2, STR), F("state", 3, Ref("TaskState")),
     F("assignee", 4, Ref("User"), optional=True), F("comments", 5, List(Ref("Comment"))),
+    F("labels", 7, Map(STR, STR)),  # added at tag 7 — tag 6 was retired, so it's skipped
     reserved=[6, "priority"],   # retired tag 6 + name "priority" — never reusable
-    next_id=7)                  # next tag to allocate (validated > every used/reserved tag)
+    next_id=8)                  # next tag to allocate (validated > every used/reserved tag)
 ```
 
 See [Reference.md](Reference.md) §4 for the rules.
