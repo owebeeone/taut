@@ -4,6 +4,7 @@ side-channel extensions."""
 import pytest
 
 from taut import ext
+from taut.gen import scaffold
 from taut.ir.dsl import INT, STR, F, Msg, extension, schema as mk_schema
 from taut.ir.shapes import BAND_START
 from taut.ir.validate import validate
@@ -37,6 +38,52 @@ def test_unknown_fields_round_trip():
 def test_clean_messages_have_no_unknown_key():
     decoded = codec.decode(S, "Host", codec.encode(S, "Host", {"id": 1, "name": "x"}))
     assert "__unknown__" not in decoded               # only present when there are unknowns
+
+
+# --- cross-version conformance: an old struct must preserve a newer field -----
+
+def test_cross_version_preserves_unknown_field_byte_for_byte():
+    # v2 knows field id 2; v1 doesn't. v1 must carry it through unchanged.
+    v2 = mk_schema(Msg("M", F("f1", 1, INT), F("f2", 2, INT), F("f3", 3, INT)))
+    v1 = mk_schema(Msg("M", F("f1", 1, INT), F("f3", 3, INT)))   # missing tag 2
+
+    cbor1 = codec.encode(v2, "M", {"f1": 1, "f2": 2, "f3": 3})
+    m1 = codec.decode(v1, "M", cbor1)                  # v1 reads v2's bytes
+    assert m1["f1"] == 1 and m1["f3"] == 3
+    assert m1["__unknown__"] == {2: 2}                 # f2 captured as residual
+    cbor2 = codec.encode(v1, "M", m1)                  # v1 re-emits
+    assert cbor2 == cbor1                              # nothing lost: byte-identical
+
+    # mutate a known field in both; v1 (carrying f2 as residual) matches v2 exactly
+    m1["f3"] = 7
+    assert codec.encode(v1, "M", m1) == codec.encode(v2, "M", {"f1": 1, "f2": 2, "f3": 7})
+
+
+# --- generator-side forward-compat (Rust) + the gates ------------------------
+
+def test_wire_prefix_is_reserved():
+    errs = validate(mk_schema(Msg("M", F("wire_residual", 1, INT))))
+    assert any("wire_" in e for e in errs)
+
+
+def test_rust_forward_compat_emits_residual_field():
+    rs = scaffold.rust_api(S, forward_compat=True)
+    assert "pub wire_residual: Vec<(i64, Cbor)>" in rs
+    assert "map_entries()" in rs
+    # off by default
+    assert "wire_residual" not in scaffold.rust_api(S)
+
+
+def test_extensions_require_forward_compat_for_rust(tmp_path):
+    # S declares an extension -> generating Rust without forward-compat is an error
+    with pytest.raises(ValueError):
+        scaffold.emit(S, tmp_path, langs=["rust"], services=[])
+    scaffold.emit(S, tmp_path, langs=["rust"], services=[], forward_compat=True)  # ok with the flag
+
+
+def test_cpp_forward_compat_not_yet(tmp_path):
+    with pytest.raises(NotImplementedError):
+        scaffold.emit(S, tmp_path, langs=["cpp"], services=[], forward_compat=True)
 
 
 # --- extensions (side-channels) ----------------------------------------------

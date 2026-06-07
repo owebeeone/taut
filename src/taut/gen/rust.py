@@ -101,22 +101,37 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     return out
 
 
-def _emit_message(msg) -> list[str]:
+def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     out = ["#[derive(Clone, Debug, PartialEq, Default)]", f"pub struct {msg.name} {{"]
     for f in msg.fields:
         out.append(f"    pub {f.name}: {_field_type(f)},")
+    if forward_compat:
+        # unknown/newer-version fields, preserved verbatim (empty when none)
+        out.append("    pub wire_residual: Vec<(i64, Cbor)>,")
     out.append("}")
     out.append(f"impl {msg.name} {{")
-    # to_cbor (wire fields only)
-    out.append("    pub fn to_cbor(&self) -> Cbor {")
-    out.append("        Cbor::Map(vec![")
+    # encoded (tag, expr) pairs for the known wire fields
+    pairs = []
     for f in msg.wire_fields():
         if f.optional:
             enc = f"match &self.{f.name} {{ Some(v) => {_encode(f.type, 'v')}, None => Cbor::Null }}"
         else:
             enc = _encode(f.type, f"self.{f.name}")
-        out.append(f"            ({f.tag}, {enc}),")
-    out.append("        ])")
+        pairs.append((f.tag, enc))
+    # to_cbor (wire fields only; re-emits residual when forward-compat)
+    out.append("    pub fn to_cbor(&self) -> Cbor {")
+    if forward_compat:
+        out.append("        let mut m = vec![")
+        for tag, enc in pairs:
+            out.append(f"            ({tag}, {enc}),")
+        out.append("        ];")
+        out.append("        for (t, v) in &self.wire_residual { m.push((*t, v.clone())); }")
+        out.append("        Cbor::Map(m)")
+    else:
+        out.append("        Cbor::Map(vec![")
+        for tag, enc in pairs:
+            out.append(f"            ({tag}, {enc}),")
+        out.append("        ])")
     out.append("    }")
     # from_cbor
     out.append("    pub fn from_cbor(c: &Cbor) -> Self {")
@@ -130,6 +145,11 @@ def _emit_message(msg) -> list[str]:
         else:
             dec = _decode(f.type, f"c.get({f.tag})")
         out.append(f"            {f.name}: {dec},")
+    if forward_compat:
+        known = [str(f.tag) for f in msg.wire_fields()]
+        pred = f"!matches!(*t, {' | '.join(known)})" if known else "true"
+        out.append(f"            wire_residual: c.map_entries().iter()"
+                   f".filter(|(t, _)| {pred}).map(|(t, v)| (*t, v.clone())).collect(),")
     out.append("        }")
     out.append("    }")
     out.append("}")

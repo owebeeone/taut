@@ -52,7 +52,7 @@ def _py_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def python_api(schema: Schema) -> str:
+def python_api(schema: Schema, forward_compat: bool = False) -> str:
     out = ['"""GENERATED native Python types — do not edit."""',
            "from __future__ import annotations",
            "from dataclasses import dataclass",
@@ -133,7 +133,7 @@ def _ts_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def ts_api(schema: Schema) -> str:
+def ts_api(schema: Schema, forward_compat: bool = False) -> str:
     out = ["// GENERATED native TypeScript types — do not edit.", ""]
     for e in schema.enums.values():
         members = " | ".join(f'"{m}"' for m in e.members)
@@ -212,13 +212,13 @@ def _rs_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def rust_api(schema: Schema) -> str:
+def rust_api(schema: Schema, forward_compat: bool = False) -> str:
     out = ["// GENERATED native Rust types + codec — do not edit.", "#![allow(dead_code)]",
            "use crate::cbor::Cbor;", ""]
     for e in schema.enums.values():
         out += _rust._emit_enum(e.name, e.members) + [""]
     for m in schema.messages.values():
-        out += _rust._emit_message(m) + [""]
+        out += _rust._emit_message(m, forward_compat) + [""]
     return "\n".join(out) + "\n"
 
 
@@ -270,7 +270,7 @@ def _cpp_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def cpp_api(schema: Schema) -> str:
+def cpp_api(schema: Schema, forward_compat: bool = False) -> str:
     return _cpp._emit_types(schema)  # enums + structs + constexpr to_cbor/from_cbor
 
 
@@ -321,6 +321,7 @@ def emit(
     langs: list[str] | None = None,
     services: list[str] | None = None,
     runtime: bool = False,
+    forward_compat: bool = False,
 ) -> list[Path]:
     """Generate per-language code from an IR (the engine behind the `tautc` CLI).
 
@@ -331,6 +332,10 @@ def emit(
     - `runtime`: when True, also emit the vendored CBOR runtime for compiled
       targets (`rust` -> `cbor.rs`, `cpp` -> `taut/cbor.hpp`) so the generated
       code is self-contained. Off by default — emitted only on demand.
+    - `forward_compat`: when True, generated structs carry a `wire_residual` field
+      that preserves unknown/newer-version tags (Rust today). Off by default.
+      An IR that declares extensions requires it for compiled targets (D14:
+      extensions ride the residual space) — otherwise generation is a build error.
 
     `api.{ext}` (types + codec) is always written per language; client/server are
     `client.{ext}` for a lone service, `client_{svc}.{ext}` when several.
@@ -339,6 +344,13 @@ def emit(
     unknown = [l for l in lang_keys if l not in _LANGS]
     if unknown:
         raise ValueError(f"unknown lang(s) {unknown}; known: {sorted(_LANGS)}")
+    if forward_compat and "cpp" in lang_keys:
+        raise NotImplementedError("forward-compat codegen is Rust-only for now (C++ residual is a follow-up)")
+    if schema.extensions and not forward_compat and "rust" in lang_keys:
+        raise ValueError(
+            "this IR declares extensions; generating Rust requires forward_compat "
+            "(extensions ride the unknown-field/residual space) — pass --forward-compat"
+        )
     svc_names = list(services) if services is not None else list(schema.services)
     missing = [s for s in svc_names if s not in schema.services]
     if missing:
@@ -350,7 +362,7 @@ def emit(
         d = out_dir / lang
         d.mkdir(parents=True, exist_ok=True)
         api_path = d / f"api.{ext}"
-        api_path.write_text(api_fn(schema))
+        api_path.write_text(api_fn(schema, forward_compat=forward_compat))
         written.append(api_path)
         if runtime and lang in _RUNTIMES:
             rel, resource = _RUNTIMES[lang]

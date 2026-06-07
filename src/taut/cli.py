@@ -46,7 +46,7 @@ def _cmd_gen(args: argparse.Namespace) -> int:
         services = _split(args.service)  # None => all services in the IR
     written = scaffold.emit(
         schema, Path(args.out), langs=_split(args.lang), services=services,
-        runtime=args.with_runtime,
+        runtime=args.with_runtime, forward_compat=args.forward_compat,
     )
     for p in written:
         print(p)
@@ -98,6 +98,8 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--api-only", action="store_true", help="emit only api (types + encoders/decoders), no client/server")
     g.add_argument("--with-runtime", action="store_true",
                    help="also emit the vendored CBOR runtime for compiled targets (rust->cbor.rs, cpp->taut/cbor.hpp)")
+    g.add_argument("--forward-compat", action="store_true",
+                   help="generated structs carry a wire_residual field preserving unknown/newer tags (Rust; required if the IR has extensions)")
     g.set_defaults(func=_cmd_gen)
 
     c = sub.add_parser("corpus", help="derive a golden conformance corpus (+ parity harness) from an IR")

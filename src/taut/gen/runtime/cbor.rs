@@ -45,6 +45,11 @@ impl Cbor {
     pub fn is_null(&self) -> bool {
         matches!(self, Cbor::Null)
     }
+    /// All (key, value) pairs of a map (empty if not a map). Used to capture
+    /// forward-compat residual: tags the schema doesn't name.
+    pub fn map_entries(&self) -> &[(i64, Cbor)] {
+        if let Cbor::Map(m) = self { m } else { &[] }
+    }
 }
 
 fn head(out: &mut Vec<u8>, major: u8, n: u64) {

@@ -49,6 +49,9 @@ def validate(schema: Schema) -> list[str]:
                 errors.append(f"{m.name}.{f.name}: uses reserved tag {f.tag}")
             if f.name in reserved_names:
                 errors.append(f"{m.name}.{f.name}: uses reserved name {f.name!r}")
+            if f.name.startswith("wire_"):
+                errors.append(f"{m.name}.{f.name}: the 'wire_' prefix is reserved by taut "
+                              "(forward-compat residual field)")
             check_ref(f.type, f"{m.name}.{f.name}")
             if f.merge is not None:
                 if f.merge not in ("lww", "counter"):
