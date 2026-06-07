@@ -157,6 +157,12 @@ hand-vendoring. Example: razel (a Rust build daemon) authors
 These are the *reference* emitters; they read the exported `.ir.json`, and so can
 a generator you write — `tautc` is a convenience, not a requirement.
 
+**Conformance** — `tautc corpus IR -o DIR [--lang rust] [--check]` derives a golden
+corpus from the IR (deterministic coverage values, one per message, encoded by the
+canonical codec → `golden.json`) plus a per-language byte-parity harness (Rust
+`vectors.rs` today). A target *conforms* iff its codec reproduces those bytes;
+`--check` is the CI drift gate. No hand-authored vectors.
+
 ## Evolution
 
 - **Breaking-change gate** — structural diff of two IR versions classifies each

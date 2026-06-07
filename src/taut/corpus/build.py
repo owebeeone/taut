@@ -8,16 +8,15 @@ reproduce these bytes; this is the oracle that lets us trust generated code.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
+from . import kit
 from ..gen import cpp as cpp_gen
 from ..gen import rust as rust_gen
 from ..ir.export import export_to
 from ..ir.load import load_schema
 from ..ir.model import Schema
 from ..ir.validate import validate_or_raise
-from ..wire import codec
 
 # Repo-relative paths.
 _TAUT = Path(__file__).resolve().parents[3]
@@ -72,11 +71,10 @@ def reference_values() -> dict[str, tuple[str, dict]]:
 
 
 def generate_golden(schema: Schema) -> dict[str, dict]:
-    """name -> {message, cbor-hex}; self-describing so any language can replay."""
-    return {
-        name: {"message": message, "cbor": codec.encode(schema, message, value).hex()}
-        for name, (message, value) in reference_values().items()
-    }
+    """name -> {message, cbor-hex}; self-describing so any language can replay.
+    GripLab uses curated reference values; the conformance kit (`taut.corpus.kit`)
+    is the same machinery pointable at any IR (with auto-synthesized values)."""
+    return kit.build_corpus(schema, reference_values())
 
 
 def main() -> None:
@@ -84,7 +82,7 @@ def main() -> None:
     validate_or_raise(schema)
     export_to(schema, IR_JSON_PATH)
     golden = generate_golden(schema)
-    GOLDEN_PATH.write_text(json.dumps(golden, indent=2, sort_keys=True) + "\n")
+    GOLDEN_PATH.write_text(kit.golden_json(golden))
     rust_gen.emit()
     cpp_gen.emit(schema, reference_values())
     print(f"wrote IR to {IR_JSON_PATH}, {len(golden)} vectors to {GOLDEN_PATH}, and the Rust + C++ corpora")

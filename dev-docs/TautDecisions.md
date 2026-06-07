@@ -146,7 +146,10 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
   codegen self-contained and verifiable:
   - **Emit the per-language CBOR runtime** alongside the types (kills the hand-port).
   - **Conformance kit** — `tautc corpus` emits golden vectors + a per-language
-    parity test, so no consumer rewrites `vectors.rs`.
+    parity test, so no consumer rewrites `vectors.rs`. *(BUILT: auto-synth values
+    [`corpus/synth.py`] → neutral `golden.json` + Rust `vectors.rs` harness +
+    `--check` drift gate; `corpus/build.py` now routes GripLab through the kit,
+    golden byte-identical. C++/other harnesses ride their generators in 0.3+.)*
   - **Forward-compat residual in the generators** (D10–D12: `wire_residual` +
     flag/gate + `wire_` reservation) so compiled targets stop dropping unknowns.
   - **JSON profile** — *(BUILT in 0.2.0 dev)* IR-driven CBOR↔JSON (`taut.wire.

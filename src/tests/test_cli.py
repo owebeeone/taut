@@ -67,3 +67,19 @@ def test_with_runtime_skips_languages_without_one(tmp_path):
     cli.main(["gen", str(IR_PATH), "-o", str(tmp_path), "--lang", "python", "--with-runtime"])
     assert (tmp_path / "python" / "api.py").exists()
     assert not list((tmp_path / "python").glob("cbor*"))
+
+
+def test_corpus_emits_golden_and_rust_harness(tmp_path):
+    rc = cli.main(["corpus", str(IR_PATH), "-o", str(tmp_path), "--lang", "rust"])
+    assert rc == 0
+    assert (tmp_path / "golden.json").exists()
+    assert "corpus_byte_parity" in (tmp_path / "rust" / "vectors.rs").read_text()
+
+
+def test_corpus_check_passes_then_detects_drift(tmp_path):
+    cli.main(["corpus", str(IR_PATH), "-o", str(tmp_path)])
+    # fresh output is up to date
+    assert cli.main(["corpus", str(IR_PATH), "-o", str(tmp_path), "--check"]) == 0
+    # tamper -> drift gate fails (exit 2)
+    (tmp_path / "golden.json").write_text("{}\n")
+    assert cli.main(["corpus", str(IR_PATH), "-o", str(tmp_path), "--check"]) == 2
