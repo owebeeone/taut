@@ -12,7 +12,7 @@ schema is authored as a small, restricted Python DSL — or any `.ir.json` — a
 everything else is *projected* from it.
 
 > Status: **pre-alpha**. The model, codec, generators, corpus, and evolution gate
-> are built and tested (53 tests green); APIs may still move.
+> are built and tested (57 tests green); APIs may still move.
 
 ```
 pip install taut-proto      # distribution name (PyPI)
@@ -116,7 +116,28 @@ client or server from JSON alone, zero codegen); Rust and C++ get **generated
 native types with encoders/decoders** (compiled targets need types ahead of
 time). The C++ corpus is a wall of `static_assert`s — *compiling is the test*.
 
-## `tautc` — codegen CLI
+## Opinionated about the wire, not the API
+
+Small-and-tight vs. bloated is only half the pitch. The other half: taut pins
+*exactly* what cross-language interop requires — the deterministic wire, the
+`(name, in, out, shape)` contract, and the evolution gate — and **nothing more**.
+Those must be fixed, so they are.
+
+How that contract surfaces in *your* code is your call. The IR is the governed
+artifact (a tiny JSON); projecting it into types, clients, and servers is a
+choice, not a mandate:
+
+- The bundled `tautc` generators are **reference** projections. Use them, swap
+  them, or write your own against the exported `.ir.json` — pydantic models, plain
+  dataclasses, a transactional/ORM wrapper, different client ergonomics, whatever
+  fits your app.
+- Or generate nothing: Python and TypeScript drive the IR straight through the
+  runtime codec.
+
+Where `protoc` hands you *its* message classes and gRPC *its* stubs, taut hands
+you the bytes and the schema and gets out of the way.
+
+## `tautc` — the reference codegen CLI
 
 ```
 tautc gen IR --out DIR [--lang python,typescript,rust,cpp] [--service A,B] [--api-only]
@@ -128,6 +149,9 @@ service. `--api-only` emits just the struct defs + codec — the drop-in for a
 build script on a compiled target. Example: razel (a Rust build daemon) authors
 `ir/razel.taut.py` and generates its Rust wire layer with
 `tautc gen ir/razel.taut.py -o razel/gen --lang rust --api-only`.
+
+These are the *reference* emitters; they read the exported `.ir.json`, and so can
+a generator you write — `tautc` is a convenience, not a requirement.
 
 ## Evolution
 
@@ -180,11 +204,4 @@ Design notes and the decisions log live in [dev-docs/](dev-docs/).
 
 ## License
 
-[MIT](LICENSE) — deliberately the most permissive option, because the only payoff
-that matters here is **adoption**. A schema mechanism is worth something only if
-other people and projects actually build on it; the IP itself is near-zero. A
-copyleft license (AGPL/LGPL) would add friction that works *against* that one
-goal, and Apache-2.0's patent ceremony buys nothing for a tiny pure-Python tool
-with no patent surface. MIT keeps the barrier to use as close to zero as the code
-is — and stays drop-in compatible with consumers under any license (e.g. razel's
-`Apache-2.0 OR MIT`). Use it; that's the whole point.
+[MIT](LICENSE)
