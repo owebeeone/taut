@@ -1,7 +1,7 @@
 # taut
 
 **One tiny declarative contract → native types, a deterministic wire codec, and
-service stubs across Python, TypeScript, Rust, and C++ — verified byte-for-byte
+service stubs across Python, TypeScript, Rust, C++, and Swift — verified byte-for-byte
 by a shared golden corpus.**
 
 taut is a cross-language data + service protocol mechanism: protobuf's essential
@@ -113,7 +113,7 @@ A hand-rolled, frozen **deterministic CBOR** subset: definite-length, shortest-
 form integers, ascending integer map keys. The same value encodes to the same
 bytes in every language — pinned by a **golden conformance corpus** (value →
 exact hex). Python and TypeScript run a fully **IR-driven codec** (instantiate a
-client or server from JSON alone, zero codegen); Rust and C++ get **generated
+client or server from JSON alone, zero codegen); Rust, C++, and Swift get **generated
 native types with encoders/decoders** (compiled targets need types ahead of
 time). The C++ corpus is a wall of `static_assert`s — *compiling is the test*.
 

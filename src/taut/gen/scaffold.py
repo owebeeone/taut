@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import cpp as _cpp
 from . import rust as _rust
+from . import swift as _swift
 from ..ir.model import EnumRef, ListOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef
 
 # Compiled targets whose generated code imports an external CBOR runtime module.
@@ -25,6 +26,7 @@ from ..ir.model import EnumRef, ListOf, MsgRef, Scalar, Schema, ServiceDef, Type
 _RUNTIMES: dict[str, tuple[str, str]] = {
     "rust": ("cbor.rs", "cbor.rs"),          # generated api.rs: `use crate::cbor::Cbor`
     "cpp": ("taut/cbor.hpp", "cbor.hpp"),    # generated api.hpp: `#include "taut/cbor.hpp"`
+    "swift": ("cbor.swift", "cbor.swift"),   # same-module Cbor / encode / decode
 }
 
 
@@ -304,14 +306,58 @@ def cpp_server(schema: Schema, svc: ServiceDef) -> str:
 
 
 # =============================================================================
+# Swift
+# =============================================================================
+
+def _swift_ty(t: TypeRef | None) -> str:
+    if t is None:
+        return "Void"
+    if isinstance(t, Scalar):
+        return {"int": "Int64", "str": "String", "bytes": "[UInt8]", "bool": "Bool"}[t.kind]
+    if isinstance(t, (EnumRef, MsgRef)):
+        return t.name
+    if isinstance(t, ListOf):
+        return f"[{_swift_ty(t.elem)}]"
+    raise TypeError(t)
+
+
+def swift_api(schema: Schema, forward_compat: bool = False) -> str:
+    return _swift.emit_types(schema, forward_compat)
+
+
+def swift_client(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED typed client stub over a generic transport.", ""]
+    for meth in svc.methods:
+        args = ", ".join(f"{pn}: {_swift_ty(pt)}" for pn, pt in meth.params)
+        if not meth.streams():
+            out.append(f"// {meth.name}({args}) -> {_swift_ty(meth.output)}   [transport.call]")
+        else:
+            out.append(f"// {meth.name}({args}): subscribe (\"{meth.shape}\")")
+    return "\n".join(out) + "\n"
+
+
+def swift_server(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED server handler protocol stub.", f"public protocol {svc.name}Handlers {{"]
+    for meth in svc.methods:
+        args = ", ".join(f"{pn}: {_swift_ty(pt)}" for pn, pt in meth.params)
+        if not meth.streams():
+            out.append(f"    func {_attr(meth.name)}({args}) -> {_swift_ty(meth.output)}")
+        else:
+            out.append(f"    // {_attr(meth.name)}: subscription ({meth.shape})")
+    out.append("}")
+    return "\n".join(out) + "\n"
+
+
+# =============================================================================
 # driver
 # =============================================================================
 
 _LANGS = {
-    "python":     ("py",  python_api, python_client, python_server),
-    "typescript": ("ts",  ts_api,     ts_client,     ts_server),
-    "rust":       ("rs",  rust_api,   rust_client,   rust_server),
-    "cpp":        ("hpp", cpp_api,    cpp_client,    cpp_server),
+    "python":     ("py",    python_api, python_client, python_server),
+    "typescript": ("ts",    ts_api,     ts_client,     ts_server),
+    "rust":       ("rs",    rust_api,   rust_client,   rust_server),
+    "cpp":        ("hpp",   cpp_api,    cpp_client,    cpp_server),
+    "swift":      ("swift", swift_api,  swift_client,  swift_server),
 }
 
 
@@ -345,9 +391,9 @@ def emit(
     unknown = [l for l in lang_keys if l not in _LANGS]
     if unknown:
         raise ValueError(f"unknown lang(s) {unknown}; known: {sorted(_LANGS)}")
-    if schema.extensions and not forward_compat and ({"rust", "cpp"} & set(lang_keys)):
+    if schema.extensions and not forward_compat and ({"rust", "cpp", "swift"} & set(lang_keys)):
         raise ValueError(
-            "this IR declares extensions; generating Rust/C++ requires forward_compat "
+            "this IR declares extensions; generating Rust/C++/Swift requires forward_compat "
             "(extensions ride the unknown-field/residual space) — pass --forward-compat"
         )
     svc_names = list(services) if services is not None else list(schema.services)

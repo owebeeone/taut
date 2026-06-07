@@ -168,10 +168,14 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
     sorted-key JSON; CBOR→JSON→CBOR byte-identical for residual-free values). The
     onboarding enabler ("JSON is ubiquitous") + debug/gateway format. (D8's
     deferred JSON profile, now started.)
-  - **Then 0.3+: language generators** — **Go**, **JS/TS**, **Java** and **Kotlin
-    as *distinct* generators** (Kotlin uses data classes / null-safety / sealed
-    types Java can't express), **Swift**. Each becomes "codec emitter + shipped
-    runtime + shipped corpus kit"; JSON-capable langs get a lighter path.
+  - **Then 0.3+: language generators** — **Go**, **JS/TS**, **Kotlin** (distinct
+    from Java — data classes / null-safety / sealed types), **Swift**, **Java
+    last**. Each becomes "codec emitter + shipped runtime + shipped corpus kit".
+    *(Swift **BUILT**: `gen/swift.py` + vendored `cbor.swift`; native structs +
+    enums + codec + public init; forward-compat residual [encode sorts, no merge];
+    Swift-keyword backtick-escaping [e.g. razel's `protocol` field]. swiftc-verified:
+    griplab + razel typecheck, cross-version forward-compat round-trip byte-exact.
+    Go deferred — toolchain not installed here. Java last.)*
   *(DECIDED — sequencing locked with the user; JSON profile already BUILT)*
 
 ## Already-built foundation (for reference)
