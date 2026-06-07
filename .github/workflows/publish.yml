@@ -1,0 +1,103 @@
+# Publish taut-proto to PyPI when a GitHub release is published.
+# taut-proto is pure Python (no native extension), so one universal
+# py3-none-any wheel + an sdist cover every platform. Uses PyPI Trusted
+# Publishing (OIDC) — no API token. Configure a pending publisher on PyPI for
+# project `taut-proto` pointing at this repo + the `pypi` environment.
+#
+# Distribution name is `taut-proto`; the import name is `taut`.
+
+name: Publish taut-proto to PyPI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Run tests
+        run: |
+          python -m pip install --upgrade pytest
+          python -m pytest src/tests -q
+
+  build:
+    name: Build sdist + wheel
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Validate package metadata
+        run: |
+          python - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          data = tomllib.loads(Path("pyproject.toml").read_text())
+          name = data["project"]["name"]
+          version = data["project"]["version"]
+          if name != "taut-proto":
+              raise SystemExit(f"expected package name 'taut-proto', got {name!r}")
+          print(f"building {name} {version}")
+          PY
+
+      - name: Build and check
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          python -m twine check dist/*
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/*
+
+  pypi-publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs:
+      - test
+      - build
+    permissions:
+      id-token: write   # OIDC for Trusted Publishing
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/taut-proto
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: List distributions
+        run: ls -la dist/
+
+      - name: Publish release distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/

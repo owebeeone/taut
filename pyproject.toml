@@ -20,10 +20,11 @@ classifiers = [
 dependencies = []   # stdlib only (hand-rolled deterministic CBOR; no runtime deps)
 
 # license = "..."                       # TODO: set an SPDX license before publishing
-# [project.scripts]
-# taut = "taut.cli:main"                # TODO: wire a console entry point when the CLI lands
 # [project.urls]
 # Homepage = "https://..."              # TODO: set repo/homepage before publishing
+
+[project.scripts]
+tautc = "taut.cli:main"   # codegen CLI: `tautc gen IR --out DIR [--lang ...]`
 
 [build-system]
 requires = ["setuptools>=68"]

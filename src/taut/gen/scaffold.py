@@ -300,19 +300,55 @@ _LANGS = {
 }
 
 
-def emit_all(schema: Schema, service_name: str, out_dir: Path) -> list[Path]:
-    svc = schema.services[service_name]
-    written = []
-    for lang, (ext, api_fn, client_fn, server_fn) in _LANGS.items():
+def emit(
+    schema: Schema,
+    out_dir: Path,
+    *,
+    langs: list[str] | None = None,
+    services: list[str] | None = None,
+) -> list[Path]:
+    """Generate per-language code from an IR (the engine behind the `tautc` CLI).
+
+    - `langs`: subset of {python, typescript, rust, cpp}; default all.
+    - `services`: services to emit client/server for; default = every service in
+      the schema. Pass `[]` for **api only** (native types + encoders/decoders,
+      no RPC stubs) — the common build-script case for compiled targets.
+
+    `api.{ext}` (types + codec) is always written per language; client/server are
+    `client.{ext}` for a lone service, `client_{svc}.{ext}` when several.
+    """
+    lang_keys = list(langs) if langs is not None else list(_LANGS)
+    unknown = [l for l in lang_keys if l not in _LANGS]
+    if unknown:
+        raise ValueError(f"unknown lang(s) {unknown}; known: {sorted(_LANGS)}")
+    svc_names = list(services) if services is not None else list(schema.services)
+    missing = [s for s in svc_names if s not in schema.services]
+    if missing:
+        raise ValueError(f"unknown service(s) {missing}; known: {sorted(schema.services)}")
+    multi = len(svc_names) > 1
+    written: list[Path] = []
+    for lang in lang_keys:
+        ext, api_fn, client_fn, server_fn = _LANGS[lang]
         d = out_dir / lang
         d.mkdir(parents=True, exist_ok=True)
-        for stem, fn, needs_svc in (("api", api_fn, False), ("client", client_fn, True), ("server", server_fn, True)):
-            text = fn(schema, svc) if needs_svc else fn(schema)
-            path = d / f"{stem}.{ext}"
-            path.write_text(text)
-            written.append(path)
-    # Python output is a package (client/server use relative imports).
-    init = out_dir / "python" / "__init__.py"
-    init.write_text("from .api import *  # noqa: F401,F403\n")
-    written.append(init)
+        api_path = d / f"api.{ext}"
+        api_path.write_text(api_fn(schema))
+        written.append(api_path)
+        for sname in svc_names:
+            svc = schema.services[sname]
+            suffix = f"_{sname}" if multi else ""
+            for stem, fn in (("client", client_fn), ("server", server_fn)):
+                path = d / f"{stem}{suffix}.{ext}"
+                path.write_text(fn(schema, svc))
+                written.append(path)
+    if "python" in lang_keys and svc_names:
+        # Python output is a package (client/server use relative imports).
+        init = out_dir / "python" / "__init__.py"
+        init.write_text("from .api import *  # noqa: F401,F403\n")
+        written.append(init)
     return written
+
+
+def emit_all(schema: Schema, service_name: str, out_dir: Path) -> list[Path]:
+    """Back-compat: api + client/server for one service, all languages."""
+    return emit(schema, out_dir, services=[service_name])
