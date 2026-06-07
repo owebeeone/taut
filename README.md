@@ -163,6 +163,17 @@ canonical codec → `golden.json`) plus a per-language byte-parity harness (Rust
 `vectors.rs` today). A target *conforms* iff its codec reproduces those bytes;
 `--check` is the CI drift gate. No hand-authored vectors.
 
+**CBOR ↔ JSON** — `tautc json IR -m MESSAGE` converts the deterministic-CBOR wire
+to/from JSON via the IR (stdin/stdout or `-i`/`-o` files; `--from-json` reverses;
+`--indent` pretty-prints). proto3-style conventions (int64→string, bytes→base64,
+enum→name); `cbor → json → cbor` is byte-identical. Handy for debugging and
+JSON-native gateways:
+
+```
+some-producer | tautc json api.taut.py -m BuildResult            # CBOR -> JSON
+tautc json api.taut.py -m BuildResult --from-json < x.json       # JSON -> CBOR
+```
+
 ## Evolution
 
 - **Breaking-change gate** — structural diff of two IR versions classifies each

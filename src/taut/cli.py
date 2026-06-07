@@ -24,6 +24,7 @@ from .corpus import kit, synth
 from .gen import scaffold
 from .ir.load import load_schema, schema_from_json
 from .ir.validate import validate_or_raise
+from .wire import jsoncodec
 
 
 def _load(path: Path):
@@ -86,6 +87,26 @@ def _cmd_corpus(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_json(args: argparse.Namespace) -> int:
+    schema = _load(Path(args.ir))
+    validate_or_raise(schema)
+    if args.from_json:  # JSON text -> CBOR bytes
+        text = Path(args.input).read_text() if args.input else sys.stdin.read()
+        data = jsoncodec.json_to_cbor(schema, args.message, text)
+        if args.output:
+            Path(args.output).write_bytes(data)
+        else:
+            sys.stdout.buffer.write(data)
+    else:               # CBOR bytes -> JSON text
+        data = Path(args.input).read_bytes() if args.input else sys.stdin.buffer.read()
+        text = jsoncodec.cbor_to_json(schema, args.message, data, indent=args.indent)
+        if args.output:
+            Path(args.output).write_text(text + "\n")
+        else:
+            print(text)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="tautc", description="taut codegen — IR -> code")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -108,6 +129,15 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("-l", "--lang", help="comma-separated parity harnesses to emit (currently: rust)")
     c.add_argument("--check", action="store_true", help="don't write; exit 2 if committed output is stale (CI drift gate)")
     c.set_defaults(func=_cmd_corpus)
+
+    j = sub.add_parser("json", help="convert between deterministic-CBOR and JSON via the IR")
+    j.add_argument("ir", help="path to a taut IR (.taut.py DSL module or .ir.json)")
+    j.add_argument("-m", "--message", required=True, help="message name the bytes/JSON conform to")
+    j.add_argument("--from-json", action="store_true", help="reverse direction: JSON -> CBOR (default is CBOR -> JSON)")
+    j.add_argument("-i", "--input", help="input file (default: stdin; CBOR is binary, JSON is text)")
+    j.add_argument("-o", "--output", help="output file (default: stdout)")
+    j.add_argument("--indent", type=int, help="pretty-print JSON with this indent (CBOR -> JSON only)")
+    j.set_defaults(func=_cmd_json)
 
     args = p.parse_args(argv)
     return args.func(args)

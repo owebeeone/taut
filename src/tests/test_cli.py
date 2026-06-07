@@ -83,3 +83,23 @@ def test_corpus_check_passes_then_detects_drift(tmp_path):
     # tamper -> drift gate fails (exit 2)
     (tmp_path / "golden.json").write_text("{}\n")
     assert cli.main(["corpus", str(IR_PATH), "-o", str(tmp_path), "--check"]) == 2
+
+
+def test_json_cbor_roundtrip_via_files(tmp_path):
+    from taut.ir.load import load_schema
+    from taut.wire import codec
+    razel = str(IR_PATH.parent / "razel.taut.py")
+    s = load_schema(IR_PATH.parent / "razel.taut.py")
+    cbor = tmp_path / "v.cbor"
+    cbor.write_bytes(codec.encode(s, "BuildResult",
+                                  {"target": "//x", "status": "built", "recomputes": 7,
+                                   "outputs": [{"path": "o", "digest": b"\xde\xad"}], "message": None}))
+    js = tmp_path / "v.json"
+    out_cbor = tmp_path / "v2.cbor"
+    # CBOR -> JSON
+    assert cli.main(["json", razel, "-m", "BuildResult", "-i", str(cbor), "-o", str(js)]) == 0
+    text = js.read_text()
+    assert '"recomputes": "7"' in text or '"recomputes":"7"' in text   # int64 -> string
+    # JSON -> CBOR, byte-identical to the original
+    assert cli.main(["json", razel, "-m", "BuildResult", "--from-json", "-i", str(js), "-o", str(out_cbor)]) == 0
+    assert out_cbor.read_bytes() == cbor.read_bytes()
