@@ -186,7 +186,15 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
     **JS BUILT**: `gen/js.py` + vendored `cbor.js` (CommonJS); ES classes + frozen
     enum objects + codec, nullable optionals, forward-compat residual (encode
     sorts). node-verified: griplab + razel load, cross-version round-trip
-    byte-exact. **Java last** (records-or-classes TBD).)*
+    byte-exact. **Java BUILT** (the last one): `gen/java.py` + vendored `Cbor.java`;
+    plain classes with mutable public fields + default equals (kept simple),
+    enums w/ wire value, boxed/nullable optionals, forward-compat residual
+    (Cbor.encode sorts). javac/JBR-21-verified: griplab + razel compile,
+    cross-version round-trip byte-exact. *Single-file package-private classes for
+    now; a public/multi-file Java projection is a later refinement.*
+    **0.3 language fan-out COMPLETE** — taut now spans **nine** targets
+    (Python, TypeScript, Rust, C++, Swift, Go, Kotlin, JS, Java), each
+    compile/run-verified with cross-version forward-compat.)*
   *(DECIDED — sequencing locked with the user; JSON profile already BUILT)*
 
 ## Already-built foundation (for reference)

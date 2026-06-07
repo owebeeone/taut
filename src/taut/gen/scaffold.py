@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import cpp as _cpp
 from . import go as _go
+from . import java as _java
 from . import js as _js
 from . import kotlin as _kotlin
 from . import rust as _rust
@@ -33,6 +34,7 @@ _RUNTIMES: dict[str, tuple[str, str]] = {
     "go": ("cbor.go", "cbor.go"),            # same-package Cbor / Encode / Decode
     "kotlin": ("cbor.kt", "cbor.kt"),        # same-package Cbor / encode / decode
     "js": ("cbor.js", "cbor.js"),            # require("./cbor.js")
+    "java": ("Cbor.java", "Cbor.java"),      # same-package taut.Cbor / KV
 }
 
 
@@ -465,6 +467,48 @@ def js_server(schema: Schema, svc: ServiceDef) -> str:
 
 
 # =============================================================================
+# Java
+# =============================================================================
+
+def _java_ty(t: TypeRef | None) -> str:
+    if t is None:
+        return "void"
+    if isinstance(t, Scalar):
+        return {"int": "long", "str": "String", "bytes": "byte[]", "bool": "boolean"}[t.kind]
+    if isinstance(t, (EnumRef, MsgRef)):
+        return t.name
+    if isinstance(t, ListOf):
+        return f"java.util.List<{_java_ty(t.elem)}>"
+    raise TypeError(t)
+
+
+def java_api(schema: Schema, forward_compat: bool = False) -> str:
+    return _java.emit_types(schema, forward_compat)
+
+
+def java_client(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED typed client stub over a generic transport.", "package taut;", ""]
+    for meth in svc.methods:
+        args = ", ".join(f"{_java_ty(pt)} {pn}" for pn, pt in meth.params)
+        kind = "call" if not meth.streams() else f'subscribe ("{meth.shape}")'
+        out.append(f"// {_attr(meth.name)}({args}) -> {_java_ty(meth.output)}  [{kind}]")
+    return "\n".join(out) + "\n"
+
+
+def java_server(schema: Schema, svc: ServiceDef) -> str:
+    out = ["// GENERATED server handler interface stub.", "package taut;", "",
+           f"interface {svc.name}Handlers {{"]
+    for meth in svc.methods:
+        args = ", ".join(f"{_java_ty(pt)} {pn}" for pn, pt in meth.params)
+        if not meth.streams():
+            out.append(f"    {_java_ty(meth.output)} {_attr(meth.name)}({args});")
+        else:
+            out.append(f"    // {_attr(meth.name)}: subscription ({meth.shape})")
+    out.append("}")
+    return "\n".join(out) + "\n"
+
+
+# =============================================================================
 # driver
 # =============================================================================
 
@@ -477,6 +521,7 @@ _LANGS = {
     "go":         ("go",    go_api,     go_client,     go_server),
     "kotlin":     ("kt",    kotlin_api, kotlin_client, kotlin_server),
     "js":         ("js",    js_api,     js_client,     js_server),
+    "java":       ("java",  java_api,   java_client,   java_server),
 }
 
 
@@ -510,10 +555,11 @@ def emit(
     unknown = [l for l in lang_keys if l not in _LANGS]
     if unknown:
         raise ValueError(f"unknown lang(s) {unknown}; known: {sorted(_LANGS)}")
-    if schema.extensions and not forward_compat and ({"rust", "cpp", "swift", "go", "kotlin", "js"} & set(lang_keys)):
+    _GENERATED = {"rust", "cpp", "swift", "go", "kotlin", "js", "java"}
+    if schema.extensions and not forward_compat and (_GENERATED & set(lang_keys)):
         raise ValueError(
             "this IR declares extensions; generating a typed target "
-            "(rust/cpp/swift/go/kotlin/js) requires forward_compat (extensions ride "
+            f"({'/'.join(sorted(_GENERATED))}) requires forward_compat (extensions ride "
             "the residual space) — pass --forward-compat"
         )
     svc_names = list(services) if services is not None else list(schema.services)
