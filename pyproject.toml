@@ -11,7 +11,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Gianni Mariani", email = "gianni@mariani.ws" }]
 keywords = ["idl", "protocol", "schema", "serialization", "cbor", "rpc", "contract"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",

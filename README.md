@@ -11,8 +11,9 @@ evolution gate) with roughly 90% less of its weight (no plugin toolchain, no
 schema is authored as a small, restricted Python DSL — or any `.ir.json` — and
 everything else is *projected* from it.
 
-> Status: **pre-alpha**. The model, codec, generators, corpus, and evolution gate
-> are built and tested (57 tests green); APIs may still move.
+> Status: **alpha**. The model, codec, generators, corpus, and evolution gate are
+> built and tested end-to-end across four languages (57 tests green); APIs may
+> still move.
 
 ```
 pip install taut-proto      # distribution name (PyPI)
