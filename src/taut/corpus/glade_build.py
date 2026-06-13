@@ -17,15 +17,19 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import kit, synth
+from ..gen import rust as rust_gen
 from ..ir.export import export_to
 from ..ir.load import load_schema
 from ..ir.model import Schema
 from ..ir.validate import validate_or_raise
 
 _TAUT = Path(__file__).resolve().parents[3]
+_REPO = _TAUT.parent                       # glial-dev (glade/ is a sibling of taut/)
 IR_PATH = _TAUT / "ir" / "glade.taut.py"
 GOLDEN_PATH = _TAUT / "corpus" / "glade.golden.json"
 IR_JSON_PATH = _TAUT / "corpus" / "glade.ir.json"
+RUNTIME_CBOR_RS = _TAUT / "src" / "taut" / "gen" / "runtime" / "cbor.rs"
+GLADE_RS_DIR = _REPO / "glade" / "wire-rs" / "src"   # the rust glade-wire codec crate
 
 
 def _head(origin: str, seq: int, h: bytes | None) -> dict:
@@ -103,12 +107,25 @@ def glade_values(schema: Schema) -> dict[str, tuple[str, dict]]:
     return values
 
 
+def emit_rust(schema: Schema, corpus: dict[str, dict]) -> None:
+    """Emit the rust glade-wire codec crate sources (P0.S4): generated types +
+    `roundtrip` dispatcher + VECTORS (via the shared rust generator), plus the
+    CBOR runtime. The crate's Cargo.toml + lib.rs (parity tests) are tracked by
+    hand; these two files are regenerated artifacts, like trial/rs."""
+    if not GLADE_RS_DIR.parent.exists():
+        return  # crate not scaffolded yet; nothing to regenerate
+    GLADE_RS_DIR.mkdir(parents=True, exist_ok=True)
+    (GLADE_RS_DIR / "generated.rs").write_text(rust_gen._emit(schema, corpus))
+    (GLADE_RS_DIR / "cbor.rs").write_text(RUNTIME_CBOR_RS.read_text())
+
+
 def main() -> None:
     schema = load_schema(IR_PATH)
     validate_or_raise(schema)
     export_to(schema, IR_JSON_PATH)
     corpus = kit.build_corpus(schema, glade_values(schema))
     GOLDEN_PATH.write_text(kit.golden_json(corpus))
+    emit_rust(schema, corpus)
     print(f"wrote IR to {IR_JSON_PATH} and {len(corpus)} vectors to {GOLDEN_PATH}")
 
 
