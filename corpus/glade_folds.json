@@ -1,0 +1,280 @@
+[
+  {
+    "name": "value/single",
+    "fold": "value",
+    "ops": [
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      }
+    ],
+    "expect": "4131"
+  },
+  {
+    "name": "value/concurrent-lamport",
+    "fold": "value",
+    "ops": [
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      },
+      {
+        "origin": "b",
+        "seq": 1,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4231"
+      }
+    ],
+    "expect": "4231"
+  },
+  {
+    "name": "value/tiebreak-origin",
+    "fold": "value",
+    "ops": [
+      {
+        "origin": "a",
+        "seq": 2,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4132"
+      },
+      {
+        "origin": "b",
+        "seq": 1,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4231"
+      }
+    ],
+    "expect": "4231"
+  },
+  {
+    "name": "value/out-of-order",
+    "fold": "value",
+    "ops": [
+      {
+        "origin": "b",
+        "seq": 1,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4231"
+      },
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      }
+    ],
+    "expect": "4231"
+  },
+  {
+    "name": "value/duplicate",
+    "fold": "value",
+    "ops": [
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      },
+      {
+        "origin": "b",
+        "seq": 1,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4231"
+      },
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      },
+      {
+        "origin": "b",
+        "seq": 1,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4231"
+      }
+    ],
+    "expect": "4231"
+  },
+  {
+    "name": "value/empty",
+    "fold": "value",
+    "ops": [],
+    "expect": null
+  },
+  {
+    "name": "log/order",
+    "fold": "log",
+    "ops": [
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      },
+      {
+        "origin": "b",
+        "seq": 1,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4231"
+      }
+    ],
+    "expect": [
+      "4131",
+      "4231"
+    ]
+  },
+  {
+    "name": "log/tiebreak-origin",
+    "fold": "log",
+    "ops": [
+      {
+        "origin": "a",
+        "seq": 2,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4132"
+      },
+      {
+        "origin": "b",
+        "seq": 1,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4231"
+      }
+    ],
+    "expect": [
+      "4132",
+      "4231"
+    ]
+  },
+  {
+    "name": "log/out-of-order",
+    "fold": "log",
+    "ops": [
+      {
+        "origin": "b",
+        "seq": 1,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4231"
+      },
+      {
+        "origin": "a",
+        "seq": 2,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4132"
+      },
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      }
+    ],
+    "expect": [
+      "4131",
+      "4132",
+      "4231"
+    ]
+  },
+  {
+    "name": "log/duplicate",
+    "fold": "log",
+    "ops": [
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      },
+      {
+        "origin": "b",
+        "seq": 1,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4231"
+      },
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      }
+    ],
+    "expect": [
+      "4131",
+      "4231"
+    ]
+  },
+  {
+    "name": "equiv/forked",
+    "fold": "equiv",
+    "ops": [
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      },
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "41312d666f726b"
+      }
+    ],
+    "expect": true
+  },
+  {
+    "name": "equiv/clean",
+    "fold": "equiv",
+    "ops": [
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      },
+      {
+        "origin": "b",
+        "seq": 1,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4231"
+      },
+      {
+        "origin": "a",
+        "seq": 1,
+        "lamport": 1,
+        "prev": null,
+        "payload": "4131"
+      }
+    ],
+    "expect": false
+  }
+]
