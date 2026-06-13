@@ -1,0 +1,62 @@
+[
+  {
+    "name": "chain/a0",
+    "op": {
+      "share": "sh",
+      "glade_id": "g",
+      "key": "",
+      "origin": "a",
+      "seq": 0,
+      "prev": null,
+      "lamport": 0,
+      "shape": "value",
+      "payload": "7030"
+    },
+    "hash": "8a87b62f11deec6937b784dd4bada44d6473aa304c9cfd9c8974b139539e6873"
+  },
+  {
+    "name": "chain/a1",
+    "op": {
+      "share": "sh",
+      "glade_id": "g",
+      "key": "",
+      "origin": "a",
+      "seq": 1,
+      "prev": "8a87b62f11deec6937b784dd4bada44d6473aa304c9cfd9c8974b139539e6873",
+      "lamport": 1,
+      "shape": "value",
+      "payload": "7031"
+    },
+    "hash": "aee9d38f848a822fc9dec97e549645cd27400316f277468ad9e19040f9ea26a9"
+  },
+  {
+    "name": "chain/a2",
+    "op": {
+      "share": "sh",
+      "glade_id": "g",
+      "key": "",
+      "origin": "a",
+      "seq": 2,
+      "prev": "aee9d38f848a822fc9dec97e549645cd27400316f277468ad9e19040f9ea26a9",
+      "lamport": 2,
+      "shape": "value",
+      "payload": "7032"
+    },
+    "hash": "ee0b8923ff7281a153e805df961ca05e58ff5bc87ac19fdf2fd96ad0aceff94b"
+  },
+  {
+    "name": "fork/a0",
+    "op": {
+      "share": "sh",
+      "glade_id": "g",
+      "key": "",
+      "origin": "a",
+      "seq": 0,
+      "prev": null,
+      "lamport": 0,
+      "shape": "value",
+      "payload": "70302d666f726b"
+    },
+    "hash": "c2862c82d40044a4166ac6c19c50425744c73a1825a7db784ae3392aac4f3134"
+  }
+]
