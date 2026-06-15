@@ -76,6 +76,19 @@ def test_corpus_emits_golden_and_rust_harness(tmp_path):
     assert "corpus_byte_parity" in (tmp_path / "rust" / "vectors.rs").read_text()
 
 
+def test_generated_rust_files_have_single_terminal_newline(tmp_path):
+    cli.main(["gen", str(IR_PATH), "-o", str(tmp_path / "gen"), "--lang", "rust", "--api-only"])
+    cli.main(["corpus", str(IR_PATH), "-o", str(tmp_path / "corpus"), "--lang", "rust"])
+
+    for path in [
+        tmp_path / "gen" / "rust" / "api.rs",
+        tmp_path / "corpus" / "rust" / "vectors.rs",
+    ]:
+        text = path.read_text()
+        assert text.endswith("\n")
+        assert not text.endswith("\n\n")
+
+
 def test_corpus_check_passes_then_detects_drift(tmp_path):
     cli.main(["corpus", str(IR_PATH), "-o", str(tmp_path)])
     # fresh output is up to date

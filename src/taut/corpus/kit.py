@@ -83,7 +83,7 @@ def rust_vectors(schema: Schema, corpus: dict[str, dict]) -> str:
     lines.append("    }")
     lines.append("}")
     lines.append(_RUST_HELPERS)
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines).rstrip() + "\n"
 
 
 # lang -> (relative output path, emitter). golden.json is always written; these

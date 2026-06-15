@@ -81,6 +81,12 @@ def _encode(t: TypeRef, expr: str) -> str:
     raise TypeError(t)
 
 
+def _encode_optional(t: TypeRef, expr: str) -> str:
+    if isinstance(t, (Scalar, EnumRef, MsgRef)):
+        return _encode_ref(t, expr)
+    return _encode(t, expr)
+
+
 def _decode(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {
@@ -134,7 +140,7 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     pairs = []
     for f in msg.wire_fields():
         if f.optional:
-            enc = f"match &self.{f.name} {{ Some(v) => {_encode(f.type, 'v')}, None => Cbor::Null }}"
+            enc = f"match &self.{f.name} {{ Some(v) => {_encode_optional(f.type, 'v')}, None => Cbor::Null }}"
         else:
             enc = _encode(f.type, f"self.{f.name}")
         pairs.append((f.tag, enc))

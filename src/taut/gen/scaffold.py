@@ -235,7 +235,7 @@ def rust_api(schema: Schema, forward_compat: bool = False) -> str:
         out += _rust._emit_enum(e.name, e.members) + [""]
     for m in schema.messages.values():
         out += _rust._emit_message(m, forward_compat) + [""]
-    return "\n".join(out) + "\n"
+    return "\n".join(out).rstrip() + "\n"
 
 
 def rust_client(schema: Schema, svc: ServiceDef) -> str:
