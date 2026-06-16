@@ -212,6 +212,50 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
   differently (enum/sealed/variant/interface/discriminated-union), so it wants a
   real consumer to pin the per-language shape. *(OPEN — only when needed)*
 
+## Generator extension architecture
+
+- **D25. API surface extensions** — taut's default generator remains a low-opinion
+  owned-struct projection; opinionated API shapes move behind pluggable
+  `(surface, language)` providers. `proto2`, `proto3`, and `capnproto` are API
+  compatibility profiles over the taut IR and deterministic CBOR wire, not wire
+  compatibility profiles. Provider identity is the derived Python namespace
+  module `taut_extensions.<surface>.<language>.provider`, imported in-process via
+  the direct Python provider API. The provider receives canonical `taut_ir_json`
+  and writes generated outputs through a caller-owned file-like sink, so tautc
+  can stream to disk, cache in memory, or test without filesystem writes. `tautc`
+  supplies `options["layout"]` with caller-selected roots plus language-specific
+  package paths (`paths.java_path`, `paths.python_path`) and package declarations
+  (`java_package`, `python_package`) so providers put Java and Python files in
+  their import/package locations without hard-coding a project layout. Layout is
+  multi-package: providers select a stable `package_id` from
+  `options["layout"]["packages"]`, and tests must assert exact file location for
+  default and secondary packages.
+  Namespace directories are implicit namespace packages that MUST NOT ship
+  `__init__.py` in the shared namespace directories. Distribution packages may
+  contain one or many provider modules; the module path is the contract.
+  Discovery should also support built-ins, Python entry points,
+  `TAUT_EXTENSION_PATH`, and PATH executable adapters named like
+  `taut-extension-proto2-rust` or `taut-extension-cpp`. Discovery produces
+  candidate records with `provider_id`, `source_kind`, and `source_path`, and
+  `--extension` selects by `provider_id`. Extensions own generation, runtime
+  emission, and language-specific tests; the existing golden corpus stays the
+  first conformance gate. Proto2/proto3 extensions additionally require a
+  real `protoc` parity harness: generate `.proto` fixtures, compile them with
+  `protoc`, generate the taut API classes from the same IR, and run the same API
+  behavior tests against both class sets through a provider adapter DSL. The
+  roll-build shape is now decided: derived namespace-module providers first,
+  `protoc` pinned to `v35.0` with runtime/plugin/build-tool/dependency-resolver
+  locks, no new canonical API-surface corpus in v1, future wire profiles as a
+  separate protocol, and first implementation order Java proto2, Python proto2,
+  then Rust proto2. The Java lock records `protobuf-java`, the JDK, the selected
+  Java build runner (`javac`, Maven, or Gradle), dependency resolver, and artifact
+  source without making any public repository mandatory. Execution should use
+  GLP-0005 with a clean-tree start tag
+  `taut-ext-p00-start`, full plan-docs ledger files, split P01a-P01d provider
+  harness checkpoints, and phase checkpoints recorded in `Checkpoints.md`. See
+  [TautProtoApiSurfaceExtensions.md](TautProtoApiSurfaceExtensions.md).
+  *(SPEC — roll-buildable; deferred decisions are explicitly non-blocking.)*
+
 ## Already-built foundation (for reference)
 
 Delivery shapes (atom/log/stream/swmr/snapshot_delta/crdt) + validator;
