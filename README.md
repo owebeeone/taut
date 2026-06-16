@@ -67,26 +67,26 @@ you want ~10% of the load for the parts that actually bite.
 A schema is **enums + messages + services**, authored declaratively:
 
 ```python
-from taut.ir.dsl import INT, STR, BYTES, Enum, F, Msg, Ref, List, method, service, schema
+from taut.ir.dsl import INT, STR, BYTES, Enum, F, Msg, Params, Ref, List, method, service, schema
 
 SCHEMA = schema(
-    Enum("BuildStatus", cached=0, built=1, failed=2),
+    service("Razel",
+        method("build", role="in", params=Params(target=STR), out=Ref.BuildResult),
+        method("build.subscribe", role="out", shape="atom", out=Ref.BuildResult)),
 
-    Msg("OutputArtifact",
-        F("path", 1, STR),
-        F("digest", 2, BYTES),
+    BuildStatus=Enum(cached=0, built=1, failed=2),
+
+    OutputArtifact=Msg(
+        path=F(1, STR),
+        digest=F(2, BYTES),
         next_id=3),
 
-    Msg("BuildResult",
-        F("target", 1, STR),
-        F("status", 2, Ref("BuildStatus")),
-        F("outputs", 3, List(Ref("OutputArtifact"))),
-        F("message", 4, STR, optional=True),
+    BuildResult=Msg(
+        target=F(1, STR),
+        status=F(2, Ref.BuildStatus),
+        outputs=F(3, List(Ref.OutputArtifact)),
+        message=F(4, STR, optional=True),
         next_id=5),
-
-    service("Razel",
-        method("build", role="in", params=[("target", STR)], out=Ref("BuildResult")),
-        method("build.subscribe", role="out", shape="atom", out=Ref("BuildState"))),
 )
 ```
 
@@ -94,6 +94,10 @@ SCHEMA = schema(
   `transient`, CRDT `merge`). Types are a closed set: scalars (`int/str/bytes/
   bool`), enum/message refs, `List`, and `Map` (a key-sorted, deterministic
   keyed collection — `K` scalar, `V` scalar/enum/message).
+- **Keyword-named enums, messages, fields, `Ref.Name` references, and
+  `Params(...)` method params** are preferred. The explicit string forms remain
+  available for names that are not Python identifiers, Python keywords, or
+  `Msg(...)` control names such as `reserved` and `next_id`.
 - **`reserved` + `next_id`** are first-class, validated message features (not
   comments) — retired tags/names can never be reused, and `next_id` is checked.
 - **Methods are the minimal contract `(name, in, out, shape)`.** `shape` is the

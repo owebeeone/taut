@@ -14,7 +14,7 @@ It is loaded by path (the conventional extension is `*.taut.py`), so it must
 define a top-level `SCHEMA: Schema`:
 
 ```python
-from taut.ir.dsl import (BOOL, INT, STR, BYTES, Enum, F, List, Msg, Ref,
+from taut.ir.dsl import (BOOL, INT, STR, BYTES, Enum, F, List, Msg, Params, Ref,
                           method, schema, service)
 
 SCHEMA = schema( ... declarations ... )
@@ -32,35 +32,51 @@ IR module.
 | `STR` | CBOR text | `str` / `string` / `String` / `string_view` |
 | `BYTES` | CBOR byte string | `bytes` / `Uint8Array` / `Vec<u8>` / `string_view` |
 | `BOOL` | CBOR bool | `bool` |
-| `Ref("Name")` | — | reference to a declared enum or message |
+| `Ref.Name` | — | reference to a declared enum or message |
 | `List(elem)` | CBOR array | list / array / `Vec<T>` / `std::vector<T>` |
 
 `Ref` resolves to either an enum or a message automatically (you don't
-distinguish). `List` nests: `List(Ref("Task"))`, `List(STR)`.
+distinguish). Attribute refs are preferred for identifier-shaped names:
+`Ref.TaskState`, `List(Ref.Task)`, `List(STR)`. The callable form
+`Ref("legacy-name")` remains available for names that cannot be expressed as
+Python attributes.
 
 ## 3. Enums
 
 ```python
-Enum("TaskState", open=0, doing=1, done=2)
+SCHEMA = schema(
+    TaskState=Enum(open=0, doing=1, done=2),
+)
 ```
 
 Members carry **integer wire values**; native bindings use idiomatic names
 (`TaskState.open`, `TaskState::Open`, …). The wire is the integer; the name is a
 projection. Wire values must be unique.
 
+`Enum("TaskState", open=0, doing=1, done=2)` remains valid for compatibility and
+for names that cannot be expressed as Python identifiers.
+
 ## 4. Messages and fields
 
 ```python
-Msg("Task",
-    F("id", 1, INT),
-    F("title", 2, STR),
-    F("state", 3, Ref("TaskState")),
-    F("assignee", 4, STR, optional=True),
-    F("cached_render", 5, STR, transient=True),
-    F("votes", 6, INT, merge="counter"))
+SCHEMA = schema(
+    Task=Msg(
+        id=F(1, INT),
+        title=F(2, STR),
+        state=F(3, Ref.TaskState),
+        assignee=F(4, STR, optional=True),
+        cached_render=F(5, STR, transient=True),
+        votes=F(6, INT, merge="counter")),
+)
 ```
 
-`F(name, tag, type, *, optional=False, transient=False, merge=None)`:
+The preferred form names enums and messages with `schema(...)` keywords
+(`TaskState=Enum(...)`, `Task=Msg(...)`), names each field with a `Msg(...)`
+keyword (`title=F(2, STR)`), and uses `Ref.Name` for enum/message references.
+This keeps the governed names as Python identifiers while the integer tags stay
+explicit.
+
+`F(tag, type, *, optional=False, transient=False, merge=None)`:
 
 - **tag** — a positive integer, unique within the message. On the wire a message
   is a CBOR map keyed by tag; tags are the stable contract (rename a field freely,
@@ -70,7 +86,9 @@ Msg("Task",
   indices, handles). The wire is a projection of the tagged, non-transient subset.
 - **merge** — marks a CRDT field; see §7.
 
-`Msg(name, *fields, reserved=(), next_id=None)` declares the message.
+`Msg(*fields, reserved=(), next_id=None, **named_fields)` declares the message.
+When the message is anonymous, `schema(MessageName=Msg(...))` MUST provide the
+message name.
 
 **Evolution metadata** (protobuf-style, but first-class and validated):
 
@@ -85,14 +103,34 @@ Msg("Task",
   `< next_id`. Bump it when you add a field; the validator guarantees `next_id` is
   always a safe fresh tag.
 
+The explicit string forms remain available when a name is not a valid Python
+identifier, is a Python keyword, or collides with `Msg(...)` control arguments
+such as `reserved` or `next_id`:
+
+```python
+SCHEMA = schema(
+    Subscribe=Msg(
+        F("from", 1, List(Ref.Head), optional=True),
+        F("next_id", 2, STR),
+        alias=F(3, Ref("legacy-head")),
+    ),
+)
+```
+
+The older all-explicit form is still valid for compatibility:
+
+```python
+Msg("Task", F("id", 1, INT), F("title", 2, STR))
+```
+
 ## 5. Services and methods (web APIs)
 
 ```python
 service("Tasks",
     method("create", role="in",
-           params=[("title", STR)], out=Ref("Task")),
+           params=Params(title=STR), out=Ref.Task),
     method("tasks.subscribe", role="out", shape="atom",
-           out=List(Ref("Task"))),
+           out=List(Ref.Task)),
 )
 ```
 
@@ -105,8 +143,16 @@ degenerate "delivered once" member); `kind`/`output`/`events` are derived from
 | --- | --- |
 | `role` | semantic verb role (see legend) |
 | `shape` | the delivery shape (§6); defaults to `unary` (request→response) |
-| `params` | `in` — ordered `[(name, TypeRef), …]`; map 1:1 to a handler's args |
+| `params` | `in` — `Params(name=TypeRef, ...)`; map 1:1 to a handler's args |
 | `out` | a bare `TypeRef` (bound to the shape's sole slot) **or** `{slot: TypeRef}` for multi-slot shapes (`swmr`/`crdt`) |
+
+`Params(...)` preserves keyword order and returns the same tuple shape accepted
+by `method(...)`. The tuple form remains available for names that cannot be
+expressed as Python keywords:
+
+```python
+method("tail", role="out", params=[("from", Ref.Head)], out=Ref.Event)
+```
 
 `service(name, *methods)` groups them. A schema may declare several services.
 
@@ -155,9 +201,11 @@ vocabulary):
 | `counter` | PN counter (int only) | sum of distinct per-`(actor,seq)` deltas |
 
 ```python
-Msg("Board",
-    F("title", 1, STR, merge="lww"),
-    F("votes", 2, INT, merge="counter"))
+SCHEMA = schema(
+    Board=Msg(
+        title=F(1, STR, merge="lww"),
+        votes=F(2, INT, merge="counter")),
+)
 ```
 
 The wire carries CRDT from day one via built-in messages `CrdtOp`,

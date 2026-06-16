@@ -16,56 +16,56 @@ The IR is authored in a restricted, declarative Python DSL — no logic, just
 declarations:
 
 ```python
-from taut.ir.dsl import BOOL, INT, STR, Enum, F, List, Map, Msg, Ref, method, schema, service
+from taut.ir.dsl import BOOL, INT, STR, Enum, F, List, Map, Msg, Params, Ref, method, schema, service
 
 SCHEMA = schema(
-    # an enum — integer wire values, idiomatic native names per language
-    Enum("TaskState", open=0, doing=1, done=2),
-
-    # messages compose: a field can reference another message, an optional
-    # message, or a list of messages — nesting is automatic on the wire.
-    Msg("User",
-        F("id", 1, INT),
-        F("name", 2, STR)),
-
-    Msg("Comment",
-        F("author", 1, Ref("User")),          # a message field — composition
-        F("text", 2, STR)),
-
-    Msg("Task",
-        F("id", 1, INT),
-        F("title", 2, STR),
-        F("state", 3, Ref("TaskState")),       # enum field
-        F("assignee", 4, Ref("User"), optional=True),  # nested message, optional
-        F("comments", 5, List(Ref("Comment"))),        # list of messages
-        F("labels", 7, Map(STR, STR)),                 # map<str,str> — a keyed collection
-        reserved=[6, "priority"],   # tag 6 / "priority" retired (see §5) — never reusable
-        next_id=8),
-
-    Msg("Event",
-        F("ts", 1, INT),
-        F("text", 2, STR)),
-
     # the web API: a service of methods. Each method is (name, in, out, shape);
     # `shape` is the sole discriminator and defaults to `unary` (delivered once).
     service("Tasks",
         # unary (default shape): request -> response. params can be messages.
         method("create", role="in",
-               params=[("title", STR)], out=Ref("Task")),
+               params=Params(title=STR), out=Ref.Task),
         method("comment", role="in",
-               params=[("task_id", INT), ("author", Ref("User")), ("text", STR)],
-               out=Ref("Comment")),
+               params=Params(task_id=INT, author=Ref.User, text=STR),
+               out=Ref.Comment),
         method("set_state", role="ctl",
-               params=[("id", INT), ("state", Ref("TaskState"))], out=BOOL),
+               params=Params(id=INT, state=Ref.TaskState), out=BOOL),
 
         # Atom: the whole task list, latest-wins, pushed on every change
         method("tasks.subscribe", role="out", shape="atom",
-               out=List(Ref("Task"))),
+               out=List(Ref.Task)),
 
         # Log: an append-only activity feed (replay then tail)
         method("activity.subscribe", role="out", shape="log",
-               out=Ref("Event")),
+               out=Ref.Event),
     ),
+
+    # an enum — integer wire values, idiomatic native names per language
+    TaskState=Enum(open=0, doing=1, done=2),
+
+    # messages compose: a field can reference another message, an optional
+    # message, or a list of messages — nesting is automatic on the wire.
+    User=Msg(
+        id=F(1, INT),
+        name=F(2, STR)),
+
+    Comment=Msg(
+        author=F(1, Ref.User),          # a message field — composition
+        text=F(2, STR)),
+
+    Task=Msg(
+        id=F(1, INT),
+        title=F(2, STR),
+        state=F(3, Ref.TaskState),       # enum field
+        assignee=F(4, Ref.User, optional=True),  # nested message, optional
+        comments=F(5, List(Ref.Comment)),        # list of messages
+        labels=F(7, Map(STR, STR)),                 # map<str,str> — a keyed collection
+        reserved=[6, "priority"],   # tag 6 / "priority" retired (see §5) — never reusable
+        next_id=8),
+
+    Event=Msg(
+        ts=F(1, INT),
+        text=F(2, STR)),
 )
 ```
 
@@ -75,6 +75,11 @@ optional `User`, a list of `Comment`, and a `map<str,str>` of `labels`; each
 streaming endpoints, read whole in a screen. (`out=` is a bare type for
 single-slot shapes — bound to the shape's slot; multi-slot shapes like `swmr` take
 `out={"snapshot": …, "delta": …}`.)
+
+Keyword-named enums, messages, fields, `Ref.Name` references, and `Params(...)`
+method params are the preferred style. The positional `service(...)` declaration
+appears before keyword declarations because Python requires positional call
+arguments first; references resolve after the whole schema is built.
 
 ## 2. Load, validate, export
 
@@ -168,10 +173,10 @@ reused, and keep **`next_id`** ahead of every tag — both are first-class,
 validated message features (the example uses them on `Task`):
 
 ```python
-Msg("Task",
-    F("id", 1, INT), F("title", 2, STR), F("state", 3, Ref("TaskState")),
-    F("assignee", 4, Ref("User"), optional=True), F("comments", 5, List(Ref("Comment"))),
-    F("labels", 7, Map(STR, STR)),  # added at tag 7 — tag 6 was retired, so it's skipped
+Task=Msg(
+    id=F(1, INT), title=F(2, STR), state=F(3, Ref.TaskState),
+    assignee=F(4, Ref.User, optional=True), comments=F(5, List(Ref.Comment)),
+    labels=F(7, Map(STR, STR)),  # added at tag 7 — tag 6 was retired, so it's skipped
     reserved=[6, "priority"],   # retired tag 6 + name "priority" — never reusable
     next_id=8)                  # next tag to allocate (validated > every used/reserved tag)
 ```

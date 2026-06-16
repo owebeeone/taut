@@ -11,48 +11,48 @@ from pathlib import Path
 # make the taut builder importable when loaded by path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-from taut.ir.dsl import BOOL, INT, STR, Enum, F, List, Map, Msg, Ref, method, schema, service
+from taut.ir.dsl import BOOL, INT, STR, Enum, F, List, Map, Msg, Params, Ref, method, schema, service
 
 SCHEMA = schema(
-    Enum("TaskState", open=0, doing=1, done=2),
+    service("Tasks",
+        method("create", role="in",
+               params=Params(title=STR), out=Ref.Task),
+        method("comment", role="in",
+               params=Params(task_id=INT, author=Ref.User, text=STR),
+               out=Ref.Comment),
+        method("set_state", role="ctl",
+               params=Params(id=INT, state=Ref.TaskState), out=BOOL),
+        method("tasks.subscribe", role="out", shape="atom",
+               out=List(Ref.Task)),
+        method("activity.subscribe", role="out", shape="log",
+               out=Ref.Event),
+    ),
 
-    Msg("User",
-        F("id", 1, INT),
-        F("name", 2, STR),
+    TaskState=Enum(open=0, doing=1, done=2),
+
+    User=Msg(
+        id=F(1, INT),
+        name=F(2, STR),
         next_id=3),
 
-    Msg("Comment",
-        F("author", 1, Ref("User")),                 # composition: a message field
-        F("text", 2, STR),
+    Comment=Msg(
+        author=F(1, Ref.User),                 # composition: a message field
+        text=F(2, STR),
         next_id=3),
 
-    Msg("Task",
-        F("id", 1, INT),
-        F("title", 2, STR),
-        F("state", 3, Ref("TaskState")),
-        F("assignee", 4, Ref("User"), optional=True),  # nested message, optional
-        F("comments", 5, List(Ref("Comment"))),        # list of messages
-        F("labels", 7, Map(STR, STR)),                 # keyed collection (e.g. {"team": "infra"})
+    Task=Msg(
+        id=F(1, INT),
+        title=F(2, STR),
+        state=F(3, Ref.TaskState),
+        assignee=F(4, Ref.User, optional=True),  # nested message, optional
+        comments=F(5, List(Ref.Comment)),        # list of messages
+        labels=F(7, Map(STR, STR)),                 # keyed collection (e.g. {"team": "infra"})
         # tag 6 and the name "priority" were retired — never reuse them:
         reserved=[6, "priority"],
         next_id=8),
 
-    Msg("Event",
-        F("ts", 1, INT),
-        F("text", 2, STR),
+    Event=Msg(
+        ts=F(1, INT),
+        text=F(2, STR),
         next_id=3),
-
-    service("Tasks",
-        method("create", role="in",
-               params=[("title", STR)], out=Ref("Task")),
-        method("comment", role="in",
-               params=[("task_id", INT), ("author", Ref("User")), ("text", STR)],
-               out=Ref("Comment")),
-        method("set_state", role="ctl",
-               params=[("id", INT), ("state", Ref("TaskState"))], out=BOOL),
-        method("tasks.subscribe", role="out", shape="atom",
-               out=List(Ref("Task"))),
-        method("activity.subscribe", role="out", shape="log",
-               out=Ref("Event")),
-    ),
 )

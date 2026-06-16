@@ -7,6 +7,8 @@ the surface. Loaded by `load.py`.
 
 from __future__ import annotations
 
+import keyword
+
 from .model import (
     EnumDef,
     EnumRef,
@@ -31,12 +33,90 @@ BYTES = Scalar("bytes")
 BOOL = Scalar("bool")
 
 
-def Enum(name: str, **members: int) -> EnumDef:
+def _validate_identifier(name: str, kind: str) -> None:
+    if not isinstance(name, str):
+        raise TypeError(f"{kind} name must be a string")
+    if not name.isidentifier() or keyword.iskeyword(name):
+        raise ValueError(f"{kind} name must be a Python identifier: {name!r}")
+
+
+def _field_named(name: str, field: FieldDef) -> FieldDef:
+    _validate_identifier(name, "field")
+    if not isinstance(field, FieldDef):
+        raise TypeError(f"field {name!r} must be declared with F(...)")
+    if field.name == "":
+        return FieldDef(
+            name=name,
+            tag=field.tag,
+            type=field.type,
+            optional=field.optional,
+            transient=field.transient,
+            merge=field.merge,
+        )
+    if field.name != name:
+        raise TypeError(f"field name mismatch: keyword {name!r} names field {field.name!r}")
+    return field
+
+
+def _message_named(name: str, message: MessageDef) -> MessageDef:
+    _validate_identifier(name, "declaration")
+    if not isinstance(message, MessageDef):
+        raise TypeError(f"declaration {name!r} must be declared with Msg(...)")
+    if message.name == "":
+        return MessageDef(
+            name=name,
+            fields=message.fields,
+            reserved_tags=message.reserved_tags,
+            reserved_names=message.reserved_names,
+            next_id=message.next_id,
+        )
+    if message.name != name:
+        raise TypeError(f"declaration name mismatch: keyword {name!r} names {message.name!r}")
+    return message
+
+
+def _enum_named(name: str, enum: EnumDef) -> EnumDef:
+    _validate_identifier(name, "declaration")
+    if not isinstance(enum, EnumDef):
+        raise TypeError(f"declaration {name!r} must be declared with Enum(...)")
+    if enum.name == "":
+        return EnumDef(name=name, members=dict(enum.members))
+    if enum.name != name:
+        raise TypeError(f"declaration name mismatch: keyword {name!r} names {enum.name!r}")
+    return enum
+
+
+def _declaration_named(name: str, decl: EnumDef | MessageDef) -> EnumDef | MessageDef:
+    if isinstance(decl, MessageDef):
+        return _message_named(name, decl)
+    if isinstance(decl, EnumDef):
+        return _enum_named(name, decl)
+    _validate_identifier(name, "declaration")
+    raise TypeError(f"declaration {name!r} must be declared with Enum(...) or Msg(...)")
+
+
+def Enum(*args, **members: int) -> EnumDef:
+    if len(args) == 1 and isinstance(args[0], str):
+        name = args[0]
+    elif len(args) == 0:
+        name = ""
+    else:
+        raise TypeError("Enum expects Enum(name, **members) or Enum(**members)")
     return EnumDef(name=name, members=dict(members))
 
 
-def Ref(name: str) -> MsgRef:
-    return MsgRef(name)
+class _RefFactory:
+    def __call__(self, name: str) -> MsgRef:
+        if not isinstance(name, str):
+            raise TypeError("ref name must be a string")
+        return MsgRef(name)
+
+    def __getattr__(self, name: str) -> MsgRef:
+        _validate_identifier(name, "ref")
+        return self(name)
+
+
+Ref = _RefFactory()
 
 
 def List(elem: TypeRef) -> ListOf:
@@ -49,19 +129,59 @@ def Map(key: TypeRef, value: TypeRef) -> MapOf:
     return MapOf(key, value)
 
 
-def F(name: str, tag: int, type: TypeRef, *, optional: bool = False, transient: bool = False,
-      merge: str | None = None) -> FieldDef:
+def F(
+    *args,
+    optional: bool = False,
+    transient: bool = False,
+    merge: str | None = None,
+) -> FieldDef:
+    if len(args) == 3 and isinstance(args[0], str):
+        name, tag, type = args
+    elif len(args) == 2 and isinstance(args[0], int) and not isinstance(args[0], bool):
+        name = ""
+        tag, type = args
+    else:
+        raise TypeError("F expects F(name, tag, type) or F(tag, type)")
+    if not isinstance(tag, int) or isinstance(tag, bool):
+        raise TypeError("field tag must be an integer")
     return FieldDef(name=name, tag=tag, type=type, optional=optional, transient=transient, merge=merge)
 
 
-def Msg(name: str, *fields: FieldDef, reserved=(), next_id: int | None = None) -> MessageDef:
+def Msg(*args, reserved=(), next_id: int | None = None, **named_fields) -> MessageDef:
     """A message. `reserved` mixes retired tags (int) and names (str), like
     protobuf's `reserved`; `next_id` is the next tag to allocate (validated to be
     above every used/reserved tag)."""
+    if args and isinstance(args[0], str):
+        name = args[0]
+        fields = args[1:]
+    else:
+        name = ""
+        fields = args
+    if isinstance(named_fields.get("name"), str):
+        if name:
+            raise TypeError("message name provided twice")
+        name = named_fields.pop("name")
+    checked_fields = []
+    for field in fields:
+        if not isinstance(field, FieldDef):
+            raise TypeError("message fields must be declared with F(...)")
+        if field.name == "":
+            raise TypeError("anonymous field requires a Msg(...) keyword name")
+        checked_fields.append(field)
+    checked_fields.extend(
+        _field_named(field_name, field)
+        for field_name, field in named_fields.items()
+    )
     rtags = tuple(r for r in reserved if isinstance(r, int) and not isinstance(r, bool))
     rnames = tuple(r for r in reserved if isinstance(r, str))
-    return MessageDef(name=name, fields=tuple(fields), reserved_tags=rtags,
+    return MessageDef(name=name, fields=tuple(checked_fields), reserved_tags=rtags,
                       reserved_names=rnames, next_id=next_id)
+
+
+def Params(**named_params: TypeRef) -> tuple[tuple[str, TypeRef], ...]:
+    for name in named_params:
+        _validate_identifier(name, "param")
+    return tuple(named_params.items())
 
 
 def method(
@@ -114,7 +234,16 @@ def _resolve_method(m: MethodDef, enum_names: set[str]) -> MethodDef:
     )
 
 
-def schema(*decls) -> Schema:
+def schema(*decls, **named_decls) -> Schema:
+    named_declarations = tuple(_declaration_named(name, decl) for name, decl in named_decls.items())
+    checked_decls = []
+    for decl in decls:
+        if isinstance(decl, MessageDef) and decl.name == "":
+            raise TypeError("anonymous message requires a schema(...) keyword name")
+        if isinstance(decl, EnumDef) and decl.name == "":
+            raise TypeError("anonymous enum requires a schema(...) keyword name")
+        checked_decls.append(decl)
+    decls = tuple(checked_decls) + named_declarations
     enums = {d.name: d for d in decls if isinstance(d, EnumDef)}
     enum_names = set(enums)
     messages = {}
