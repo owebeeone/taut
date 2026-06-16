@@ -12,8 +12,7 @@ schema is authored as a small, restricted Python DSL — or any `.ir.json` — a
 everything else is *projected* from it.
 
 > Status: **alpha**. The model, codec, generators, corpus, and evolution gate are
-> built and tested end-to-end across nine languages (94 tests green); APIs may
-> still move.
+> implemented across nine languages; APIs may still move.
 
 ```
 pip install taut-proto      # distribution name (PyPI)
