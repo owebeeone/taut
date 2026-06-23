@@ -1,0 +1,29 @@
+# Taut Res+Ext Phase 2 Swift Prompt Review 55
+
+## Findings
+
+1. **[P0] Phase 1 prerequisites are absent, so the Swift prompt is not runnable as written.**  
+   The Phase 2 Swift brief requires running `residual_vectors.json` decode-to-reencode parity and verifying `ext_vectors.json` (`dev-docs/TautResExtP2-Swift.md:9`, `dev-docs/TautResExtP2-Swift.md:18`), and the base brief defines those files as the parse-free oracle (`dev-docs/TautResExtP2-Base.md:15-22`). The plan says Phase 1 must emit and commit both corpora and wire them into regen gates before fan-out (`dev-docs/TautResExtPlan.md:55-62`). In this checkout, `corpus/` has no `residual_vectors.json` or `ext_vectors.json`, and the current conformance kit only exposes a Rust harness (`src/taut/corpus/kit.py:89-93`). A Swift implementer would have to invent corpora, skip the required byte gates, or edit Phase-1/shared files that the base brief explicitly excludes from Phase 2 (`dev-docs/TautResExtP2-Base.md:63-68`).
+
+2. **[P0] `ext.swift` cannot be vendored by `--with-runtime` under the current ownership rules.**  
+   The Swift prompt owns a new `src/taut/gen/runtime/ext.swift` file (`dev-docs/TautResExtP2-Swift.md:6-7`), but the base brief says not to edit `gen/scaffold.py` (`dev-docs/TautResExtP2-Base.md:63-68`). The current scaffold runtime map has exactly one runtime resource per compiled language, with Swift mapped only to `cbor.swift` (`src/taut/gen/scaffold.py:30-38`), and `emit()` writes only that one mapped runtime file (`src/taut/gen/scaffold.py:594-599`). The plan expected Phase 1 to add the `ext.<lang>` runtime slot to `_RUNTIMES`/scaffold (`dev-docs/TautResExtPlan.md:59-61`), but that has not landed. Adding only `ext.swift` would let a local test compile it by direct path, but generated Swift output from `tautc gen --with-runtime` would not include the extension accessors.
+
+3. **[P1] The Swift brief names the wrong residual field.**  
+   The Swift prompt says `src/taut/gen/swift.py` emits `wireResidual` (`dev-docs/TautResExtP2-Swift.md:6-7`). The actual Swift generator emits `wire_residual` (`src/taut/gen/swift.py:109-123`, `src/taut/gen/swift.py:141`, `src/taut/gen/swift.py:153-155`), and the existing Swift tests assert that spelling (`src/tests/test_swift.py:46-50`). Following the prompt literally risks changing the Swift public API to camelCase or writing tests against a nonexistent property. The prompt should say `wire_residual`; camelCase is used by other targets such as Kotlin/Java/JS, not this Swift generator.
+
+4. **[P1] The fixture schema and dispatch contract are not identified.**  
+   The plan says Phase 0/1 must fix and commit a host message, extension message, band tag, and residual fixture as IR (`dev-docs/TautResExtPlan.md:45-49`, `dev-docs/TautResExtPlan.md:61-62`). The Swift brief only says to "Generate the fixture `--forward-compat`" (`dev-docs/TautResExtP2-Swift.md:9`) and does not name the IR path, message names, extension type, band tag, or expected vector row schema. Existing Swift tests generate ad hoc schemas inline (`src/tests/test_swift.py:153-171`), but a parse-free corpus still needs enough metadata to dispatch each row to the correct generated Swift type. Without that shared fixture contract, separate language agents can produce incompatible harnesses while all believing they followed the prompt.
+
+5. **[P2] The Swift extension API shape should explicitly reconcile generic `Cbor?` with the base typed contract.**  
+   The base contract describes `ext_get` as returning an `ExtMsg | null` after decoding the nested map through the extension type (`dev-docs/TautResExtP2-Base.md:50-56`), mirroring Python's typed `ext_get(schema, bytes, ext_message, tag)` (`src/taut/ext.py:24-38`). The Swift brief instead specifies `extGet(_ host, tag) -> Cbor?`, with callers doing `ExtMsg.fromCbor` themselves (`dev-docs/TautResExtP2-Swift.md:13-17`). That can be a reasonable generic Swift surface, but the prompt should state that this is intentional and sufficient for parity, or require a typed convenience wrapper as well. Otherwise cross-language completion criteria can drift between "generic CBOR accessor" and "typed extension accessor."
+
+6. **[P2] Error semantics are underspecified for Swift.**  
+   Both base and Swift briefs require the band check (`dev-docs/TautResExtP2-Base.md:42-45`, `dev-docs/TautResExtP2-Swift.md:16`), and Python raises `ValueError` for below-band tags (`src/taut/ext.py:19-21`). The Swift prompt does not say whether `extSet`/`extGet`/`extClear` should be `throws`, use `precondition`, or `fatalError`, nor what should happen when `host` does not decode to a top-level map. If `ext_vectors.json` includes invalid-tag or malformed-host cases, the expected Swift behavior needs to be specified before implementation.
+
+7. **[P3] The verification ladder needs its dev prerequisites stated.**  
+   `swiftc` is available in this checkout, but `PYTHONPATH=src python3 -m pytest src/tests/test_swift.py -q` currently fails because `pytest` is not installed. Existing Swift tests import pytest (`src/tests/test_swift.py:17`), and the base brief uses pytest as the suite command (`dev-docs/TautResExtP2-Base.md:79`). The prompt should either state the expected dev environment/install step or provide a direct Swift harness command for agents that only have `swiftc`.
+
+## Overall Assessment
+
+The Swift implementation is not safely implementable from this prompt in the current repo state. The core Swift runtime and generator already have a plausible residual model, and `swiftc` is present, but the prompt depends on Phase 1 artifacts that are missing and on scaffold wiring that Phase 2 is not allowed to change. Land the shared corpora, fixture IR, harness contract, and multi-runtime vendoring support first, then update the Swift brief's residual field spelling and extension API/error expectations.
+
