@@ -28,7 +28,8 @@ def _id(name: str) -> str:
 
 def _kt_ty(t: TypeRef) -> str:
     if isinstance(t, Scalar):
-        return {"int": "Long", "str": "String", "bytes": "ByteArray", "bool": "Boolean"}[t.kind]
+        return {"int": "Long", "str": "String", "bytes": "ByteArray",
+                "bool": "Boolean", "float": "Double"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -45,7 +46,8 @@ def _field_type(f: FieldDef) -> str:
 
 def _default(t: TypeRef) -> str:
     if isinstance(t, Scalar):
-        return {"int": "0L", "str": '""', "bytes": "ByteArray(0)", "bool": "false"}[t.kind]
+        return {"int": "0L", "str": '""', "bytes": "ByteArray(0)",
+                "bool": "false", "float": "0.0"}[t.kind]
     if isinstance(t, ListOf):
         return "emptyList()"
     raise TypeError(f"no Kotlin default for transient field of type {t!r}")
@@ -54,7 +56,8 @@ def _default(t: TypeRef) -> str:
 def _enc(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {"int": f"Cbor.int({expr})", "str": f"Cbor.text({expr})",
-                "bytes": f"Cbor.bytes({expr})", "bool": f"Cbor.bool({expr})"}[t.kind]
+                "bytes": f"Cbor.bytes({expr})", "bool": f"Cbor.bool({expr})",
+                "float": f"Cbor.float({expr})"}[t.kind]
     if isinstance(t, EnumRef):
         return f"Cbor.int({expr}.wire)"
     if isinstance(t, MsgRef):
@@ -70,7 +73,8 @@ def _enc(t: TypeRef, expr: str) -> str:
 def _dec(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {"int": f"{expr}.intVal", "str": f"{expr}.textVal",
-                "bytes": f"{expr}.bytesVal", "bool": f"{expr}.boolVal"}[t.kind]
+                "bytes": f"{expr}.bytesVal", "bool": f"{expr}.boolVal",
+                "float": f"{expr}.floatVal"}[t.kind]
     if isinstance(t, EnumRef):
         return f"{t.name}.fromWire({expr}.intVal)"
     if isinstance(t, MsgRef):
