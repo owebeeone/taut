@@ -15,9 +15,14 @@ TS brief).
 ## The single oracle
 Correctness == reproducing the **Python** bytes. The reference is `src/taut/wire/codec.py`
 (the `__unknown__` residual path) and `src/taut/ext.py` (the extension accessors). Two
-parse-free conformance corpora encode that truth:
-- `corpus/residual_vectors.json` — residual round-trip vectors.
-- `corpus/ext_vectors.json` — extension set/get/clear vectors.
+parse-free conformance corpora encode that truth. Phase 1 has landed the shared surface (✅):
+- **`ir/resext.taut.py`** — the shared fixture (`Host` + extension `Decision` + band-tag
+  extension). **`tautc gen` your types from THIS schema** so all 8 languages are byte-comparable.
+- `corpus/residual_vectors.json` — residual round-trip vectors (`encode(decode(wire)) == wire`,
+  incl. an interleaved unknown tag and a band-tag extension riding as residual).
+- `corpus/ext_vectors.json` — extension set/get/clear vectors (`{op, host, value, expect}` hex).
+- Your `ext.<lang>` runtime slot is already wired in `_RUNTIMES`/`emit()` — drop your file into
+  `gen/runtime/` and `tautc gen --with-runtime` vendors it (you still do NOT edit `scaffold.py`).
 Raw CBOR **hex** in/out, keyed on bytes (never on parsed values). For every row your codec /
 accessors must reproduce the exact `expect` hex.
 

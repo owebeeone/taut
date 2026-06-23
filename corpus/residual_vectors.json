@@ -1,0 +1,22 @@
+[
+  {
+    "note": "clean-no-unknowns",
+    "message": "Host",
+    "wire": "a301010263616e6e0509"
+  },
+  {
+    "note": "interleaved+trailing-unknown",
+    "message": "Host",
+    "wire": "a501010263616e6e036b696e7465726c6561766564050909182a"
+  },
+  {
+    "note": "band-tag-extension-as-residual",
+    "message": "Host",
+    "wire": "a401010263616e6e05091a00100001a2016262370201"
+  },
+  {
+    "note": "interleaved+band",
+    "message": "Host",
+    "wire": "a501010263616e6e036b696e7465726c656176656405091a00100001a2016262370201"
+  }
+]

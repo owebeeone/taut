@@ -23,23 +23,29 @@ from . import rust as _rust
 from . import swift as _swift
 from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef
 
-# Compiled targets whose generated code imports an external CBOR runtime module.
-# Maps lang -> (output path relative to its lang dir, vendored resource file).
-# Python/TS use the IR-driven runtime codec (the installed package), so they have
-# nothing to emit here.
-_RUNTIMES: dict[str, tuple[str, str]] = {
-    "rust": ("cbor.rs", "cbor.rs"),          # generated api.rs: `use crate::cbor::Cbor`
-    "cpp": ("taut/cbor.hpp", "cbor.hpp"),    # generated api.hpp: `#include "taut/cbor.hpp"`
-    "swift": ("cbor.swift", "cbor.swift"),   # same-module Cbor / encode / decode
-    "go": ("cbor.go", "cbor.go"),            # same-package Cbor / Encode / Decode
-    "kotlin": ("cbor.kt", "cbor.kt"),        # same-package Cbor / encode / decode
-    "js": ("cbor.js", "cbor.js"),            # require("./cbor.js")
-    "java": ("Cbor.java", "Cbor.java"),      # same-package taut.Cbor / KV
+# Compiled targets whose generated code imports external runtime modules. Maps
+# lang -> list of (output path relative to its lang dir, vendored resource file).
+# Each carries the CBOR runtime plus `ext.<lang>`, the side-channel/extension accessor
+# runtime (Phase 2 fills it in). emit() vendors each resource that *exists*, so the ext
+# slot ships automatically once its file lands. Python/TS use the IR-driven runtime
+# codec (the installed package), so they have nothing to emit here.
+_RUNTIMES: dict[str, list[tuple[str, str]]] = {
+    "rust":   [("cbor.rs", "cbor.rs"), ("ext.rs", "ext.rs")],            # use crate::cbor / crate::ext
+    "cpp":    [("taut/cbor.hpp", "cbor.hpp"), ("taut/ext.hpp", "ext.hpp")],
+    "swift":  [("cbor.swift", "cbor.swift"), ("ext.swift", "ext.swift")],
+    "go":     [("cbor.go", "cbor.go"), ("ext.go", "ext.go")],
+    "kotlin": [("cbor.kt", "cbor.kt"), ("ext.kt", "ext.kt")],
+    "js":     [("cbor.js", "cbor.js"), ("ext.js", "ext.js")],
+    "java":   [("Cbor.java", "Cbor.java"), ("Ext.java", "Ext.java")],
 }
 
 
 def _runtime_source(resource: str) -> str:
     return resources.files("taut.gen.runtime").joinpath(resource).read_text(encoding="utf-8")
+
+
+def _runtime_exists(resource: str) -> bool:
+    return resources.files("taut.gen.runtime").joinpath(resource).is_file()
 
 
 def _attr(name: str) -> str:
@@ -592,11 +598,13 @@ def emit(
         api_path.write_text(api_fn(schema, forward_compat=forward_compat))
         written.append(api_path)
         if runtime and lang in _RUNTIMES:
-            rel, resource = _RUNTIMES[lang]
-            rt_path = d / rel
-            rt_path.parent.mkdir(parents=True, exist_ok=True)
-            rt_path.write_text(_runtime_source(resource))
-            written.append(rt_path)
+            for rel, resource in _RUNTIMES[lang]:
+                if not _runtime_exists(resource):
+                    continue   # e.g. ext.<lang> before Phase 2 — vendored once its file lands
+                rt_path = d / rel
+                rt_path.parent.mkdir(parents=True, exist_ok=True)
+                rt_path.write_text(_runtime_source(resource))
+                written.append(rt_path)
         for sname in svc_names:
             svc = schema.services[sname]
             suffix = f"_{sname}" if multi else ""

@@ -1,6 +1,6 @@
 # Taut — Forward-Compat Residual + OOB Extension Parity
 
-**Status:** Plan — ready to execute.
+**Status:** **Phase 1 complete** (fork gate landed — 187 tests green). Phase 2 (8-way fan-out) ready.
 **Date:** 2026-06-23
 **Related:** the FLOAT precedent — [history/TautFloatPlan.md](history/TautFloatPlan.md) (+ `history/TautFloatP2-*`); decisions **D10–D15** in [TautDecisions.md](TautDecisions.md).
 
@@ -48,7 +48,11 @@ LOC budgets aspirational (< 500/step).
   vectors carry an **interleaved unknown tag** (a residual tag *between* two known tags) and
   a **band-tag unknown**. Pin the per-language `ext_*` API shape (mirrors `ext.py`). *(~docs)*
 
-### Phase 1 — Python reference + shared surface *(milestone: the fork gate)* — single-threaded
+### Phase 1 — Python reference + shared surface *(milestone: the fork gate)* — ✅ DONE 2026-06-23
+*(Landed: `ir/resext.taut.py` fixture, `corpus/resext_build.py` → `residual_vectors.json` (4) +
+`ext_vectors.json` (5), `run_tests.py` regen + lockstep gates, and the `ext.<lang>` slot in
+`_RUNTIMES`/`emit()`. The `kit.py` per-language harness emission (1.3) was deferred as optional —
+the corpora are the contract; agents hand-write their harness.)*
 - **1.1** Reference: `ext.py` is the extension oracle; the codec `__unknown__` path is the
   residual oracle. Add reference tests for band-tag-as-residual and the interleaved-unknown
   merge if not already covered. *(~80 LOC)*

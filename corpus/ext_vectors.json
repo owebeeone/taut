@@ -1,0 +1,43 @@
+[
+  {
+    "op": "set",
+    "note": "attach",
+    "host": "a301010263616e6e0509",
+    "ext_message": "Decision",
+    "tag": 1048577,
+    "value": "a2016262370201",
+    "expect": "a401010263616e6e05091a00100001a2016262370201"
+  },
+  {
+    "op": "set",
+    "note": "replace-existing",
+    "host": "a401010263616e6e05091a00100001a2016262370201",
+    "ext_message": "Decision",
+    "tag": 1048577,
+    "value": "a2016262390202",
+    "expect": "a401010263616e6e05091a00100001a2016262390202"
+  },
+  {
+    "op": "get",
+    "note": "read",
+    "host": "a401010263616e6e05091a00100001a2016262370201",
+    "ext_message": "Decision",
+    "tag": 1048577,
+    "expect": "a2016262370201"
+  },
+  {
+    "op": "get",
+    "note": "absent",
+    "host": "a301010263616e6e0509",
+    "ext_message": "Decision",
+    "tag": 1048577,
+    "expect": "null"
+  },
+  {
+    "op": "clear",
+    "note": "strip",
+    "host": "a401010263616e6e05091a00100001a2016262370201",
+    "tag": 1048577,
+    "expect": "a301010263616e6e0509"
+  }
+]
