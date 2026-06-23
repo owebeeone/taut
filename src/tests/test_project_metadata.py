@@ -10,4 +10,4 @@ def test_release_version_is_next_minor():
     match = re.search(r'(?m)^version = "([^"]+)"$', text)
 
     assert match is not None
-    assert match.group(1) == "0.5.0"
+    assert match.group(1) == "0.6.0"
