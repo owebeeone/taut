@@ -13,7 +13,8 @@ from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema,
 def _enc(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {"int": f"CInt({expr})", "str": f"CText({expr})",
-                "bytes": f"CBytes({expr})", "bool": f"CBool({expr})"}[t.kind]
+                "bytes": f"CBytes({expr})", "bool": f"CBool({expr})",
+                "float": f"CFloat({expr})"}[t.kind]
     if isinstance(t, EnumRef):
         return f"CInt({expr})"          # enum value is its wire int
     if isinstance(t, MsgRef):
@@ -29,7 +30,8 @@ def _enc(t: TypeRef, expr: str) -> str:
 def _dec(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {"int": f"{expr}.i", "str": f"{expr}.s",
-                "bytes": f"{expr}.b", "bool": f"({expr}.i !== 0)"}[t.kind]
+                "bytes": f"{expr}.b", "bool": f"({expr}.i !== 0)",
+                "float": f"{expr}.f"}[t.kind]
     if isinstance(t, EnumRef):
         return f"{expr}.i"
     if isinstance(t, MsgRef):
@@ -93,7 +95,7 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
 def emit_types(schema: Schema, forward_compat: bool = False) -> str:
     out = ['"use strict";',
            "// GENERATED native JS types + codec — do not edit. Pairs with cbor.js.",
-           'const { CInt, CText, CBytes, CBool, CArr, CMap, CNull, cget, cmapEntries, isNull } = require("./cbor.js");',
+           'const { CInt, CFloat, CText, CBytes, CBool, CArr, CMap, CNull, cget, cmapEntries, isNull } = require("./cbor.js");',
            ""]
     names = []
     for e in schema.enums.values():
