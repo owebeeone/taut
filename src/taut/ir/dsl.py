@@ -31,6 +31,7 @@ INT = Scalar("int")
 STR = Scalar("str")
 BYTES = Scalar("bytes")
 BOOL = Scalar("bool")
+FLOAT = Scalar("float")
 
 
 def _validate_identifier(name: str, kind: str) -> None:

@@ -8,7 +8,7 @@ adapter layered on top. The wire is a projection of the *tagged* subset:
   - message  -> CBOR map { field.tag : encoded-value }, transient fields skipped
   - enum     -> its integer wire value
   - list     -> CBOR array
-  - scalar   -> passthrough (int/str/bytes/bool)
+  - scalar   -> passthrough (int/str/bytes/bool); float fields coerce value->float
   - optional -> always emitted; None -> CBOR null (deterministic; no omission)
 """
 
@@ -40,7 +40,7 @@ def decode_struct(schema: Schema, message: str, struct: Any) -> dict[str, Any]:
 
 def _to_wire(schema: Schema, tref: TypeRef, value: Any) -> Any:
     if isinstance(tref, Scalar):
-        return value
+        return float(value) if tref.kind == "float" else value
     if isinstance(tref, EnumRef):
         return schema.enums[tref.name].members[value]   # member name -> int
     if isinstance(tref, ListOf):

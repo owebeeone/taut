@@ -19,7 +19,7 @@ def validate(schema: Schema) -> list[str]:
 
     def check_ref(t: TypeRef, ctx: str) -> None:
         if isinstance(t, Scalar):
-            if t.kind not in ("int", "str", "bytes", "bool"):
+            if t.kind not in ("int", "str", "bytes", "bool", "float"):
                 errors.append(f"{ctx}: unknown scalar {t.kind!r}")
         elif isinstance(t, EnumRef):
             if t.name not in schema.enums:

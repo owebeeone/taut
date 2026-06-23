@@ -9,16 +9,20 @@ emitted in ascending order. Supported major types:
   3    text string (utf-8)
   4    array
   5    map (integer keys only — field tags)
-  7    simple: false (0xf4), true (0xf5), null (0xf6)
+  7    simple: false (0xf4), true (0xf5), null (0xf6);
+       float: half (0xf9) / single (0xfa) / double (0xfb)
 
-This is the whole vocabulary taut freezes. No floats, no tags, no indefinite
-lengths, no big-nums. Other languages bind to the *same* subset; the corpus is
-byte-exact across all of them. Hand-rolled (no dependency) so the bytes are
-fully under our control and pinned by the RFC vectors in the tests.
+This is the whole vocabulary taut freezes. Floats use **shortest-form**
+(preferred serialization, §4.2.1): the smallest of half/single/double that
+round-trips the value exactly, NaN canonical to F9 7E00, -0.0 preserved. No tags,
+no indefinite lengths, no big-nums. Other languages bind to the *same* subset; the
+corpus is byte-exact across all of them. Hand-rolled (no dependency) so the bytes
+are fully under our control and pinned by the RFC vectors in the tests.
 """
 
 from __future__ import annotations
 
+import struct
 from typing import Any
 
 
@@ -40,6 +44,30 @@ def _head(major: int, n: int) -> bytes:
     raise ValueError("integer too large for the frozen CBOR subset")
 
 
+def _float_bytes(value: float) -> bytes:
+    """Shortest-form IEEE-754: the smallest of half/single/double that round-trips
+    `value` exactly; NaN canonical to the half quiet-NaN F9 7E00 (§4.2.1).
+
+    Python delegates half/single narrowing to `struct`; targets without native
+    float16 hand-roll round-to-nearest-even narrowing — `corpus/float_vectors.json`
+    is the byte-exact contract (subnormal/boundary/near-miss rows included)."""
+    if value != value:                        # NaN — canonical, before any width test
+        return b"\xf9\x7e\x00"
+    try:
+        h = struct.pack(">e", value)          # half
+        if struct.unpack(">e", h)[0] == value:
+            return b"\xf9" + h
+    except OverflowError:
+        pass
+    try:
+        s = struct.pack(">f", value)          # single
+        if struct.unpack(">f", s)[0] == value:
+            return b"\xfa" + s
+    except OverflowError:
+        pass
+    return b"\xfb" + struct.pack(">d", value)  # double
+
+
 def dumps(value: Any) -> bytes:
     out = bytearray()
     _encode(value, out)
@@ -59,6 +87,8 @@ def _encode(value: Any, out: bytearray) -> None:
             out += _head(0, value)
         else:
             out += _head(1, -1 - value)
+    elif isinstance(value, float):
+        out += _float_bytes(value)
     elif isinstance(value, (bytes, bytearray)):
         out += _head(2, len(value))
         out += bytes(value)
@@ -146,5 +176,11 @@ def _decode(data: bytes, offset: int) -> tuple[Any, int]:
             return True, offset
         if info == 22:
             return None, offset
+        if info == 25:
+            return struct.unpack(">e", data[offset:offset + 2])[0], offset + 2
+        if info == 26:
+            return struct.unpack(">f", data[offset:offset + 4])[0], offset + 4
+        if info == 27:
+            return struct.unpack(">d", data[offset:offset + 8])[0], offset + 8
         raise ValueError(f"unsupported simple value {info}")
     raise ValueError(f"unsupported major type {major}")

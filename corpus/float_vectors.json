@@ -1,0 +1,112 @@
+[
+  {
+    "note": "zero",
+    "f64": "0000000000000000",
+    "cbor": "f90000"
+  },
+  {
+    "note": "neg-zero",
+    "f64": "8000000000000000",
+    "cbor": "f98000"
+  },
+  {
+    "note": "one",
+    "f64": "3ff0000000000000",
+    "cbor": "f93c00"
+  },
+  {
+    "note": "neg-one",
+    "f64": "bff0000000000000",
+    "cbor": "f9bc00"
+  },
+  {
+    "note": "one-and-half",
+    "f64": "3ff8000000000000",
+    "cbor": "f93e00"
+  },
+  {
+    "note": "half-min-subnormal",
+    "f64": "3e70000000000000",
+    "cbor": "f90001"
+  },
+  {
+    "note": "half-min-normal",
+    "f64": "3f10000000000000",
+    "cbor": "f90400"
+  },
+  {
+    "note": "half-max",
+    "f64": "40effc0000000000",
+    "cbor": "f97bff"
+  },
+  {
+    "note": "near-miss-not-half-exact-single",
+    "f64": "3ff0020000000000",
+    "cbor": "fa3f801000"
+  },
+  {
+    "note": "single-100000",
+    "f64": "40f86a0000000000",
+    "cbor": "fa47c35000"
+  },
+  {
+    "note": "single-max",
+    "f64": "47efffffe0000000",
+    "cbor": "fa7f7fffff"
+  },
+  {
+    "note": "single-min-subnormal",
+    "f64": "36a0000000000000",
+    "cbor": "fa00000001"
+  },
+  {
+    "note": "double-tenth",
+    "f64": "3fb999999999999a",
+    "cbor": "fb3fb999999999999a"
+  },
+  {
+    "note": "double-1.1",
+    "f64": "3ff199999999999a",
+    "cbor": "fb3ff199999999999a"
+  },
+  {
+    "note": "double-pi",
+    "f64": "400921fb54442d18",
+    "cbor": "fb400921fb54442d18"
+  },
+  {
+    "note": "double-min-subnormal",
+    "f64": "0000000000000001",
+    "cbor": "fb0000000000000001"
+  },
+  {
+    "note": "double-max",
+    "f64": "7fefffffffffffff",
+    "cbor": "fb7fefffffffffffff"
+  },
+  {
+    "note": "pos-inf",
+    "f64": "7ff0000000000000",
+    "cbor": "f97c00"
+  },
+  {
+    "note": "neg-inf",
+    "f64": "fff0000000000000",
+    "cbor": "f9fc00"
+  },
+  {
+    "note": "nan-quiet-canonical",
+    "f64": "7ff8000000000000",
+    "cbor": "f97e00"
+  },
+  {
+    "note": "nan-signaling",
+    "f64": "7ff0000000000001",
+    "cbor": "f97e00"
+  },
+  {
+    "note": "nan-neg-payload",
+    "f64": "fff8000000000000",
+    "cbor": "f97e00"
+  }
+]

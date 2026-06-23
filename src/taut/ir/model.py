@@ -16,7 +16,7 @@ from .shapes import is_streaming
 
 @dataclass(frozen=True)
 class Scalar:
-    kind: str   # 'int' | 'str' | 'bytes' | 'bool'
+    kind: str   # 'int' | 'str' | 'bytes' | 'bool' | 'float'
 
 
 @dataclass(frozen=True)

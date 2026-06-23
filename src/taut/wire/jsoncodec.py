@@ -9,6 +9,7 @@ mapping (familiar and safe):
   - bytes            -> base64 string
   - enum             -> its member-name string
   - bool / str       -> passthrough
+  - float            -> JSON number (finite); "NaN" / "Infinity" / "-Infinity" otherwise
   - list             -> JSON array
   - message          -> JSON object keyed by field name
   - optional absent  -> JSON null
@@ -24,6 +25,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 from typing import Any
 
 from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
@@ -38,6 +40,12 @@ def _to_json(schema: Schema, tref: TypeRef, value: Any) -> Any:
             return str(value)                          # i64 as string (precision)
         if tref.kind == "bytes":
             return base64.b64encode(value).decode("ascii")
+        if tref.kind == "float":
+            if math.isnan(value):
+                return "NaN"
+            if math.isinf(value):
+                return "Infinity" if value > 0 else "-Infinity"
+            return value                               # finite float -> JSON number
         return value                                   # str / bool passthrough
     if isinstance(tref, EnumRef):
         return value                                   # member-name string
@@ -74,6 +82,10 @@ def _from_json(schema: Schema, tref: TypeRef, jv: Any) -> Any:
             return int(jv)                             # string (or number) -> int
         if tref.kind == "bytes":
             return base64.b64decode(jv)
+        if tref.kind == "float":
+            if isinstance(jv, str):
+                return {"NaN": math.nan, "Infinity": math.inf, "-Infinity": -math.inf}[jv]
+            return float(jv)
         return jv
     if isinstance(tref, EnumRef):
         return jv

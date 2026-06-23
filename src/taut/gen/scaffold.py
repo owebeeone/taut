@@ -54,7 +54,7 @@ def _py_ty(t: TypeRef | None) -> str:
     if t is None:
         return "None"
     if isinstance(t, Scalar):
-        return {"int": "int", "str": "str", "bytes": "bytes", "bool": "bool"}[t.kind]
+        return {"int": "int", "str": "str", "bytes": "bytes", "bool": "bool", "float": "float"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -137,7 +137,7 @@ def _ts_ty(t: TypeRef | None) -> str:
     if t is None:
         return "void"
     if isinstance(t, Scalar):
-        return {"int": "number", "str": "string", "bytes": "Uint8Array", "bool": "boolean"}[t.kind]
+        return {"int": "number", "str": "string", "bytes": "Uint8Array", "bool": "boolean", "float": "number"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -218,7 +218,7 @@ def _rs_ty(t: TypeRef | None) -> str:
     if t is None:
         return "()"
     if isinstance(t, Scalar):
-        return {"int": "i64", "str": "String", "bytes": "Vec<u8>", "bool": "bool"}[t.kind]
+        return {"int": "i64", "str": "String", "bytes": "Vec<u8>", "bool": "bool", "float": "f64"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -278,7 +278,7 @@ def _cpp_ty(t: TypeRef | None) -> str:
     if t is None:
         return "void"
     if isinstance(t, Scalar):
-        return {"int": "long long", "str": "std::string_view", "bytes": "std::string_view", "bool": "bool"}[t.kind]
+        return {"int": "long long", "str": "std::string_view", "bytes": "std::string_view", "bool": "bool", "float": "double"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -329,7 +329,7 @@ def _swift_ty(t: TypeRef | None) -> str:
     if t is None:
         return "Void"
     if isinstance(t, Scalar):
-        return {"int": "Int64", "str": "String", "bytes": "[UInt8]", "bool": "Bool"}[t.kind]
+        return {"int": "Int64", "str": "String", "bytes": "[UInt8]", "bool": "Bool", "float": "Double"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -374,7 +374,7 @@ def _go_ty(t: TypeRef | None) -> str:
     if t is None:
         return ""
     if isinstance(t, Scalar):
-        return {"int": "int64", "str": "string", "bytes": "[]byte", "bool": "bool"}[t.kind]
+        return {"int": "int64", "str": "string", "bytes": "[]byte", "bool": "bool", "float": "float64"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -418,7 +418,7 @@ def _kt_ty(t: TypeRef | None) -> str:
     if t is None:
         return "Unit"
     if isinstance(t, Scalar):
-        return {"int": "Long", "str": "String", "bytes": "ByteArray", "bool": "Boolean"}[t.kind]
+        return {"int": "Long", "str": "String", "bytes": "ByteArray", "bool": "Boolean", "float": "Double"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -488,7 +488,7 @@ def _java_ty(t: TypeRef | None) -> str:
     if t is None:
         return "void"
     if isinstance(t, Scalar):
-        return {"int": "long", "str": "String", "bytes": "byte[]", "bool": "boolean"}[t.kind]
+        return {"int": "long", "str": "String", "bytes": "byte[]", "bool": "boolean", "float": "double"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):

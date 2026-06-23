@@ -16,6 +16,7 @@ def run(cmd: list[str]) -> None:
 
 def main() -> None:
     run([sys.executable, "-m", "taut.corpus.build"])
+    run([sys.executable, "-m", "taut.corpus.float_build"])
     run([sys.executable, "-m", "taut.corpus.glade_build"])
     run([sys.executable, "-m", "taut.crdt.glade_fold"])
     run([sys.executable, "-m", "taut.crdt.glade_chain"])
