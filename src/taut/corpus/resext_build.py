@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 from .. import ext
+from ..ir.export import export_to
 from ..ir.load import load_schema
 from ..ir.shapes import BAND_START
 from ..wire import cbor, codec
@@ -23,6 +24,7 @@ _TAUT = Path(__file__).resolve().parents[3]
 IR_PATH = _TAUT / "ir" / "resext.taut.py"
 RESIDUAL_PATH = _TAUT / "corpus" / "residual_vectors.json"
 EXT_PATH = _TAUT / "corpus" / "ext_vectors.json"
+IR_JSON_PATH = _TAUT / "corpus" / "resext.ir.json"   # neutral IR so non-Python targets can loadSchema
 
 S = load_schema(IR_PATH)
 TAG = BAND_START + 1
@@ -89,7 +91,8 @@ def ext_json() -> str:
 def main() -> None:
     RESIDUAL_PATH.write_text(residual_json())
     EXT_PATH.write_text(ext_json())
-    print(f"wrote {len(_residual_rows())} residual + {len(_ext_rows())} ext vectors to {RESIDUAL_PATH.parent}")
+    export_to(S, IR_JSON_PATH)   # neutral IR JSON so non-Python targets (TS) can loadSchema the fixture
+    print(f"wrote {len(_residual_rows())} residual + {len(_ext_rows())} ext vectors + resext.ir.json to {RESIDUAL_PATH.parent}")
 
 
 if __name__ == "__main__":
