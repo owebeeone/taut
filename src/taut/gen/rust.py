@@ -32,7 +32,7 @@ def _variant(member: str) -> str:
 
 def _rust_type(t: TypeRef) -> str:
     if isinstance(t, Scalar):
-        return {"int": "i64", "str": "String", "bytes": "Vec<u8>", "bool": "bool"}[t.kind]
+        return {"int": "i64", "str": "String", "bytes": "Vec<u8>", "bool": "bool", "float": "f64"}[t.kind]
     if isinstance(t, EnumRef):
         return t.name
     if isinstance(t, MsgRef):
@@ -48,7 +48,8 @@ def _encode_ref(t: TypeRef, e: str) -> str:
     """Encode a value bound by reference (map iteration gives &K / &V)."""
     if isinstance(t, Scalar):
         return {"int": f"Cbor::Int(*{e})", "bool": f"Cbor::Bool(*{e})",
-                "str": f"Cbor::Text({e}.clone())", "bytes": f"Cbor::Bytes({e}.clone())"}[t.kind]
+                "float": f"Cbor::Float(*{e})", "str": f"Cbor::Text({e}.clone())",
+                "bytes": f"Cbor::Bytes({e}.clone())"}[t.kind]
     if isinstance(t, EnumRef):
         return f"Cbor::Int({e}.wire())"
     if isinstance(t, MsgRef):
@@ -68,13 +69,15 @@ def _encode(t: TypeRef, expr: str) -> str:
             "str": f"Cbor::Text({expr}.clone())",
             "bytes": f"Cbor::Bytes({expr}.clone())",
             "bool": f"Cbor::Bool({expr})",
+            "float": f"Cbor::Float({expr})",
         }[t.kind]
     if isinstance(t, EnumRef):
         return f"Cbor::Int({expr}.wire())"
     if isinstance(t, MsgRef):
         return f"{expr}.to_cbor()"
     if isinstance(t, ListOf):
-        return f"Cbor::Array({expr}.iter().map(|x| {_encode(t.elem, 'x')}).collect())"
+        enc = _encode_ref(t.elem, "x") if isinstance(t.elem, (Scalar, EnumRef, MsgRef)) else _encode(t.elem, "x")
+        return f"Cbor::Array({expr}.iter().map(|x| {enc}).collect())"
     if isinstance(t, MapOf):  # BTreeMap iterates in ascending key order -> deterministic
         return (f"Cbor::Array({expr}.iter().map(|(k, v)| "
                 f"Cbor::Map(vec![(1, {_encode_ref(t.key, 'k')}), (2, {_encode_ref(t.value, 'v')})])).collect())")
@@ -94,6 +97,7 @@ def _decode(t: TypeRef, expr: str) -> str:
             "str": f"{expr}.text()",
             "bytes": f"{expr}.bytes()",
             "bool": f"{expr}.boolean()",
+            "float": f"{expr}.float()",
         }[t.kind]
     if isinstance(t, EnumRef):
         return f"{t.name}::from_wire({expr}.int())"
