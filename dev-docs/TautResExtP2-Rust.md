@@ -3,9 +3,14 @@
 Read [TautResExtP2-Base.md](TautResExtP2-Base.md) first; reuse
 [history/TautFloatP2-Rust.md](history/TautFloatP2-Rust.md) for the `Cbor` enum idiom.
 
-**Files you own:** `src/taut/gen/runtime/cbor.rs` (residual accessor already there) ·
-`src/taut/gen/rust.py` (emits `wire_residual: Vec<(i64, Cbor)>`) · **NEW** `src/taut/gen/runtime/ext.rs` ·
-the Rust harness/tests.
+**Files you own:** **NEW** `src/taut/gen/runtime/ext.rs` · `src/tests/test_rust.py`.
+`src/taut/gen/runtime/cbor.rs` and `src/taut/gen/rust.py` are verify-first only: residual support
+appears present (`wire_residual: Vec<(i64, Cbor)>` and sorted map encode), so edit them only if
+`residual_vectors.json` demonstrates a real Rust divergence.
+
+**Do not change:** `ir/*`, the corpora/generators, Python `ext.py`, `gen/scaffold.py`, another
+language, package dependencies, `forward_compat=False` defaults, or proven FLOAT/CBOR encode paths
+unless tied to a failing ResExt vector.
 
 **Prior art — `razel/crates/razel-wire` (verified 2026-06-23).** razel ships a proven taut Rust
 wire crate: `cbor.rs` (runtime, incl. the `map_entries` residual primitive), `vectors.rs` (golden
@@ -34,7 +39,16 @@ tags must interleave). If `to_cbor` builds a `Vec<(i64,Cbor)>` and hands it to `
 existing `tag`, push `(tag, value)`, `encode(&Cbor::Map(v))` (sorts). `ext_get(host, tag) -> Option<Cbor>`
 (None if absent). `ext_clear(host, tag) -> Vec<u8>`. Band-check FIRST: `tag >= 1<<20`, else **`panic!`** — match cbor.rs's
 panic-on-misuse idiom (do NOT add a `Result` surface). Add a `#[should_panic]` test for a below-band tag.
-`value` is the caller's `ExtMsg::to_cbor()`; `ext_get` returns the nested `Cbor` for `ExtMsg::from_cbor`.
+Reject non-map hosts; do not coerce them to empty maps. `value` is the caller's
+`Decision::to_cbor()`; `ext_get` returns the nested `Cbor` for `Decision::from_cbor`.
 
-**Verify:** cargo is available — build a harness over both corpora + a differential fuzz vs the
-Python oracle. No new deps (no `half`, nothing). Keep `test_regen`/`test_forward_compat` green.
+**Tests/gates to add:** residual byte parity over all four residual rows; extension byte parity over
+all five ext rows through generated `Decision::to_cbor()` / `Decision::from_cbor()`; below-band
+`#[should_panic]`; non-map host rejection; the D14 flag/gate checks already in
+`test_forward_compat.py`; and the fixed-seed differential fuzz described by the base brief.
+
+**Verify:** the authoritative in-repo path is the existing pytest-generated temporary
+`rustc --test` harness pattern, not an in-tree Cargo crate. Required evidence:
+`PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python -m pytest -q -p no:cacheprovider src/tests/test_resext_vectors.py src/tests/test_forward_compat.py src/tests/test_rust.py`.
+Report `rustc --version`, corpus parity result, invalid-case result, fuzz seed, and mismatch count.
+No new deps (no `half`, nothing). Keep `test_regen`/`test_forward_compat` green.
