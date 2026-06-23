@@ -1,4 +1,5 @@
 import json
+import random
 import re
 import shutil
 import subprocess
@@ -7,8 +8,13 @@ from pathlib import Path
 
 import pytest
 
+from taut import cli, ext
+from taut.corpus import resext_build as resext
 from taut.gen import cpp as cpp_gen
+from taut.ir.load import load_schema
+from taut.ir.shapes import BAND_START
 from taut.ir.dsl import FLOAT, INT, F, List, Map, Msg, schema as mk
+from taut.wire import cbor, codec
 
 
 S_SCALAR_LIST = mk(Msg("M",
@@ -35,6 +41,76 @@ def _cpp_compiler() -> str:
     if compiler is None:
         pytest.skip("no C++ compiler on PATH")
     return compiler
+
+
+def _compile_and_run_cpp(tmp_path: Path, source: str, name: str) -> subprocess.CompletedProcess[str]:
+    compiler = _cpp_compiler()
+    src = tmp_path / f"{name}.cpp"
+    src.write_text(source)
+    exe = tmp_path / name
+    result = subprocess.run(
+        [compiler, "-std=c++20", "-I", str(tmp_path / "cpp"), str(src), "-o", str(exe)],
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0, textwrap.dedent(f"""\
+        command: {compiler} -std=c++20 -I {tmp_path / "cpp"} {src} -o {exe}
+        stdout:
+        {result.stdout}
+        stderr:
+        {result.stderr}
+    """)
+    run = subprocess.run([str(exe)], text=True, capture_output=True)
+    assert run.returncode == 0, textwrap.dedent(f"""\
+        command: {exe}
+        stdout:
+        {run.stdout}
+        stderr:
+        {run.stderr}
+    """)
+    return run
+
+
+def _resext_schema():
+    return load_schema(resext.IR_PATH)
+
+
+def _resext_cpp_rows():
+    s = _resext_schema()
+    residual_rows = [
+        {"note": r["note"], "wire": r["wire"]}
+        for r in json.loads(resext.RESIDUAL_PATH.read_text())
+    ]
+    ext_rows = json.loads(resext.EXT_PATH.read_text())
+    return s, residual_rows, ext_rows
+
+
+def _fuzz_value(rng: random.Random, depth: int = 0):
+    choice = rng.randrange(7 if depth == 0 else 6)
+    if choice == 0:
+        return rng.randint(-50, 200)
+    if choice == 1:
+        return rng.choice([True, False, None])
+    if choice == 2:
+        return f"s{rng.randrange(1000)}"
+    if choice == 3:
+        return bytes(rng.randrange(256) for _ in range(rng.randrange(0, 8)))
+    if choice == 4:
+        return [rng.randint(-10, 10) for _ in range(rng.randrange(0, 4))]
+    if choice == 5:
+        return [f"a{rng.randrange(100)}", rng.choice([True, False]), rng.randint(0, 9)]
+    return rng.choice([0.0, -0.0, 0.5, 1.5, 100000.0])
+
+
+def _cpp_string_literal(s: str) -> str:
+    return json.dumps(s)
+
+
+def _cpp_rows(rows: list[dict], keys: list[str]) -> str:
+    rendered = []
+    for row in rows:
+        rendered.append("{" + ", ".join(_cpp_string_literal(str(row[k])) for k in keys) + "}")
+    return ",\n".join(rendered)
 
 
 def test_cpp_codegen_threads_float_scalar_and_list():
@@ -155,3 +231,319 @@ def test_cpp_runtime_float_vectors_static_assert(tmp_path):
         stderr:
         {result.stderr}
     """)
+
+
+def test_cpp_resext_runtime_corpus_negatives_and_fuzz(tmp_path):
+    s, residual_rows, ext_rows = _resext_cpp_rows()
+    assert cli.main([
+        "gen", str(resext.IR_PATH), "-o", str(tmp_path), "--lang", "cpp",
+        "--api-only", "--with-runtime", "--forward-compat",
+    ]) == 0
+    assert (tmp_path / "cpp/api.hpp").exists()
+    assert (tmp_path / "cpp/taut/cbor.hpp").exists()
+    assert (tmp_path / "cpp/taut/ext.hpp").exists()
+
+    seed = 0xC0FFEE
+    rng = random.Random(seed)
+    fuzz_residual = []
+    fuzz_ext = []
+    tag = BAND_START + 1
+    for i in range(1000):
+        host_map = {
+            1: rng.randint(0, 5000),
+            2: f"n{i}",
+            5: rng.randint(-20, 200),
+            3: _fuzz_value(rng),                         # interleaves between 2 and 5
+            BAND_START + 10 + rng.randrange(20): _fuzz_value(rng),
+        }
+        extra_tag = rng.choice([0, 4, 6, 7, 8, 64, BAND_START + 100 + rng.randrange(50)])
+        if extra_tag not in {1, 2, 3, 5}:
+            host_map[extra_tag] = _fuzz_value(rng)
+        fuzz_residual.append({"note": f"residual-fuzz-{i}", "wire": cbor.dumps(host_map).hex()})
+
+        ext_host_map = {1: rng.randint(0, 5000), 2: f"h{i}", 5: rng.randint(-20, 200)}
+        ext_host = cbor.dumps(ext_host_map)
+        if i % 5 == 0:
+            ext_host = ext.ext_set(s, ext_host, "Decision", tag, {"backend": "old", "hops": -1})
+        value = {"backend": f"b{i}", "hops": rng.randint(-10, 30)}
+        value_wire = codec.encode(s, "Decision", value)
+        set_expect = ext.ext_set(s, ext_host, "Decision", tag, value)
+        clear_expect = ext.ext_clear(set_expect, tag)
+        fuzz_ext.append({
+            "note": f"ext-fuzz-{i}",
+            "host": ext_host.hex(),
+            "tag": tag,
+            "value": value_wire.hex(),
+            "set_expect": set_expect.hex(),
+            "clear_expect": clear_expect.hex(),
+        })
+
+    large_host = cbor.dumps({1: 1, 2: "x" * 700, 5: 9})
+    large_value = {"backend": "large", "hops": 1}
+    large_value_wire = codec.encode(s, "Decision", large_value)
+    large_set = ext.ext_set(s, large_host, "Decision", tag, large_value)
+    assert len(large_set) > 512
+    fuzz_ext.append({
+        "note": "large-host-output-over-512",
+        "host": large_host.hex(),
+        "tag": tag,
+        "value": large_value_wire.hex(),
+        "set_expect": large_set.hex(),
+        "clear_expect": ext.ext_clear(large_set, tag).hex(),
+    })
+
+    residual_init = _cpp_rows(residual_rows + fuzz_residual, ["note", "wire"])
+    ext_init = ",\n".join(
+        "{"
+        + ", ".join([
+            _cpp_string_literal(row["op"]),
+            _cpp_string_literal(row["note"]),
+            _cpp_string_literal(row["host"]),
+            str(row["tag"]),
+            _cpp_string_literal(row.get("value", "")),
+            _cpp_string_literal(row["expect"]),
+        ])
+        + "}"
+        for row in ext_rows
+    )
+    fuzz_ext_init = ",\n".join(
+        "{"
+        + ", ".join([
+            _cpp_string_literal(row["note"]),
+            _cpp_string_literal(row["host"]),
+            str(row["tag"]),
+            _cpp_string_literal(row["value"]),
+            _cpp_string_literal(row["set_expect"]),
+            _cpp_string_literal(row["clear_expect"]),
+        ])
+        + "}"
+        for row in fuzz_ext
+    )
+
+    source = textwrap.dedent(f"""\
+        #include "api.hpp"
+        #include "taut/ext.hpp"
+
+        #include <exception>
+        #include <functional>
+        #include <iostream>
+        #include <stdexcept>
+        #include <string>
+        #include <string_view>
+        #include <vector>
+
+        struct ResidualRow {{ const char* note; const char* wire; }};
+        struct ExtRow {{ const char* op; const char* note; const char* host; long long tag; const char* value; const char* expect; }};
+        struct ExtFuzzRow {{ const char* note; const char* host; long long tag; const char* value; const char* set_expect; const char* clear_expect; }};
+
+        static const ResidualRow residual_rows[] = {{
+        {residual_init}
+        }};
+
+        static const ExtRow ext_rows[] = {{
+        {ext_init}
+        }};
+
+        static const ExtFuzzRow ext_fuzz_rows[] = {{
+        {fuzz_ext_init}
+        }};
+
+        int hex_nibble(char c) {{
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            throw std::invalid_argument("bad hex");
+        }}
+
+        std::string from_hex(std::string_view hex) {{
+            if ((hex.size() % 2) != 0) throw std::invalid_argument("odd hex");
+            std::string out;
+            out.reserve(hex.size() / 2);
+            for (std::size_t i = 0; i < hex.size(); i += 2) {{
+                out.push_back(static_cast<char>((hex_nibble(hex[i]) << 4) | hex_nibble(hex[i + 1])));
+            }}
+            return out;
+        }}
+
+        std::string_view view(const std::string& s) {{
+            return std::string_view(s.data(), s.size());
+        }}
+
+        std::string to_hex(std::string_view data) {{
+            static constexpr char digits[] = "0123456789abcdef";
+            std::string out;
+            out.reserve(data.size() * 2);
+            for (unsigned char byte : data) {{
+                out.push_back(digits[byte >> 4]);
+                out.push_back(digits[byte & 0x0f]);
+            }}
+            return out;
+        }}
+
+        std::string to_hex(const std::vector<unsigned char>& data) {{
+            return to_hex(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()));
+        }}
+
+        std::string buf_string(const taut::Buf& b) {{
+            return std::string(reinterpret_cast<const char*>(b.d), b.n);
+        }}
+
+        std::string buf_hex(const taut::Buf& b) {{
+            return to_hex(std::string_view(reinterpret_cast<const char*>(b.d), b.n));
+        }}
+
+        std::string typed_decision_wire(std::string_view value_hex) {{
+            std::string value_bytes = from_hex(value_hex);
+            taut::Decision d = taut::Decision::from_cbor(taut::checked_parse_map(view(value_bytes)));
+            taut::Buf b;
+            d.to_cbor(b);
+            return buf_string(b);
+        }}
+
+        int mismatches = 0;
+
+        void fail(std::string_view note, std::string_view got, std::string_view expect) {{
+            ++mismatches;
+            std::cerr << "mismatch " << note << "\\n  got    " << got << "\\n  expect " << expect << "\\n";
+        }}
+
+        void expect_invalid(std::string_view note, const std::function<void()>& fn, std::string_view contains = "") {{
+            try {{
+                fn();
+                fail(note, "no throw", "std::invalid_argument");
+            }} catch (const std::invalid_argument& e) {{
+                if (!contains.empty() && std::string_view(e.what()).find(contains) == std::string_view::npos) {{
+                    fail(note, e.what(), contains);
+                }}
+            }} catch (const std::exception& e) {{
+                fail(note, e.what(), "std::invalid_argument");
+            }}
+        }}
+
+        void run_residuals() {{
+            for (const auto& row : residual_rows) {{
+                try {{
+                    std::string wire = from_hex(row.wire);
+                    taut::Host host = taut::Host::from_cbor(taut::checked_parse_map(view(wire)));
+                    taut::Buf b;
+                    host.to_cbor(b);
+                    std::string got = buf_hex(b);
+                    if (got != row.wire) fail(row.note, got, row.wire);
+                }} catch (const std::exception& e) {{
+                    fail(row.note, e.what(), "no exception");
+                }}
+            }}
+        }}
+
+        void run_ext_corpus() {{
+            for (const auto& row : ext_rows) {{
+                try {{
+                    std::string host = from_hex(row.host);
+                    std::string op(row.op);
+                    if (op == "set") {{
+                        std::string typed_wire = typed_decision_wire(row.value);
+                        taut::Cbor value = taut::checked_parse_map(view(typed_wire));
+                        std::string got = to_hex(taut::ext_set(view(host), row.tag, value));
+                        if (got != row.expect) fail(row.note, got, row.expect);
+                    }} else if (op == "get") {{
+                        auto got = taut::ext_get(view(host), row.tag);
+                        if (std::string_view(row.expect) == "null") {{
+                            if (got.has_value()) fail(row.note, "present", "null");
+                        }} else {{
+                            if (!got.has_value()) {{
+                                fail(row.note, "null", row.expect);
+                            }} else {{
+                                taut::Decision d = taut::Decision::from_cbor(*got);
+                                taut::Buf b;
+                                d.to_cbor(b);
+                                std::string got_hex = buf_hex(b);
+                                if (got_hex != row.expect) fail(row.note, got_hex, row.expect);
+                            }}
+                        }}
+                    }} else if (op == "clear") {{
+                        std::string got = to_hex(taut::ext_clear(view(host), row.tag));
+                        if (got != row.expect) fail(row.note, got, row.expect);
+                    }} else {{
+                        fail(row.note, op, "known op");
+                    }}
+                }} catch (const std::exception& e) {{
+                    fail(row.note, e.what(), "no exception");
+                }}
+            }}
+        }}
+
+        void run_ext_fuzz() {{
+            for (const auto& row : ext_fuzz_rows) {{
+                try {{
+                    std::string host = from_hex(row.host);
+                    std::string typed_wire = typed_decision_wire(row.value);
+                    taut::Cbor value = taut::checked_parse_map(view(typed_wire));
+                    std::string set_got = to_hex(taut::ext_set(view(host), row.tag, value));
+                    if (set_got != row.set_expect) fail(row.note, set_got, row.set_expect);
+
+                    std::string strapped = from_hex(row.set_expect);
+                    auto got = taut::ext_get(view(strapped), row.tag);
+                    if (!got.has_value()) {{
+                        fail(row.note, "null", row.value);
+                    }} else {{
+                        taut::Decision d = taut::Decision::from_cbor(*got);
+                        taut::Buf b;
+                        d.to_cbor(b);
+                        std::string got_hex = buf_hex(b);
+                        if (got_hex != row.value) fail(row.note, got_hex, row.value);
+                    }}
+
+                    std::string clear_got = to_hex(taut::ext_clear(view(strapped), row.tag));
+                    if (clear_got != row.clear_expect) fail(row.note, clear_got, row.clear_expect);
+                }} catch (const std::exception& e) {{
+                    fail(row.note, e.what(), "no exception");
+                }}
+            }}
+        }}
+
+        void run_negatives() {{
+            expect_invalid("below-band-before-host-decode", [] {{
+                (void)taut::ext_get(std::string_view("\\xff", 1), 7);
+            }}, "below");
+            expect_invalid("scalar-host", [] {{
+                std::string host = from_hex("01");
+                (void)taut::ext_get(view(host), {tag});
+            }});
+            expect_invalid("trailing-host", [] {{
+                std::string host = from_hex("a000");
+                (void)taut::ext_get(view(host), {tag});
+            }});
+            expect_invalid("invalid-map-key", [] {{
+                std::string host = from_hex("a1616b01");
+                (void)taut::ext_get(view(host), {tag});
+            }});
+            expect_invalid("unsupported-major", [] {{
+                std::string host = from_hex("c0a0");
+                (void)taut::ext_get(view(host), {tag});
+            }});
+            expect_invalid("unsupported-simple", [] {{
+                std::string host = from_hex("a101f7");
+                (void)taut::ext_get(view(host), {tag});
+            }});
+            expect_invalid("unsupported-additional-info", [] {{
+                std::string host = from_hex("a1011f");
+                (void)taut::ext_get(view(host), {tag});
+            }});
+        }}
+
+        int main() {{
+            run_residuals();
+            run_ext_corpus();
+            run_ext_fuzz();
+            run_negatives();
+            if (mismatches != 0) {{
+                std::cerr << "ResExt C++ seed={seed} mismatches=" << mismatches << "\\n";
+                return 1;
+            }}
+            std::cout << "ResExt C++ seed={seed} mismatches=0\\n";
+            return 0;
+        }}
+    """)
+
+    run = _compile_and_run_cpp(tmp_path, source, "cpp_resext_runtime")
+    assert f"seed={seed} mismatches=0" in run.stdout

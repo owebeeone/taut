@@ -81,6 +81,13 @@ def test_extensions_require_forward_compat_for_rust(tmp_path):
     scaffold.emit(S, tmp_path, langs=["rust"], services=[], forward_compat=True)  # ok with the flag
 
 
+def test_extensions_require_forward_compat_for_cpp(tmp_path):
+    # S declares an extension -> generating C++ without forward-compat is an error
+    with pytest.raises(ValueError):
+        scaffold.emit(S, tmp_path, langs=["cpp"], services=[])
+    scaffold.emit(S, tmp_path, langs=["cpp"], services=[], forward_compat=True)  # ok with the flag
+
+
 def test_cpp_forward_compat_emits_residual():
     hpp = scaffold.cpp_api(S, forward_compat=True)
     assert "std::vector<std::pair<long long, Cbor>> wire_residual;" in hpp
