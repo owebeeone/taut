@@ -34,7 +34,7 @@ def test_committed_resext_ir_json_loads_and_is_current():
     from taut.ir.load import schema_from_json
     from taut.ir.validate import validate
     committed = rb.IR_JSON_PATH.read_text()
-    assert json.loads(committed) == json.loads(schema_json(S)), \
+    assert json.loads(committed) == schema_json(S), \
         "resext.ir.json is stale — run `python -m taut.corpus.resext_build`"
     assert validate(schema_from_json(json.loads(committed))) == []   # the neutral IR that TS consumes
 
