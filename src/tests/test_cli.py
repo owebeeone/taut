@@ -44,18 +44,26 @@ def test_unknown_lang_errors(tmp_path):
 
 
 def test_runtime_off_by_default(tmp_path):
-    cli.main(["gen", str(IR_PATH), "-o", str(tmp_path), "--lang", "rust,cpp", "--api-only"])
+    cli.main(["gen", str(IR_PATH), "-o", str(tmp_path), "--lang", "typescript,rust,cpp", "--api-only"])
+    assert not (tmp_path / "typescript" / "cbor.ts").exists()
     assert not (tmp_path / "rust" / "cbor.rs").exists()
     assert not (tmp_path / "cpp" / "taut" / "cbor.hpp").exists()
 
 
 def test_with_runtime_emits_self_contained_compiled_targets(tmp_path):
-    cli.main(["gen", str(IR_PATH), "-o", str(tmp_path), "--lang", "rust,cpp",
-              "--api-only", "--with-runtime"])
+    cli.main(["gen", str(IR_PATH), "-o", str(tmp_path), "--lang", "typescript,rust,cpp",
+              "-s", "GripLab", "--with-runtime"])
+    ts_cbor = tmp_path / "typescript" / "cbor.ts"
+    ts_codec = tmp_path / "typescript" / "codec.ts"
+    ts_schema = tmp_path / "typescript" / "schema.ts"
+    ts_client = tmp_path / "typescript" / "taut_client.ts"
     cbor_rs = tmp_path / "rust" / "cbor.rs"
     cbor_hpp = tmp_path / "cpp" / "taut" / "cbor.hpp"
+    assert ts_cbor.exists() and ts_codec.exists() and ts_schema.exists() and ts_client.exists()
     assert cbor_rs.exists() and cbor_hpp.exists()
     # the emitted runtime must satisfy what the generated code imports
+    assert "export class CborFloat" in ts_cbor.read_text()
+    assert 'from "./taut_client.ts"' in (tmp_path / "typescript" / "client.ts").read_text()
     assert "pub enum Cbor" in cbor_rs.read_text()
     assert "use crate::cbor::Cbor;" in (tmp_path / "rust" / "api.rs").read_text()
     assert "namespace taut" in cbor_hpp.read_text()
@@ -63,7 +71,7 @@ def test_with_runtime_emits_self_contained_compiled_targets(tmp_path):
 
 
 def test_with_runtime_skips_languages_without_one(tmp_path):
-    # Python/TS use the IR-driven runtime codec; nothing to emit, no error.
+    # Python uses the in-package Python runtime directly; nothing to emit, no error.
     cli.main(["gen", str(IR_PATH), "-o", str(tmp_path), "--lang", "python", "--with-runtime"])
     assert (tmp_path / "python" / "api.py").exists()
     assert not list((tmp_path / "python").glob("cbor*"))

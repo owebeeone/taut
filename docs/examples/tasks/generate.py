@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the per-language code for the Tasks API into ./generated/ : api
-(types + codec), client, and server stubs, plus the vendored CBOR runtime for each
-compiled target — so every generated/<lang>/ is self-contained and the per-language
+(types + codec), client, and server stubs, plus vendored runtimes where a target
+needs them — so every generated/<lang>/ is self-contained and the per-language
 examples (example.*) run as-is. Run: python generate.py"""
 
 import sys

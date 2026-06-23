@@ -39,7 +39,8 @@ compared field-for-field.
 
 The remaining P7 piece: publish each IR version + its golden corpus as a
 content-addressed **OCI artifact**; consumers pin by digest, fetch, and generate
-locally. This also severs the cross-repo filesystem coupling (the deferred #1) —
-`trial` would pin a taut IR digest instead of reading a sibling checkout. It
-needs `oras`/a registry (network), so it is out of scope for the offline trials;
-the gate above is the governance logic it would run in CI at publish time.
+locally. This also severs cross-repo filesystem coupling: generated target
+workspaces would pin a taut IR digest instead of reading a sibling checkout. It
+needs `oras`/a registry (network), so it is out of scope for offline target
+experiments; the gate above is the governance logic it would run in CI at publish
+time.

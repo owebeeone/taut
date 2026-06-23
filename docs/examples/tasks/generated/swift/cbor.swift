@@ -1,11 +1,12 @@
 // Minimal deterministic CBOR — the Swift binding of the frozen wire substrate.
 // Byte-for-byte identical to taut/src/taut/wire/cbor.py and the Rust/TS/C++
-// runtimes: the same tiny subset (int, bytes, text, array, int-keyed map, bool,
-// null) in core-deterministic encoding (definite length, shortest-form ints,
-// ascending map keys). Hand-rolled, no dependencies.
+// runtimes: the same tiny subset (int, float, bytes, text, array, int-keyed map,
+// bool, null) in core-deterministic encoding (definite length, shortest-form
+// ints/floats, ascending map keys). Hand-rolled, no dependencies.
 
 public indirect enum Cbor {
     case int(Int64)
+    case float(Double)
     case bytes([UInt8])
     case text(String)
     case array([Cbor])
@@ -20,6 +21,7 @@ public extension Cbor {
         fatalError("no map key \(key)")
     }
     var intVal: Int64 { if case let .int(n) = self { return n }; fatalError("not an int") }
+    var floatVal: Double { if case let .float(x) = self { return x }; fatalError("not a float") }
     var textVal: String { if case let .text(s) = self { return s }; fatalError("not text") }
     var bytesVal: [UInt8] { if case let .bytes(b) = self { return b }; fatalError("not bytes") }
     var boolVal: Bool { if case let .bool(b) = self { return b }; fatalError("not a bool") }
@@ -38,6 +40,49 @@ private func head(_ out: inout [UInt8], _ major: UInt8, _ n: UInt64) {
     else { out.append(mt | 27); for i in stride(from: 56, through: 0, by: -8) { out.append(UInt8((n >> UInt64(i)) & 0xff)) } }
 }
 
+private func append16(_ out: inout [UInt8], _ bits: UInt16) {
+    out.append(UInt8((bits >> 8) & 0xff))
+    out.append(UInt8(bits & 0xff))
+}
+
+private func append32(_ out: inout [UInt8], _ bits: UInt32) {
+    for i in stride(from: 24, through: 0, by: -8) {
+        out.append(UInt8((bits >> UInt32(i)) & 0xff))
+    }
+}
+
+private func append64(_ out: inout [UInt8], _ bits: UInt64) {
+    for i in stride(from: 56, through: 0, by: -8) {
+        out.append(UInt8((bits >> UInt64(i)) & 0xff))
+    }
+}
+
+private func encFloat(_ v: Double, _ out: inout [UInt8]) {
+    if v.isNaN {
+        out.append(0xf9)
+        append16(&out, 0x7e00)
+        return
+    }
+
+    // Requires native Swift Float16; older targets need a hand-rolled half narrower.
+    let h = Float16(v)
+    if Double(h) == v {
+        out.append(0xf9)
+        append16(&out, h.bitPattern)
+        return
+    }
+
+    let f = Float(v)
+    if Double(f) == v {
+        out.append(0xfa)
+        append32(&out, f.bitPattern)
+        return
+    }
+
+    out.append(0xfb)
+    append64(&out, v.bitPattern)
+}
+
 public func encode(_ v: Cbor) -> [UInt8] {
     var out = [UInt8]()
     enc(v, &out)
@@ -48,6 +93,7 @@ private func enc(_ v: Cbor, _ out: inout [UInt8]) {
     switch v {
     case let .int(n):
         if n >= 0 { head(&out, 0, UInt64(n)) } else { head(&out, 1, UInt64(-1 - n)) }
+    case let .float(x): encFloat(x, &out)
     case let .bytes(b): head(&out, 2, UInt64(b.count)); out.append(contentsOf: b)
     case let .text(s): let b = Array(s.utf8); head(&out, 3, UInt64(b.count)); out.append(contentsOf: b)
     case let .array(a): head(&out, 4, UInt64(a.count)); for x in a { enc(x, &out) }
@@ -97,6 +143,17 @@ private func dec(_ data: [UInt8], _ off0: Int) -> (Cbor, Int) {
         case 20: return (.bool(false), off)
         case 21: return (.bool(true), off)
         case 22: return (.null, off)
+        case 25:
+            let bits = (UInt16(data[off]) << 8) | UInt16(data[off + 1])
+            return (.float(Double(Float16(bitPattern: bits))), off + 2)
+        case 26:
+            var bits: UInt32 = 0
+            for j in 0..<4 { bits = (bits << 8) | UInt32(data[off + j]) }
+            return (.float(Double(Float(bitPattern: bits))), off + 4)
+        case 27:
+            var bits: UInt64 = 0
+            for j in 0..<8 { bits = (bits << 8) | UInt64(data[off + j]) }
+            return (.float(Double(bitPattern: bits)), off + 8)
         default: fatalError("unsupported simple value \(info)")
         }
     default: fatalError("unsupported major type \(major)")

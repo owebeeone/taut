@@ -9,8 +9,8 @@ brief for the `Cbor` value-model idiom (enum vs struct vs tagged vs structural).
 Bring **two** forward-compat mechanisms to byte-exact parity with the Python reference in ONE
 target language: (A) **residual** unknown-tag preservation (`wire_residual`), and (B) the
 **extension** accessor API (`ext_set`/`ext_get`/`ext_clear`). One agent per language, isolated
-worktree, only your own files. **TS runs in the `trial` repo, not the taut worktree** (see the
-TS brief).
+worktree, only your own files. TypeScript is now an in-repo runtime-resource target under
+`src/taut/gen/runtime/typescript/`.
 
 ## The single oracle
 Correctness == reproducing the **Python** bytes. The reference is `src/taut/wire/codec.py`

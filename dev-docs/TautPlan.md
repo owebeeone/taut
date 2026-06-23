@@ -101,9 +101,9 @@ taut/
   ir/                         # AUTHORED IR modules (the only governed artifact)
     griplab.taut.py          # GripLab surface as Python-as-DSL declarations
   corpus/                     # generated golden vectors (committed; the oracle)
-  trial/                      # GENERATED + hand-wired target slices (one per language)
+  targets/                    # disposable generated + hand-wired target slices
     py/                       # reference implementation (defines truth)
-    ts/                       # generalization gate (P3): TS client ↔ Py server
+    ts/                       # durable TS runtime lives in src/taut/gen/runtime/typescript/
     rs/                       # P5
     cpp/                      # P6 — the showcase target (compile-time + static_assert)
 ```
@@ -114,11 +114,11 @@ Notes:
   emit each target language's source.
 - **`ir/` vs `src/`**: `ir/` holds *authored intent* (governed, tiny, read whole);
   `src/` holds the *machine* that consumes it. Never fuse them.
-- **`trial/<lang>/`** holds generated mechanism + a thin hand-written composition
+- Target output trees hold generated mechanism + a thin hand-written composition
   root (DI, handlers) per language. Generated files are never hand-edited;
   regeneration reproduces the tree (DoD §9).
-- Python is both a builder (`src/`) and a target (`trial/py/`). The reference
-  implementation lives in `trial/py/`; the corpus is generated from it.
+- Python is both a builder (`src/`) and a target. The reference implementation
+  defines the corpus.
 
 ---
 
@@ -226,7 +226,7 @@ is deferred to Phase 4 — Phase 0 only needs the shape to fall out honestly.
 
 ## 7. The oracle — golden conformance corpus
 
-Generated from the Python reference (`trial/py/`) alongside the IR:
+Generated from the Python reference alongside the IR:
 
 - **value → exact bytes** per message (round-trip + canonical encoding).
 - **request → exact frame** per method, and **canonical event sequences** per
@@ -247,7 +247,7 @@ validate each abstraction by adding the *second* language before going wide.
 Phases 0–3 + 7 are the proven-value foundation; 4–6 are the harder cross-language
 work and **must not block the foundation**.
 
-- **P0 — Python vertical slice, hand-wired, working.** `trial/py/`. One service =
+- **P0 — Python vertical slice, hand-wired, working.** One service =
   a GripLab terminal-slice subset: **Atom** (presence), **Stream** (terminal
   output), **SWMR** (file snapshot+delta), plus the **`cmd.run` fan-out+error
   DAG**. No codegen. JSON wire mirroring GripLab. **Goal: discover the real shapes
@@ -259,7 +259,7 @@ work and **must not block the foundation**.
   delivery-shape annotations + validator; generated Py stubs + clients; same
   endpoints now run the generated path. Add **Log**, **Snapshot+Delta**, and the
   **CRDT contract surface** (API present, engine slot empty).
-- **P3 — Generalization gate: add TypeScript.** `trial/ts/`. Generate TS
+- **P3 — Generalization gate: add TypeScript.** `src/taut/gen/runtime/typescript/`. Generate TS
   types+codec+stubs+shape clients; pass the *same* corpus; a TS client talks to
   the Py server across every implemented shape. **This is also the real interop
   win**: it regenerates GripLab's hand-written `protocol.ts` boundary from the IR.
@@ -267,9 +267,9 @@ work and **must not block the foundation**.
 - **P4 — Formalize orchestration.** Lift the `cmd.run` DAG into a portable
   declarative spec (waves; per-task retry/timeout/fallback + structured
   cancellation; teardown). Python executes on sdax. Sagas deferred.
-- **P5 — Add Rust.** `trial/rs/`. Codec + stubs + shape clients; tokio scheduler
+- **P5 — Add Rust.** Codec + stubs + shape clients; tokio scheduler
   binding. Arena/index representations allowed as transient state.
-- **P6 — Add C++ (the long pole).** `trial/cpp/`. Build prompt §5a in full:
+- **P6 — Add C++ (the long pole).** Build prompt §5a in full:
   C++23/26, compile-time selection/derivation, `static_assert` corpus,
   concepts-first errors, TMP confined to the generated mechanism.
 - **P7 — Distribution / BSR.** IR modules as OCI artifacts; digest pinning;
@@ -285,7 +285,7 @@ Cross-cutting: the CRDT wire + API surface is required from P1–P2; a CRDT
 
 Definition of done for P0:
 
-1. `trial/py/` runs a `GripLabSlice` service over WebSocket+JSON with four
+1. The Python target runs a `GripLabSlice` service over WebSocket+JSON with four
    endpoints:
    - `presence.subscribe` — **Atom**, whole peer list, latest-wins.
    - `terminal.output.subscribe` — **Stream**, live append, ephemeral.

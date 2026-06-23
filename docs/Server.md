@@ -4,11 +4,9 @@ This shows how to stand up a server for a taut service: write handlers, back the
 streaming endpoints with delivery-shape engines, **register them against the IR**
 (so `shape`/params come from the contract, not by hand), and serve.
 
-> The reusable runtime — shape engines, the IR-driven transport, the WebSocket
-> server loop — lives in the reference slice `trial/py/griplab_slice/` (files
-> `shapes.py`, `transport.py`, `server.py`, `ws.py`). The snippets below use the
-> **Tasks** API from [GettingStarted.md](GettingStarted.md) and mirror that code;
-> the fully runnable end-to-end server is the GripLab one in that package.
+> The snippets below use the **Tasks** API from [GettingStarted.md](GettingStarted.md)
+> and show the generic binding shape: handlers, delivery-shape engines, IR-driven
+> transport, and WebSocket framing.
 
 ## The handler contract
 
@@ -101,14 +99,12 @@ for m in svc.methods:                 # registration derived from the contract
     transport.register_method(m, handlers[m.name])
 ```
 
-This is the same loop the reference [`composition.py`](../../trial/py/griplab_slice/composition.py)
-uses. Add a method to the IR and the server picks it up by name; the drift check
-ensures you didn't forget a handler.
+This is the same loop shape used by the reference composition. Add a method to the IR and the server
+picks it up by name; the drift check ensures you didn't forget a handler.
 
 ## 4. Serve
 
-The WebSocket loop ([`server.py`](../../trial/py/griplab_slice/server.py))
-dispatches purely from the contract — it reads the bound method's `shape`:
+The WebSocket loop dispatches purely from the contract — it reads the bound method's `shape`:
 
 - **unary** → `await transport.request(method, payload)` → send one response;
 - **streaming shape** → `transport.open(method, payload)` → pump the shape's
@@ -150,8 +146,7 @@ async for event, value in await client.subscribe("tasks.subscribe"):
     ...                                                          # 'replace' -> the task list
 ```
 
-A TypeScript or Rust client (`trial/ts/src/client.ts`, `trial/rs/src/client.rs`)
-talks to the same server unchanged — they're driven by the same IR.
+A TypeScript or Rust client talks to the same server unchanged when driven by the same IR.
 
 ## What's generic vs per-IR today
 
@@ -162,6 +157,4 @@ its messages to dataclasses). To serve *your* API today you point that binding a
 your schema and types; turning it into a point-at-any-IR `taut.serve(schema,
 handlers)` library is a noted next step.
 
-The runnable, tested reference is the GripLab server — see
-[`trial/py/griplab_slice/server.py`](../../trial/py/griplab_slice/server.py) and
-its Rust peer [`trial/rs/src/server.rs`](../../trial/rs/src/server.rs).
+The generated server stubs and runtime client helpers show the target-specific wiring shape.

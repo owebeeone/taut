@@ -148,10 +148,8 @@ The contract is enough to generate/derive the rest:
 
 **[Server.md](Server.md)** walks through building a server for this exact Tasks
 API: write handlers (plain functions), back the streaming endpoints with shape
-engines, register them against the IR, and serve. See `trial/ts/src/client.ts`,
-`trial/rs/src/client.rs`, `trial/py/griplab_slice/ws_client.py` for the client
-shape, and `trial/py/griplab_slice/server.py` / `trial/rs/src/server.rs` for the
-runnable reference servers.
+engines, register them against the IR, and serve. See `src/taut/gen/runtime/typescript/taut_client.ts`,
+and the generated client/server stubs for the client/server shape.
 
 ## 5. Evolve it safely
 

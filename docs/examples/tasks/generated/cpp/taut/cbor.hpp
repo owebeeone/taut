@@ -6,12 +6,128 @@
 // key order by the generator). Zero runtime cost; no heap; host-testable.
 #pragma once
 
+#include <bit>
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 namespace taut {
+
+constexpr std::uint64_t f64_bits(double v) {
+    return std::bit_cast<std::uint64_t>(v);
+}
+
+constexpr double f64_from_bits(std::uint64_t bits) {
+    return std::bit_cast<double>(bits);
+}
+
+constexpr std::uint32_t f32_bits(float v) {
+    return std::bit_cast<std::uint32_t>(v);
+}
+
+constexpr float f32_from_bits(std::uint32_t bits) {
+    return std::bit_cast<float>(bits);
+}
+
+constexpr bool f64_is_nan_bits(std::uint64_t bits) {
+    return (bits & 0x7ff0000000000000ULL) == 0x7ff0000000000000ULL
+        && (bits & 0x000fffffffffffffULL) != 0;
+}
+
+constexpr bool f64_is_inf_bits(std::uint64_t bits) {
+    return (bits & 0x7fffffffffffffffULL) == 0x7ff0000000000000ULL;
+}
+
+constexpr unsigned long long round_shift_right(unsigned long long v, int shift) {
+    if (shift <= 0) return v << -shift;
+    if (shift >= 64) return 0;
+    unsigned long long q = v >> shift;
+    unsigned long long rem = v & ((1ULL << shift) - 1);
+    unsigned long long half = 1ULL << (shift - 1);
+    if (rem > half || (rem == half && (q & 1ULL) != 0)) ++q;
+    return q;
+}
+
+struct HalfNarrow {
+    std::uint16_t bits{0};
+    bool overflow{false};
+};
+
+constexpr double half_to_double(std::uint16_t h) {
+    std::uint64_t sign = static_cast<std::uint64_t>(h & 0x8000U) << 48;
+    unsigned exp = (h >> 10) & 0x1fU;
+    unsigned frac = h & 0x03ffU;
+    if (exp == 0) {
+        if (frac == 0) return f64_from_bits(sign);
+        int e = -14;
+        while ((frac & 0x0400U) == 0) {
+            frac <<= 1;
+            --e;
+        }
+        frac &= 0x03ffU;
+        return f64_from_bits(sign
+            | (static_cast<std::uint64_t>(e + 1023) << 52)
+            | (static_cast<std::uint64_t>(frac) << 42));
+    }
+    if (exp == 0x1fU) {
+        return f64_from_bits(sign
+            | 0x7ff0000000000000ULL
+            | (static_cast<std::uint64_t>(frac) << 42));
+    }
+    return f64_from_bits(sign
+        | (static_cast<std::uint64_t>(exp + 1008) << 52)
+        | (static_cast<std::uint64_t>(frac) << 42));
+}
+
+constexpr HalfNarrow narrow_half(double v) {
+    std::uint64_t bits = f64_bits(v);
+    std::uint16_t sign = static_cast<std::uint16_t>((bits >> 48) & 0x8000U);
+    std::uint64_t abs = bits & 0x7fffffffffffffffULL;
+    unsigned exp = static_cast<unsigned>((bits >> 52) & 0x7ffU);
+    std::uint64_t frac = bits & 0x000fffffffffffffULL;
+
+    if (f64_is_nan_bits(bits)) return {static_cast<std::uint16_t>(sign | 0x7e00U), false};
+    if (f64_is_inf_bits(bits)) return {static_cast<std::uint16_t>(sign | 0x7c00U), false};
+    if (abs == 0) return {sign, false};
+    if (abs > 0x40effc0000000000ULL) return {static_cast<std::uint16_t>(sign | 0x7c00U), true};
+
+    if (exp == 0) return {sign, false}; // non-zero double subnormal is below half range.
+
+    int e = static_cast<int>(exp) - 1023;
+    unsigned long long mant = (1ULL << 52) | frac;
+
+    if (e >= -14) {
+        int half_exp = e + 15;
+        unsigned long long rounded = round_shift_right(mant, 42);
+        if (rounded == 0x800ULL) {
+            rounded = 0x400ULL;
+            ++half_exp;
+        }
+        if (half_exp >= 31) return {static_cast<std::uint16_t>(sign | 0x7c00U), true};
+        return {static_cast<std::uint16_t>(sign | (half_exp << 10) | (rounded & 0x03ffULL)), false};
+    }
+
+    unsigned long long rounded = round_shift_right(mant, 28 - e);
+    if (rounded == 0) return {sign, false};
+    if (rounded >= 0x400ULL) return {static_cast<std::uint16_t>(sign | 0x0400U), false};
+    return {static_cast<std::uint16_t>(sign | rounded), false};
+}
+
+constexpr bool half_exact(double v, std::uint16_t& bits_out) {
+    HalfNarrow h = narrow_half(v);
+    bits_out = h.bits;
+    return !h.overflow && f64_bits(half_to_double(h.bits)) == f64_bits(v);
+}
+
+constexpr bool single_exact(double v) {
+    std::uint64_t bits = f64_bits(v);
+    if (f64_is_nan_bits(bits)) return false;
+    if (f64_is_inf_bits(bits)) return true;
+    if ((bits & 0x7fffffffffffffffULL) > 0x47efffffe0000000ULL) return false;
+    return f64_bits(static_cast<double>(static_cast<float>(v))) == bits;
+}
 
 struct Buf {
     unsigned char d[512]{};
@@ -52,6 +168,30 @@ struct Buf {
         head(2, s.size());
         for (char c : s) push(static_cast<unsigned char>(c));
     }
+    constexpr void float_(double v) {
+        std::uint64_t bits = f64_bits(v);
+        if (f64_is_nan_bits(bits)) {
+            push(0xf9);
+            push(0x7e);
+            push(0x00);
+            return;
+        }
+        std::uint16_t h = 0;
+        if (half_exact(v, h)) {
+            push(0xf9);
+            push(static_cast<unsigned char>(h >> 8));
+            push(static_cast<unsigned char>(h));
+            return;
+        }
+        if (single_exact(v)) {
+            std::uint32_t f = f32_bits(static_cast<float>(v));
+            push(0xfa);
+            for (int i = 3; i >= 0; --i) push(static_cast<unsigned char>(f >> (i * 8)));
+            return;
+        }
+        push(0xfb);
+        for (int i = 7; i >= 0; --i) push(static_cast<unsigned char>(bits >> (i * 8)));
+    }
     constexpr void boolean(bool b) { push(b ? 0xf5 : 0xf4); }
     constexpr void null_() { push(0xf6); }
     constexpr void array(std::size_t k) { head(4, k); }
@@ -83,15 +223,17 @@ constexpr bool eq(const Buf& b, std::string_view bytes) {
 // --- decode: a constexpr CBOR value tree + parser (mirrors cbor.rs) ----------
 
 struct Cbor {
-    enum class K { Int, Bytes, Text, Arr, Map, Bool, Null };
+    enum class K { Int, Bytes, Text, Arr, Map, Bool, Null, Float };
     K k{K::Null};
     long long i{0};
+    double f{0.0};
     std::string_view s{};                          // Text / Bytes (view into source)
     std::vector<Cbor> arr{};                        // Array
     std::vector<std::pair<long long, Cbor>> map{};  // Map (integer keys)
 
     constexpr long long as_int() const { return i; }
     constexpr bool as_bool() const { return i != 0; }
+    constexpr double as_float() const { return f; }
     constexpr std::string_view as_text() const { return s; }
     constexpr std::string_view as_bytes() const { return s; }
     constexpr const std::vector<Cbor>& as_array() const { return arr; }
@@ -146,6 +288,25 @@ constexpr std::pair<Cbor, std::size_t> decode_at(std::string_view d, std::size_t
     // major == 7
     if (info == 20) { c.k = Cbor::K::Bool; c.i = 0; }
     else if (info == 21) { c.k = Cbor::K::Bool; c.i = 1; }
+    else if (info == 25) {
+        c.k = Cbor::K::Float;
+        c.f = half_to_double(static_cast<std::uint16_t>((byte_at(d, off) << 8) | byte_at(d, off + 1)));
+        off += 2;
+    }
+    else if (info == 26) {
+        std::uint32_t bits = 0;
+        for (int j = 0; j < 4; ++j) bits = (bits << 8) | byte_at(d, off + j);
+        c.k = Cbor::K::Float;
+        c.f = static_cast<double>(f32_from_bits(bits));
+        off += 4;
+    }
+    else if (info == 27) {
+        std::uint64_t bits = 0;
+        for (int j = 0; j < 8; ++j) bits = (bits << 8) | byte_at(d, off + j);
+        c.k = Cbor::K::Float;
+        c.f = f64_from_bits(bits);
+        off += 8;
+    }
     else { c.k = Cbor::K::Null; }
     return {c, off};
 }
@@ -162,6 +323,7 @@ constexpr void encode_value(Buf& b, const Cbor& c) {
         case Cbor::K::Text: b.text(c.s); break;
         case Cbor::K::Bool: b.boolean(c.i != 0); break;
         case Cbor::K::Null: b.null_(); break;
+        case Cbor::K::Float: b.float_(c.f); break;
         case Cbor::K::Arr:
             b.array(c.arr.size());
             for (const auto& e : c.arr) encode_value(b, e);

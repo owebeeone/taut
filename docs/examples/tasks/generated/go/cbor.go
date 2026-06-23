@@ -1,11 +1,14 @@
 // Minimal deterministic CBOR — the Go binding of the frozen wire substrate.
 // Byte-for-byte identical to taut/src/taut/wire/cbor.py and the Rust/TS/C++/Swift
 // runtimes: the same tiny subset (int, bytes, text, array, int-keyed map, bool,
-// null) in core-deterministic encoding (definite length, shortest-form ints,
-// ascending map keys). Hand-rolled, stdlib only.
+// null, float) in core-deterministic encoding (definite length, shortest-form
+// ints/floats, ascending map keys). Hand-rolled, stdlib only.
 package taut
 
-import "sort"
+import (
+	"math"
+	"sort"
+)
 
 type Kind int
 
@@ -17,6 +20,7 @@ const (
 	KMap
 	KBool
 	KNull
+	KFloat
 )
 
 // KV is one integer-keyed map entry.
@@ -33,14 +37,16 @@ type Cbor struct {
 	B    []byte
 	Arr  []Cbor
 	Map  []KV
+	F    float64
 }
 
-func CInt(n int64) Cbor    { return Cbor{Kind: KInt, I: n} }
-func CText(s string) Cbor  { return Cbor{Kind: KText, S: s} }
-func CBytes(b []byte) Cbor { return Cbor{Kind: KBytes, B: b} }
-func CArr(a []Cbor) Cbor   { return Cbor{Kind: KArr, Arr: a} }
-func CMap(m []KV) Cbor     { return Cbor{Kind: KMap, Map: m} }
-func CNull() Cbor          { return Cbor{Kind: KNull} }
+func CInt(n int64) Cbor     { return Cbor{Kind: KInt, I: n} }
+func CText(s string) Cbor   { return Cbor{Kind: KText, S: s} }
+func CBytes(b []byte) Cbor  { return Cbor{Kind: KBytes, B: b} }
+func CArr(a []Cbor) Cbor    { return Cbor{Kind: KArr, Arr: a} }
+func CMap(m []KV) Cbor      { return Cbor{Kind: KMap, Map: m} }
+func CNull() Cbor           { return Cbor{Kind: KNull} }
+func CFloat(n float64) Cbor { return Cbor{Kind: KFloat, F: n} }
 func CBool(b bool) Cbor {
 	c := Cbor{Kind: KBool}
 	if b {
@@ -65,6 +71,7 @@ func (c Cbor) Bool() bool       { return c.I != 0 }
 func (c Cbor) Array() []Cbor    { return c.Arr }
 func (c Cbor) IsNull() bool     { return c.Kind == KNull }
 func (c Cbor) MapEntries() []KV { return c.Map } // forward-compat residual capture
+func (c Cbor) Float() float64   { return c.F }
 
 func head(out *[]byte, major byte, n uint64) {
 	mt := major << 5
@@ -124,6 +131,111 @@ func enc(c Cbor, out *[]byte) {
 		}
 	case KNull:
 		*out = append(*out, 0xf6)
+	case KFloat:
+		floatBytes(c.F, out)
+	}
+}
+
+func floatBytes(v float64, out *[]byte) {
+	if math.IsNaN(v) {
+		*out = append(*out, 0xf9, 0x7e, 0x00)
+		return
+	}
+	if h, ok := float64ToHalfBits(v); ok && math.Float64bits(halfToFloat64(h)) == math.Float64bits(v) {
+		*out = append(*out, 0xf9, byte(h>>8), byte(h))
+		return
+	}
+	f := float32(v)
+	if math.Float64bits(float64(f)) == math.Float64bits(v) {
+		bits := math.Float32bits(f)
+		*out = append(*out, 0xfa, byte(bits>>24), byte(bits>>16), byte(bits>>8), byte(bits))
+		return
+	}
+	bits := math.Float64bits(v)
+	*out = append(*out, 0xfb, byte(bits>>56), byte(bits>>48), byte(bits>>40), byte(bits>>32), byte(bits>>24), byte(bits>>16), byte(bits>>8), byte(bits))
+}
+
+func roundShiftEven(n uint64, shift uint) uint64 {
+	if shift == 0 {
+		return n
+	}
+	q := n >> shift
+	rem := n & ((uint64(1) << shift) - 1)
+	half := uint64(1) << (shift - 1)
+	if rem > half || (rem == half && q&1 == 1) {
+		q++
+	}
+	return q
+}
+
+func float64ToHalfBits(v float64) (uint16, bool) {
+	bits := math.Float64bits(v)
+	sign := uint16((bits >> 48) & 0x8000)
+	exp := int((bits >> 52) & 0x7ff)
+	frac := bits & ((uint64(1) << 52) - 1)
+
+	if exp == 0x7ff {
+		if frac != 0 {
+			return 0x7e00, true
+		}
+		return sign | 0x7c00, true
+	}
+	if exp == 0 {
+		return sign, true
+	}
+
+	unbiased := exp - 1023
+	sig := (uint64(1) << 52) | frac
+	if unbiased > 15 {
+		return sign | 0x7c00, false
+	}
+	if unbiased >= -14 {
+		halfExp := unbiased + 15
+		rounded := roundShiftEven(sig, 42)
+		if rounded == 0x800 {
+			halfExp++
+			rounded = 0x400
+			if halfExp >= 31 {
+				return sign | 0x7c00, false
+			}
+		}
+		return sign | uint16(halfExp<<10) | uint16(rounded&0x3ff), true
+	}
+	if unbiased < -25 {
+		return sign, true
+	}
+	rounded := roundShiftEven(sig, uint(28-unbiased))
+	if rounded == 0 {
+		return sign, true
+	}
+	if rounded >= 0x400 {
+		return sign | 0x0400, true
+	}
+	return sign | uint16(rounded), true
+}
+
+func halfToFloat64(h uint16) float64 {
+	sign := uint64(h&0x8000) << 48
+	exp := (h >> 10) & 0x1f
+	frac := uint64(h & 0x03ff)
+	switch exp {
+	case 0:
+		if frac == 0 {
+			return math.Float64frombits(sign)
+		}
+		v := math.Ldexp(float64(frac), -24)
+		if sign != 0 {
+			return -v
+		}
+		return v
+	case 0x1f:
+		if frac == 0 {
+			return math.Float64frombits(sign | 0x7ff0000000000000)
+		}
+		return math.Float64frombits(sign | 0x7ff8000000000000 | (frac << 42))
+	default:
+		exp64 := uint64(int(exp) - 15 + 1023)
+		return math.Float64frombits(sign | (exp64 << 52) | (frac << 42))
 	}
 }
 
@@ -205,6 +317,21 @@ func dec(data []byte, off int) (Cbor, int) {
 			return CBool(true), off
 		case 22:
 			return CNull(), off
+		case 25:
+			bits := uint16(data[off])<<8 | uint16(data[off+1])
+			return CFloat(halfToFloat64(bits)), off + 2
+		case 26:
+			var bits uint32
+			for j := 0; j < 4; j++ {
+				bits = bits<<8 | uint32(data[off+j])
+			}
+			return CFloat(float64(math.Float32frombits(bits))), off + 4
+		case 27:
+			var bits uint64
+			for j := 0; j < 8; j++ {
+				bits = bits<<8 | uint64(data[off+j])
+			}
+			return CFloat(math.Float64frombits(bits)), off + 8
 		}
 	}
 	panic("unsupported CBOR item")

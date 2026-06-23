@@ -1,6 +1,6 @@
 "use strict";
 // GENERATED native JS types + codec — do not edit. Pairs with cbor.js.
-const { CInt, CText, CBytes, CBool, CArr, CMap, CNull, cget, cmapEntries, isNull } = require("./cbor.js");
+const { CInt, CFloat, CText, CBytes, CBool, CArr, CMap, CNull, cget, cmapEntries, isNull } = require("./cbor.js");
 
 const TaskState = Object.freeze({ open: 0, doing: 1, done: 2 });
 

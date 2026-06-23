@@ -66,14 +66,15 @@ is a derived projection of the tagged subset.
 | Wire codec (deterministic CBOR) | `taut.wire.codec` / `taut.wire.cbor` |
 | Per-language generators | `taut.gen.rust`, `taut.gen.cpp` |
 | Golden corpus | `taut/corpus/` |
-| Reference slices + clients/servers | the `trial/` repo (`py/ ts/ rs/ cpp/`) |
+| Reference slices + clients/servers | TypeScript runtime in `src/taut/gen/runtime/typescript/`; worked slices are disposable generated outputs |
 | CRDT reference engine + slot | `taut.crdt` |
 
 ## Status
 
 This is a working spike, not a packaged product. The library API (author →
 validate → export → encode/decode) is general; the per-language generators and
-the WebSocket client/server bindings currently target the `trial/` slices as
-worked examples. See [GettingStarted.md](GettingStarted.md) to define your own
-API, [Server.md](Server.md) to serve it, and [Reference.md](Reference.md) for the
+the WebSocket client/server bindings can be emitted into self-contained output
+trees, with TypeScript's generic runtime vendored from the in-repo runtime
+resources. See [GettingStarted.md](GettingStarted.md) to define your own API,
+[Server.md](Server.md) to serve it, and [Reference.md](Reference.md) for the
 complete authoring surface.

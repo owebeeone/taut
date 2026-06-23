@@ -210,9 +210,10 @@ dev-docs/        design notes + the decisions log (Taut*.md)
 .github/         the PyPI publish workflow (Trusted Publishing on release)
 ```
 
-Reference target implementations and the full cross-language interop matrix
-(TS/Rust/Python clients × Python/Rust servers, plus the C++ oracle) live in a
-companion `trial/` repo, each validated against this repo's corpus.
+Reference target implementations and the full cross-language interop matrix are
+validated against this repo's corpus. TypeScript's reusable runtime now lives in
+`src/taut/gen/runtime/typescript/`; other worked interop slices are disposable
+generated outputs, not durable source.
 
 ## Docs
 

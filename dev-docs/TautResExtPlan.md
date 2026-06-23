@@ -66,7 +66,7 @@ the corpora are the contract; agents hand-write their harness.)*
   schema(s) as IR. *(~150 LOC)*
 
 ### Phase 2 — language fan-out *(milestone: all 9 byte-match, residual + extensions)* — 8 worktree-isolated agents
-One agent per language (Rust, C++, Swift, Go, Kotlin, JS, Java, **TS — in the `trial` repo**).
+One agent per language (Rust, C++, Swift, Go, Kotlin, JS, Java, **TS — in-repo runtime resources under `src/taut/gen/runtime/typescript/`**).
 Each: (a) **residual** — generate the fixture types `--forward-compat`, run `residual_vectors.json`
 decode→re-encode, byte-diff vs the oracle, fix any merge-order divergence; (b) **extensions** —
 implement `ext_set/get/clear` (a new `ext.<lang>` over the runtime `Cbor` + the generated ext
@@ -87,8 +87,9 @@ fuzz where the toolchain exists. *(~150–350 LOC each.)*
 2. **Extension nested-map, not bytes** — `ext_set` rides the ext message as a *nested CBOR map*
    (`encode_struct`, not pre-serialized bytes) so the host re-encodes once and the band tag
    sorts canonically. Pre-serializing to bytes would change the wire — a parity break.
-3. **TS cross-repo** — the TS codec lives in the `trial` repo (interpreter-style), not the
-   taut worktree; oracle corpora must be copied in (as FLOAT did).
+3. **TS runtime-resource ownership** — TypeScript is interpreter-style and lives in
+   `src/taut/gen/runtime/typescript/`; keep its oracle handoff in-repo through pytest-generated
+   temporary harnesses.
 4. **C++ ext at runtime** — the C++ codec is constexpr-centric, but `ext_*` operates on runtime
    byte buffers; implement it as a normal (non-constexpr) runtime path over `parse`/`encode_value`.
 5. **The flag gate** — `wire_residual` is off by default; a schema with extensions *requires*

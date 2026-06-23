@@ -1,7 +1,7 @@
 # taut Orchestration — execution spec (P4)
 
 Status: working draft. Normative (`MUST`/`SHOULD`/`MAY`).
-Reference impl: `trial/py/griplab_slice/scheduler.py` (sdax-style, asyncio).
+Reference impl: Python target scheduler prototype (sdax-style, asyncio).
 
 Per-endpoint control flow is a **declarative task DAG**: a set of tasks, each with
 dependencies and a per-task **error policy**. The scheduler derives parallel
@@ -48,7 +48,7 @@ language. Sagas / compensation are explicitly deferred.
 `cmd.run` fans out one task per repo (single wave, no deps) under
 `ErrorPolicy(timeout=30.0, on_error="isolate")`, then a gather task assembles the
 session — so one repo's failure is isolated by *policy*, not hand-coded control
-flow. See `trial/py/griplab_slice/service.py`.
+flow.
 
 ## Deferred
 

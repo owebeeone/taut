@@ -1,5 +1,5 @@
 // GENERATED typed client over the generic tautClient (call/subscribe).
-import type { tautClient } from "../../../../trial/ts/src/client.ts";
+import type { tautClient } from "./taut_client.ts";
 import type * as api from "./api.ts";
 
 export class TasksClient {

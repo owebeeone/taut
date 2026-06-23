@@ -27,9 +27,16 @@ from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, ServiceDe
 # lang -> list of (output path relative to its lang dir, vendored resource file).
 # Each carries the CBOR runtime plus `ext.<lang>`, the side-channel/extension accessor
 # runtime (Phase 2 fills it in). emit() vendors each resource that *exists*, so the ext
-# slot ships automatically once its file lands. Python/TS use the IR-driven runtime
-# codec (the installed package), so they have nothing to emit here.
+# slot ships automatically once its file lands. Python uses the installed package
+# directly; TypeScript vendors its IR-driven runtime from the resources below.
 _RUNTIMES: dict[str, list[tuple[str, str]]] = {
+    "typescript": [
+        ("cbor.ts", "typescript/cbor.ts"),
+        ("codec.ts", "typescript/codec.ts"),
+        ("schema.ts", "typescript/schema.ts"),
+        ("taut_client.ts", "typescript/taut_client.ts"),
+        ("ext.ts", "typescript/ext.ts"),
+    ],
     "rust":   [("cbor.rs", "cbor.rs"), ("ext.rs", "ext.rs")],            # use crate::cbor / crate::ext
     "cpp":    [("taut/cbor.hpp", "cbor.hpp"), ("taut/ext.hpp", "ext.hpp")],
     "swift":  [("cbor.swift", "cbor.swift"), ("ext.swift", "ext.swift")],
@@ -171,7 +178,7 @@ def ts_api(schema: Schema, forward_compat: bool = False) -> str:
 
 def ts_client(schema: Schema, svc: ServiceDef) -> str:
     out = ["// GENERATED typed client over the generic tautClient (call/subscribe).",
-           'import type { tautClient } from "../../../../trial/ts/src/client.ts";',
+           'import type { tautClient } from "./taut_client.ts";',
            "import type * as api from \"./api.ts\";", "",
            f"export class {svc.name}Client {{",
            "  private c: tautClient;",

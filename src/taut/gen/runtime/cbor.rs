@@ -1,5 +1,6 @@
 //! Minimal deterministic CBOR — the Rust binding of the frozen wire substrate.
-//! Byte-for-byte identical to taut/src/taut/wire/cbor.py and trial/ts/src/cbor.ts:
+//! Byte-for-byte identical to taut/src/taut/wire/cbor.py and
+//! src/taut/gen/runtime/typescript/cbor.ts:
 //! the same tiny subset (int, bytes, text, array, int-keyed map, bool, null,
 //! float) in core deterministic encoding (definite length, shortest-form ints,
 //! shortest-form floats, ascending map keys). Hand-rolled, zero dependencies.

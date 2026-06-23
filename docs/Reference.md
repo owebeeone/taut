@@ -292,10 +292,10 @@ from taut.ir import compat
 python3 -m taut.ir.compat <baseline.ir.json> <new.ir.json>   # exit 1 on breaking
 ```
 
-**Per-language generators** (`taut.gen.rust`, `taut.gen.cpp`) emit native types
-+ codec for compiled targets. They currently write into the `trial/` slices
-(`trial/rs/src/generated.rs`, `trial/cpp/generated/{types,corpus}.hpp`); point
-them at your own tree to target your API.
+**Per-language generators** emit native types and vendored runtimes where needed.
+The TypeScript generic runtime lives in `src/taut/gen/runtime/typescript/` and is
+emitted by `tautc gen --lang typescript --with-runtime`; Rust/C++ can still be
+pointed at whatever generated-output tree the caller chooses.
 
 **The project's own build** (worked example): `python3 -m taut.corpus.build`
 validates the GripLab IR (`taut/ir/griplab.taut.py`), exports
@@ -312,7 +312,7 @@ validates the GripLab IR (`taut/ir/griplab.taut.py`), exports
 
 ## 12. Reference implementations
 
-The `trial/` repo (sibling checkout) is the worked end-to-end example: native
-types + codec + WebSocket clients and servers in Python, TypeScript, Rust, and a
-C++ compile-time oracle, all driven by this IR. See the per-target READMEs and
-[../dev-docs/CodeShape.md](../dev-docs/CodeShape.md).
+TypeScript's reusable runtime source is in this repo under
+`src/taut/gen/runtime/typescript/` and can be vendored into generated outputs
+with `--with-runtime`. Other targets can be emitted into caller-owned generated
+output trees and validated against the same corpus.

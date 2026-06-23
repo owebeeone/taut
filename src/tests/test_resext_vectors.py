@@ -5,6 +5,7 @@ over a shared fixture schema; every language target must reproduce these exact b
 Parse-free: raw CBOR hex in/out. Committed files stay in lockstep with the generator."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -82,7 +83,8 @@ def test_scaffold_registers_ext_runtime_slot():
     from taut.gen import scaffold
     for lang, files in scaffold._RUNTIMES.items():
         resources = [res for _, res in files]
-        assert any(r == "Ext.java" or r.lower().startswith("ext.") for r in resources), \
+        basenames = [Path(r).name for r in resources]
+        assert any(r == "Ext.java" or r.lower().startswith("ext.") for r in basenames), \
             f"{lang} has no ext.<lang> runtime slot"
 
 
