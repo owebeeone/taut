@@ -10,8 +10,10 @@ the Rust harness/tests.
 **Prior art — `razel/crates/razel-wire` (verified 2026-06-23).** razel ships a proven taut Rust
 wire crate: `cbor.rs` (runtime, incl. the `map_entries` residual primitive), `vectors.rs` (golden
 corpus from taut's Python codec), and a `corpus_byte_parity` test that decode→re-encodes every
-vector to identical bytes in `cargo test`. **Reuse that `vectors.rs` + `corpus_byte_parity` shape**
-for your harness. But it only proves *codec* parity — two real gaps remain, so Rust is NOT done:
+vector to identical bytes in `cargo test`. That crate is **not in this checkout** (no `Cargo.toml`/`vectors.rs`/`razel-wire` here) — treat it as
+*conceptual* prior art. Your actual harness is the in-repo `src/tests/test_rust.py` pattern: a pytest
+that writes a temp `.rs`, `#[path=…] mod cbor;` the vendored runtime, and builds+runs with `rustc --test`
+(skip if `rustc` absent). It proves only *codec* parity today — two real gaps remain, so Rust is NOT done:
 - **Residual is UNPROVEN in Rust.** Both razel-wire and `gwz-core` generate with **forward-compat
   OFF** (no `wire_residual` in either `generated.rs`) and neither has an unknown-tag round-trip
   test. Your residual step is the **first** byte-proof of preservation, not a re-confirmation —
@@ -23,12 +25,15 @@ for your harness. But it only proves *codec* parity — two real gaps remain, so
 `residual_vectors.json` decode→re-encode, byte-diff. The one thing to verify hard: known fields
 and residual pairs emit in a **single ascending tag order** (an unknown tag between two known
 tags must interleave). If `to_cbor` builds a `Vec<(i64,Cbor)>` and hands it to `Cbor::Map` whose
-`encode` sorts, you're fine — confirm it, don't assume.
+`encode` sorts, you're fine — confirm it, don't assume. Turn forward-compat on **only** via
+`tautc gen --forward-compat` for the fixture — do NOT change the `forward_compat=False` default in
+`rust.py::_emit`/`_emit_message`, or `test_regen`/`test_forward_compat` move.
 
 **Extensions (implement) — `ext.rs`.** Mirror `ext.py` over the `Cbor` enum:
 `ext_set(host: &[u8], tag: i64, value: Cbor) -> Vec<u8>` → `decode` host to `Cbor::Map(v)`, drop any
 existing `tag`, push `(tag, value)`, `encode(&Cbor::Map(v))` (sorts). `ext_get(host, tag) -> Option<Cbor>`
-(None if absent). `ext_clear(host, tag) -> Vec<u8>`. Band-check `tag >= 1<<20` (panic/Err below band).
+(None if absent). `ext_clear(host, tag) -> Vec<u8>`. Band-check FIRST: `tag >= 1<<20`, else **`panic!`** — match cbor.rs's
+panic-on-misuse idiom (do NOT add a `Result` surface). Add a `#[should_panic]` test for a below-band tag.
 `value` is the caller's `ExtMsg::to_cbor()`; `ext_get` returns the nested `Cbor` for `ExtMsg::from_cbor`.
 
 **Verify:** cargo is available — build a harness over both corpora + a differential fuzz vs the

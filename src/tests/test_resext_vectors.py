@@ -76,9 +76,14 @@ def test_scaffold_registers_ext_runtime_slot():
             f"{lang} has no ext.<lang> runtime slot"
 
 
-def test_emit_vendors_cbor_and_tolerates_missing_ext(tmp_path):
+def test_emit_vendors_registered_runtimes_that_exist(tmp_path):
     from taut.gen import scaffold
     written = scaffold.emit(S, tmp_path, langs=["rust"], services=[], runtime=True, forward_compat=True)
     names = {p.name for p in written}
-    assert "cbor.rs" in names              # cbor still vendored
-    assert "ext.rs" not in names           # not present yet → skipped cleanly (Phase 2 drops it in)
+    assert "cbor.rs" in names                              # cbor runtime always vendored
+    # The ext.<lang> slot is registered; emit() vendors each runtime resource that *exists*
+    # and skips the rest — so this holds before AND after a Phase-2 ext.rs lands (no per-agent
+    # flip of this assertion needed; we check the mechanism, not the absence of ext.rs).
+    rust_resources = {res for _, res in scaffold._RUNTIMES["rust"]}
+    for vendored in names & rust_resources:
+        assert scaffold._runtime_exists(vendored), vendored

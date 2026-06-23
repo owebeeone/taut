@@ -15,8 +15,10 @@ unknowns), byte-diff vs the oracle.
 **Extensions (implement) — `ext.go`.** Over `Cbor{Map []KV}`:
 `ExtSet(host []byte, tag int64, value Cbor) []byte` → `Decode` host, rebuild `[]KV` without `tag`,
 append `KV{tag, value}`, `Encode` (sorts). `ExtGet(host []byte, tag int64) (Cbor, bool)`.
-`ExtClear(host []byte, tag int64) []byte`. Band-check `tag >= 1<<20` (panic below band). `value` is
-`ExtMsg.ToCbor()`; `ExtGet` returns the nested `Cbor` for `ExtMsg.FromCbor`.
+`ExtClear(host []byte, tag int64) []byte`. Band-check `tag >= 1<<20` (panic below band). `value` is the
+ext message as a `Cbor` map (`ExtMsg.ToCbor()`). **Harness note:** `ext_vectors.json`'s `value` is the
+nested Decision-CBOR **hex** — `Decode` it to a `Cbor` and pass that; do NOT wrap the raw hex bytes as a
+CBOR byte string. `ExtGet` returns the nested `Cbor` for `ExtMsg.FromCbor`.
 
 **Verify:** go available — a tiny module in /tmp over both corpora + a differential fuzz. Stdlib only
 (`math`, `sort`). Extend `test_go.py` for the new shape.

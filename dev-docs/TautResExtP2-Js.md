@@ -12,10 +12,12 @@ already exists as a pattern).
 decode→re-encode, byte-diff. Verify the emit interleaves known + residual in one ascending order
 (`enc`'s `MAP` arm sorts) for an interleaved unknown tag + a band-tag unknown.
 
-**Extensions (implement) — `ext.js`.** Over `CMap` (`{kind: MAP, map: [[key, Cbor], ...]}`):
+**Extensions (implement) — `ext.js`.** Use the exported `CMap([[key, Cbor], …])` constructor — the
+`MAP` kind constant is **private** to `cbor.js`, so don't reference it:
 `extSet(host, tag, value)` → `decode` host, rebuild `map` without `tag`, push `[tag, value]`,
 `encode(CMap(map))` (sorts). `extGet(host, tag)` → the nested `Cbor` or `null`. `extClear(host, tag)`.
-Band-check `tag >= 2**20`. **Export `extSet/extGet/extClear` in `module.exports`.** `value` is
+Band-check FIRST: `Number.isSafeInteger(tag) && tag >= 2**20` (reject non-integers / unsafe ints so band
+tags round-trip like Python ints). **Export `extSet/extGet/extClear` in `module.exports`.** `value` is
 `ExtMsg.toCbor(...)`; `extGet` returns the nested `Cbor` for `ExtMsg.fromCbor`.
 
 **Verify:** node available — a harness over both corpora + a differential fuzz vs Python. No deps.

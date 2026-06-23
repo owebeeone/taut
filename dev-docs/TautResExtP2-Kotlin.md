@@ -17,7 +17,7 @@ without `tag`, add `Pair(tag, value)`, `encode(Cbor.map(...))` (sorts). `extGet(
 (null if absent). `extClear(host, tag): ByteArray`. Band-check `tag >= 1L shl 20`. `value` is
 `ExtMsg.toCbor()`; `extGet` returns the nested `Cbor` for `ExtMsg.fromCbor`.
 
-**Verify:** `kotlinc` is at `/Applications/Android Studio.app/Contents/plugins/Kotlin/kotlinc/bin/kotlinc`;
-PATH `java` is broken, so set `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`.
-Compile a harness over both corpora + a differential fuzz; run the jar with `$JAVA_HOME/bin/java`.
-JDK stdlib only.
+**Verify:** `kotlinc` is at `/Applications/Android Studio.app/Contents/plugins/Kotlin/kotlinc/bin/kotlinc`.
+`test_kotlin.py` gates compiled parity on `shutil.which("kotlinc")`, so **prepend that bin dir to `PATH`**
+(and set `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`, since PATH `java` may be
+a broken shim) — else the harness silently skips. Run the jar with `$JAVA_HOME/bin/java`. JDK stdlib only.

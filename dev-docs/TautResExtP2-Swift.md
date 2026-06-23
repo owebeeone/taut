@@ -4,7 +4,7 @@ Read [TautResExtP2-Base.md](TautResExtP2-Base.md) first; reuse
 [history/TautFloatP2-Swift.md](history/TautFloatP2-Swift.md) for the `Cbor` enum idiom.
 
 **Files you own:** `src/taut/gen/runtime/cbor.swift` (residual accessor present) · `src/taut/gen/swift.py`
-(emits the `wireResidual` field) · **NEW** `src/taut/gen/runtime/ext.swift` · the Swift harness/tests.
+(emits the `wire_residual` field — single underscore per D10, **not** `wireResidual`) · **NEW** `src/taut/gen/runtime/ext.swift` · the Swift harness/tests.
 
 **Residual (verify+fix).** Generate the fixture `--forward-compat`, run `residual_vectors.json`
 decode→re-encode, byte-diff. Verify the generated `encode`/`toCbor` emits known + residual in one
