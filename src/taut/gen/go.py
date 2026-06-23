@@ -18,7 +18,7 @@ def _pascal(name: str) -> str:
 
 def _go_ty(t: TypeRef) -> str:
     if isinstance(t, Scalar):
-        return {"int": "int64", "str": "string", "bytes": "[]byte", "bool": "bool"}[t.kind]
+        return {"int": "int64", "str": "string", "bytes": "[]byte", "bool": "bool", "float": "float64"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -41,7 +41,8 @@ def _enc(t: TypeRef, expr: str) -> str:
     """A Cbor expression encoding the (non-optional, non-list) value `expr`."""
     if isinstance(t, Scalar):
         return {"int": f"CInt({expr})", "str": f"CText({expr})",
-                "bytes": f"CBytes({expr})", "bool": f"CBool({expr})"}[t.kind]
+                "bytes": f"CBytes({expr})", "bool": f"CBool({expr})",
+                "float": f"CFloat({expr})"}[t.kind]
     if isinstance(t, EnumRef):
         return f"CInt(int64({expr}))"
     if isinstance(t, MsgRef):
@@ -53,7 +54,8 @@ def _dec(t: TypeRef, expr: str) -> str:
     """A Go expression decoding the Cbor `expr` into the native (single) value."""
     if isinstance(t, Scalar):
         return {"int": f"{expr}.Int()", "str": f"{expr}.Text()",
-                "bytes": f"{expr}.Bytes()", "bool": f"{expr}.Bool()"}[t.kind]
+                "bytes": f"{expr}.Bytes()", "bool": f"{expr}.Bool()",
+                "float": f"{expr}.Float()"}[t.kind]
     if isinstance(t, EnumRef):
         return f"{t.name}({expr}.Int())"
     if isinstance(t, MsgRef):
