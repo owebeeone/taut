@@ -17,8 +17,8 @@ from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema,
 
 def _java_ty(t: TypeRef, boxed: bool = False) -> str:
     if isinstance(t, Scalar):
-        prim = {"int": "long", "str": "String", "bytes": "byte[]", "bool": "boolean"}[t.kind]
-        box = {"int": "Long", "str": "String", "bytes": "byte[]", "bool": "Boolean"}[t.kind]
+        prim = {"int": "long", "str": "String", "bytes": "byte[]", "bool": "boolean", "float": "double"}[t.kind]
+        box = {"int": "Long", "str": "String", "bytes": "byte[]", "bool": "Boolean", "float": "Double"}[t.kind]
         return box if boxed else prim
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
@@ -36,7 +36,8 @@ def _field_type(f: FieldDef) -> str:
 def _enc(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {"int": f"Cbor.int_({expr})", "str": f"Cbor.text({expr})",
-                "bytes": f"Cbor.bytes({expr})", "bool": f"Cbor.bool({expr})"}[t.kind]
+                "bytes": f"Cbor.bytes({expr})", "bool": f"Cbor.bool({expr})",
+                "float": f"Cbor.float_({expr})"}[t.kind]
     if isinstance(t, EnumRef):
         return f"Cbor.int_({expr}.wire)"
     if isinstance(t, MsgRef):
@@ -53,7 +54,8 @@ def _enc(t: TypeRef, expr: str) -> str:
 def _dec(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {"int": f"{expr}.i", "str": f"{expr}.s",
-                "bytes": f"{expr}.b", "bool": f"({expr}.i != 0)"}[t.kind]
+                "bytes": f"{expr}.b", "bool": f"({expr}.i != 0)",
+                "float": f"{expr}.d"}[t.kind]
     if isinstance(t, EnumRef):
         return f"{t.name}.fromWire({expr}.i)"
     if isinstance(t, MsgRef):
