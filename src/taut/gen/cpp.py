@@ -16,6 +16,7 @@ corpus.build here would be a cycle).
 
 from __future__ import annotations
 
+import struct
 from pathlib import Path
 
 from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
@@ -55,7 +56,7 @@ def _lit(data: bytes) -> str:
 
 def _base_type(t: TypeRef) -> str:
     if isinstance(t, Scalar):
-        return {"int": "long long", "str": "std::string_view", "bytes": "std::string_view", "bool": "bool"}[t.kind]
+        return {"int": "long long", "float": "double", "str": "std::string_view", "bytes": "std::string_view", "bool": "bool"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -74,6 +75,7 @@ def _encode_scalar(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {
             "int": f"b.integer({expr});",
+            "float": f"b.float_({expr});",
             "bool": f"b.boolean({expr});",
             "str": f"b.text({expr});",
             "bytes": f"b.bytes({expr});",
@@ -87,7 +89,7 @@ def _encode_scalar(t: TypeRef, expr: str) -> str:
 
 def _decode_expr(t: TypeRef, acc: str) -> str:
     if isinstance(t, Scalar):
-        return {"int": f"{acc}.as_int()", "bool": f"{acc}.as_bool()",
+        return {"int": f"{acc}.as_int()", "float": f"{acc}.as_float()", "bool": f"{acc}.as_bool()",
                 "str": f"{acc}.as_text()", "bytes": f"{acc}.as_bytes()"}[t.kind]
     if isinstance(t, EnumRef):
         return f"static_cast<{t.name}>({acc}.as_int())"
@@ -199,6 +201,9 @@ def _render(schema: Schema, t: TypeRef, v) -> str:
     if isinstance(t, Scalar):
         if t.kind == "int":
             return str(v)
+        if t.kind == "float":
+            bits = struct.unpack(">Q", struct.pack(">d", float(v)))[0]
+            return f"taut::f64_from_bits(0x{bits:016x}ULL)"
         if t.kind == "bool":
             return "true" if v else "false"
         if t.kind == "str":
