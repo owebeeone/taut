@@ -25,7 +25,7 @@ def _id(name: str) -> str:
 
 def _swift_ty(t: TypeRef) -> str:
     if isinstance(t, Scalar):
-        return {"int": "Int64", "str": "String", "bytes": "[UInt8]", "bool": "Bool"}[t.kind]
+        return {"int": "Int64", "str": "String", "bytes": "[UInt8]", "bool": "Bool", "float": "Double"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -42,7 +42,7 @@ def _field_type(f: FieldDef) -> str:
 
 def _default(t: TypeRef) -> str:
     if isinstance(t, Scalar):
-        return {"int": "0", "str": '""', "bytes": "[]", "bool": "false"}[t.kind]
+        return {"int": "0", "str": '""', "bytes": "[]", "bool": "false", "float": "0.0"}[t.kind]
     if isinstance(t, ListOf):
         return "[]"
     if isinstance(t, EnumRef):
@@ -54,6 +54,7 @@ def _encode(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {
             "int": f"Cbor.int({expr})",
+            "float": f"Cbor.float({expr})",
             "str": f"Cbor.text({expr})",
             "bytes": f"Cbor.bytes({expr})",
             "bool": f"Cbor.bool({expr})",
@@ -76,6 +77,7 @@ def _decode(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {
             "int": f"{expr}.intVal",
+            "float": f"{expr}.floatVal",
             "str": f"{expr}.textVal",
             "bytes": f"{expr}.bytesVal",
             "bool": f"{expr}.boolVal",
