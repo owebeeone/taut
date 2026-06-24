@@ -20,6 +20,7 @@ import json
 import sys
 from pathlib import Path
 
+from . import __version__
 from .corpus import kit, synth
 from .gen import scaffold
 from .ir.load import load_schema, schema_from_json
@@ -109,6 +110,7 @@ def _cmd_json(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="tautc", description="taut codegen — IR -> code")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     g = sub.add_parser("gen", help="generate native types + codec (and client/server) from an IR")
