@@ -166,7 +166,7 @@ def assert_pyproject_metadata():
         fail(f"expected project.name {PACKAGE_NAME!r} in pyproject.toml")
     if not re.search(r'(?m)^dynamic\s*=\s*\["version"\]$', text):
         fail("pyproject.toml must keep version dynamic for setuptools-scm")
-    if not re.search(r'(?m)^tautc\s*=\s*"taut\.cli:main"$', text):
+    if not re.search(r'(?m)^tautc\s*=\s*"taut\.cli:main"(?:\s*(?:#.*)?)$', text):
         fail("expected project.scripts.tautc = 'taut.cli:main'")
 
 
