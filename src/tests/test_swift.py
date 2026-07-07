@@ -29,6 +29,9 @@ ROOT = Path(__file__).resolve().parents[2]
 FLOAT_VECTORS = ROOT / "corpus" / "float_vectors.json"
 RESIDUAL_VECTORS = ROOT / "corpus" / "residual_vectors.json"
 EXT_VECTORS = ROOT / "corpus" / "ext_vectors.json"
+PARITY_IR = ROOT / "ir" / "parity_int.taut.py"
+PARITY_INT_VECTORS = ROOT / "corpus" / "parity" / "int.vectors.json"
+PARITY_MALFORMED_VECTORS = ROOT / "corpus" / "parity" / "malformed.vectors.json"
 SWIFT_CBOR = ROOT / "src/taut/gen/runtime/cbor.swift"
 SWIFT_EXT = ROOT / "src/taut/gen/runtime/ext.swift"
 RESEXT_FUZZ_SEED = 0x55_0202
@@ -61,6 +64,26 @@ def _write_resext_model(tmp_path):
 
 def _swift_string(value: str) -> str:
     return json.dumps(value)
+
+
+def _swift_i64(value: str) -> str:
+    if value == "-9223372036854775808":
+        return "Int64.min"
+    if value == "9223372036854775807":
+        return "Int64.max"
+    return value
+
+
+def _swift_intbox(value: dict[str, object]) -> str:
+    entries = value["by_id"]
+    if entries:
+        by_id = "[" + ", ".join(
+            f"{_swift_i64(str(k))}: {_swift_i64(str(v))}"
+            for k, v in entries
+        ) + "]"
+    else:
+        by_id = "[:]"
+    return f"IntBox(n: {_swift_i64(str(value['n']))}, by_id: {by_id})"
 
 
 def _swift_support() -> str:
@@ -174,7 +197,8 @@ def test_emits_structs_enums_and_codec():
     assert "public struct BuildResult {" in s
     assert "public enum BuildStatus: Int64 {" in s
     assert "public func toCbor() -> Cbor" in s
-    assert "public static func fromCbor(_ c: Cbor) -> BuildResult" in s
+    assert "public static func fromCbor(_ c: Cbor) throws -> BuildResult" in s
+    assert "public static func fromCbor(_ c: Cbor) throws -> BuildStatus" in s
     assert "public init(" in s  # constructible cross-module
 
 
@@ -236,8 +260,109 @@ def test_float_codegen_shape():
     assert "Cbor.array(xs.map { Cbor.float($0) })" in s
     assert "(2, Cbor.float($0.value))" in s
     assert "maybe.map { Cbor.float($0) }" in s
-    assert "x: c.get(1).floatVal" in s
-    assert "return v.isNull ? nil : v.floatVal" in s
+    assert "x: try c.tryGet(1).tryFloat()" in s
+    assert "return try v.tryFloat()" in s
+
+
+def test_swift_parity_corpus_vectors(tmp_path):
+    int_vectors = json.loads(PARITY_INT_VECTORS.read_text())["vectors"]
+    malformed_vectors = json.loads(PARITY_MALFORMED_VECTORS.read_text())["vectors"]
+    round_trip_rows = [
+        row for row in int_vectors
+        if row["kind"] == "round_trip"
+    ]
+    encode_fail_count = sum(1 for row in int_vectors if row["kind"] == "encode_fail")
+    round_trip_swift = ",\n".join(
+        f"    ({_swift_string(row['name'])}, {_swift_string(row['cbor'])}, {{ {_swift_intbox(row['value'])} }})"
+        for row in round_trip_rows
+    )
+    malformed_blob = "\n".join(
+        "|".join([
+            row["name"],
+            row["stage"],
+            row.get("schema", ""),
+            row["bytes"],
+            row["expect"]["tag"],
+        ])
+        for row in malformed_vectors
+    )
+
+    model = tmp_path / "Parity.swift"
+    model.write_text(swift.emit_types(load_schema(PARITY_IR)))
+    harness = tmp_path / "main.swift"
+    harness.write_text(_swift_support() + textwrap.dedent(f"""
+        let roundTripRows: [(String, String, () -> IntBox)] = [
+        {round_trip_swift}
+        ]
+        let malformedBlob = {_swift_string(malformed_blob)}
+        let encodeFailRows = {encode_fail_count}
+        var mismatches = 0
+
+        func check(_ condition: Bool, _ message: String) {{
+            if !condition {{
+                print(message)
+                mismatches += 1
+            }}
+        }}
+
+        func expectError(_ name: String, expectedTag: String, _ work: () throws -> Void) {{
+            do {{
+                try work()
+                check(false, "\\(name): decoded successfully")
+            }} catch let error as CborError {{
+                check(error.parityTag == expectedTag, "\\(name): \\(error.parityTag) != \\(expectedTag) (\\(error))")
+            }} catch {{
+                check(false, "\\(name): non-CborError \\(error)")
+            }}
+        }}
+
+        for (name, expected, makeValue) in roundTripRows {{
+            let value = makeValue()
+            let encoded = hex(encode(value.toCbor()))
+            check(encoded == expected, "round trip encode \\(name): \\(encoded) != \\(expected)")
+
+            do {{
+                let decoded = try IntBox.fromCbor(tryDecode(bytes(fromHex: expected)))
+                check(decoded.n == value.n, "round trip n \\(name): \\(decoded.n) != \\(value.n)")
+                check(decoded.by_id == value.by_id, "round trip by_id \\(name): \\(decoded.by_id) != \\(value.by_id)")
+                let reencoded = hex(encode(decoded.toCbor()))
+                check(reencoded == expected, "round trip reencode \\(name): \\(reencoded) != \\(expected)")
+            }} catch {{
+                check(false, "round trip decode \\(name): \\(error)")
+            }}
+        }}
+
+        for parts in fields(malformedBlob) {{
+            let name = String(parts[0])
+            let stage = String(parts[1])
+            let schema = String(parts[2])
+            let wire = String(parts[3])
+            let expectedTag = String(parts[4])
+
+            expectError(name, expectedTag: expectedTag) {{
+                if stage == "raw_decode" {{
+                    _ = try tryDecode(bytes(fromHex: wire))
+                }} else if stage == "from_cbor" && schema == "IntBox" {{
+                    _ = try IntBox.fromCbor(tryDecode(bytes(fromHex: wire)))
+                }} else if stage == "from_wire" && schema == "Mode" {{
+                    _ = try Mode.fromCbor(tryDecode(bytes(fromHex: wire)))
+                }} else {{
+                    throw CborError.wrongType("known parity stage")
+                }}
+            }}
+        }}
+
+        check(encodeFailRows == 3, "unexpected encode-fail count \\(encodeFailRows)")
+
+        if mismatches != 0 {{
+            fatalError("swift parity mismatches=\\(mismatches)")
+        }}
+        print("swift parity round_trip=\\(roundTripRows.count) malformed=\\(fields(malformedBlob).count) encode_fail_unrepresentable=\\(encodeFailRows) mismatches=0")
+        """))
+    exe = _compile_swift(tmp_path, [SWIFT_CBOR, model, harness], "swift-parity-corpus")
+    run = subprocess.run([str(exe)], text=True, capture_output=True)
+    assert run.returncode == 0, run.stderr + run.stdout
+    assert "swift parity round_trip=7 malformed=12 encode_fail_unrepresentable=3 mismatches=0" in run.stdout
 
 
 def test_swift_resext_corpus_vectors(tmp_path):
@@ -272,7 +397,7 @@ def test_swift_resext_corpus_vectors(tmp_path):
         for parts in fields(residualBlob) {{
             let note = String(parts[0])
             let wire = String(parts[1])
-            let decoded = Host.fromCbor(decode(bytes(fromHex: wire)))
+            let decoded = try! Host.fromCbor(tryDecode(bytes(fromHex: wire)))
             let got = hex(encode(decoded.toCbor()))
             check(got == wire, "residual \\(note): \\(got) != \\(wire)")
         }}
@@ -286,12 +411,12 @@ def test_swift_resext_corpus_vectors(tmp_path):
             let expect = String(parts[5])
 
             if op == "set" {{
-                let decision = Decision.fromCbor(decode(bytes(fromHex: value)))
+                let decision = try! Decision.fromCbor(tryDecode(bytes(fromHex: value)))
                 let got = hex(extSet(bytes(fromHex: host), tag: tag, value: decision.toCbor()))
                 check(got == expect, "ext set \\(note): \\(got) != \\(expect)")
             }} else if op == "get" {{
                 let raw = extGet(bytes(fromHex: host), tag: tag)
-                let got = raw.map {{ hex(encode(Decision.fromCbor($0).toCbor())) }} ?? "null"
+                let got = raw.map {{ hex(encode((try! Decision.fromCbor($0)).toCbor())) }} ?? "null"
                 check(got == expect, "ext get \\(note): \\(got) != \\(expect)")
             }} else if op == "clear" {{
                 let got = hex(extClear(bytes(fromHex: host), tag: tag))
@@ -375,7 +500,7 @@ def test_swift_resext_fixed_seed_fuzz(tmp_path):
         for parts in fields(residualBlob) {{
             let note = String(parts[0])
             let wire = String(parts[1])
-            let decoded = Host.fromCbor(decode(bytes(fromHex: wire)))
+            let decoded = try! Host.fromCbor(tryDecode(bytes(fromHex: wire)))
             let got = hex(encode(decoded.toCbor()))
             check(got == wire, "seed=\\(seed) residual \\(note): input=\\(wire) got=\\(got)")
         }}
@@ -391,12 +516,12 @@ def test_swift_resext_fixed_seed_fuzz(tmp_path):
             let clearHost = String(parts[7])
             let clearExpect = String(parts[8])
 
-            let decision = Decision.fromCbor(decode(bytes(fromHex: value)))
+            let decision = try! Decision.fromCbor(tryDecode(bytes(fromHex: value)))
             let setGot = hex(extSet(bytes(fromHex: host), tag: tag, value: decision.toCbor()))
             check(setGot == setExpect, "seed=\\(seed) ext set \\(note): host=\\(host) got=\\(setGot) expect=\\(setExpect)")
 
             let raw = extGet(bytes(fromHex: getHost), tag: tag)
-            let getGot = raw.map {{ hex(encode(Decision.fromCbor($0).toCbor())) }} ?? "null"
+            let getGot = raw.map {{ hex(encode((try! Decision.fromCbor($0)).toCbor())) }} ?? "null"
             check(getGot == getExpect, "seed=\\(seed) ext get \\(note): host=\\(getHost) got=\\(getGot) expect=\\(getExpect)")
 
             let clearGot = hex(extClear(bytes(fromHex: clearHost), tag: tag))
@@ -550,13 +675,13 @@ def test_generated_swift_float_model_roundtrips(tmp_path):
             fatalError("generated FloatBox encode: \\(hex(encoded)) != \\(expected)")
         }}
 
-        let decoded = FloatBox.fromCbor(decode(encoded))
+        let decoded = try! FloatBox.fromCbor(tryDecode(encoded))
         let reencoded = encode(decoded.toCbor())
         if reencoded != encoded {{
             fatalError("generated FloatBox reencode: \\(hex(reencoded)) != \\(hex(encoded))")
         }}
 
-        let decodedFromExpected = FloatBox.fromCbor(decode(bytes(fromHex: expected)))
+        let decodedFromExpected = try! FloatBox.fromCbor(tryDecode(bytes(fromHex: expected)))
         let reencodedExpected = hex(encode(decodedFromExpected.toCbor()))
         if reencodedExpected != expected {{
             fatalError("generated FloatBox expected reencode: \\(reencodedExpected) != \\(expected)")

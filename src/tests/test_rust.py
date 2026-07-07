@@ -27,6 +27,7 @@ from taut.wire import codec
 
 ROOT = Path(__file__).resolve().parents[2]
 RESEXT_SCHEMA = load_schema(ROOT / "ir" / "resext.taut.py")
+PARITY_SCHEMA = load_schema(ROOT / "ir" / "parity_int.taut.py")
 
 
 def test_rust_generator_emits_float_scalar_codec():
@@ -112,6 +113,14 @@ def test_rust_runtime_matches_float_vectors(tmp_path):
 
 def _rs_str(s: str) -> str:
     return json.dumps(s)
+
+
+def _opt_rs_str(s: object | None) -> str:
+    return f"Some({_rs_str(str(s))})" if s is not None else "None"
+
+
+def _opt_rs_u8(n: object | None) -> str:
+    return f"Some({int(n)}u8)" if n is not None else "None"
 
 
 def _rust_residual_rows() -> str:
@@ -438,6 +447,60 @@ _FC = schema(
 )
 
 
+def _rust_parity_int_rows() -> tuple[str, str]:
+    rows = json.loads((ROOT / "corpus" / "parity" / "int.vectors.json").read_text())["vectors"]
+    round_trip = []
+    encode_fail = []
+    for row in rows:
+        if row["kind"] == "round_trip":
+            pairs = ", ".join(
+                f"({_rs_str(k)}, {_rs_str(v)})"
+                for k, v in row["value"]["by_id"]
+            )
+            round_trip.append(
+                "        IntRow { "
+                f"name: {_rs_str(row['name'])}, "
+                f"cbor: {_rs_str(row['cbor'])}, "
+                f"n: {_rs_str(row['value']['n'])}, "
+                f"by_id: &[{pairs}] "
+                "}"
+            )
+        elif row["kind"] == "encode_fail":
+            encode_fail.append(
+                "        EncodeFailRow { "
+                f"name: {_rs_str(row['name'])}, "
+                f"value: {_rs_str(row['value']['n'])}, "
+                f"tag: {_rs_str(row['expect']['tag'])} "
+                "}"
+            )
+        else:
+            raise AssertionError(f"unknown parity int vector kind {row['kind']!r}")
+    return ",\n".join(round_trip), ",\n".join(encode_fail)
+
+
+def _rust_parity_malformed_rows() -> str:
+    rows = json.loads((ROOT / "corpus" / "parity" / "malformed.vectors.json").read_text())["vectors"]
+    out = []
+    for row in rows:
+        expect = row["expect"]
+        out.append(
+            "        MalformedRow { "
+            f"name: {_rs_str(row['name'])}, "
+            f"stage: {_rs_str(row['stage'])}, "
+            f"schema: {_opt_rs_str(row.get('schema'))}, "
+            f"bytes: {_rs_str(row['bytes'])}, "
+            f"tag: {_rs_str(expect['tag'])}, "
+            f"key: {_opt_rs_str(expect.get('key'))}, "
+            f"expected: {_opt_rs_str(expect.get('expected'))}, "
+            f"enum_name: {_opt_rs_str(expect.get('enum'))}, "
+            f"value: {_opt_rs_str(expect.get('value'))}, "
+            f"info: {_opt_rs_u8(expect.get('info'))}, "
+            f"major: {_opt_rs_u8(expect.get('major'))} "
+            "}"
+        )
+    return ",\n".join(out)
+
+
 def test_rust_fail_closed_emits_fallible_from_cbor_and_i64_ints():
     rs = scaffold.rust_api(_FC, fail_closed=True)
     # from_cbor is fallible and never panics on input
@@ -601,5 +664,224 @@ def test_rust_fail_closed_runtime_decode_is_fail_closed(tmp_path):
     """))
 
     bin_path = tmp_path / "fail_closed"
+    subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
+    subprocess.run([str(bin_path)], check=True)
+
+
+def test_rust_fail_closed_replays_shared_i64_parity_corpus(tmp_path):
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        pytest.skip("rustc not available")
+
+    generated = tmp_path / "generated"
+    scaffold.emit(PARITY_SCHEMA, generated, langs=["rust"], services=[], runtime=True, fail_closed=True)
+    rust_dir = generated / "rust"
+    api_path = (rust_dir / "api.rs").as_posix()
+    cbor_path = (rust_dir / "cbor.rs").as_posix()
+    round_trip_rows, encode_fail_rows = _rust_parity_int_rows()
+    malformed_rows = _rust_parity_malformed_rows()
+
+    test_rs = tmp_path / "parity_vectors.rs"
+    test_rs.write_text(textwrap.dedent(f"""
+        extern crate alloc;
+        #[path = "{cbor_path}"]
+        mod cbor;
+        #[path = "{api_path}"]
+        mod api;
+
+        use api::{{IntBox, Mode}};
+        use cbor::{{encode, try_decode, DecodeError}};
+
+        struct IntRow {{
+            name: &'static str,
+            cbor: &'static str,
+            n: &'static str,
+            by_id: &'static [(&'static str, &'static str)],
+        }}
+
+        static ROUND_TRIP: &[IntRow] = &[
+{round_trip_rows}
+        ];
+
+        struct EncodeFailRow {{
+            name: &'static str,
+            value: &'static str,
+            tag: &'static str,
+        }}
+
+        static ENCODE_FAIL: &[EncodeFailRow] = &[
+{encode_fail_rows}
+        ];
+
+        struct MalformedRow {{
+            name: &'static str,
+            stage: &'static str,
+            schema: Option<&'static str>,
+            bytes: &'static str,
+            tag: &'static str,
+            key: Option<&'static str>,
+            expected: Option<&'static str>,
+            enum_name: Option<&'static str>,
+            value: Option<&'static str>,
+            info: Option<u8>,
+            major: Option<u8>,
+        }}
+
+        static MALFORMED: &[MalformedRow] = &[
+{malformed_rows}
+        ];
+
+        fn parse_i64(s: &str) -> i64 {{
+            s.parse::<i64>().unwrap_or_else(|e| panic!("bad i64 {{s}}: {{e}}"))
+        }}
+
+        fn unhex(s: &str) -> Vec<u8> {{
+            (0..s.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+                .collect()
+        }}
+
+        fn hexof(b: &[u8]) -> String {{
+            use std::fmt::Write as _;
+            b.iter().fold(String::new(), |mut s, x| {{
+                let _ = write!(s, "{{x:02x}}");
+                s
+            }})
+        }}
+
+        fn by_id(row: &IntRow) -> std::collections::BTreeMap<i64, i64> {{
+            row.by_id
+                .iter()
+                .map(|(k, v)| (parse_i64(k), parse_i64(v)))
+                .collect()
+        }}
+
+        fn assert_error(row: &MalformedRow, got: DecodeError) {{
+            match row.tag {{
+                "Truncated" => assert_eq!(got, DecodeError::Truncated, "{{}}", row.name),
+                "TrailingBytes" => assert_eq!(got, DecodeError::TrailingBytes, "{{}}", row.name),
+                "InvalidUtf8" => assert_eq!(got, DecodeError::InvalidUtf8, "{{}}", row.name),
+                "UnsupportedInfo" => assert_eq!(
+                    got,
+                    DecodeError::UnsupportedInfo(row.info.unwrap()),
+                    "{{}}",
+                    row.name
+                ),
+                "UnsupportedMajor" => assert_eq!(
+                    got,
+                    DecodeError::UnsupportedMajor(row.major.unwrap()),
+                    "{{}}",
+                    row.name
+                ),
+                "NonIntegerMapKey" => assert_eq!(got, DecodeError::NonIntegerMapKey, "{{}}", row.name),
+                "DuplicateMapKey" => assert_eq!(
+                    got,
+                    DecodeError::DuplicateMapKey(parse_i64(row.key.unwrap())),
+                    "{{}}",
+                    row.name
+                ),
+                "IntOverflow" => assert_eq!(got, DecodeError::IntOverflow, "{{}}", row.name),
+                "MissingKey" => assert_eq!(
+                    got,
+                    DecodeError::MissingKey(parse_i64(row.key.unwrap())),
+                    "{{}}",
+                    row.name
+                ),
+                "WrongType" => assert_eq!(
+                    got,
+                    DecodeError::WrongType {{ expected: row.expected.unwrap() }},
+                    "{{}}",
+                    row.name
+                ),
+                "UnknownEnum" => assert_eq!(
+                    got,
+                    DecodeError::UnknownEnum {{
+                        enum_name: row.enum_name.unwrap(),
+                        value: parse_i64(row.value.unwrap()),
+                    }},
+                    "{{}}",
+                    row.name
+                ),
+                other => panic!("unknown expected tag {{other}} for {{}}", row.name),
+            }}
+        }}
+
+        #[test]
+        fn round_trip_rows_match_shared_corpus() {{
+            assert_eq!(ROUND_TRIP.len(), 7);
+            for row in ROUND_TRIP {{
+                let expected_by_id = by_id(row);
+                let constructed = IntBox {{
+                    n: parse_i64(row.n),
+                    by_id: expected_by_id.clone(),
+                }};
+                assert_eq!(hexof(&encode(&constructed.to_cbor())), row.cbor, "encode {{}}", row.name);
+
+                let decoded_cbor = try_decode(&unhex(row.cbor)).unwrap_or_else(|e| {{
+                    panic!("decode {{}}: {{e:?}}", row.name)
+                }});
+                let decoded = IntBox::from_cbor(&decoded_cbor).unwrap_or_else(|e| {{
+                    panic!("from_cbor {{}}: {{e:?}}", row.name)
+                }});
+                assert_eq!(decoded.n, parse_i64(row.n), "n {{}}", row.name);
+                assert_eq!(decoded.by_id, expected_by_id, "by_id {{}}", row.name);
+                assert_eq!(hexof(&encode(&decoded.to_cbor())), row.cbor, "re-encode {{}}", row.name);
+            }}
+        }}
+
+        #[test]
+        fn encode_fail_rows_are_rejected_at_i64_construction_boundary() {{
+            assert_eq!(ENCODE_FAIL.len(), 3);
+            for row in ENCODE_FAIL {{
+                assert_eq!(row.tag, "IntOutOfSubset", "{{}}", row.name);
+                assert!(
+                    row.value.parse::<i64>().is_err(),
+                    "encode-fail value {{}} for {{}} should not fit Rust i64",
+                    row.value,
+                    row.name
+                );
+            }}
+        }}
+
+        #[test]
+        fn malformed_rows_return_expected_typed_errors() {{
+            assert_eq!(MALFORMED.len(), 12);
+            for row in MALFORMED {{
+                match row.stage {{
+                    "raw_decode" => {{
+                        let got = try_decode(&unhex(row.bytes)).expect_err(row.name);
+                        assert_error(row, got);
+                    }}
+                    "from_cbor" => {{
+                        let c = try_decode(&unhex(row.bytes)).unwrap_or_else(|e| {{
+                            panic!("raw decode {{}}: {{e:?}}", row.name)
+                        }});
+                        let got = match row.schema {{
+                            Some("IntBox") => IntBox::from_cbor(&c).map(|_| ()).expect_err(row.name),
+                            other => panic!("unsupported from_cbor schema {{other:?}} for {{}}", row.name),
+                        }};
+                        assert_error(row, got);
+                    }}
+                    "from_wire" => {{
+                        let c = try_decode(&unhex(row.bytes)).unwrap_or_else(|e| {{
+                            panic!("raw decode {{}}: {{e:?}}", row.name)
+                        }});
+                        let value = c.try_int().unwrap_or_else(|e| {{
+                            panic!("enum int {{}}: {{e:?}}", row.name)
+                        }});
+                        let got = match row.schema {{
+                            Some("Mode") => Mode::from_wire(value).map(|_| ()).expect_err(row.name),
+                            other => panic!("unsupported from_wire schema {{other:?}} for {{}}", row.name),
+                        }};
+                        assert_error(row, got);
+                    }}
+                    other => panic!("unknown malformed stage {{other}} for {{}}", row.name),
+                }}
+            }}
+        }}
+    """))
+
+    bin_path = tmp_path / "parity_vectors"
     subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
     subprocess.run([str(bin_path)], check=True)

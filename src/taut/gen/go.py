@@ -50,16 +50,16 @@ def _enc(t: TypeRef, expr: str) -> str:
     raise TypeError(t)
 
 
-def _dec(t: TypeRef, expr: str) -> str:
-    """A Go expression decoding the Cbor `expr` into the native (single) value."""
+def _try_dec(t: TypeRef, expr: str) -> str:
+    """A Go expression returning `(native_value, error)` for Cbor `expr`."""
     if isinstance(t, Scalar):
-        return {"int": f"{expr}.Int()", "str": f"{expr}.Text()",
-                "bytes": f"{expr}.Bytes()", "bool": f"{expr}.Bool()",
-                "float": f"{expr}.Float()"}[t.kind]
+        return {"int": f"{expr}.TryInt()", "str": f"{expr}.TryText()",
+                "bytes": f"{expr}.TryBytes()", "bool": f"{expr}.TryBool()",
+                "float": f"{expr}.TryFloat()"}[t.kind]
     if isinstance(t, EnumRef):
-        return f"{t.name}({expr}.Int())"
+        return f"Try{t.name}FromCbor({expr})"
     if isinstance(t, MsgRef):
-        return f"{t.name}FromCbor({expr})"
+        return f"Try{t.name}FromCbor({expr})"
     raise TypeError(t)
 
 
@@ -68,7 +68,41 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     for m, v in members.items():
         out.append(f"\t{name}{_pascal(m)} {name} = {v}")
     out.append(")")
+    out.append("")
+    out.append(f"func Try{name}FromWire(v int64) ({name}, error) {{")
+    out.append("\tswitch v {")
+    for m, v in members.items():
+        out.append(f"\tcase {v}:")
+        out.append(f"\t\treturn {name}{_pascal(m)}, nil")
+    out.append("\tdefault:")
+    out.append(f"\t\treturn 0, UnknownEnumError(\"{name}\", v)")
+    out.append("\t}")
+    out.append("}")
+    out.append("")
+    out.append(f"func {name}FromWire(v int64) {name} {{")
+    out.append(f"\tx, err := Try{name}FromWire(v)")
+    out.append("\tif err != nil { panic(err) }")
+    out.append("\treturn x")
+    out.append("}")
+    out.append("")
+    out.append(f"func Try{name}FromCbor(c Cbor) ({name}, error) {{")
+    out.append("\tv, err := c.TryInt()")
+    out.append("\tif err != nil { return 0, err }")
+    out.append(f"\treturn Try{name}FromWire(v)")
+    out.append("}")
+    out.append("")
+    out.append(f"func {name}FromCbor(c Cbor) {name} {{")
+    out.append(f"\tx, err := Try{name}FromCbor(c)")
+    out.append("\tif err != nil { panic(err) }")
+    out.append("\treturn x")
+    out.append("}")
     return out
+
+
+def _emit_try_assign(out: list[str], dst: str, t: TypeRef, expr: str) -> None:
+    out.append(f"\t\tx, err := {_try_dec(t, expr)}")
+    out.append("\t\tif err != nil { return v, err }")
+    out.append(f"\t\t{dst} = x")
 
 
 def _emit_message(msg, forward_compat: bool = False) -> list[str]:
@@ -107,26 +141,78 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     out.append("}")
     out.append("")
     # FromCbor
-    out.append(f"func {msg.name}FromCbor(c Cbor) {msg.name} {{")
+    out.append(f"func Try{msg.name}FromCbor(c Cbor) ({msg.name}, error) {{")
     out.append(f"\tvar v {msg.name}")
     for f in msg.fields:
         if f.transient:
             continue  # native-only; left as the Go zero value
         fn = f"v.{_pascal(f.name)}"
         if f.optional:
-            out.append(f"\tif fv := c.Get({f.tag}); !fv.IsNull() {{ t := {_dec(f.type, 'fv')}; {fn} = &t }}")
+            out.append("\t{")
+            out.append(f"\t\tfv, ok, err := c.Lookup({f.tag})")
+            out.append("\t\tif err != nil { return v, err }")
+            out.append("\t\tif ok && !fv.IsNull() {")
+            out.append(f"\t\t\tx, err := {_try_dec(f.type, 'fv')}")
+            out.append("\t\t\tif err != nil { return v, err }")
+            out.append(f"\t\t\t{fn} = &x")
+            out.append("\t\t}")
+            out.append("\t}")
         elif isinstance(f.type, ListOf):
-            out.append(f"\tfor _, e := range c.Get({f.tag}).Array() {{ {fn} = append({fn}, {_dec(f.type.elem, 'e')}) }}")
+            out.append("\t{")
+            out.append(f"\t\tfv, err := c.Require({f.tag})")
+            out.append("\t\tif err != nil { return v, err }")
+            out.append("\t\tarr, err := fv.TryArray()")
+            out.append("\t\tif err != nil { return v, err }")
+            out.append("\t\tfor _, e := range arr {")
+            out.append(f"\t\t\tx, err := {_try_dec(f.type.elem, 'e')}")
+            out.append("\t\t\tif err != nil { return v, err }")
+            out.append(f"\t\t\t{fn} = append({fn}, x)")
+            out.append("\t\t}")
+            out.append("\t}")
         elif isinstance(f.type, MapOf):
             kt, vt = _go_ty(f.type.key), _go_ty(f.type.value)
-            deck, decv = _dec(f.type.key, "e.Get(1)"), _dec(f.type.value, "e.Get(2)")
-            out.append(f"\t{fn} = map[{kt}]{vt}{{}}")
-            out.append(f"\tfor _, e := range c.Get({f.tag}).Array() {{ {fn}[{deck}] = {decv} }}")
+            out.append("\t{")
+            out.append(f"\t\tfv, err := c.Require({f.tag})")
+            out.append("\t\tif err != nil { return v, err }")
+            out.append("\t\tarr, err := fv.TryArray()")
+            out.append("\t\tif err != nil { return v, err }")
+            out.append(f"\t\t{fn} = map[{kt}]{vt}{{}}")
+            if isinstance(f.type.key, Scalar) and f.type.key.kind == "int":
+                out.append(f"\t\tseen := map[{kt}]bool{{}}")
+            out.append("\t\tfor _, e := range arr {")
+            out.append("\t\t\tkc, err := e.Require(1)")
+            out.append("\t\t\tif err != nil { return v, err }")
+            out.append(f"\t\t\tk, err := {_try_dec(f.type.key, 'kc')}")
+            out.append("\t\t\tif err != nil { return v, err }")
+            if isinstance(f.type.key, Scalar) and f.type.key.kind == "int":
+                out.append("\t\t\tif seen[k] { return v, &DecodeError{Tag: DecodeErrDuplicateMapKey, Key: k} }")
+                out.append("\t\t\tseen[k] = true")
+            out.append("\t\t\tvc, err := e.Require(2)")
+            out.append("\t\t\tif err != nil { return v, err }")
+            out.append(f"\t\t\tval, err := {_try_dec(f.type.value, 'vc')}")
+            out.append("\t\t\tif err != nil { return v, err }")
+            out.append(f"\t\t\t{fn}[k] = val")
+            out.append("\t\t}")
+            out.append("\t}")
         else:
-            out.append(f"\t{fn} = {_dec(f.type, f'c.Get({f.tag})')}")
+            out.append("\t{")
+            out.append(f"\t\tfv, err := c.Require({f.tag})")
+            out.append("\t\tif err != nil { return v, err }")
+            _emit_try_assign(out, fn, f.type, "fv")
+            out.append("\t}")
     if forward_compat:
         cond = " && ".join(f"kv.K != {f.tag}" for f in msg.wire_fields()) or "true"
-        out.append(f"\tfor _, kv := range c.MapEntries() {{ if {cond} {{ v.WireResidual = append(v.WireResidual, kv) }} }}")
+        out.append("\t{")
+        out.append("\t\tentries, err := c.TryMap()")
+        out.append("\t\tif err != nil { return v, err }")
+        out.append(f"\t\tfor _, kv := range entries {{ if {cond} {{ v.WireResidual = append(v.WireResidual, kv) }} }}")
+        out.append("\t}")
+    out.append("\treturn v, nil")
+    out.append("}")
+    out.append("")
+    out.append(f"func {msg.name}FromCbor(c Cbor) {msg.name} {{")
+    out.append(f"\tv, err := Try{msg.name}FromCbor(c)")
+    out.append("\tif err != nil { panic(err) }")
     out.append("\treturn v")
     out.append("}")
     return out

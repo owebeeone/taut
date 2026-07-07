@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "contract": "taut-codec-parity/i64/v0",
+  "schema_path": "ir/parity_int.taut.py",
+  "vectors": [
+    {
+      "name": "truncated-u64-argument",
+      "stage": "raw_decode",
+      "bytes": "1b0000",
+      "expect": {"tag": "Truncated"},
+      "why": "major-0 says eight argument bytes, only two are present"
+    },
+    {
+      "name": "trailing-byte",
+      "stage": "raw_decode",
+      "bytes": "0000",
+      "expect": {"tag": "TrailingBytes"},
+      "why": "one complete int followed by extra data"
+    },
+    {
+      "name": "invalid-utf8",
+      "stage": "raw_decode",
+      "bytes": "61ff",
+      "expect": {"tag": "InvalidUtf8"},
+      "why": "text string payload is not UTF-8"
+    },
+    {
+      "name": "reserved-additional-info-28",
+      "stage": "raw_decode",
+      "bytes": "1c",
+      "expect": {"tag": "UnsupportedInfo", "info": 28},
+      "why": "additional-info 28 is reserved by CBOR and outside taut's subset"
+    },
+    {
+      "name": "unsupported-major-tag",
+      "stage": "raw_decode",
+      "bytes": "c0",
+      "expect": {"tag": "UnsupportedMajor", "major": 6},
+      "why": "CBOR tags are outside taut's frozen subset"
+    },
+    {
+      "name": "non-integer-map-key",
+      "stage": "raw_decode",
+      "bytes": "a1617800",
+      "expect": {"tag": "NonIntegerMapKey"},
+      "why": "raw CBOR maps must use integer field-tag keys"
+    },
+    {
+      "name": "duplicate-map-key",
+      "stage": "raw_decode",
+      "bytes": "a201000101",
+      "expect": {"tag": "DuplicateMapKey", "key": 1},
+      "why": "same raw CBOR map key appears twice"
+    },
+    {
+      "name": "positive-int-overflow",
+      "stage": "raw_decode",
+      "bytes": "1b8000000000000000",
+      "expect": {"tag": "IntOverflow", "value": "9223372036854775808"},
+      "why": "CBOR major-0 value is just above i64::MAX"
+    },
+    {
+      "name": "negative-int-overflow",
+      "stage": "raw_decode",
+      "bytes": "3b8000000000000000",
+      "expect": {"tag": "IntOverflow", "value": "-9223372036854775809"},
+      "why": "CBOR major-1 value is just below i64::MIN"
+    },
+    {
+      "name": "missing-required-field",
+      "stage": "from_cbor",
+      "schema": "IntBox",
+      "bytes": "a10100",
+      "expect": {"tag": "MissingKey", "key": 2},
+      "why": "IntBox.by_id is required and absent"
+    },
+    {
+      "name": "wrong-type-field",
+      "stage": "from_cbor",
+      "schema": "IntBox",
+      "bytes": "a20161780280",
+      "expect": {"tag": "WrongType", "expected": "int"},
+      "why": "IntBox.n wants int, received text"
+    },
+    {
+      "name": "unknown-enum",
+      "stage": "from_wire",
+      "schema": "Mode",
+      "bytes": "1863",
+      "expect": {"tag": "UnknownEnum", "enum": "Mode", "value": "99"},
+      "why": "Mode has no member with wire value 99"
+    }
+  ]
+}

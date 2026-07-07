@@ -2,7 +2,8 @@
 with the vendored `cbor.js` runtime (CommonJS; emitted by `tautc gen --lang js
 --with-runtime`). Enums are frozen name->wire objects (a field holds the wire
 int); optionals are nullable; forward-compat residual rides along (cbor.js's
-encode sorts map keys). Integers are JS numbers (safe to 2^53, like the TS codec).
+encode sorts map keys). Codec integer fields are BigInt so every i64 value is
+exact.
 """
 
 from __future__ import annotations
@@ -29,24 +30,30 @@ def _enc(t: TypeRef, expr: str) -> str:
 
 def _dec(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
-        return {"int": f"{expr}.i", "str": f"{expr}.s",
-                "bytes": f"{expr}.b", "bool": f"({expr}.i !== 0)",
-                "float": f"{expr}.f"}[t.kind]
+        return {"int": f"expectInt({expr})", "str": f"expectText({expr})",
+                "bytes": f"expectBytes({expr})", "bool": f"expectBool({expr})",
+                "float": f"expectFloat({expr})"}[t.kind]
     if isinstance(t, EnumRef):
-        return f"{expr}.i"
+        return f"{t.name}FromCbor({expr})"
     if isinstance(t, MsgRef):
         return f"{t.name}.fromCbor({expr})"
     if isinstance(t, ListOf):
-        return f"{expr}.arr.map((e) => {_dec(t.elem, 'e')})"
+        return f"expectArray({expr}).map((e) => {_dec(t.elem, 'e')})"
     if isinstance(t, MapOf):
-        return (f"new Map({expr}.arr.map((e) => "
+        return (f"new Map(expectArray({expr}).map((e) => "
                 f"[{_dec(t.key, 'cget(e, 1)')}, {_dec(t.value, 'cget(e, 2)')}]))")
     raise TypeError(t)
 
 
 def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     body = ", ".join(f"{m}: {v}" for m, v in members.items())
-    return [f"const {name} = Object.freeze({{ {body} }});"]
+    values = ", ".join(str(v) for v in members.values())
+    return [
+        f"const {name} = Object.freeze({{ {body} }});",
+        f"const {name}Values = new Set([{values}]);",
+        f"function {name}FromWire(v) {{ return enumFromWire(v, \"{name}\", {name}Values); }}",
+        f"function {name}FromCbor(c) {{ return enumFromCbor(c, \"{name}\", {name}Values); }}",
+    ]
 
 
 def _emit_message(msg, forward_compat: bool = False) -> list[str]:
@@ -95,12 +102,14 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
 def emit_types(schema: Schema, forward_compat: bool = False) -> str:
     out = ['"use strict";',
            "// GENERATED native JS types + codec — do not edit. Pairs with cbor.js.",
-           'const { CInt, CFloat, CText, CBytes, CBool, CArr, CMap, CNull, cget, cmapEntries, isNull } = require("./cbor.js");',
+           'const { CInt, CFloat, CText, CBytes, CBool, CArr, CMap, CNull, cget, cmapEntries, isNull, expectInt, expectFloat, expectText, expectBytes, expectBool, expectArray, enumFromWire, enumFromCbor } = require("./cbor.js");',
            ""]
     names = []
     for e in schema.enums.values():
         out += _emit_enum(e.name, e.members) + [""]
         names.append(e.name)
+        names.append(f"{e.name}FromWire")
+        names.append(f"{e.name}FromCbor")
     for m in schema.messages.values():
         out += _emit_message(m, forward_compat) + [""]
         names.append(m.name)

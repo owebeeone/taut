@@ -113,6 +113,14 @@ def _cpp_rows(rows: list[dict], keys: list[str]) -> str:
     return ",\n".join(rendered)
 
 
+def _cpp_int_literal(value: str) -> str:
+    if value == "-9223372036854775808":
+        return "std::numeric_limits<long long>::min()"
+    if value == "9223372036854775807":
+        return "std::numeric_limits<long long>::max()"
+    return f"{value}LL"
+
+
 def test_cpp_codegen_threads_float_scalar_and_list():
     hpp = cpp_gen._emit_types(S_SCALAR_LIST)
     assert "double x;" in hpp
@@ -131,6 +139,359 @@ def test_cpp_codegen_threads_float_map_string_shape_only():
     assert "for (const auto& [k, v] : by_id)" in hpp
     assert "b.float_(v);" in hpp
     assert "v.by_id[e.get(1).as_int()] = e.get(2).as_float();" in hpp
+
+
+def test_cpp_codegen_emits_fallible_decode_path_for_i64_and_enums():
+    root = Path(__file__).resolve().parents[2]
+    schema = load_schema(root / "ir" / "parity_int.taut.py")
+    hpp = cpp_gen._emit_types(schema)
+    assert "inline constexpr DecodeResult<Mode> try_Mode_from_wire(long long v)" in hpp
+    assert 'DecodeError::unknown_enum("Mode", v)' in hpp
+    assert "static DecodeResult<IntBox> try_from_cbor(const Cbor& c)" in hpp
+    assert "auto __decoded_1 = (*__field_1.value).try_int();" in hpp
+    assert "auto __decoded_2_arr = (*__field_2.value).try_array();" in hpp
+    assert "auto __decoded_2_k = (*__decoded_2_key_cbor.value).try_int();" in hpp
+    assert "auto __decoded_2_v = (*__decoded_2_val_cbor.value).try_int();" in hpp
+
+
+def test_cpp_runtime_replays_shared_i64_parity_corpus(tmp_path):
+    root = Path(__file__).resolve().parents[2]
+    schema_path = root / "ir" / "parity_int.taut.py"
+    int_vectors = json.loads((root / "corpus" / "parity" / "int.vectors.json").read_text())["vectors"]
+    malformed = json.loads((root / "corpus" / "parity" / "malformed.vectors.json").read_text())["vectors"]
+
+    assert cli.main([
+        "gen", str(schema_path), "-o", str(tmp_path), "--lang", "cpp",
+        "--api-only", "--with-runtime",
+    ]) == 0
+
+    round_rows = []
+    encode_rows = []
+    for row in int_vectors:
+        value = row["value"]
+        if row["kind"] == "round_trip":
+            pairs = value["by_id"]
+            by_id = "{}" if not pairs else "{" + ", ".join(
+                "{" + _cpp_int_literal(k) + ", " + _cpp_int_literal(v) + "}" for k, v in pairs
+            ) + "}"
+            round_rows.append(
+                "{"
+                + ", ".join([
+                    _cpp_string_literal(row["name"]),
+                    _cpp_int_literal(value["n"]),
+                    by_id,
+                    _cpp_string_literal(row["cbor"]),
+                ])
+                + "}"
+            )
+        elif row["kind"] == "encode_fail":
+            encode_rows.append(
+                "{"
+                + ", ".join([
+                    _cpp_string_literal(row["name"]),
+                    _cpp_string_literal(value["n"]),
+                    _cpp_string_literal(row["expect"]["tag"]),
+                ])
+                + "}"
+            )
+
+    mal_rows = []
+    for row in malformed:
+        expect = row["expect"]
+        mal_rows.append(
+            "{"
+            + ", ".join([
+                _cpp_string_literal(row["name"]),
+                _cpp_string_literal(row["stage"]),
+                _cpp_string_literal(row.get("schema", "")),
+                _cpp_string_literal(row["bytes"]),
+                _cpp_string_literal(expect["tag"]),
+                "true" if "key" in expect else "false",
+                _cpp_int_literal(str(expect.get("key", "0"))),
+                "true" if "info" in expect else "false",
+                str(expect.get("info", 0)),
+                "true" if "major" in expect else "false",
+                str(expect.get("major", 0)),
+                _cpp_string_literal(expect.get("expected", "")),
+                _cpp_string_literal(expect.get("enum", "")),
+                _cpp_string_literal(str(expect.get("value", ""))),
+            ])
+            + "}"
+        )
+
+    source = textwrap.dedent("""\
+        #include "api.hpp"
+
+        #include <cstdlib>
+        #include <cstdint>
+        #include <iostream>
+        #include <limits>
+        #include <map>
+        #include <string>
+        #include <string_view>
+
+        struct RoundRow {
+            const char* name;
+            long long n;
+            std::map<long long, long long> by_id;
+            const char* cbor;
+        };
+
+        struct EncodeFailRow {
+            const char* name;
+            const char* n;
+            const char* tag;
+        };
+
+        struct MalRow {
+            const char* name;
+            const char* stage;
+            const char* schema;
+            const char* bytes;
+            const char* tag;
+            bool has_key;
+            long long key;
+            bool has_info;
+            unsigned info;
+            bool has_major;
+            unsigned major;
+            const char* expected;
+            const char* enum_name;
+            const char* value;
+        };
+
+        static const RoundRow round_rows[] = {
+        ROUND_ROWS
+        };
+
+        static const EncodeFailRow encode_fail_rows[] = {
+        ENCODE_ROWS
+        };
+
+        static const MalRow malformed_rows[] = {
+        MAL_ROWS
+        };
+
+        int hex_nibble(char c) {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            std::abort();
+        }
+
+        std::string from_hex(std::string_view hex) {
+            std::string out;
+            out.reserve(hex.size() / 2);
+            for (std::size_t i = 0; i < hex.size(); i += 2) {
+                out.push_back(static_cast<char>((hex_nibble(hex[i]) << 4) | hex_nibble(hex[i + 1])));
+            }
+            return out;
+        }
+
+        std::string_view view(const std::string& s) {
+            return std::string_view(s.data(), s.size());
+        }
+
+        std::string to_hex(std::string_view data) {
+            static constexpr char digits[] = "0123456789abcdef";
+            std::string out;
+            out.reserve(data.size() * 2);
+            for (unsigned char byte : data) {
+                out.push_back(digits[byte >> 4]);
+                out.push_back(digits[byte & 0x0f]);
+            }
+            return out;
+        }
+
+        std::string buf_hex(const taut::Buf& b) {
+            return to_hex(std::string_view(reinterpret_cast<const char*>(b.d), b.n));
+        }
+
+        taut::DecodeErrorTag tag_from_name(std::string_view name) {
+            using T = taut::DecodeErrorTag;
+            if (name == "Truncated") return T::Truncated;
+            if (name == "TrailingBytes") return T::TrailingBytes;
+            if (name == "InvalidUtf8") return T::InvalidUtf8;
+            if (name == "UnsupportedInfo") return T::UnsupportedInfo;
+            if (name == "UnsupportedMajor") return T::UnsupportedMajor;
+            if (name == "NonIntegerMapKey") return T::NonIntegerMapKey;
+            if (name == "IntOverflow") return T::IntOverflow;
+            if (name == "DuplicateMapKey") return T::DuplicateMapKey;
+            if (name == "MissingKey") return T::MissingKey;
+            if (name == "WrongType") return T::WrongType;
+            if (name == "UnknownEnum") return T::UnknownEnum;
+            std::abort();
+        }
+
+        const char* tag_name(taut::DecodeErrorTag tag) {
+            using T = taut::DecodeErrorTag;
+            switch (tag) {
+                case T::Truncated: return "Truncated";
+                case T::TrailingBytes: return "TrailingBytes";
+                case T::InvalidUtf8: return "InvalidUtf8";
+                case T::UnsupportedInfo: return "UnsupportedInfo";
+                case T::UnsupportedMajor: return "UnsupportedMajor";
+                case T::NonIntegerMapKey: return "NonIntegerMapKey";
+                case T::IntOverflow: return "IntOverflow";
+                case T::DuplicateMapKey: return "DuplicateMapKey";
+                case T::MissingKey: return "MissingKey";
+                case T::WrongType: return "WrongType";
+                case T::UnknownEnum: return "UnknownEnum";
+            }
+            return "?";
+        }
+
+        bool overflow_payload_matches(const taut::DecodeError& error, std::string_view value) {
+            if (value.empty()) return true;
+            const std::uint64_t just_outside = 1ULL << 63;
+            if (value == "9223372036854775808") {
+                return !error.negative_overflow && error.unsigned_value == just_outside;
+            }
+            if (value == "-9223372036854775809") {
+                return error.negative_overflow && error.unsigned_value == just_outside;
+            }
+            return false;
+        }
+
+        bool error_matches(const taut::DecodeError& error, const MalRow& row) {
+            if (error.tag != tag_from_name(row.tag)) return false;
+            using T = taut::DecodeErrorTag;
+            switch (error.tag) {
+                case T::UnsupportedInfo:
+                    return !row.has_info || error.info == row.info;
+                case T::UnsupportedMajor:
+                    return !row.has_major || error.major == row.major;
+                case T::DuplicateMapKey:
+                case T::MissingKey:
+                    return !row.has_key || error.key == row.key;
+                case T::WrongType:
+                    return std::string_view(row.expected).empty()
+                        || std::string_view(error.expected ? error.expected : "") == row.expected;
+                case T::UnknownEnum:
+                    return (std::string_view(row.enum_name).empty()
+                            || std::string_view(error.enum_name ? error.enum_name : "") == row.enum_name)
+                        && (std::string_view(row.value).empty() || std::to_string(error.value) == row.value);
+                case T::IntOverflow:
+                    return overflow_payload_matches(error, row.value);
+                default:
+                    return true;
+            }
+        }
+
+        bool outside_i64(std::string_view value) {
+            return value == "9223372036854775808"
+                || value == "-9223372036854775809"
+                || value == "18446744073709551615";
+        }
+
+        int mismatches = 0;
+
+        void fail(std::string_view note, std::string_view got, std::string_view expect) {
+            ++mismatches;
+            std::cerr << "mismatch " << note << "\\n  got    " << got << "\\n  expect " << expect << "\\n";
+        }
+
+        void expect_error(const MalRow& row, const taut::DecodeError& error) {
+            if (!error_matches(error, row)) fail(row.name, tag_name(error.tag), row.tag);
+        }
+
+        void run_round_trip() {
+            for (const auto& row : round_rows) {
+                taut::IntBox box{row.n, row.by_id};
+                taut::Buf b;
+                box.to_cbor(b);
+                std::string got = buf_hex(b);
+                if (got != row.cbor) fail(row.name, got, row.cbor);
+
+                std::string wire = from_hex(row.cbor);
+                auto decoded = taut::try_decode(view(wire));
+                if (!decoded) {
+                    fail(row.name, tag_name(decoded.error.tag), "valid decode");
+                    continue;
+                }
+                auto msg = taut::IntBox::try_from_cbor(decoded.value);
+                if (!msg) {
+                    fail(row.name, tag_name(msg.error.tag), "valid IntBox");
+                    continue;
+                }
+                if (msg.value.n != row.n || msg.value.by_id != row.by_id) {
+                    fail(row.name, "decoded value mismatch", "same native value");
+                }
+                taut::Buf round;
+                msg.value.to_cbor(round);
+                got = buf_hex(round);
+                if (got != row.cbor) fail(row.name, got, row.cbor);
+            }
+        }
+
+        void run_encode_fail() {
+            for (const auto& row : encode_fail_rows) {
+                if (std::string_view(row.tag) != "IntOutOfSubset") {
+                    fail(row.name, row.tag, "IntOutOfSubset");
+                }
+                if (!outside_i64(row.n)) {
+                    fail(row.name, row.n, "outside native long long");
+                }
+            }
+        }
+
+        void run_malformed() {
+            for (const auto& row : malformed_rows) {
+                std::string bytes = from_hex(row.bytes);
+                if (std::string_view(row.stage) == "raw_decode") {
+                    auto decoded = taut::try_decode(view(bytes));
+                    if (decoded) fail(row.name, "decoded", row.tag);
+                    else expect_error(row, decoded.error);
+                } else if (std::string_view(row.stage) == "from_cbor") {
+                    auto decoded = taut::try_decode(view(bytes));
+                    if (!decoded) {
+                        fail(row.name, tag_name(decoded.error.tag), "valid raw CBOR before from_cbor");
+                    } else if (std::string_view(row.schema) == "IntBox") {
+                        auto msg = taut::IntBox::try_from_cbor(decoded.value);
+                        if (msg) fail(row.name, "decoded IntBox", row.tag);
+                        else expect_error(row, msg.error);
+                    } else {
+                        fail(row.name, row.schema, "known from_cbor schema");
+                    }
+                } else if (std::string_view(row.stage) == "from_wire") {
+                    auto decoded = taut::try_decode(view(bytes));
+                    if (!decoded) {
+                        fail(row.name, tag_name(decoded.error.tag), "valid enum wire int");
+                        continue;
+                    }
+                    auto wire = decoded.value.try_int();
+                    if (!wire) {
+                        fail(row.name, tag_name(wire.error.tag), "valid enum wire int");
+                        continue;
+                    }
+                    if (std::string_view(row.schema) == "Mode") {
+                        auto mode = taut::try_Mode_from_wire(wire.value);
+                        if (mode) fail(row.name, "decoded Mode", row.tag);
+                        else expect_error(row, mode.error);
+                    } else {
+                        fail(row.name, row.schema, "known from_wire schema");
+                    }
+                } else {
+                    fail(row.name, row.stage, "known stage");
+                }
+            }
+        }
+
+        int main() {
+            run_round_trip();
+            run_encode_fail();
+            run_malformed();
+            if (mismatches != 0) return 1;
+            std::cout << "C++ parity corpus mismatches=0\\n";
+            return 0;
+        }
+    """)
+    source = source.replace("ROUND_ROWS", ",\n".join(round_rows))
+    source = source.replace("ENCODE_ROWS", ",\n".join(encode_rows))
+    source = source.replace("MAL_ROWS", ",\n".join(mal_rows))
+
+    run = _compile_and_run_cpp(tmp_path, source, "cpp_i64_parity")
+    assert "C++ parity corpus mismatches=0" in run.stdout
 
 
 def test_cpp_generated_scalar_list_float_static_asserts_cxx20(tmp_path):

@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "contract": "taut-codec-parity/i64/v0",
+  "schema_path": "ir/parity_int.taut.py",
+  "vectors": [
+    {
+      "name": "zero",
+      "kind": "round_trip",
+      "message": "IntBox",
+      "value": {"n": "0", "by_id": []},
+      "cbor": "a201000280"
+    },
+    {
+      "name": "minus-one",
+      "kind": "round_trip",
+      "message": "IntBox",
+      "value": {"n": "-1", "by_id": []},
+      "cbor": "a201200280"
+    },
+    {
+      "name": "safe-int-max",
+      "kind": "round_trip",
+      "message": "IntBox",
+      "value": {"n": "9007199254740991", "by_id": []},
+      "cbor": "a2011b001fffffffffffff0280"
+    },
+    {
+      "name": "safe-int-plus-one",
+      "kind": "round_trip",
+      "message": "IntBox",
+      "value": {"n": "9007199254740992", "by_id": []},
+      "cbor": "a2011b00200000000000000280"
+    },
+    {
+      "name": "i64-max",
+      "kind": "round_trip",
+      "message": "IntBox",
+      "value": {"n": "9223372036854775807", "by_id": []},
+      "cbor": "a2011b7fffffffffffffff0280"
+    },
+    {
+      "name": "i64-min",
+      "kind": "round_trip",
+      "message": "IntBox",
+      "value": {"n": "-9223372036854775808", "by_id": []},
+      "cbor": "a2013b7fffffffffffffff0280"
+    },
+    {
+      "name": "map-key-i64-bounds",
+      "kind": "round_trip",
+      "message": "IntBox",
+      "value": {
+        "n": "0",
+        "by_id": [
+          ["-9223372036854775808", "-1"],
+          ["9223372036854775807", "1"]
+        ]
+      },
+      "cbor": "a201000282a2013b7fffffffffffffff0220a2011b7fffffffffffffff0201"
+    },
+    {
+      "name": "encode-too-large-positive",
+      "kind": "encode_fail",
+      "message": "IntBox",
+      "value": {"n": "9223372036854775808", "by_id": []},
+      "expect": {"tag": "IntOutOfSubset"}
+    },
+    {
+      "name": "encode-too-large-negative",
+      "kind": "encode_fail",
+      "message": "IntBox",
+      "value": {"n": "-9223372036854775809", "by_id": []},
+      "expect": {"tag": "IntOutOfSubset"}
+    },
+    {
+      "name": "encode-u64-max",
+      "kind": "encode_fail",
+      "message": "IntBox",
+      "value": {"n": "18446744073709551615", "by_id": []},
+      "expect": {"tag": "IntOutOfSubset"}
+    }
+  ]
+}

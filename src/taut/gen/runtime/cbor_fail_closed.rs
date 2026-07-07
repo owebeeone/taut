@@ -51,6 +51,8 @@ pub enum DecodeError {
     UnsupportedMajor(u8),
     /// A map key that was not a (frozen-subset) integer.
     NonIntegerMapKey,
+    /// The same integer key appeared twice in one CBOR map.
+    DuplicateMapKey(i64),
     /// A CBOR integer on the wire outside the frozen `i64` subset — a major-0
     /// value above `i64::MAX`, a major-1 value below `i64::MIN`, or a map key
     /// wider than `i64`. Rejected here rather than silently wrapped or widened.
@@ -80,6 +82,7 @@ impl core::fmt::Display for DecodeError {
             DecodeError::UnsupportedInfo(i) => write!(f, "unsupported additional-info {i}"),
             DecodeError::UnsupportedMajor(m) => write!(f, "unsupported major type {m}"),
             DecodeError::NonIntegerMapKey => write!(f, "non-integer map key"),
+            DecodeError::DuplicateMapKey(k) => write!(f, "duplicate map key {k}"),
             DecodeError::IntOverflow => write!(f, "integer out of range for target"),
             DecodeError::MissingKey(k) => write!(f, "missing map key {k}"),
             DecodeError::WrongType { expected } => write!(f, "expected CBOR {expected}"),
@@ -548,6 +551,9 @@ fn dec(data: &[u8], off: usize) -> Result<(Cbor, usize), DecodeError> {
                     Cbor::Int(i) => i,
                     _ => return Err(DecodeError::NonIntegerMapKey),
                 };
+                if m.iter().any(|(existing, _)| *existing == ki) {
+                    return Err(DecodeError::DuplicateMapKey(ki));
+                }
                 m.push((ki, v));
                 o = o3;
             }

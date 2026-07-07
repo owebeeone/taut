@@ -23,6 +23,9 @@ RAZEL = load_schema(IR_PATH.parent / "razel.taut.py")
 RESEXT = load_schema(rb.IR_PATH)
 ROOT = Path(__file__).resolve().parents[2]
 EXT_JAVA = ROOT / "src" / "taut" / "gen" / "runtime" / "Ext.java"
+PARITY_IR = ROOT / "ir" / "parity_int.taut.py"
+PARITY_INT = ROOT / "corpus" / "parity" / "int.vectors.json"
+PARITY_MALFORMED = ROOT / "corpus" / "parity" / "malformed.vectors.json"
 FUZZ_SEED = 55004
 FUZZ_ITERS = 1000
 FLOATY = mk(Msg("Floaty",
@@ -140,6 +143,46 @@ def _write_resext_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
     return residual, ext_vectors, fuzz
 
 
+def _write_parity_inputs(tmp_path: Path) -> tuple[Path, Path]:
+    int_rows = tmp_path / "parity-int.tsv"
+    malformed_rows = tmp_path / "parity-malformed.tsv"
+
+    int_data = json.loads(PARITY_INT.read_text())
+    rows = []
+    for row in int_data["vectors"]:
+        value = row["value"]
+        by_id = ";".join(f"{k}={v}" for k, v in value.get("by_id", [])) or "-"
+        rows.append([
+            row["kind"],
+            row["name"],
+            value["n"],
+            by_id,
+            row.get("cbor", "-"),
+            row.get("expect", {}).get("tag", "-"),
+        ])
+    _hex_rows(int_rows, rows)
+
+    malformed_data = json.loads(PARITY_MALFORMED.read_text())
+    rows = []
+    for row in malformed_data["vectors"]:
+        expect = row["expect"]
+        rows.append([
+            row["name"],
+            row["stage"],
+            row.get("schema", "-"),
+            row["bytes"],
+            expect["tag"],
+            str(expect.get("key", "-")),
+            str(expect.get("expected", "-")),
+            str(expect.get("enum", "-")),
+            str(expect.get("value", "-")),
+            str(expect.get("info", "-")),
+            str(expect.get("major", "-")),
+        ])
+    _hex_rows(malformed_rows, rows)
+    return int_rows, malformed_rows
+
+
 def _generate_resext_java(tmp_path: Path) -> Path:
     out = tmp_path / "generated"
     rc = cli.main([
@@ -159,6 +202,166 @@ def _generate_resext_java(tmp_path: Path) -> Path:
     assert (java_dir / "Cbor.java").is_file()
     assert (java_dir / "Ext.java").is_file()
     return java_dir
+
+
+def _generate_parity_java(tmp_path: Path) -> Path:
+    out = tmp_path / "parity-generated"
+    rc = cli.main([
+        "gen",
+        str(PARITY_IR),
+        "-o",
+        str(out),
+        "-l",
+        "java",
+        "--api-only",
+        "--with-runtime",
+    ])
+    assert rc == 0
+    java_dir = out / "java"
+    assert (java_dir / "api.java").is_file()
+    assert (java_dir / "Cbor.java").is_file()
+    return java_dir
+
+
+PARITY_HARNESS = r"""
+package taut;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public final class JavaParityCorpus {
+    private static int roundTripRows = 0;
+    private static int encodeFailRows = 0;
+    private static int malformedRows = 0;
+
+    public static void main(String[] args) throws Exception {
+        runInt(Path.of(args[0]));
+        runMalformed(Path.of(args[1]));
+        System.out.println("ok round_trip=" + roundTripRows
+                + " encode_fail=" + encodeFailRows
+                + " malformed=" + malformedRows
+                + " mismatches=0");
+    }
+
+    private static void runInt(Path path) throws Exception {
+        for (String line : Files.readAllLines(path)) {
+            if (line.isBlank()) continue;
+            String[] row = line.split("\t", -1);
+            String kind = row[0];
+            String name = row[1];
+            String n = row[2];
+            if (kind.equals("round_trip")) {
+                IntBox box = new IntBox();
+                box.n = Long.parseLong(n);
+                box.by_id = parseMap(row[3]);
+                checkHex(Cbor.encode(box.toCbor()), row[4], "encode " + name);
+
+                IntBox decoded = IntBox.fromCbor(Cbor.decode(fromHex(row[4])));
+                check(decoded.n == box.n, "decode n " + name);
+                check(decoded.by_id.equals(box.by_id), "decode map " + name);
+                checkHex(Cbor.encode(decoded.toCbor()), row[4], "re-encode " + name);
+                roundTripRows++;
+            } else if (kind.equals("encode_fail")) {
+                expectNumberFormat(() -> Long.parseLong(n), "encode_fail native guard " + name);
+                encodeFailRows++;
+            } else {
+                throw new AssertionError("unknown int vector kind " + kind);
+            }
+        }
+    }
+
+    private static void runMalformed(Path path) throws Exception {
+        for (String line : Files.readAllLines(path)) {
+            if (line.isBlank()) continue;
+            String[] row = line.split("\t", -1);
+            String name = row[0];
+            String stage = row[1];
+            String schema = row[2];
+            byte[] bytes = fromHex(row[3]);
+            if (stage.equals("raw_decode")) {
+                expectDecode(() -> Cbor.decode(bytes), row, name);
+            } else if (stage.equals("from_cbor") && schema.equals("IntBox")) {
+                Cbor c = Cbor.decode(bytes);
+                expectDecode(() -> IntBox.fromCbor(c), row, name);
+            } else if (stage.equals("from_wire") && schema.equals("Mode")) {
+                long wire = Cbor.decode(bytes).asInt();
+                expectDecode(() -> Mode.fromWire(wire), row, name);
+            } else {
+                throw new AssertionError("unsupported malformed vector " + name);
+            }
+            malformedRows++;
+        }
+    }
+
+    private static Map<Long, Long> parseMap(String text) {
+        Map<Long, Long> out = new LinkedHashMap<>();
+        if (text.equals("-")) return out;
+        for (String item : text.split(";")) {
+            String[] pair = item.split("=", -1);
+            out.put(Long.parseLong(pair[0]), Long.parseLong(pair[1]));
+        }
+        return out;
+    }
+
+    private static void expectDecode(CheckedRunnable fn, String[] row, String name) {
+        try {
+            fn.run();
+        } catch (Cbor.DecodeError err) {
+            checkError(err, row, name);
+            return;
+        }
+        throw new AssertionError(name + " did not throw DecodeError");
+    }
+
+    private static void checkError(Cbor.DecodeError err, String[] row, String name) {
+        String tag = row[4];
+        check(err.tag.name().equals(tag), name + " tag " + err.tag + " expected " + tag);
+        if (!row[5].equals("-")) check(err.key != null && err.key == Long.parseLong(row[5]), name + " key");
+        if (!row[6].equals("-")) check(row[6].equals(err.expected), name + " expected type");
+        if (!row[7].equals("-")) check(row[7].equals(err.enumName), name + " enum");
+        if (!row[8].equals("-")) check(row[8].equals(err.value), name + " value");
+        if (!row[9].equals("-")) check(err.info != null && err.info == Integer.parseInt(row[9]), name + " info");
+        if (!row[10].equals("-")) check(err.major != null && err.major == Integer.parseInt(row[10]), name + " major");
+    }
+
+    private static void expectNumberFormat(CheckedRunnable fn, String label) {
+        try {
+            fn.run();
+        } catch (NumberFormatException ok) {
+            return;
+        }
+        throw new AssertionError(label + " did not reject out-of-long value");
+    }
+
+    private static void checkHex(byte[] got, String expect, String label) {
+        check(toHex(got).equals(expect), label + " got " + toHex(got) + " expected " + expect);
+    }
+
+    private static void check(boolean ok, String msg) {
+        if (!ok) throw new AssertionError(msg);
+    }
+
+    private static byte[] fromHex(String hex) {
+        byte[] out = new byte[hex.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+        }
+        return out;
+    }
+
+    private static String toHex(byte[] bytes) {
+        StringBuilder out = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) out.append(String.format("%02x", b & 0xff));
+        return out.toString();
+    }
+
+    private interface CheckedRunnable {
+        void run();
+    }
+}
+"""
 
 
 RESEXT_HARNESS = r"""
@@ -353,10 +556,10 @@ def test_float_scalar_codegen_shape():
     assert "m.add(new KV(2, maybe != null ? Cbor.float_(maybe) : Cbor.NUL));" in s
     assert "Cbor.arr(xs.stream().map(e -> Cbor.float_(e)).toList())" in s
     assert "new KV(2, Cbor.float_(e.getValue()))" in s
-    assert "v.x = c.get(1).d;" in s
-    assert "v.maybe = f.isNull() ? null : f.d;" in s
-    assert "c.get(3).arr.stream().map(e -> e.d).toList()" in s
-    assert "e -> e.get(2).d" in s
+    assert "v.x = c.get(1).asFloat();" in s
+    assert "v.maybe = f.isNull() ? null : f.asFloat();" in s
+    assert "c.get(3).asArray().stream().map(e -> e.asFloat()).toList()" in s
+    assert "e -> e.get(2).asFloat()" in s
 
 
 def test_forward_compat_residual():
@@ -375,6 +578,39 @@ def test_ext_runtime_public_api_source_shape():
     assert "public static byte[] extClear(byte[] host, long tag)" in src
     assert src.index("checkTag(tag);") < src.index("decodeHostMap(host);")
     assert "root.kind != Cbor.MAP" in src
+
+
+def test_java_i64_fail_closed_shared_parity_corpus(tmp_path):
+    javac, java_bin = _find_java_tools()
+    java_dir = _generate_parity_java(tmp_path)
+    int_rows, malformed_rows = _write_parity_inputs(tmp_path)
+
+    harness = java_dir / "JavaParityCorpus.java"
+    harness.write_text(textwrap.dedent(PARITY_HARNESS).strip() + "\n")
+
+    classes = tmp_path / "classes"
+    classes.mkdir()
+    subprocess.run([
+        javac,
+        "-d",
+        str(classes),
+        str(java_dir / "Cbor.java"),
+        str(java_dir / "api.java"),
+        str(harness),
+    ], check=True, cwd=ROOT, capture_output=True, text=True)
+
+    parity = subprocess.run([
+        java_bin,
+        "-cp",
+        str(classes),
+        "taut.JavaParityCorpus",
+        str(int_rows),
+        str(malformed_rows),
+    ], check=True, cwd=ROOT, capture_output=True, text=True)
+    assert "round_trip=7" in parity.stdout
+    assert "encode_fail=3" in parity.stdout
+    assert "malformed=12" in parity.stdout
+    assert "mismatches=0" in parity.stdout
 
 
 def test_java_resext_runtime_parity_invalid_cases_public_access_and_fuzz(tmp_path):

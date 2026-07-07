@@ -18,12 +18,16 @@ from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec
 
+ROOT = IR_PATH.parent.parent
 RAZEL = load_schema(IR_PATH.parent / "razel.taut.py")
 RESEXT = load_schema(rb.IR_PATH)
 FLOATY = mk(Msg("Floaty",
                 F("x", 1, FLOAT),
                 F("xs", 2, List(FLOAT)),
                 F("by_id", 3, Map(INT, FLOAT))))
+PARITY_IR = ROOT / "ir" / "parity_int.taut.py"
+PARITY_INT_VECTORS = ROOT / "corpus" / "parity" / "int.vectors.json"
+PARITY_MALFORMED_VECTORS = ROOT / "corpus" / "parity" / "malformed.vectors.json"
 RESEXT_FUZZ_SEED = 0x55_0004
 
 
@@ -53,8 +57,109 @@ def test_float_scalar_shape():
     assert "[1, CFloat(this.x)]" in s
     assert "CArr(this.xs.map((e) => CFloat(e)))" in s
     assert "CMap([[1, CInt(k)], [2, CFloat(v)]])" in s
-    assert "v.x = cget(c, 1).f;" in s
-    assert "v.xs = cget(c, 2).arr.map((e) => e.f);" in s
+    assert "v.x = expectFloat(cget(c, 1));" in s
+    assert "v.xs = expectArray(cget(c, 2)).map((e) => expectFloat(e));" in s
+
+
+def test_js_i64_bigint_and_fail_closed_parity(tmp_path):
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+
+    cli.main([
+        "gen", str(PARITY_IR), "-o", str(tmp_path), "--lang", "js",
+        "--api-only", "--with-runtime",
+    ])
+    js_dir = tmp_path / "js"
+    assert (js_dir / "api.js").exists()
+    assert (js_dir / "cbor.js").exists()
+
+    int_vectors = json.loads(PARITY_INT_VECTORS.read_text())
+    malformed_vectors = json.loads(PARITY_MALFORMED_VECTORS.read_text())
+    harness = js_dir / "parity_i64.test.js"
+    harness.write_text(textwrap.dedent(f"""
+        "use strict";
+
+        const test = require("node:test");
+        const assert = require("node:assert/strict");
+        const {{ IntBox, ModeFromCbor }} = require("./api.js");
+        const {{ DecodeError, EncodeError, decode, encode }} = require("./cbor.js");
+
+        const intVectors = {json.dumps(int_vectors)};
+        const malformedVectors = {json.dumps(malformed_vectors)};
+
+        function bytesFromHex(hex) {{
+          const out = new Uint8Array(hex.length / 2);
+          for (let i = 0; i < out.length; i++) {{
+            out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+          }}
+          return out;
+        }}
+
+        function hexFromBytes(bytes) {{
+          return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+        }}
+
+        function intBoxFromVector(row) {{
+          return new IntBox({{
+            n: BigInt(row.value.n),
+            by_id: new Map(row.value.by_id.map(([k, v]) => [BigInt(k), BigInt(v)])),
+          }});
+        }}
+
+        function vectorEntries(box) {{
+          return Array.from(box.by_id.entries(), ([k, v]) => [k.toString(), v.toString()]);
+        }}
+
+        function checkError(err, row) {{
+          assert.ok(err instanceof DecodeError || err instanceof EncodeError, `${{row.name}}: typed error`);
+          assert.equal(err.tag, row.expect.tag, `${{row.name}}: tag`);
+          for (const [key, value] of Object.entries(row.expect)) {{
+            if (key === "tag") continue;
+            assert.equal(String(err[key]), String(value), `${{row.name}}: payload ${{key}}`);
+          }}
+          return true;
+        }}
+
+        test("round-trip i64 vectors use bigint and match canonical CBOR", () => {{
+          for (const row of intVectors.vectors.filter((r) => r.kind === "round_trip")) {{
+            const box = intBoxFromVector(row);
+            const encoded = hexFromBytes(encode(box.toCbor()));
+            assert.equal(encoded, row.cbor, `${{row.name}}: encode`);
+
+            const decoded = IntBox.fromCbor(decode(bytesFromHex(row.cbor)));
+            assert.equal(typeof decoded.n, "bigint", `${{row.name}}: n carrier`);
+            assert.equal(decoded.n, BigInt(row.value.n), `${{row.name}}: n`);
+            assert.deepEqual(vectorEntries(decoded), row.value.by_id, `${{row.name}}: by_id`);
+            assert.equal(hexFromBytes(encode(decoded.toCbor())), row.cbor, `${{row.name}}: re-encode`);
+          }}
+        }});
+
+        test("out-of-subset encode vectors are typed errors", () => {{
+          for (const row of intVectors.vectors.filter((r) => r.kind === "encode_fail")) {{
+            assert.throws(() => encode(intBoxFromVector(row).toCbor()), (err) => checkError(err, row), row.name);
+          }}
+        }});
+
+        test("malformed decode vectors are typed fail-closed errors", () => {{
+          for (const row of malformedVectors.vectors) {{
+            const bytes = bytesFromHex(row.bytes);
+            let fn;
+            if (row.stage === "raw_decode") {{
+              fn = () => decode(bytes);
+            }} else if (row.stage === "from_cbor") {{
+              fn = () => IntBox.fromCbor(decode(bytes));
+            }} else if (row.stage === "from_wire") {{
+              fn = () => ModeFromCbor(decode(bytes));
+            }} else {{
+              throw new Error(`unknown stage ${{row.stage}}`);
+            }}
+            assert.throws(fn, (err) => checkError(err, row), row.name);
+          }}
+        }});
+    """))
+
+    subprocess.run([node, "--test", str(harness)], check=True)
 
 
 def test_js_float_runtime_parity():

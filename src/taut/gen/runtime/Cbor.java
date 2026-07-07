@@ -4,10 +4,15 @@
 // Hand-rolled, JDK only.
 package taut;
 
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class Cbor {
     public static final int INT = 0, BYTES = 1, TEXT = 2, ARR = 3, MAP = 4, BOOL = 5, NULL = 6, FLOAT = 7;
@@ -18,6 +23,157 @@ public final class Cbor {
     public final byte[] b;
     public final List<Cbor> arr;
     public final List<KV> map;
+
+    public enum DecodeTag {
+        Truncated,
+        TrailingBytes,
+        InvalidUtf8,
+        UnsupportedInfo,
+        UnsupportedMajor,
+        NonIntegerMapKey,
+        IntOverflow,
+        DuplicateMapKey,
+        MissingKey,
+        WrongType,
+        UnknownEnum
+    }
+
+    public static final class DecodeError extends RuntimeException {
+        public final DecodeTag tag;
+        public final Long key;
+        public final String expected;
+        public final String enumName;
+        public final String value;
+        public final Integer info;
+        public final Integer major;
+
+        private DecodeError(
+                DecodeTag tag,
+                String message,
+                Long key,
+                String expected,
+                String enumName,
+                String value,
+                Integer info,
+                Integer major) {
+            super(message);
+            this.tag = tag;
+            this.key = key;
+            this.expected = expected;
+            this.enumName = enumName;
+            this.value = value;
+            this.info = info;
+            this.major = major;
+        }
+
+        public static DecodeError truncated() {
+            return new DecodeError(DecodeTag.Truncated, "truncated CBOR input", null, null, null, null, null, null);
+        }
+
+        public static DecodeError trailingBytes() {
+            return new DecodeError(
+                    DecodeTag.TrailingBytes,
+                    "trailing bytes after top-level CBOR item",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        public static DecodeError invalidUtf8() {
+            return new DecodeError(DecodeTag.InvalidUtf8, "invalid UTF-8 in CBOR text", null, null, null, null, null, null);
+        }
+
+        public static DecodeError unsupportedInfo(int info) {
+            return new DecodeError(
+                    DecodeTag.UnsupportedInfo,
+                    "unsupported CBOR additional-info " + info,
+                    null,
+                    null,
+                    null,
+                    null,
+                    info,
+                    null);
+        }
+
+        public static DecodeError unsupportedMajor(int major) {
+            return new DecodeError(
+                    DecodeTag.UnsupportedMajor,
+                    "unsupported CBOR major type " + major,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    major);
+        }
+
+        public static DecodeError nonIntegerMapKey() {
+            return new DecodeError(DecodeTag.NonIntegerMapKey, "non-integer CBOR map key", null, null, null, null, null, null);
+        }
+
+        public static DecodeError intOverflow(String value) {
+            return new DecodeError(
+                    DecodeTag.IntOverflow,
+                    "integer outside i64 subset: " + value,
+                    null,
+                    null,
+                    null,
+                    value,
+                    null,
+                    null);
+        }
+
+        public static DecodeError duplicateMapKey(long key) {
+            return new DecodeError(
+                    DecodeTag.DuplicateMapKey,
+                    "duplicate CBOR map key " + key,
+                    key,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        public static DecodeError missingKey(long key) {
+            return new DecodeError(
+                    DecodeTag.MissingKey,
+                    "missing CBOR map key " + key,
+                    key,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        public static DecodeError wrongType(String expected) {
+            return new DecodeError(
+                    DecodeTag.WrongType,
+                    "expected CBOR " + expected,
+                    null,
+                    expected,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        public static DecodeError unknownEnum(String enumName, long value) {
+            return new DecodeError(
+                    DecodeTag.UnknownEnum,
+                    "unknown " + enumName + " wire value " + value,
+                    null,
+                    null,
+                    enumName,
+                    Long.toString(value),
+                    null,
+                    null);
+        }
+    }
 
     private Cbor(int kind, long i, double d, String s, byte[] b, List<Cbor> arr, List<KV> map) {
         this.kind = kind; this.i = i; this.d = d; this.s = s; this.b = b; this.arr = arr; this.map = map;
@@ -32,11 +188,18 @@ public final class Cbor {
     public static final Cbor NUL = new Cbor(NULL, 0, 0.0, null, null, null, null);
 
     public Cbor get(long key) {
+        if (kind != MAP) throw DecodeError.wrongType("map");
         for (KV kv : map) if (kv.k == key) return kv.v;
-        throw new RuntimeException("no map key " + key);
+        throw DecodeError.missingKey(key);
     }
     public boolean isNull() { return kind == NULL; }
-    public List<KV> mapEntries() { return map == null ? List.of() : map; } // forward-compat residual
+    public long asInt() { if (kind == INT) return i; throw DecodeError.wrongType("int"); }
+    public double asFloat() { if (kind == FLOAT) return d; throw DecodeError.wrongType("float"); }
+    public String asText() { if (kind == TEXT) return s; throw DecodeError.wrongType("text"); }
+    public byte[] asBytes() { if (kind == BYTES) return b; throw DecodeError.wrongType("bytes"); }
+    public boolean asBool() { if (kind == BOOL) return i != 0; throw DecodeError.wrongType("bool"); }
+    public List<Cbor> asArray() { if (kind == ARR) return arr; throw DecodeError.wrongType("array"); }
+    public List<KV> mapEntries() { if (kind == MAP) return map; throw DecodeError.wrongType("map"); }
 
     public static byte[] encode(Cbor c) {
         List<Byte> out = new ArrayList<>();
@@ -148,36 +311,118 @@ public final class Cbor {
                 List<KV> m = new ArrayList<>(c.map);
                 m.sort((a, b2) -> Long.compare(a.k, b2.k)); // ascending keys
                 head(out, 5, m.size());
-                for (KV kv : m) { head(out, 0, kv.k); enc(kv.v, out); }
+                for (KV kv : m) {
+                    if (kv.k >= 0) head(out, 0, kv.k);
+                    else head(out, 1, -1 - kv.k);
+                    enc(kv.v, out);
+                }
             }
             case BOOL -> out.add((byte) (c.i != 0 ? 0xf5 : 0xf4));
             case NULL -> out.add((byte) 0xf6);
+            default -> throw new IllegalArgumentException("unknown CBOR kind " + c.kind);
         }
     }
     public static Cbor decode(byte[] data) {
         int[] off = {0};
         Cbor v = dec(data, off);
-        if (off[0] != data.length) throw new RuntimeException("trailing bytes after top-level CBOR item");
+        if (off[0] != data.length) throw DecodeError.trailingBytes();
         return v;
     }
-    private static int u(byte[] d, int i) { return d[i] & 0xFF; }
+    private static int u(byte[] d, int i) {
+        if (i < 0 || i >= d.length) throw DecodeError.truncated();
+        return d[i] & 0xFF;
+    }
+    private static void require(byte[] d, int off, int len) {
+        if (off < 0 || len < 0 || off > d.length || len > d.length - off) throw DecodeError.truncated();
+    }
     private static long readArg(byte[] d, int[] off, int info) {
         if (info < 24) return info;
-        if (info == 24) { long v = u(d, off[0]); off[0] += 1; return v; }
-        if (info == 25) { long v = ((long) u(d, off[0]) << 8) | u(d, off[0] + 1); off[0] += 2; return v; }
-        if (info == 26) { long v = 0; for (int j = 0; j < 4; j++) v = (v << 8) | u(d, off[0] + j); off[0] += 4; return v; }
-        long v = 0; for (int j = 0; j < 8; j++) v = (v << 8) | u(d, off[0] + j); off[0] += 8; return v;
+        if (info == 24) { require(d, off[0], 1); long v = u(d, off[0]); off[0] += 1; return v; }
+        if (info == 25) { require(d, off[0], 2); long v = ((long) u(d, off[0]) << 8) | u(d, off[0] + 1); off[0] += 2; return v; }
+        if (info == 26) {
+            require(d, off[0], 4);
+            long v = 0;
+            for (int j = 0; j < 4; j++) v = (v << 8) | u(d, off[0] + j);
+            off[0] += 4;
+            return v;
+        }
+        if (info == 27) {
+            require(d, off[0], 8);
+            long v = 0;
+            for (int j = 0; j < 8; j++) v = (v << 8) | u(d, off[0] + j);
+            off[0] += 8;
+            return v;
+        }
+        throw DecodeError.unsupportedInfo(info);
+    }
+    private static int readLength(byte[] d, int[] off, int info) {
+        long n = readArg(d, off, info);
+        if (Long.compareUnsigned(n, Integer.MAX_VALUE) > 0) throw DecodeError.truncated();
+        return (int) n;
+    }
+    private static String unsignedStringPlusOne(long n) {
+        return new BigInteger(Long.toUnsignedString(n)).add(BigInteger.ONE).toString();
+    }
+    private static String decodeUtf8(byte[] d, int off, int n) {
+        try {
+            return StandardCharsets.UTF_8
+                    .newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(d, off, n))
+                    .toString();
+        } catch (CharacterCodingException exc) {
+            throw DecodeError.invalidUtf8();
+        }
     }
     private static Cbor dec(byte[] d, int[] off) {
         int initial = u(d, off[0]); off[0]++;
         int major = initial >> 5, info = initial & 0x1f;
         switch (major) {
-            case 0 -> { return int_(readArg(d, off, info)); }
-            case 1 -> { return int_(-1 - readArg(d, off, info)); }
-            case 2 -> { int n = (int) readArg(d, off, info); byte[] bb = Arrays.copyOfRange(d, off[0], off[0] + n); off[0] += n; return bytes(bb); }
-            case 3 -> { int n = (int) readArg(d, off, info); String s = new String(d, off[0], n, StandardCharsets.UTF_8); off[0] += n; return text(s); }
-            case 4 -> { int n = (int) readArg(d, off, info); List<Cbor> a = new ArrayList<>(); for (int j = 0; j < n; j++) a.add(dec(d, off)); return arr(a); }
-            case 5 -> { int n = (int) readArg(d, off, info); List<KV> m = new ArrayList<>(); for (int j = 0; j < n; j++) { Cbor k = dec(d, off); Cbor v = dec(d, off); m.add(new KV(k.i, v)); } return map(m); }
+            case 0 -> {
+                long n = readArg(d, off, info);
+                if (n < 0) throw DecodeError.intOverflow(Long.toUnsignedString(n));
+                return int_(n);
+            }
+            case 1 -> {
+                long n = readArg(d, off, info);
+                if (n < 0) throw DecodeError.intOverflow("-" + unsignedStringPlusOne(n));
+                return int_(-1 - n);
+            }
+            case 2 -> {
+                int n = readLength(d, off, info);
+                require(d, off[0], n);
+                byte[] bb = new byte[n];
+                System.arraycopy(d, off[0], bb, 0, n);
+                off[0] += n;
+                return bytes(bb);
+            }
+            case 3 -> {
+                int n = readLength(d, off, info);
+                require(d, off[0], n);
+                String s = decodeUtf8(d, off[0], n);
+                off[0] += n;
+                return text(s);
+            }
+            case 4 -> {
+                int n = readLength(d, off, info);
+                List<Cbor> a = new ArrayList<>();
+                for (int j = 0; j < n; j++) a.add(dec(d, off));
+                return arr(a);
+            }
+            case 5 -> {
+                int n = readLength(d, off, info);
+                List<KV> m = new ArrayList<>();
+                Set<Long> seen = new HashSet<>();
+                for (int j = 0; j < n; j++) {
+                    Cbor k = dec(d, off);
+                    if (k.kind != INT) throw DecodeError.nonIntegerMapKey();
+                    if (!seen.add(k.i)) throw DecodeError.duplicateMapKey(k.i);
+                    Cbor v = dec(d, off);
+                    m.add(new KV(k.i, v));
+                }
+                return map(m);
+            }
             case 7 -> {
                 if (info == 20) return bool(false);
                 if (info == 21) return bool(true);
@@ -185,9 +430,10 @@ public final class Cbor {
                 if (info == 25) return float_(halfToDouble((int) readArg(d, off, info)));
                 if (info == 26) return float_((double) Float.intBitsToFloat((int) readArg(d, off, info)));
                 if (info == 27) return float_(Double.longBitsToDouble(readArg(d, off, info)));
+                throw DecodeError.unsupportedInfo(info);
             }
+            default -> throw DecodeError.unsupportedMajor(major);
         }
-        throw new RuntimeException("unsupported CBOR item");
     }
 }
 

@@ -4,6 +4,21 @@
 // ascending map keys). Hand-rolled, stdlib only.
 package taut
 
+sealed class DecodeError(message: String) : RuntimeException(message) {
+    class Truncated : DecodeError("truncated CBOR input")
+    class TrailingBytes : DecodeError("trailing bytes after top-level CBOR item")
+    class InvalidUtf8 : DecodeError("invalid UTF-8 in CBOR text string")
+    class UnsupportedInfo(val info: Int) : DecodeError("unsupported additional-info $info")
+    class UnsupportedMajor(val major: Int) : DecodeError("unsupported major type $major")
+    class NonIntegerMapKey : DecodeError("non-integer map key")
+    class IntOverflow(val value: String) : DecodeError("integer out of i64 range: $value")
+    class DuplicateMapKey(val key: Long) : DecodeError("duplicate map key $key")
+    class MissingKey(val key: Long) : DecodeError("missing map key $key")
+    class WrongType(val expected: String) : DecodeError("expected CBOR $expected")
+    class UnknownEnum(val enumName: String, val value: Long) :
+        DecodeError("unknown $enumName wire value $value")
+}
+
 class Cbor(
     val kind: Int,
     val i: Long = 0,
@@ -28,17 +43,39 @@ class Cbor(
     }
 
     fun get(key: Long): Cbor {
+        if (kind != MAP) throw DecodeError.WrongType("map")
         for (kv in map) if (kv.first == key) return kv.second
-        throw RuntimeException("no map key $key")
+        throw DecodeError.MissingKey(key)
     }
-    val intVal: Long get() = i
-    val textVal: String get() = s
-    val bytesVal: ByteArray get() = b
-    val boolVal: Boolean get() = i != 0L
-    val arrVal: List<Cbor> get() = arr
-    val floatVal: Double get() = f
+    val intVal: Long get() {
+        if (kind != INT) throw DecodeError.WrongType("int")
+        return i
+    }
+    val textVal: String get() {
+        if (kind != TEXT) throw DecodeError.WrongType("text")
+        return s
+    }
+    val bytesVal: ByteArray get() {
+        if (kind != BYTES) throw DecodeError.WrongType("bytes")
+        return b
+    }
+    val boolVal: Boolean get() {
+        if (kind != BOOL) throw DecodeError.WrongType("bool")
+        return i != 0L
+    }
+    val arrVal: List<Cbor> get() {
+        if (kind != ARR) throw DecodeError.WrongType("array")
+        return arr
+    }
+    val floatVal: Double get() {
+        if (kind != FLOAT) throw DecodeError.WrongType("float")
+        return f
+    }
     val isNull: Boolean get() = kind == NULL
-    val mapEntries: List<Pair<Long, Cbor>> get() = map  // forward-compat residual
+    val mapEntries: List<Pair<Long, Cbor>> get() {
+        if (kind != MAP) throw DecodeError.WrongType("map")
+        return map
+    }  // forward-compat residual
 }
 
 private fun head(out: MutableList<Byte>, major: Int, n: Long) {
@@ -136,6 +173,10 @@ private fun encFloat(v: Double, out: MutableList<Byte>) {
     out.add(0xfb.toByte()); put64(out, java.lang.Double.doubleToLongBits(v))
 }
 
+private fun encInt(n: Long, out: MutableList<Byte>) {
+    if (n >= 0) head(out, 0, n) else head(out, 1, -1L - n)
+}
+
 fun encode(c: Cbor): ByteArray {
     val out = ArrayList<Byte>()
     enc(c, out)
@@ -144,14 +185,14 @@ fun encode(c: Cbor): ByteArray {
 
 private fun enc(c: Cbor, out: MutableList<Byte>) {
     when (c.kind) {
-        Cbor.INT -> if (c.i >= 0) head(out, 0, c.i) else head(out, 1, -1 - c.i)
+        Cbor.INT -> encInt(c.i, out)
         Cbor.BYTES -> { head(out, 2, c.b.size.toLong()); for (x in c.b) out.add(x) }
         Cbor.TEXT -> { val bb = c.s.toByteArray(Charsets.UTF_8); head(out, 3, bb.size.toLong()); for (x in bb) out.add(x) }
         Cbor.ARR -> { head(out, 4, c.arr.size.toLong()); for (x in c.arr) enc(x, out) }
         Cbor.MAP -> {
             val m = c.map.sortedBy { it.first }  // deterministic: ascending keys
             head(out, 5, m.size.toLong())
-            for (kv in m) { head(out, 0, kv.first); enc(kv.second, out) }
+            for (kv in m) { encInt(kv.first, out); enc(kv.second, out) }
         }
         Cbor.BOOL -> out.add((if (c.i != 0L) 0xf5 else 0xf4).toByte())
         Cbor.NULL -> out.add(0xf6.toByte())
@@ -161,57 +202,135 @@ private fun enc(c: Cbor, out: MutableList<Byte>) {
 
 private fun u(data: ByteArray, i: Int): Int = data[i].toInt() and 0xFF
 
+private fun ensure(data: ByteArray, off: Int, n: Int) {
+    if (off < 0 || n < 0 || off > data.size || data.size - off < n) throw DecodeError.Truncated()
+}
+
 fun decode(data: ByteArray): Cbor {
     val (v, off) = dec(data, 0)
-    if (off != data.size) throw RuntimeException("trailing bytes after top-level CBOR item")
+    if (off != data.size) throw DecodeError.TrailingBytes()
     return v
 }
 
 private fun readArg(data: ByteArray, off: Int, info: Int): Pair<Long, Int> = when {
     info < 24 -> Pair(info.toLong(), off)
-    info == 24 -> Pair(u(data, off).toLong(), off + 1)
-    info == 25 -> Pair((u(data, off).toLong() shl 8) or u(data, off + 1).toLong(), off + 2)
-    info == 26 -> { var v = 0L; for (j in 0 until 4) v = (v shl 8) or u(data, off + j).toLong(); Pair(v, off + 4) }
-    else -> { var v = 0L; for (j in 0 until 8) v = (v shl 8) or u(data, off + j).toLong(); Pair(v, off + 8) }
+    info == 24 -> {
+        ensure(data, off, 1)
+        Pair(u(data, off).toLong(), off + 1)
+    }
+    info == 25 -> {
+        ensure(data, off, 2)
+        Pair((u(data, off).toLong() shl 8) or u(data, off + 1).toLong(), off + 2)
+    }
+    info == 26 -> {
+        ensure(data, off, 4)
+        var v = 0L
+        for (j in 0 until 4) v = (v shl 8) or u(data, off + j).toLong()
+        Pair(v, off + 4)
+    }
+    info == 27 -> {
+        ensure(data, off, 8)
+        var v = 0L
+        for (j in 0 until 8) v = (v shl 8) or u(data, off + j).toLong()
+        Pair(v, off + 8)
+    }
+    else -> throw DecodeError.UnsupportedInfo(info)
+}
+
+private fun unsignedString(bits: Long): String = java.lang.Long.toUnsignedString(bits)
+
+private fun positiveInt(bits: Long): Long {
+    if (bits < 0) throw DecodeError.IntOverflow(unsignedString(bits))
+    return bits
+}
+
+private fun negativeInt(bits: Long): Long {
+    if (bits < 0) {
+        val unsigned = java.math.BigInteger(unsignedString(bits))
+        throw DecodeError.IntOverflow(unsigned.add(java.math.BigInteger.ONE).negate().toString())
+    }
+    return -1L - bits
+}
+
+private fun sizeArg(bits: Long): Int {
+    if (bits < 0 || bits > Int.MAX_VALUE.toLong()) throw DecodeError.IntOverflow(unsignedString(bits))
+    return bits.toInt()
+}
+
+private fun utf8(data: ByteArray, off: Int, len: Int): String {
+    val decoder = Charsets.UTF_8.newDecoder()
+        .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+        .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+    try {
+        return decoder.decode(java.nio.ByteBuffer.wrap(data, off, len)).toString()
+    } catch (e: java.nio.charset.CharacterCodingException) {
+        throw DecodeError.InvalidUtf8()
+    }
 }
 
 private fun dec(data: ByteArray, off0: Int): Pair<Cbor, Int> {
+    ensure(data, off0, 1)
     val initial = u(data, off0)
     val major = initial shr 5
     val info = initial and 0x1f
     val off = off0 + 1
     when (major) {
-        0 -> { val (n, o) = readArg(data, off, info); return Pair(Cbor.int(n), o) }
-        1 -> { val (n, o) = readArg(data, off, info); return Pair(Cbor.int(-1 - n), o) }
-        2 -> { val (n, o) = readArg(data, off, info); val k = n.toInt(); return Pair(Cbor.bytes(data.copyOfRange(o, o + k)), o + k) }
-        3 -> { val (n, o) = readArg(data, off, info); val k = n.toInt(); return Pair(Cbor.text(String(data, o, k, Charsets.UTF_8)), o + k) }
+        0 -> { val (n, o) = readArg(data, off, info); return Pair(Cbor.int(positiveInt(n)), o) }
+        1 -> { val (n, o) = readArg(data, off, info); return Pair(Cbor.int(negativeInt(n)), o) }
+        2 -> {
+            val (n, o) = readArg(data, off, info)
+            val k = sizeArg(n)
+            ensure(data, o, k)
+            return Pair(Cbor.bytes(data.copyOfRange(o, o + k)), o + k)
+        }
+        3 -> {
+            val (n, o) = readArg(data, off, info)
+            val k = sizeArg(n)
+            ensure(data, o, k)
+            return Pair(Cbor.text(utf8(data, o, k)), o + k)
+        }
         4 -> {
             val (n, o0) = readArg(data, off, info); var o = o0; val a = ArrayList<Cbor>()
-            for (j in 0 until n.toInt()) { val (v, o2) = dec(data, o); a.add(v); o = o2 }
+            for (j in 0 until sizeArg(n)) { val (v, o2) = dec(data, o); a.add(v); o = o2 }
             return Pair(Cbor.arr(a), o)
         }
         5 -> {
             val (n, o0) = readArg(data, off, info); var o = o0; val m = ArrayList<Pair<Long, Cbor>>()
-            for (j in 0 until n.toInt()) { val (kc, o2) = dec(data, o); val (vc, o3) = dec(data, o2); m.add(Pair(kc.i, vc)); o = o3 }
+            val seen = HashSet<Long>()
+            for (j in 0 until sizeArg(n)) {
+                val (kc, o2) = dec(data, o)
+                if (kc.kind != Cbor.INT) throw DecodeError.NonIntegerMapKey()
+                val key = kc.intVal
+                if (!seen.add(key)) throw DecodeError.DuplicateMapKey(key)
+                val (vc, o3) = dec(data, o2)
+                m.add(Pair(key, vc))
+                o = o3
+            }
             return Pair(Cbor.map(m), o)
         }
         7 -> return when (info) {
             20 -> Pair(Cbor.bool(false), off)
             21 -> Pair(Cbor.bool(true), off)
             22 -> Pair(Cbor.nul, off)
-            25 -> Pair(Cbor.float(halfBitsToDouble((u(data, off) shl 8) or u(data, off + 1))), off + 2)
+            25 -> {
+                ensure(data, off, 2)
+                Pair(Cbor.float(halfBitsToDouble((u(data, off) shl 8) or u(data, off + 1))), off + 2)
+            }
             26 -> {
+                ensure(data, off, 4)
                 var bits = 0
                 for (j in 0 until 4) bits = (bits shl 8) or u(data, off + j)
                 Pair(Cbor.float(java.lang.Float.intBitsToFloat(bits).toDouble()), off + 4)
             }
             27 -> {
+                ensure(data, off, 8)
                 var bits = 0L
                 for (j in 0 until 8) bits = (bits shl 8) or u(data, off + j).toLong()
                 Pair(Cbor.float(java.lang.Double.longBitsToDouble(bits)), off + 8)
             }
-            else -> throw RuntimeException("unsupported simple value $info")
+            else -> throw DecodeError.UnsupportedInfo(info)
         }
+        6 -> throw DecodeError.UnsupportedMajor(major)
     }
-    throw RuntimeException("unsupported major type $major")
+    throw DecodeError.UnsupportedMajor(major)
 }

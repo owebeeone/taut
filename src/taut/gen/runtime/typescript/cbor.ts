@@ -13,6 +13,7 @@ export class CborFloat {
 }
 
 export type CborValue =
+  | bigint
   | number
   | CborFloat
   | string
@@ -22,6 +23,62 @@ export type CborValue =
   | CborValue[]
   | Map<number, CborValue>;
 
+export type DecodeErrorTag =
+  | "Truncated"
+  | "TrailingBytes"
+  | "InvalidUtf8"
+  | "UnsupportedInfo"
+  | "UnsupportedMajor"
+  | "NonIntegerMapKey"
+  | "IntOverflow"
+  | "DuplicateMapKey"
+  | "MissingKey"
+  | "WrongType"
+  | "UnknownEnum";
+
+export interface DecodeErrorFields {
+  info?: number;
+  major?: number;
+  key?: number | bigint;
+  value?: string;
+  expected?: string;
+  enum?: string;
+}
+
+export class DecodeError extends Error {
+  readonly tag: DecodeErrorTag;
+  readonly info?: number;
+  readonly major?: number;
+  readonly key?: number | bigint;
+  readonly value?: string;
+  readonly expected?: string;
+  readonly enum?: string;
+
+  constructor(tag: DecodeErrorTag, fields: DecodeErrorFields = {}) {
+    const detail = Object.entries(fields).map(([k, v]) => `${k}=${String(v)}`).join(" ");
+    super(detail ? `${tag} ${detail}` : tag);
+    this.name = "DecodeError";
+    this.tag = tag;
+    Object.assign(this, fields);
+  }
+}
+
+export class EncodeError extends Error {
+  readonly tag = "IntOutOfSubset";
+  readonly value?: string;
+
+  constructor(value?: bigint | number | string) {
+    super(value === undefined ? "IntOutOfSubset" : `IntOutOfSubset value=${String(value)}`);
+    this.name = "EncodeError";
+    this.value = value === undefined ? undefined : String(value);
+  }
+}
+
+export const I64_MIN = -(1n << 63n);
+export const I64_MAX = (1n << 63n) - 1n;
+
+const U32_LIMIT = 0x100000000n;
+const textDecoder = new TextDecoder("utf-8", { fatal: true });
 const floatScratch = new DataView(new ArrayBuffer(8));
 const F64_FRAC_MASK = (1n << 52n) - 1n;
 const F64_HIDDEN_BIT = 1n << 52n;
@@ -146,16 +203,36 @@ function pushShortestFloat(out: number[], value: number): void {
   pushFloat64(out, value);
 }
 
-function pushHead(out: number[], major: number, n: number): void {
+function checkedInt(value: bigint | number): bigint {
+  let n: bigint;
+  if (typeof value === "bigint") {
+    n = value;
+  } else {
+    if (!Number.isInteger(value)) throw new Error("frozen CBOR subset: no floats");
+    if (!Number.isSafeInteger(value)) throw new EncodeError(value);
+    n = BigInt(value);
+  }
+  if (n < I64_MIN || n > I64_MAX) throw new EncodeError(n);
+  return n;
+}
+
+function pushHead(out: number[], major: number, n: bigint | number): void {
+  const bn = typeof n === "bigint" ? n : BigInt(n);
   const mt = major << 5;
-  if (n < 24) out.push(mt | n);
-  else if (n < 0x100) out.push(mt | 24, n);
-  else if (n < 0x10000) out.push(mt | 25, (n >> 8) & 0xff, n & 0xff);
-  else if (n < 0x100000000)
-    out.push(mt | 26, (n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff);
-  else {
+  if (bn < 0n) throw new EncodeError(bn);
+  if (bn < 24n) out.push(mt | Number(bn));
+  else if (bn < 0x100n) out.push(mt | 24, Number(bn));
+  else if (bn < 0x10000n) out.push(mt | 25, Number((bn >> 8n) & 0xffn), Number(bn & 0xffn));
+  else if (bn < U32_LIMIT) {
+    out.push(
+      mt | 26,
+      Number((bn >> 24n) & 0xffn),
+      Number((bn >> 16n) & 0xffn),
+      Number((bn >> 8n) & 0xffn),
+      Number(bn & 0xffn),
+    );
+  } else {
     out.push(mt | 27);
-    const bn = BigInt(n);
     for (let i = 7; i >= 0; i--) out.push(Number((bn >> BigInt(i * 8)) & 0xffn));
   }
 }
@@ -168,10 +245,10 @@ function enc(value: CborValue, out: number[]): void {
     pushShortestFloat(out, value.value);
     return;
   }
-  if (typeof value === "number") {
-    if (!Number.isInteger(value)) throw new Error("frozen CBOR subset: no floats");
-    if (value >= 0) pushHead(out, 0, value);
-    else pushHead(out, 1, -1 - value);
+  if (typeof value === "bigint" || typeof value === "number") {
+    const n = checkedInt(value);
+    if (n >= 0n) pushHead(out, 0, n);
+    else pushHead(out, 1, -1n - n);
     return;
   }
   if (value instanceof Uint8Array) {
@@ -194,6 +271,7 @@ function enc(value: CborValue, out: number[]): void {
     const keys = [...value.keys()].sort((a, b) => a - b); // deterministic
     pushHead(out, 5, keys.length);
     for (const k of keys) {
+      if (!Number.isSafeInteger(k) || k < 0) throw new Error(`invalid CBOR map key ${k}`);
       pushHead(out, 0, k);
       enc(value.get(k) as CborValue, out);
     }
@@ -208,43 +286,77 @@ export function encode(value: CborValue): Uint8Array {
   return Uint8Array.from(out);
 }
 
-function readArg(data: Uint8Array, off: number, info: number): [number, number] {
-  if (info < 24) return [info, off];
-  if (info === 24) return [data[off], off + 1];
-  if (info === 25) return [(data[off] << 8) | data[off + 1], off + 2];
-  if (info === 26)
+function requireBytes(data: Uint8Array, off: number, count: number): void {
+  if (off + count > data.length) throw new DecodeError("Truncated");
+}
+
+function readArg(data: Uint8Array, off: number, info: number): [bigint, number] {
+  if (info < 24) return [BigInt(info), off];
+  if (info === 24) {
+    requireBytes(data, off, 1);
+    return [BigInt(data[off]), off + 1];
+  }
+  if (info === 25) {
+    requireBytes(data, off, 2);
+    return [BigInt((data[off] << 8) | data[off + 1]), off + 2];
+  }
+  if (info === 26) {
+    requireBytes(data, off, 4);
     return [
-      data[off] * 0x1000000 + data[off + 1] * 0x10000 + data[off + 2] * 0x100 + data[off + 3],
+      BigInt(data[off]) << 24n |
+        BigInt(data[off + 1]) << 16n |
+        BigInt(data[off + 2]) << 8n |
+        BigInt(data[off + 3]),
       off + 4,
     ];
+  }
   if (info === 27) {
+    requireBytes(data, off, 8);
     let bn = 0n;
     for (let i = 0; i < 8; i++) bn = (bn << 8n) | BigInt(data[off + i]);
-    return [Number(bn), off + 8];
+    return [bn, off + 8];
   }
-  throw new Error(`unsupported additional-info ${info}`);
+  throw new DecodeError("UnsupportedInfo", { info });
+}
+
+function readLength(data: Uint8Array, off: number, info: number): [number, number] {
+  const [n, o] = readArg(data, off, info);
+  if (n > BigInt(Number.MAX_SAFE_INTEGER)) throw new DecodeError("IntOverflow", { value: n.toString() });
+  return [Number(n), o];
 }
 
 function dec(data: Uint8Array, off: number): [CborValue, number] {
+  requireBytes(data, off, 1);
   const initial = data[off];
   const major = initial >> 5;
   const info = initial & 0x1f;
   off++;
-  if (major === 0) return readArg(data, off, info);
+  if (major === 0) {
+    const [n, o] = readArg(data, off, info);
+    if (n > I64_MAX) throw new DecodeError("IntOverflow", { value: n.toString() });
+    return [n, o];
+  }
   if (major === 1) {
     const [n, o] = readArg(data, off, info);
-    return [-1 - n, o];
+    if (n > I64_MAX) throw new DecodeError("IntOverflow", { value: (-1n - n).toString() });
+    return [-1n - n, o];
   }
   if (major === 2) {
-    const [n, o] = readArg(data, off, info);
+    const [n, o] = readLength(data, off, info);
+    requireBytes(data, o, n);
     return [data.slice(o, o + n), o + n];
   }
   if (major === 3) {
-    const [n, o] = readArg(data, off, info);
-    return [new TextDecoder().decode(data.slice(o, o + n)), o + n];
+    const [n, o] = readLength(data, off, info);
+    requireBytes(data, o, n);
+    try {
+      return [textDecoder.decode(data.slice(o, o + n)), o + n];
+    } catch {
+      throw new DecodeError("InvalidUtf8");
+    }
   }
   if (major === 4) {
-    let [n, o] = readArg(data, off, info);
+    let [n, o] = readLength(data, off, info);
     const arr: CborValue[] = [];
     for (let i = 0; i < n; i++) {
       const [v, o2] = dec(data, o);
@@ -254,38 +366,49 @@ function dec(data: Uint8Array, off: number): [CborValue, number] {
     return [arr, o];
   }
   if (major === 5) {
-    let [n, o] = readArg(data, off, info);
+    let [n, o] = readLength(data, off, info);
     const m = new Map<number, CborValue>();
+    const seen = new Set<string>();
     for (let i = 0; i < n; i++) {
       const [k, o2] = dec(data, o);
+      if (typeof k !== "bigint") throw new DecodeError("NonIntegerMapKey");
+      if (k < 0n || k > BigInt(Number.MAX_SAFE_INTEGER)) throw new DecodeError("NonIntegerMapKey");
+      const key = Number(k);
+      const token = k.toString();
+      if (seen.has(token)) throw new DecodeError("DuplicateMapKey", { key });
+      seen.add(token);
       const [v, o3] = dec(data, o2);
-      m.set(k as number, v);
+      m.set(key, v);
       o = o3;
     }
     return [m, o];
   }
+  if (major === 6) throw new DecodeError("UnsupportedMajor", { major });
   if (major === 7) {
     if (info === 20) return [false, off];
     if (info === 21) return [true, off];
     if (info === 22) return [null, off];
     if (info === 25) {
+      requireBytes(data, off, 2);
       return [new CborFloat(halfToNumber((data[off] << 8) | data[off + 1])), off + 2];
     }
     if (info === 26) {
+      requireBytes(data, off, 4);
       const v = new DataView(data.buffer, data.byteOffset + off, 4).getFloat32(0, false);
       return [new CborFloat(v), off + 4];
     }
     if (info === 27) {
+      requireBytes(data, off, 8);
       const v = new DataView(data.buffer, data.byteOffset + off, 8).getFloat64(0, false);
       return [new CborFloat(v), off + 8];
     }
-    throw new Error(`unsupported simple value ${info}`);
+    throw new DecodeError("UnsupportedInfo", { info });
   }
-  throw new Error(`unsupported major type ${major}`);
+  throw new DecodeError("UnsupportedMajor", { major });
 }
 
 export function decode(data: Uint8Array): CborValue {
   const [value, off] = dec(data, 0);
-  if (off !== data.length) throw new Error("trailing bytes after top-level CBOR item");
+  if (off !== data.length) throw new DecodeError("TrailingBytes");
   return value;
 }

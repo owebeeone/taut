@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .corpus import kit, synth
+from .corpus import kit, parity, synth
 from .gen import scaffold
 from .ir.load import load_schema, schema_from_json
 from .ir.validate import validate_or_raise
@@ -109,6 +109,17 @@ def _cmd_json(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_parity(args: argparse.Namespace) -> int:
+    try:
+        lines = parity.validate_all(target=args.target)
+    except parity.ParityValidationError as exc:
+        print(f"parity: {exc}", file=sys.stderr)
+        return 2
+    for line in lines:
+        print(line)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="tautc", description="taut codegen — IR -> code")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -146,6 +157,10 @@ def main(argv: list[str] | None = None) -> int:
     j.add_argument("-o", "--output", help="output file (default: stdout)")
     j.add_argument("--indent", type=int, help="pretty-print JSON with this indent (CBOR -> JSON only)")
     j.set_defaults(func=_cmd_json)
+
+    pr = sub.add_parser("parity", help="validate the shared codec-parity corpus and target allowlist")
+    pr.add_argument("-t", "--target", choices=parity.TARGETS, help="show status for one codec target")
+    pr.set_defaults(func=_cmd_parity)
 
     args = p.parse_args(argv)
     return args.func(args)

@@ -20,7 +20,7 @@ def test_each_generator_emits_a_native_map_type():
     assert "Map<String, Long>" in scaffold.kotlin_api(S)
     assert "java.util.Map<String, Long>" in scaffold.java_api(S)
     assert "dict[str, int]" in scaffold.python_api(S)
-    assert "Record<string, number>" in scaffold.ts_api(S)
+    assert "Map<string, bigint>" in scaffold.ts_api(S)
     assert "new Map(" in scaffold.js_api(S)
 
 

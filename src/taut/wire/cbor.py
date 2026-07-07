@@ -26,10 +26,40 @@ import struct
 from typing import Any
 
 
+INT_MIN = -(1 << 63)
+INT_MAX = (1 << 63) - 1
+
+
+class DecodeError(ValueError):
+    """Typed fail-closed CBOR decode error."""
+
+    def __init__(self, tag: str, **payload: Any) -> None:
+        self.tag = tag
+        self.payload = payload
+        for key, value in payload.items():
+            setattr(self, key, value)
+        detail = f": {payload}" if payload else ""
+        super().__init__(f"{tag}{detail}")
+
+
+class EncodeError(ValueError):
+    """Typed fail-closed CBOR encode error."""
+
+    def __init__(self, tag: str, **payload: Any) -> None:
+        self.tag = tag
+        self.payload = payload
+        for key, value in payload.items():
+            setattr(self, key, value)
+        detail = f": {payload}" if payload else ""
+        super().__init__(f"{tag}{detail}")
+
+
 # --- encode -------------------------------------------------------------------
 
 def _head(major: int, n: int) -> bytes:
     """Major type byte + shortest-form argument for a non-negative n."""
+    if n > INT_MAX:
+        raise EncodeError("IntOutOfSubset", value=n)
     mt = major << 5
     if n < 24:
         return bytes([mt | n])
@@ -118,42 +148,57 @@ def _encode(value: Any, out: bytearray) -> None:
 def loads(data: bytes) -> Any:
     value, offset = _decode(data, 0)
     if offset != len(data):
-        raise ValueError("trailing bytes after top-level CBOR item")
+        raise DecodeError("TrailingBytes")
     return value
+
+
+def _take(data: bytes, offset: int, n: int) -> bytes:
+    end = offset + n
+    if offset < 0 or end > len(data):
+        raise DecodeError("Truncated")
+    return data[offset:end]
 
 
 def _read_arg(data: bytes, offset: int, info: int) -> tuple[int, int]:
     if info < 24:
         return info, offset
     if info == 24:
-        return data[offset], offset + 1
+        return _take(data, offset, 1)[0], offset + 1
     if info == 25:
-        return int.from_bytes(data[offset:offset + 2], "big"), offset + 2
+        return int.from_bytes(_take(data, offset, 2), "big"), offset + 2
     if info == 26:
-        return int.from_bytes(data[offset:offset + 4], "big"), offset + 4
+        return int.from_bytes(_take(data, offset, 4), "big"), offset + 4
     if info == 27:
-        return int.from_bytes(data[offset:offset + 8], "big"), offset + 8
-    raise ValueError(f"unsupported additional-info {info} in frozen subset")
+        return int.from_bytes(_take(data, offset, 8), "big"), offset + 8
+    raise DecodeError("UnsupportedInfo", info=info)
 
 
 def _decode(data: bytes, offset: int) -> tuple[Any, int]:
-    initial = data[offset]
+    initial = _take(data, offset, 1)[0]
     major = initial >> 5
     info = initial & 0x1F
     offset += 1
 
     if major == 0:
         n, offset = _read_arg(data, offset, info)
+        if n > INT_MAX:
+            raise DecodeError("IntOverflow", value=n)
         return n, offset
     if major == 1:
         n, offset = _read_arg(data, offset, info)
+        if n > INT_MAX:
+            raise DecodeError("IntOverflow", value=-1 - n)
         return -1 - n, offset
     if major == 2:
         n, offset = _read_arg(data, offset, info)
-        return bytes(data[offset:offset + n]), offset + n
+        return _take(data, offset, n), offset + n
     if major == 3:
         n, offset = _read_arg(data, offset, info)
-        return data[offset:offset + n].decode("utf-8"), offset + n
+        raw = _take(data, offset, n)
+        try:
+            return raw.decode("utf-8"), offset + n
+        except UnicodeDecodeError as exc:
+            raise DecodeError("InvalidUtf8") from exc
     if major == 4:
         n, offset = _read_arg(data, offset, info)
         items = []
@@ -166,6 +211,10 @@ def _decode(data: bytes, offset: int) -> tuple[Any, int]:
         result: dict[int, Any] = {}
         for _ in range(n):
             key, offset = _decode(data, offset)
+            if not isinstance(key, int) or isinstance(key, bool):
+                raise DecodeError("NonIntegerMapKey")
+            if key in result:
+                raise DecodeError("DuplicateMapKey", key=key)
             val, offset = _decode(data, offset)
             result[key] = val
         return result, offset
@@ -177,10 +226,10 @@ def _decode(data: bytes, offset: int) -> tuple[Any, int]:
         if info == 22:
             return None, offset
         if info == 25:
-            return struct.unpack(">e", data[offset:offset + 2])[0], offset + 2
+            return struct.unpack(">e", _take(data, offset, 2))[0], offset + 2
         if info == 26:
-            return struct.unpack(">f", data[offset:offset + 4])[0], offset + 4
+            return struct.unpack(">f", _take(data, offset, 4))[0], offset + 4
         if info == 27:
-            return struct.unpack(">d", data[offset:offset + 8])[0], offset + 8
-        raise ValueError(f"unsupported simple value {info}")
-    raise ValueError(f"unsupported major type {major}")
+            return struct.unpack(">d", _take(data, offset, 8))[0], offset + 8
+        raise DecodeError("UnsupportedInfo", info=info)
+    raise DecodeError("UnsupportedMajor", major=major)

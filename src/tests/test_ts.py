@@ -21,6 +21,10 @@ from taut.wire import cbor, codec
 
 SEED = 0x7A17_2E57
 FUZZ_ITERS = 1000
+ROOT = Path(__file__).resolve().parents[2]
+PARITY_IR_PATH = ROOT / "ir" / "parity_int.taut.py"
+PARITY_INT_VECTORS = ROOT / "corpus" / "parity" / "int.vectors.json"
+PARITY_MALFORMED_VECTORS = ROOT / "corpus" / "parity" / "malformed.vectors.json"
 
 
 def _rand_scalar(rng: random.Random) -> Any:
@@ -218,6 +222,126 @@ test("fixed-seed ResExt fuzz matches the Python oracle", () => {
 """.lstrip()
     )
     return harness
+
+
+def _write_parity_harness(ts_dir: Path) -> Path:
+    harness = ts_dir / "parity.test.ts"
+    harness.write_text(
+        """
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { decode as cborDecode } from "./cbor.ts";
+import { decode, decodeRef, encode } from "./codec.ts";
+import { loadSchema } from "./schema.ts";
+
+const schema = loadSchema(JSON.parse(readFileSync("parity_int.ir.json", "utf8")));
+const intVectors = JSON.parse(readFileSync("int.vectors.json", "utf8"));
+const malformedVectors = JSON.parse(readFileSync("malformed.vectors.json", "utf8"));
+
+function hexToBytes(hex: string): Uint8Array {
+  return Uint8Array.from(Buffer.from(hex, "hex"));
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString("hex");
+}
+
+function intBox(value: { n: string; by_id: [string, string][] }) {
+  return {
+    n: BigInt(value.n),
+    by_id: new Map(value.by_id.map(([k, v]) => [BigInt(k), BigInt(v)])),
+  };
+}
+
+function assertParityError(fn: () => unknown, expect: Record<string, unknown>, note: string): void {
+  let thrown: any = null;
+  try {
+    fn();
+  } catch (e) {
+    thrown = e;
+  }
+  assert.notEqual(thrown, null, `${note}: expected an error`);
+  assert.equal(thrown.tag, expect.tag, `${note}: tag`);
+  for (const [key, value] of Object.entries(expect)) {
+    if (key === "tag") continue;
+    assert.equal(String(thrown[key]), String(value), `${note}: ${key}`);
+  }
+}
+
+test("shared i64 vectors round-trip exactly with bigint carriers", () => {
+  for (const row of intVectors.vectors) {
+    const native = intBox(row.value);
+    if (row.kind === "round_trip") {
+      const encoded = encode(schema, row.message, native);
+      assert.equal(bytesToHex(encoded), row.cbor, row.name);
+      const decoded = decode(schema, row.message, hexToBytes(row.cbor));
+      assert.deepEqual(decoded, native, row.name);
+      assert.equal(bytesToHex(encode(schema, row.message, decoded)), row.cbor, row.name);
+    } else if (row.kind === "encode_fail") {
+      assertParityError(() => encode(schema, row.message, native), row.expect, row.name);
+    } else {
+      assert.fail(`unknown vector kind ${row.kind}`);
+    }
+  }
+});
+
+test("shared malformed vectors fail closed with typed tags", () => {
+  for (const row of malformedVectors.vectors) {
+    assertParityError(() => {
+      const data = hexToBytes(row.bytes);
+      if (row.stage === "raw_decode") {
+        return cborDecode(data);
+      }
+      if (row.stage === "from_cbor") {
+        return decode(schema, row.schema, data);
+      }
+      if (row.stage === "from_wire") {
+        return decodeRef(schema, { k: "enum", name: row.schema }, data);
+      }
+      assert.fail(`unknown vector stage ${row.stage}`);
+    }, row.expect, row.name);
+  }
+});
+""".lstrip()
+    )
+    return harness
+
+
+def test_typescript_codec_parity_i64_if_node(tmp_path):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+
+    schema = load_schema(PARITY_IR_PATH)
+    assert cli.main([
+        "gen",
+        str(PARITY_IR_PATH),
+        "-o",
+        str(tmp_path),
+        "--lang",
+        "typescript",
+        "--api-only",
+        "--with-runtime",
+    ]) == 0
+
+    ts_dir = tmp_path / "typescript"
+    api = (ts_dir / "api.ts").read_text()
+    assert "n: bigint;" in api
+    assert "by_id: Map<bigint, bigint>;" in api
+
+    export_to(schema, ts_dir / "parity_int.ir.json")
+    (ts_dir / "int.vectors.json").write_text(PARITY_INT_VECTORS.read_text())
+    (ts_dir / "malformed.vectors.json").write_text(PARITY_MALFORMED_VECTORS.read_text())
+    harness = _write_parity_harness(ts_dir)
+
+    subprocess.run(
+        [node, "--experimental-strip-types", "--test", str(harness.name)],
+        cwd=ts_dir,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
 
 
 def test_typescript_runtime_resext_phase2_if_node(tmp_path):

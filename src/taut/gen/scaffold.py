@@ -150,13 +150,13 @@ def _ts_ty(t: TypeRef | None) -> str:
     if t is None:
         return "void"
     if isinstance(t, Scalar):
-        return {"int": "number", "str": "string", "bytes": "Uint8Array", "bool": "boolean", "float": "number"}[t.kind]
+        return {"int": "bigint", "str": "string", "bytes": "Uint8Array", "bool": "boolean", "float": "number"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
         return f"{_ts_ty(t.elem)}[]"
     if isinstance(t, MapOf):
-        return f"Record<string, {_ts_ty(t.value)}>"
+        return f"Map<{_ts_ty(t.key)}, {_ts_ty(t.value)}>"
     raise TypeError(t)
 
 

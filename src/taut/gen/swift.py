@@ -76,21 +76,22 @@ def _encode(t: TypeRef, expr: str) -> str:
 def _decode(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {
-            "int": f"{expr}.intVal",
-            "float": f"{expr}.floatVal",
-            "str": f"{expr}.textVal",
-            "bytes": f"{expr}.bytesVal",
-            "bool": f"{expr}.boolVal",
+            "int": f"try {expr}.tryInt()",
+            "float": f"try {expr}.tryFloat()",
+            "str": f"try {expr}.tryText()",
+            "bytes": f"try {expr}.tryBytes()",
+            "bool": f"try {expr}.tryBool()",
         }[t.kind]
     if isinstance(t, EnumRef):
-        return f"{t.name}(rawValue: {expr}.intVal)!"
+        return f"try {t.name}.fromCbor({expr})"
     if isinstance(t, MsgRef):
-        return f"{t.name}.fromCbor({expr})"
+        return f"try {t.name}.fromCbor({expr})"
     if isinstance(t, ListOf):
-        return f"{expr}.arrayVal.map {{ {_decode(t.elem, '$0')} }}"
+        return f"try {expr}.tryArray().map {{ {_decode(t.elem, '$0')} }}"
     if isinstance(t, MapOf):
-        return (f"Dictionary(uniqueKeysWithValues: {expr}.arrayVal.map {{ "
-                f"({_decode(t.key, '$0.get(1)')}, {_decode(t.value, '$0.get(2)')}) }})")
+        return (f"try decodeDictionary({expr}, "
+                f"key: {{ {_decode(t.key, '$0')} }}, "
+                f"value: {{ {_decode(t.value, '$0')} }})")
     raise TypeError(t)
 
 
@@ -98,6 +99,14 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     out = [f"public enum {name}: Int64 {{"]
     for m, v in members.items():
         out.append(f"    case {_id(m)} = {v}")
+    out.append("")
+    out.append(f"    public static func fromCbor(_ c: Cbor) throws -> {name} {{")
+    out.append("        let raw = try c.tryInt()")
+    out.append(f"        guard let value = {name}(rawValue: raw) else {{")
+    out.append(f"            throw CborError.unknownEnum(\"{name}\", raw)")
+    out.append("        }")
+    out.append("        return value")
+    out.append("    }")
     out.append("}")
     return out
 
@@ -141,15 +150,15 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     out.append(f"        return Cbor.map({arr}{' + wire_residual' if forward_compat else ''})")
     out.append("    }")
     # fromCbor
-    out.append(f"    public static func fromCbor(_ c: Cbor) -> {msg.name} {{")
+    out.append(f"    public static func fromCbor(_ c: Cbor) throws -> {msg.name} {{")
     args = []
     for f in msg.fields:
         if f.transient:
             continue  # native-only; init default applies
         if f.optional:
-            args.append(f"{_id(f.name)}: {{ let v = c.get({f.tag}); return v.isNull ? nil : {_decode(f.type, 'v')} }}()")
+            args.append(f"{_id(f.name)}: try {{ let v = try c.tryGet({f.tag}); if v.isNull {{ return nil }}; return {_decode(f.type, 'v')} }}()")
         else:
-            args.append(f"{_id(f.name)}: {_decode(f.type, f'c.get({f.tag})')}")
+            args.append(f"{_id(f.name)}: {_decode(f.type, f'c.tryGet({f.tag})')}")
     if forward_compat:
         known = ", ".join(str(f.tag) for f in msg.wire_fields())
         args.append(f"wire_residual: c.mapEntries.filter {{ ![{known}].contains($0.0) }}")

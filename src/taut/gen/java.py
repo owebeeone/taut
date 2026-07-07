@@ -53,19 +53,20 @@ def _enc(t: TypeRef, expr: str) -> str:
 
 def _dec(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
-        return {"int": f"{expr}.i", "str": f"{expr}.s",
-                "bytes": f"{expr}.b", "bool": f"({expr}.i != 0)",
-                "float": f"{expr}.d"}[t.kind]
+        return {"int": f"{expr}.asInt()", "str": f"{expr}.asText()",
+                "bytes": f"{expr}.asBytes()", "bool": f"{expr}.asBool()",
+                "float": f"{expr}.asFloat()"}[t.kind]
     if isinstance(t, EnumRef):
-        return f"{t.name}.fromWire({expr}.i)"
+        return f"{t.name}.fromWire({expr}.asInt())"
     if isinstance(t, MsgRef):
         return f"{t.name}.fromCbor({expr})"
     if isinstance(t, ListOf):
-        return f"{expr}.arr.stream().map(e -> {_dec(t.elem, 'e')}).toList()"
+        return f"{expr}.asArray().stream().map(e -> {_dec(t.elem, 'e')}).toList()"
     if isinstance(t, MapOf):
-        return (f"{expr}.arr.stream().collect(java.util.stream.Collectors.toMap("
+        return (f"{expr}.asArray().stream().collect(java.util.stream.Collectors.toMap("
                 f"e -> {_dec(t.key, 'e.get(1)')}, e -> {_dec(t.value, 'e.get(2)')}, "
-                f"(a, b) -> b, java.util.LinkedHashMap::new))")
+                f"(a, b) -> {{ throw Cbor.DecodeError.duplicateMapKey(0); }}, "
+                f"java.util.LinkedHashMap::new))")
     raise TypeError(t)
 
 
@@ -76,7 +77,7 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
         f"    {consts};",
         "    final long wire;",
         f"    {name}(long w) {{ this.wire = w; }}",
-        f"    static {name} fromWire(long v) {{ for (var e : values()) if (e.wire == v) return e; throw new RuntimeException(\"bad wire \" + v); }}",
+        f"    static {name} fromWire(long v) {{ for (var e : values()) if (e.wire == v) return e; throw Cbor.DecodeError.unknownEnum(\"{name}\", v); }}",
         "}",
     ]
 

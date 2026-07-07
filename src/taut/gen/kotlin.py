@@ -89,12 +89,18 @@ def _dec(t: TypeRef, expr: str) -> str:
 
 def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     entries = ", ".join(f"{_id(m)}({v})" for m, v in members.items())
-    return [
+    out = [
         f"enum class {name}(val wire: Long) {{",
         f"    {entries};",
-        "    companion object { fun fromWire(v: Long) = values().first { it.wire == v } }",
+        "    companion object {",
+        f"        fun fromWire(v: Long): {name} {{",
+        "            for (e in values()) if (e.wire == v) return e",
+        f'            throw DecodeError.UnknownEnum("{name}", v)',
+        "        }",
+        "    }",
         "}",
     ]
+    return out
 
 
 def _emit_message(msg, forward_compat: bool = False) -> list[str]:

@@ -6,8 +6,11 @@
 package taut
 
 import (
+	"fmt"
 	"math"
 	"sort"
+	"strconv"
+	"unicode/utf8"
 )
 
 type Kind int
@@ -40,6 +43,55 @@ type Cbor struct {
 	F    float64
 }
 
+const (
+	DecodeErrTruncated        = "Truncated"
+	DecodeErrTrailingBytes    = "TrailingBytes"
+	DecodeErrInvalidUtf8      = "InvalidUtf8"
+	DecodeErrUnsupportedInfo  = "UnsupportedInfo"
+	DecodeErrUnsupportedMajor = "UnsupportedMajor"
+	DecodeErrNonIntegerMapKey = "NonIntegerMapKey"
+	DecodeErrIntOverflow      = "IntOverflow"
+	DecodeErrDuplicateMapKey  = "DuplicateMapKey"
+	DecodeErrMissingKey       = "MissingKey"
+	DecodeErrWrongType        = "WrongType"
+	DecodeErrUnknownEnum      = "UnknownEnum"
+)
+
+const maxInt64Uint = uint64(1<<63 - 1)
+
+type DecodeError struct {
+	Tag      string
+	Info     byte
+	Major    byte
+	Key      int64
+	Expected string
+	Enum     string
+	Value    string
+}
+
+func UnknownEnumError(enum string, value int64) error {
+	return &DecodeError{Tag: DecodeErrUnknownEnum, Enum: enum, Value: strconv.FormatInt(value, 10)}
+}
+
+func (e *DecodeError) Error() string {
+	switch e.Tag {
+	case DecodeErrUnsupportedInfo:
+		return fmt.Sprintf("%s(%d)", e.Tag, e.Info)
+	case DecodeErrUnsupportedMajor:
+		return fmt.Sprintf("%s(%d)", e.Tag, e.Major)
+	case DecodeErrDuplicateMapKey, DecodeErrMissingKey:
+		return fmt.Sprintf("%s(%d)", e.Tag, e.Key)
+	case DecodeErrWrongType:
+		return fmt.Sprintf("%s(%s)", e.Tag, e.Expected)
+	case DecodeErrUnknownEnum:
+		return fmt.Sprintf("%s(%s=%s)", e.Tag, e.Enum, e.Value)
+	case DecodeErrIntOverflow:
+		return fmt.Sprintf("%s(%s)", e.Tag, e.Value)
+	default:
+		return e.Tag
+	}
+}
+
 func CInt(n int64) Cbor     { return Cbor{Kind: KInt, I: n} }
 func CText(s string) Cbor   { return Cbor{Kind: KText, S: s} }
 func CBytes(b []byte) Cbor  { return Cbor{Kind: KBytes, B: b} }
@@ -57,12 +109,35 @@ func CBool(b bool) Cbor {
 
 // Get returns the value for an integer map key (panics if absent).
 func (c Cbor) Get(key int64) Cbor {
-	for _, kv := range c.Map {
+	v, err := c.Require(key)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+func (c Cbor) Require(key int64) (Cbor, error) {
+	v, ok, err := c.Lookup(key)
+	if err != nil {
+		return Cbor{}, err
+	}
+	if !ok {
+		return Cbor{}, &DecodeError{Tag: DecodeErrMissingKey, Key: key}
+	}
+	return v, nil
+}
+
+func (c Cbor) Lookup(key int64) (Cbor, bool, error) {
+	m, err := c.TryMap()
+	if err != nil {
+		return Cbor{}, false, err
+	}
+	for _, kv := range m {
 		if kv.K == key {
-			return kv.V
+			return kv.V, true, nil
 		}
 	}
-	panic("no map key")
+	return Cbor{}, false, nil
 }
 func (c Cbor) Int() int64       { return c.I }
 func (c Cbor) Text() string     { return c.S }
@@ -72,6 +147,55 @@ func (c Cbor) Array() []Cbor    { return c.Arr }
 func (c Cbor) IsNull() bool     { return c.Kind == KNull }
 func (c Cbor) MapEntries() []KV { return c.Map } // forward-compat residual capture
 func (c Cbor) Float() float64   { return c.F }
+
+func (c Cbor) TryInt() (int64, error) {
+	if c.Kind != KInt {
+		return 0, &DecodeError{Tag: DecodeErrWrongType, Expected: "int"}
+	}
+	return c.I, nil
+}
+
+func (c Cbor) TryText() (string, error) {
+	if c.Kind != KText {
+		return "", &DecodeError{Tag: DecodeErrWrongType, Expected: "str"}
+	}
+	return c.S, nil
+}
+
+func (c Cbor) TryBytes() ([]byte, error) {
+	if c.Kind != KBytes {
+		return nil, &DecodeError{Tag: DecodeErrWrongType, Expected: "bytes"}
+	}
+	return c.B, nil
+}
+
+func (c Cbor) TryBool() (bool, error) {
+	if c.Kind != KBool {
+		return false, &DecodeError{Tag: DecodeErrWrongType, Expected: "bool"}
+	}
+	return c.I != 0, nil
+}
+
+func (c Cbor) TryArray() ([]Cbor, error) {
+	if c.Kind != KArr {
+		return nil, &DecodeError{Tag: DecodeErrWrongType, Expected: "array"}
+	}
+	return c.Arr, nil
+}
+
+func (c Cbor) TryMap() ([]KV, error) {
+	if c.Kind != KMap {
+		return nil, &DecodeError{Tag: DecodeErrWrongType, Expected: "map"}
+	}
+	return c.Map, nil
+}
+
+func (c Cbor) TryFloat() (float64, error) {
+	if c.Kind != KFloat {
+		return 0, &DecodeError{Tag: DecodeErrWrongType, Expected: "float"}
+	}
+	return c.F, nil
+}
 
 func head(out *[]byte, major byte, n uint64) {
 	mt := major << 5
@@ -240,99 +364,196 @@ func halfToFloat64(h uint16) float64 {
 }
 
 func Decode(data []byte) Cbor {
-	v, off := dec(data, 0)
-	if off != len(data) {
-		panic("trailing bytes after top-level CBOR item")
+	v, err := TryDecode(data)
+	if err != nil {
+		panic(err)
 	}
 	return v
 }
 
-func readArg(data []byte, off int, info byte) (uint64, int) {
+func TryDecode(data []byte) (Cbor, error) {
+	v, off, err := dec(data, 0)
+	if err != nil {
+		return Cbor{}, err
+	}
+	if off != len(data) {
+		return Cbor{}, &DecodeError{Tag: DecodeErrTrailingBytes}
+	}
+	return v, nil
+}
+
+func readArg(data []byte, off int, info byte) (uint64, int, error) {
 	switch {
 	case info < 24:
-		return uint64(info), off
+		return uint64(info), off, nil
 	case info == 24:
-		return uint64(data[off]), off + 1
+		if off > len(data)-1 {
+			return 0, off, &DecodeError{Tag: DecodeErrTruncated}
+		}
+		return uint64(data[off]), off + 1, nil
 	case info == 25:
-		return uint64(data[off])<<8 | uint64(data[off+1]), off + 2
+		if off > len(data)-2 {
+			return 0, off, &DecodeError{Tag: DecodeErrTruncated}
+		}
+		return uint64(data[off])<<8 | uint64(data[off+1]), off + 2, nil
 	case info == 26:
+		if off > len(data)-4 {
+			return 0, off, &DecodeError{Tag: DecodeErrTruncated}
+		}
 		var v uint64
 		for j := 0; j < 4; j++ {
 			v = v<<8 | uint64(data[off+j])
 		}
-		return v, off + 4
-	default:
+		return v, off + 4, nil
+	case info == 27:
+		if off > len(data)-8 {
+			return 0, off, &DecodeError{Tag: DecodeErrTruncated}
+		}
 		var v uint64
 		for j := 0; j < 8; j++ {
 			v = v<<8 | uint64(data[off+j])
 		}
-		return v, off + 8
+		return v, off + 8, nil
+	default:
+		return 0, off, &DecodeError{Tag: DecodeErrUnsupportedInfo, Info: info}
 	}
 }
 
-func dec(data []byte, off int) (Cbor, int) {
+func negOverflowValue(n uint64) string {
+	if n == ^uint64(0) {
+		return "-18446744073709551616"
+	}
+	return "-" + strconv.FormatUint(n+1, 10)
+}
+
+func dec(data []byte, off int) (Cbor, int, error) {
+	if off >= len(data) {
+		return Cbor{}, off, &DecodeError{Tag: DecodeErrTruncated}
+	}
 	initial := data[off]
 	major := initial >> 5
 	info := initial & 0x1f
 	off++
+	if info >= 28 {
+		return Cbor{}, off, &DecodeError{Tag: DecodeErrUnsupportedInfo, Info: info}
+	}
 	switch major {
 	case 0:
-		n, o := readArg(data, off, info)
-		return CInt(int64(n)), o
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
+		if n > maxInt64Uint {
+			return Cbor{}, o, &DecodeError{Tag: DecodeErrIntOverflow, Value: strconv.FormatUint(n, 10)}
+		}
+		return CInt(int64(n)), o, nil
 	case 1:
-		n, o := readArg(data, off, info)
-		return CInt(-1 - int64(n)), o
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
+		if n > maxInt64Uint {
+			return Cbor{}, o, &DecodeError{Tag: DecodeErrIntOverflow, Value: negOverflowValue(n)}
+		}
+		return CInt(-1 - int64(n)), o, nil
 	case 2:
-		n, o := readArg(data, off, info)
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
+		if n > uint64(len(data)-o) {
+			return Cbor{}, o, &DecodeError{Tag: DecodeErrTruncated}
+		}
 		k := int(n)
-		return CBytes(append([]byte{}, data[o:o+k]...)), o + k
+		return CBytes(append([]byte{}, data[o:o+k]...)), o + k, nil
 	case 3:
-		n, o := readArg(data, off, info)
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
+		if n > uint64(len(data)-o) {
+			return Cbor{}, o, &DecodeError{Tag: DecodeErrTruncated}
+		}
 		k := int(n)
-		return CText(string(data[o : o+k])), o + k
+		if !utf8.Valid(data[o : o+k]) {
+			return Cbor{}, o + k, &DecodeError{Tag: DecodeErrInvalidUtf8}
+		}
+		return CText(string(data[o : o+k])), o + k, nil
 	case 4:
-		n, o := readArg(data, off, info)
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
 		a := []Cbor{}
 		for i := uint64(0); i < n; i++ {
-			v, o2 := dec(data, o)
+			v, o2, err := dec(data, o)
+			if err != nil {
+				return Cbor{}, o2, err
+			}
 			a = append(a, v)
 			o = o2
 		}
-		return CArr(a), o
+		return CArr(a), o, nil
 	case 5:
-		n, o := readArg(data, off, info)
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
 		m := []KV{}
+		seen := map[int64]bool{}
 		for i := uint64(0); i < n; i++ {
-			kc, o2 := dec(data, o)
-			vc, o3 := dec(data, o2)
+			kc, o2, err := dec(data, o)
+			if err != nil {
+				return Cbor{}, o2, err
+			}
+			if kc.Kind != KInt {
+				return Cbor{}, o2, &DecodeError{Tag: DecodeErrNonIntegerMapKey}
+			}
+			if seen[kc.I] {
+				return Cbor{}, o2, &DecodeError{Tag: DecodeErrDuplicateMapKey, Key: kc.I}
+			}
+			seen[kc.I] = true
+			vc, o3, err := dec(data, o2)
+			if err != nil {
+				return Cbor{}, o3, err
+			}
 			m = append(m, KV{K: kc.I, V: vc})
 			o = o3
 		}
-		return CMap(m), o
+		return CMap(m), o, nil
 	case 7:
 		switch info {
 		case 20:
-			return CBool(false), off
+			return CBool(false), off, nil
 		case 21:
-			return CBool(true), off
+			return CBool(true), off, nil
 		case 22:
-			return CNull(), off
+			return CNull(), off, nil
 		case 25:
+			if off > len(data)-2 {
+				return Cbor{}, off, &DecodeError{Tag: DecodeErrTruncated}
+			}
 			bits := uint16(data[off])<<8 | uint16(data[off+1])
-			return CFloat(halfToFloat64(bits)), off + 2
+			return CFloat(halfToFloat64(bits)), off + 2, nil
 		case 26:
+			if off > len(data)-4 {
+				return Cbor{}, off, &DecodeError{Tag: DecodeErrTruncated}
+			}
 			var bits uint32
 			for j := 0; j < 4; j++ {
 				bits = bits<<8 | uint32(data[off+j])
 			}
-			return CFloat(float64(math.Float32frombits(bits))), off + 4
+			return CFloat(float64(math.Float32frombits(bits))), off + 4, nil
 		case 27:
+			if off > len(data)-8 {
+				return Cbor{}, off, &DecodeError{Tag: DecodeErrTruncated}
+			}
 			var bits uint64
 			for j := 0; j < 8; j++ {
 				bits = bits<<8 | uint64(data[off+j])
 			}
-			return CFloat(math.Float64frombits(bits)), off + 8
+			return CFloat(math.Float64frombits(bits)), off + 8, nil
 		}
 	}
-	panic("unsupported CBOR item")
+	return Cbor{}, off, &DecodeError{Tag: DecodeErrUnsupportedMajor, Major: major}
 }

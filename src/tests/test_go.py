@@ -24,11 +24,26 @@ from taut.wire import codec
 ROOT = Path(__file__).resolve().parents[2]
 RAZEL = load_schema(IR_PATH.parent / "razel.taut.py")
 RESEXT = load_schema(resext.IR_PATH)
+PARITY_SCHEMA = load_schema(ROOT / "ir/parity_int.taut.py")
+PARITY_INT_VECTORS = ROOT / "corpus/parity/int.vectors.json"
+PARITY_MALFORMED_VECTORS = ROOT / "corpus/parity/malformed.vectors.json"
 FLOAT_SCHEMA = mk(Msg("FloatMsg",
                       F("x", 1, FLOAT),
                       F("xs", 2, List(FLOAT)),
                       F("by_id", 3, Map(INT, FLOAT)),
                       F("maybe", 4, FLOAT, optional=True)))
+
+
+def _go_test_env(tmp_path: Path) -> dict[str, str]:
+    go_cache = tmp_path / "gocache"
+    go_tmp = tmp_path / "gotmp"
+    go_cache.mkdir(exist_ok=True)
+    go_tmp.mkdir(exist_ok=True)
+    env = os.environ.copy()
+    env["GO111MODULE"] = "off"
+    env["GOCACHE"] = str(go_cache)
+    env["GOTMPDIR"] = str(go_tmp)
+    return env
 
 
 def test_emits_structs_enums_and_codec():
@@ -38,7 +53,9 @@ def test_emits_structs_enums_and_codec():
     assert "type BuildStatus int64" in s
     assert "BuildStatusBuilt BuildStatus = 1" in s
     assert "func (x BuildResult) ToCbor() Cbor {" in s
+    assert "func TryBuildResultFromCbor(c Cbor) (BuildResult, error) {" in s
     assert "func BuildResultFromCbor(c Cbor) BuildResult {" in s
+    assert "func TryBuildStatusFromWire(v int64) (BuildStatus, error) {" in s
 
 
 def test_fields_pascalcased_and_optional_is_pointer():
@@ -63,16 +80,16 @@ def test_float_scalar_codegen():
     assert "CFloat(x.X)" in s
     assert "a = append(a, CFloat(e))" in s
     assert "V: CFloat(x.ById[k])" in s
-    assert "v.X = c.Get(1).Float()" in s
-    assert "t := fv.Float(); v.Maybe = &t" in s
+    assert "x, err := fv.TryFloat()" in s
+    assert "v.X = x" in s
+    assert "v.Maybe = &x" in s
 
 
-def test_go_runtime_float_harness():
+def test_go_runtime_float_harness(tmp_path):
     if shutil.which("go") is None:
         pytest.skip("go not installed")
 
-    env = os.environ.copy()
-    env["GO111MODULE"] = "off"
+    env = _go_test_env(tmp_path)
     result = subprocess.run(
         ["go", "test", "./src/taut/gen/runtime"],
         cwd=ROOT,
@@ -83,6 +100,275 @@ def test_go_runtime_float_harness():
         check=False,
     )
     assert result.returncode == 0, result.stdout
+
+
+def _go_i64_lit(s: str) -> str:
+    if s == "-9223372036854775808":
+        return "(-9223372036854775807 - 1)"
+    return s
+
+
+def _go_parity_int_rows(name: str, rows: list[dict]) -> str:
+    lines = [f"var {name} = []intCase{{"]
+    for row in rows:
+        if row["kind"] != "round_trip":
+            continue
+        by_id = row["value"]["by_id"]
+        if by_id:
+            entries = ", ".join(f"{_go_i64_lit(k)}: {_go_i64_lit(v)}" for k, v in by_id)
+            by_id_lit = f"map[int64]int64{{{entries}}}"
+        else:
+            by_id_lit = "map[int64]int64{}"
+        lines.append(
+            "\t{"
+            f"name: {_go_str(row['name'])}, "
+            f"n: {_go_i64_lit(row['value']['n'])}, "
+            f"byID: {by_id_lit}, "
+            f"wire: {_go_str(row['cbor'])}"
+            "},"
+        )
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def _go_parity_encode_fail_rows(name: str, rows: list[dict]) -> str:
+    lines = [f"var {name} = []encodeFailCase{{"]
+    for row in rows:
+        if row["kind"] == "encode_fail":
+            lines.append(f"\t{{name: {_go_str(row['name'])}, value: {_go_str(row['value']['n'])}}},")
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def _go_parity_malformed_rows(name: str, rows: list[dict]) -> str:
+    lines = [f"var {name} = []malformedCase{{"]
+    for row in rows:
+        expect = row["expect"]
+        fields = [
+            f"name: {_go_str(row['name'])}",
+            f"stage: {_go_str(row['stage'])}",
+            f"schema: {_go_str(row.get('schema', ''))}",
+            f"wire: {_go_str(row['bytes'])}",
+            f"tag: {_go_str(expect['tag'])}",
+            "info: -1",
+            "major: -1",
+            "key: -1",
+        ]
+        if "info" in expect:
+            fields[5] = f"info: {expect['info']}"
+        if "major" in expect:
+            fields[6] = f"major: {expect['major']}"
+        if "key" in expect:
+            fields[7] = f"key: {expect['key']}"
+        if "expected" in expect:
+            fields.append(f"expected: {_go_str(expect['expected'])}")
+        if "enum" in expect:
+            fields.append(f"enumName: {_go_str(expect['enum'])}")
+        if "value" in expect:
+            fields.append(f"value: {_go_str(expect['value'])}")
+        lines.append("\t{" + ", ".join(fields) + "},")
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def _write_parity_go_harness(tmp_path: Path) -> Path:
+    scaffold.emit(PARITY_SCHEMA, tmp_path, langs=["go"], services=[], runtime=True)
+    go_dir = tmp_path / "go"
+    int_rows = json.loads(PARITY_INT_VECTORS.read_text())["vectors"]
+    malformed_rows = json.loads(PARITY_MALFORMED_VECTORS.read_text())["vectors"]
+    harness = textwrap.dedent("""
+        package taut
+
+        import (
+            "encoding/hex"
+            "math/big"
+            "reflect"
+            "testing"
+        )
+
+        type intCase struct {
+            name string
+            n int64
+            byID map[int64]int64
+            wire string
+        }
+
+        type encodeFailCase struct {
+            name string
+            value string
+        }
+
+        type malformedCase struct {
+            name string
+            stage string
+            schema string
+            wire string
+            tag string
+            info int
+            major int
+            key int64
+            expected string
+            enumName string
+            value string
+        }
+
+        func mustHex(t *testing.T, s string) []byte {
+            t.Helper()
+            b, err := hex.DecodeString(s)
+            if err != nil {
+                t.Fatalf("bad hex %q: %v", s, err)
+            }
+            return b
+        }
+
+        func hexOf(b []byte) string {
+            return hex.EncodeToString(b)
+        }
+
+        @@INT_ROWS@@
+
+        @@ENCODE_FAIL_ROWS@@
+
+        @@MALFORMED_ROWS@@
+
+        func TestParityIntRoundTrips(t *testing.T) {
+            for _, row := range intCorpus {
+                value := IntBox{N: row.n, ById: row.byID}
+                if got := hexOf(Encode(value.ToCbor())); got != row.wire {
+                    t.Fatalf("%s encode: got %s want %s", row.name, got, row.wire)
+                }
+                c, err := TryDecode(mustHex(t, row.wire))
+                if err != nil {
+                    t.Fatalf("%s decode: %v", row.name, err)
+                }
+                decoded, err := TryIntBoxFromCbor(c)
+                if err != nil {
+                    t.Fatalf("%s from_cbor: %v", row.name, err)
+                }
+                if decoded.N != row.n || !reflect.DeepEqual(decoded.ById, row.byID) {
+                    t.Fatalf("%s value: got %+v want n=%d byID=%+v", row.name, decoded, row.n, row.byID)
+                }
+                if got := hexOf(Encode(decoded.ToCbor())); got != row.wire {
+                    t.Fatalf("%s re-encode: got %s want %s", row.name, got, row.wire)
+                }
+            }
+            t.Logf("round_trip=%d", len(intCorpus))
+        }
+
+        func TestParityEncodeFailRowsAreOutsideNativeInt64(t *testing.T) {
+            two63 := new(big.Int).Lsh(big.NewInt(1), 63)
+            min := new(big.Int).Neg(new(big.Int).Set(two63))
+            max := new(big.Int).Sub(new(big.Int).Set(two63), big.NewInt(1))
+            for _, row := range encodeFailCorpus {
+                n, ok := new(big.Int).SetString(row.value, 10)
+                if !ok {
+                    t.Fatalf("%s: bad integer %q", row.name, row.value)
+                }
+                if n.Cmp(min) >= 0 && n.Cmp(max) <= 0 {
+                    t.Fatalf("%s: %s is representable as int64", row.name, row.value)
+                }
+            }
+            t.Logf("encode_fail_unrepresentable=%d", len(encodeFailCorpus))
+        }
+
+        func malformedError(t *testing.T, row malformedCase) error {
+            t.Helper()
+            if row.stage == "raw_decode" {
+                _, err := TryDecode(mustHex(t, row.wire))
+                return err
+            }
+            c, err := TryDecode(mustHex(t, row.wire))
+            if err != nil {
+                return err
+            }
+            switch row.stage {
+            case "from_cbor":
+                switch row.schema {
+                case "IntBox":
+                    _, err = TryIntBoxFromCbor(c)
+                    return err
+                default:
+                    t.Fatalf("unknown from_cbor schema %s", row.schema)
+                }
+            case "from_wire":
+                switch row.schema {
+                case "Mode":
+                    _, err = TryModeFromCbor(c)
+                    return err
+                default:
+                    t.Fatalf("unknown from_wire schema %s", row.schema)
+                }
+            default:
+                t.Fatalf("unknown stage %s", row.stage)
+            }
+            return nil
+        }
+
+        func expectDecodeError(t *testing.T, row malformedCase, err error) {
+            t.Helper()
+            if err == nil {
+                t.Fatalf("%s: expected %s, got nil", row.name, row.tag)
+            }
+            derr, ok := err.(*DecodeError)
+            if !ok {
+                t.Fatalf("%s: got %T %v, want *DecodeError", row.name, err, err)
+            }
+            if derr.Tag != row.tag {
+                t.Fatalf("%s: tag got %s want %s (%v)", row.name, derr.Tag, row.tag, err)
+            }
+            if row.info >= 0 && int(derr.Info) != row.info {
+                t.Fatalf("%s: info got %d want %d", row.name, derr.Info, row.info)
+            }
+            if row.major >= 0 && int(derr.Major) != row.major {
+                t.Fatalf("%s: major got %d want %d", row.name, derr.Major, row.major)
+            }
+            if row.key >= 0 && derr.Key != row.key {
+                t.Fatalf("%s: key got %d want %d", row.name, derr.Key, row.key)
+            }
+            if row.expected != "" && derr.Expected != row.expected {
+                t.Fatalf("%s: expected got %s want %s", row.name, derr.Expected, row.expected)
+            }
+            if row.enumName != "" && derr.Enum != row.enumName {
+                t.Fatalf("%s: enum got %s want %s", row.name, derr.Enum, row.enumName)
+            }
+            if row.value != "" && derr.Value != row.value {
+                t.Fatalf("%s: value got %s want %s", row.name, derr.Value, row.value)
+            }
+        }
+
+        func TestParityMalformedCorpus(t *testing.T) {
+            for _, row := range malformedCorpus {
+                expectDecodeError(t, row, malformedError(t, row))
+            }
+            t.Logf("malformed=%d", len(malformedCorpus))
+        }
+    """)
+    harness = harness.replace("@@INT_ROWS@@", _go_parity_int_rows("intCorpus", int_rows))
+    harness = harness.replace("@@ENCODE_FAIL_ROWS@@", _go_parity_encode_fail_rows("encodeFailCorpus", int_rows))
+    harness = harness.replace("@@MALFORMED_ROWS@@", _go_parity_malformed_rows("malformedCorpus", malformed_rows))
+    (go_dir / "parity_test.go").write_text(harness)
+    return go_dir
+
+
+def test_go_shared_parity_harness(tmp_path):
+    if shutil.which("go") is None:
+        pytest.skip("go not installed")
+
+    go_dir = _write_parity_go_harness(tmp_path)
+    env = _go_test_env(tmp_path)
+    result = subprocess.run(
+        ["go", "test", "-v"],
+        cwd=go_dir,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout
+    assert "round_trip=7" in result.stdout
+    assert "encode_fail_unrepresentable=3" in result.stdout
+    assert "malformed=12" in result.stdout
 
 
 def _go_str(s: str) -> str:
@@ -379,8 +665,7 @@ def test_go_resext_phase2_harness(tmp_path):
         pytest.skip("go not installed")
 
     go_dir = _write_resext_go_harness(tmp_path)
-    env = os.environ.copy()
-    env["GO111MODULE"] = "off"
+    env = _go_test_env(tmp_path)
     result = subprocess.run(
         ["go", "test", "-v"],
         cwd=go_dir,
