@@ -241,13 +241,18 @@ def _rs_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def rust_api(schema: Schema, forward_compat: bool = False) -> str:
-    out = ["// GENERATED native Rust types + codec — do not edit.", "#![allow(dead_code)]",
-           "use crate::cbor::Cbor;", ""]
+def rust_api(schema: Schema, forward_compat: bool = False, fail_closed: bool = False) -> str:
+    out = ["// GENERATED native Rust types + codec — do not edit.", "#![allow(dead_code)]"]
+    if fail_closed:
+        # fail-closed decode returns the runtime's typed error type.
+        out.append("use crate::cbor::{Cbor, DecodeError};")
+    else:
+        out.append("use crate::cbor::Cbor;")
+    out.append("")
     for e in schema.enums.values():
-        out += _rust._emit_enum(e.name, e.members) + [""]
+        out += _rust._emit_enum(e.name, e.members, fail_closed) + [""]
     for m in schema.messages.values():
-        out += _rust._emit_message(m, forward_compat) + [""]
+        out += _rust._emit_message(m, forward_compat, fail_closed) + [""]
     return "\n".join(out).rstrip() + "\n"
 
 
@@ -562,6 +567,7 @@ def emit(
     services: list[str] | None = None,
     runtime: bool = False,
     forward_compat: bool = False,
+    fail_closed: bool = False,
 ) -> list[Path]:
     """Generate per-language code from an IR (the engine behind the `tautc` CLI).
 
@@ -576,6 +582,16 @@ def emit(
       that preserves unknown/newer-version tags (Rust today). Off by default.
       An IR that declares extensions requires it for compiled targets (D14:
       extensions ride the residual space) — otherwise generation is a build error.
+    - `fail_closed`: (Rust only, opt-in) when True, generated `from_cbor` returns
+      `Result<Self, DecodeError>` and `from_wire` is fallible — decode never
+      panics on malformed/untrusted input — and a CBOR `int` outside the frozen
+      `i64` subset is a typed error (no silent u64 wrap, no wider carry). With
+      `runtime=True` the matching fail-closed `cbor.rs` (typed `DecodeError`,
+      bounds-checked `try_decode` + `try_*` accessors) is vendored instead of the
+      panicking one.
+      Off by default: the default output is byte-for-byte today's, so a consumer
+      who regenerates without the flag is unaffected. Intended for an untrusted
+      wire boundary (e.g. a socket) — see dev-docs/RustFailClosed.md.
 
     `api.{ext}` (types + codec) is always written per language; client/server are
     `client.{ext}` for a lone service, `client_{svc}.{ext}` when several.
@@ -591,6 +607,14 @@ def emit(
             f"({'/'.join(sorted(_GENERATED))}) requires forward_compat (extensions ride "
             "the residual space) — pass --forward-compat"
         )
+    if fail_closed and any(l != "rust" for l in lang_keys):
+        # fail-closed codegen is Rust-only today; refuse silently-ignoring it for
+        # other targets so the flag never gives a false sense of hardening.
+        raise ValueError(
+            "--fail-closed is only supported for the rust target today; "
+            f"drop the other lang(s) {sorted(l for l in lang_keys if l != 'rust')} "
+            "or the flag"
+        )
     svc_names = list(services) if services is not None else list(schema.services)
     missing = [s for s in svc_names if s not in schema.services]
     if missing:
@@ -602,10 +626,19 @@ def emit(
         d = out_dir / lang
         d.mkdir(parents=True, exist_ok=True)
         api_path = d / f"api.{ext}"
-        api_path.write_text(api_fn(schema, forward_compat=forward_compat))
+        # Only the Rust generator takes fail_closed (guarded above to rust-only).
+        api_kwargs = {"forward_compat": forward_compat}
+        if lang == "rust":
+            api_kwargs["fail_closed"] = fail_closed
+        api_path.write_text(api_fn(schema, **api_kwargs))
         written.append(api_path)
         if runtime and lang in _RUNTIMES:
             for rel, resource in _RUNTIMES[lang]:
+                # Fail-closed Rust vendors the hardened runtime under the SAME
+                # output name (`cbor.rs`) so generated code's `use crate::cbor`
+                # is unchanged; only the source swaps.
+                if lang == "rust" and fail_closed and resource == "cbor.rs":
+                    resource = "cbor_fail_closed.rs"
                 if not _runtime_exists(resource):
                     continue   # e.g. ext.<lang> before Phase 2 — vendored once its file lands
                 rt_path = d / rel

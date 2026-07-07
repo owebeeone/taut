@@ -49,6 +49,7 @@ def _cmd_gen(args: argparse.Namespace) -> int:
     written = scaffold.emit(
         schema, Path(args.out), langs=_split(args.lang), services=services,
         runtime=args.with_runtime, forward_compat=args.forward_compat,
+        fail_closed=args.fail_closed,
     )
     for p in written:
         print(p)
@@ -123,6 +124,11 @@ def main(argv: list[str] | None = None) -> int:
                    help="also emit the vendored CBOR runtime for compiled targets (rust->cbor.rs, cpp->taut/cbor.hpp)")
     g.add_argument("--forward-compat", action="store_true",
                    help="generated structs carry a wire_residual field preserving unknown/newer tags (Rust; required if the IR has extensions)")
+    g.add_argument("--fail-closed", action="store_true",
+                   help="(Rust only, opt-in) fallible decode: from_cbor -> Result<_, DecodeError>, "
+                        "never panics on malformed/untrusted input; a CBOR int outside the frozen i64 "
+                        "subset is a typed error (no silent u64 wrap, no wider carry). With --with-runtime "
+                        "vendors the hardened cbor.rs. Default output is byte-identical to omitting the flag.")
     g.set_defaults(func=_cmd_gen)
 
     c = sub.add_parser("corpus", help="derive a golden conformance corpus (+ parity harness) from an IR")

@@ -19,7 +19,7 @@ import pytest
 from taut import ext as py_ext
 from taut.gen import scaffold
 from taut.gen import rust
-from taut.ir.dsl import FLOAT, INT, F, List, Map, Msg, schema
+from taut.ir.dsl import FLOAT, INT, STR, Enum, F, List, Map, Msg, Ref, schema
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor as py_cbor
@@ -412,4 +412,194 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
 
     bin_path = tmp_path / "resext_vectors"
     subprocess.run([rustc, "--test", str(test_rs), "-o", str(bin_path)], check=True)
+    subprocess.run([str(bin_path)], check=True)
+
+
+# =============================================================================
+# Fail-closed (opt-in) Rust codec — the untrusted-boundary hardening.
+#
+# Non-negotiable: the default (no-flag) output is byte-for-byte today's, so a
+# consumer that regenerates WITHOUT the flag is unaffected. These tests pin the
+# opt-in shape and prove the default is unchanged, mirroring the forward-compat
+# gates in test_forward_compat.py.
+# =============================================================================
+
+# A schema exercising every scalar + an enum + optional + collections, so the
+# fallible codegen is checked on each decode path.
+_FC = schema(
+    Enum("Color", red=0, green=1, blue=2),
+    Msg("M",
+        F("n", 1, INT),
+        F("name", 2, STR),
+        F("c", 3, Ref("Color")),
+        F("maybe", 4, INT, optional=True),
+        F("ns", 5, List(INT)),
+        F("by_id", 6, Map(INT, INT))),
+)
+
+
+def test_rust_fail_closed_emits_fallible_from_cbor_and_i64_ints():
+    rs = scaffold.rust_api(_FC, fail_closed=True)
+    # from_cbor is fallible and never panics on input
+    assert "pub fn from_cbor(c: &Cbor) -> Result<Self, DecodeError>" in rs
+    assert "use crate::cbor::{Cbor, DecodeError};" in rs
+    # int fields keep the i64 carrier (the frozen wire int subset); an out-of-i64
+    # wire int is a typed decode error, not a silent u64 wrap or a wider carry
+    assert "pub n: i64," in rs
+    assert "pub maybe: Option<i64>," in rs
+    # decode uses the fallible runtime accessors with `?`-propagation
+    assert "n: c.try_get(1)?.try_int()?," in rs
+    assert "name: c.try_get(2)?.try_text()?," in rs
+    # enum decode is fallible on both from_wire and the int accessor
+    assert "c: Color::from_wire(c.try_get(3)?.try_int()?)?," in rs
+    # optional decode threads the fallible get + accessor
+    assert "maybe: { let v = c.try_get(4)?; if v.is_null() { None } else { Some(v.try_int()?) } }," in rs
+
+
+def test_rust_fail_closed_enum_from_wire_is_fallible():
+    rs = scaffold.rust_api(_FC, fail_closed=True)
+    assert "pub fn from_wire(v: i64) -> Result<Self, DecodeError>" in rs
+    assert 'return Err(DecodeError::UnknownEnum { enum_name: "Color", value: v })' in rs
+    # wire() returns the i64 carrier so `Cbor::Int(x.wire())` type-checks
+    assert "pub fn wire(self) -> i64" in rs
+
+
+def test_rust_fail_closed_is_off_by_default_and_byte_identical():
+    # Default output must be exactly today's: infallible from_cbor, i64 ints,
+    # panicking from_wire, no DecodeError import.
+    default = scaffold.rust_api(_FC)
+    assert "pub fn from_cbor(c: &Cbor) -> Self {" in default
+    assert "Result<Self, DecodeError>" not in default
+    assert "DecodeError" not in default
+    assert "pub n: i64," in default
+    assert "i128" not in default
+    assert "pub fn from_wire(v: i64) -> Self {" in default
+    assert 'panic!("bad Color wire value' in default
+    # and the flag genuinely changes the output
+    assert scaffold.rust_api(_FC, fail_closed=True) != default
+
+
+def test_fail_closed_rejects_non_rust_targets(tmp_path):
+    # The flag is Rust-only today; refuse it for other targets rather than
+    # silently emitting unhardened code.
+    with pytest.raises(ValueError):
+        scaffold.emit(_FC, tmp_path, langs=["rust", "python"], services=[], fail_closed=True)
+    # rust-only is fine
+    scaffold.emit(_FC, tmp_path, langs=["rust"], services=[], fail_closed=True)
+
+
+def test_rust_fail_closed_runtime_decode_is_fail_closed(tmp_path):
+    """rustc-driven: the hardened api.rs + cbor.rs decode every malformed /
+    truncated / unknown-enum / wrong-type / trailing-byte / out-of-subset-int
+    input to a typed error (never a panic); i64 extremes round-trip and a CBOR
+    integer outside the frozen i64 subset is rejected (never wrapped)."""
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        pytest.skip("rustc not available")
+
+    generated = tmp_path / "generated"
+    scaffold.emit(_FC, generated, langs=["rust"], services=[], runtime=True, fail_closed=True)
+    rust_dir = generated / "rust"
+    api_path = (rust_dir / "api.rs").as_posix()
+    cbor_path = (rust_dir / "cbor.rs").as_posix()
+    # The hardened cbor.rs uses `alloc::…`; alias alloc->std for the std test bin.
+    test_rs = tmp_path / "fail_closed.rs"
+    test_rs.write_text(textwrap.dedent(f"""
+        extern crate alloc;
+        #[path = "{cbor_path}"]
+        mod cbor;
+        #[path = "{api_path}"]
+        mod api;
+
+        use cbor::{{try_decode, encode, Cbor, DecodeError}};
+        use api::{{Color, M}};
+
+        fn ok_map() -> Vec<u8> {{
+            // a fully valid M whose i64 field carries the in-subset extreme i64::MAX
+            let m = M {{
+                n: i64::MAX,
+                name: "x".to_string(),
+                c: Color::Blue,
+                maybe: None,
+                ns: vec![1, 2],
+                by_id: std::collections::BTreeMap::new(),
+            }};
+            encode(&m.to_cbor())
+        }}
+
+        #[test]
+        fn i64_extremes_round_trip_and_out_of_subset_is_rejected() {{
+            // The frozen wire int subset is i64: the in-subset extreme i64::MAX
+            // (carried by `n` in ok_map) survives the full struct round-trip...
+            let bytes = ok_map();
+            let decoded = try_decode(&bytes).expect("valid");
+            let m = M::from_cbor(&decoded).expect("valid M");
+            assert_eq!(m.n, i64::MAX);
+            // ...and both i64 extremes round-trip at the Cbor carrier level.
+            for v in [i64::MAX, i64::MIN, 0i64, -1, 1] {{
+                assert_eq!(try_decode(&encode(&Cbor::Int(v))), Ok(Cbor::Int(v)));
+            }}
+            // A physically valid CBOR integer OUTSIDE the frozen i64 subset is a
+            // typed error — never a silent wrap, a panic, or a 128-bit carry.
+            // u64::MAX   (major-0, 2^64 - 1)
+            assert_eq!(try_decode(&[0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
+                       Err(DecodeError::IntOverflow));
+            // -2^64      (major-1, -1 - (2^64 - 1))
+            assert_eq!(try_decode(&[0x3b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
+                       Err(DecodeError::IntOverflow));
+            // 2^63       (major-0, i64::MAX + 1) — just over
+            assert_eq!(try_decode(&[0x1b, 0x80, 0, 0, 0, 0, 0, 0, 0]),
+                       Err(DecodeError::IntOverflow));
+            // -2^63 - 1  (major-1, i64::MIN - 1) — just under
+            assert_eq!(try_decode(&[0x3b, 0x80, 0, 0, 0, 0, 0, 0, 0]),
+                       Err(DecodeError::IntOverflow));
+        }}
+
+        #[test]
+        fn every_bad_input_is_a_typed_error_never_a_panic() {{
+            // empty / truncated argument
+            assert_eq!(try_decode(&[]), Err(DecodeError::Truncated));
+            assert_eq!(try_decode(&[0x1b, 0, 0, 0]), Err(DecodeError::Truncated)); // 8-byte int, 3 present
+            // unknown major (major 6 = tags, out of subset)
+            assert!(matches!(try_decode(&[0xc0]), Err(DecodeError::UnsupportedMajor(6))));
+            // unknown enum arm
+            assert_eq!(
+                Color::from_wire(99),
+                Err(DecodeError::UnknownEnum {{ enum_name: "Color", value: 99 }})
+            );
+            // wrong type: field 1 (n) wants int, give text
+            let wrong = encode(&Cbor::Map(vec![
+                (1, Cbor::Text("nope".to_string())),
+                (2, Cbor::Text("x".to_string())),
+                (3, Cbor::Int(0)),
+                (5, Cbor::Array(vec![])),
+                (6, Cbor::Array(vec![])),
+            ]));
+            assert_eq!(
+                M::from_cbor(&try_decode(&wrong).unwrap()),
+                Err(DecodeError::WrongType {{ expected: "int" }})
+            );
+            // missing key: drop field 2
+            let missing = encode(&Cbor::Map(vec![(1, Cbor::Int(1))]));
+            assert_eq!(
+                M::from_cbor(&try_decode(&missing).unwrap()),
+                Err(DecodeError::MissingKey(2))
+            );
+            // trailing bytes after a complete item
+            let mut trailing = encode(&Cbor::Int(1));
+            trailing.push(0x00);
+            assert_eq!(try_decode(&trailing), Err(DecodeError::TrailingBytes));
+        }}
+
+        #[test]
+        fn valid_message_still_decodes() {{
+            let m = M::from_cbor(&try_decode(&ok_map()).unwrap()).unwrap();
+            assert_eq!(m.name, "x");
+            assert_eq!(m.c, Color::Blue);
+            assert_eq!(m.ns, vec![1i64, 2]);
+        }}
+    """))
+
+    bin_path = tmp_path / "fail_closed"
+    subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
     subprocess.run([str(bin_path)], check=True)
