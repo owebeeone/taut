@@ -92,7 +92,9 @@
         "channel_data": 9,
         "channel_close": 10,
         "chunk": 11,
-        "error": 12
+        "error": 12,
+        "node_hello": 13,
+        "node_welcome": 14
       }
     },
     {
@@ -447,6 +449,88 @@
             }
           },
           "optional": false,
+          "transient": false,
+          "merge": null
+        }
+      ]
+    },
+    {
+      "name": "NodeHello",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
+      "fields": [
+        {
+          "name": "node_id",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "bytes"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "protocol",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "sig",
+          "tag": 3,
+          "type": {
+            "k": "scalar",
+            "scalar": "bytes"
+          },
+          "optional": true,
+          "transient": false,
+          "merge": null
+        }
+      ]
+    },
+    {
+      "name": "NodeWelcome",
+      "reserved_tags": [],
+      "reserved_names": [],
+      "next_id": null,
+      "fields": [
+        {
+          "name": "node_id",
+          "tag": 1,
+          "type": {
+            "k": "scalar",
+            "scalar": "bytes"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "protocol",
+          "tag": 2,
+          "type": {
+            "k": "scalar",
+            "scalar": "int"
+          },
+          "optional": false,
+          "transient": false,
+          "merge": null
+        },
+        {
+          "name": "sig",
+          "tag": 3,
+          "type": {
+            "k": "scalar",
+            "scalar": "bytes"
+          },
+          "optional": true,
           "transient": false,
           "merge": null
         }

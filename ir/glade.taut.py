@@ -43,7 +43,12 @@ SCHEMA = schema(
          ops=4, heads=5,
          exchange_req=6, exchange_res=7,
          channel_open=8, channel_data=9, channel_close=10,
-         chunk=11, error=12),
+         chunk=11, error=12,
+         # node<->node handshake seam (Lane R step 2). The client HELLO
+         # (Hello/Welcome) carries a session + principal/capability; the node
+         # peer HELLO carries a node identity instead. Appended (13/14) so the
+         # existing wire values stay frozen.
+         node_hello=13, node_welcome=14),
     # QoS classes for the single-socket scheduler (§6): interactive/control
     # preempt bulk log backfill; bulk may be conflated/chunked.
     Enum("Priority", control=0, interactive=1, bulk=2),
@@ -105,6 +110,21 @@ SCHEMA = schema(
         F("session", 1, STR),
         F("protocol", 2, INT),
         F("heads", 3, List(Ref("StreamHeads")))),
+
+    # Node<->node handshake (the s-sync DIAL gate: "node<->node HELLO seam").
+    # node_id = sha256(node key) — the stubbed-but-structure-real identity
+    # (GladeSystemDataSeamNotes: ed25519 swaps in behind the seam). sig is the
+    # operator/origin signature seam — present, unenforced (empty when stubbed).
+    # Distinct from the client Hello: peers exchange node identity, not a
+    # session principal, and sync integrity NEVER trusts this handshake.
+    Msg("NodeHello",
+        F("node_id", 1, BYTES),
+        F("protocol", 2, INT),
+        F("sig", 3, BYTES, optional=True)),
+    Msg("NodeWelcome",
+        F("node_id", 1, BYTES),
+        F("protocol", 2, INT),
+        F("sig", 3, BYTES, optional=True)),
 
     # Interest. key absent = all keys under glade_id. from = resume cursor.
     Msg("Subscribe",
