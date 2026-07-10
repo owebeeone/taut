@@ -147,9 +147,11 @@ def _write_parity_inputs(tmp_path: Path) -> tuple[Path, Path]:
     int_rows = tmp_path / "parity-int.tsv"
     malformed_rows = tmp_path / "parity-malformed.tsv"
 
+    # Baseline smoke test: pin the reviewed set; `lead` rows belong to the
+    # governed `tautc parity` gate (corpus/parity/gen_vectors.py).
     int_data = json.loads(PARITY_INT.read_text())
     rows = []
-    for row in int_data["vectors"]:
+    for row in [r for r in int_data["vectors"] if not r.get("lead")]:
         value = row["value"]
         by_id = ";".join(f"{k}={v}" for k, v in value.get("by_id", [])) or "-"
         rows.append([
@@ -164,7 +166,7 @@ def _write_parity_inputs(tmp_path: Path) -> tuple[Path, Path]:
 
     malformed_data = json.loads(PARITY_MALFORMED.read_text())
     rows = []
-    for row in malformed_data["vectors"]:
+    for row in [r for r in malformed_data["vectors"] if not r.get("lead")]:
         expect = row["expect"]
         rows.append([
             row["name"],

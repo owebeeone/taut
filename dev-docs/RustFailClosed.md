@@ -1,6 +1,13 @@
-# Fail-closed Rust codec (`--fail-closed`)
+# Fail-closed Rust codec (the default since v0.8.0)
 
-**Status:** implemented (opt-in). Default codegen is byte-for-byte unchanged.
+**Status:** implemented and **the default** (D1 ratified, flipped @ **v0.8.0**).
+`tautc gen` emits the fail-closed Rust codec with no flag. The legacy fail-open
+codec survives only behind the deprecated **`--legacy-codec`** opt-out (warns on
+use, stamps a deprecation banner into the generated header); per the two-minor
+sunset rule the opt-out — and the legacy runtime template — are **removed @
+v0.10.0**. `--fail-closed` is still accepted as a redundant **no-op alias**
+(warns that it is now the default). Non-rust targets: the flag is a **no-op**
+(TS/js/python harden at the runtime-library level; Wave-2 per Phase 4).
 
 > **Revised 2026-07-07 — the frozen wire int subset is `i64` (`[-2^63, 2^63-1]`).**
 > The `i128` widening described below was dropped. The fail-closed path keeps the
@@ -31,21 +38,26 @@ hole. `taut-shape-tool`'s `framing.rs` already had to wrap decode in a
 panics leak all the way up. The fix pushes fail-closed discipline **down into
 decode itself** so the `catch_unwind` becomes unnecessary.
 
-## The opt-in — mirrors `--forward-compat`
+## The default (D1) — with a deprecated `--legacy-codec` opt-out
 
-`from_cbor -> Result<_, DecodeError>` is an API change to generated code, so it
-is strictly **opt-in**, exactly like `--forward-compat`:
+`from_cbor -> Result<_, DecodeError>` **is the default** as of v0.8.0 (D1 ratified).
+It is threaded as a `fail_closed: bool = True` kwarg through
+`emit → rust_api → _emit_enum / _emit_message / _decode_try`.
 
-- `tautc gen … -l rust --fail-closed` (CLI) / `scaffold.emit(…, fail_closed=True)`
-  (API). Threaded as a `fail_closed: bool = False` kwarg through
-  `emit → rust_api → _emit_enum / _emit_message / _decode_try`.
-- **Off by default**: a consumer who regenerates *without* the flag gets today's
-  output **byte-for-byte** (proven: pristine-HEAD default output ≡ new default
-  output, and the byte-exact generator tests in `test_rust.py` still pass). So
-  existing consumers (gwz) are unaffected by construction.
-- Rust-only today. `emit()` raises if `--fail-closed` is combined with a non-rust
-  target, so the flag never gives a false sense of hardening for a language whose
-  codegen wasn't hardened.
+- **Default**: `tautc gen … -l rust` (no flag) / `scaffold.emit(…)` emit the
+  fail-closed codec (+ the hardened `cbor.rs` with `--with-runtime`).
+- **Opt-out** (deprecated): `tautc gen … --legacy-codec` /
+  `scaffold.emit(…, fail_closed=False)` restore today's pre-v0.8.0 legacy codec
+  **body byte-for-byte** (infallible `from_cbor -> Self`, panicking runtime), with
+  a one-line **deprecation banner** prepended to the generated header and a
+  gen-time stderr warning. **Sunset:** removed @ **v0.10.0** (two minors after the
+  v0.8.0 flip). A pinned consumer is unaffected; a regen-in-window either migrates
+  or passes `--legacy-codec`; after v0.10.0 regeneration is intentionally breaking.
+- `--fail-closed` is a redundant **no-op alias** (warns: now the default).
+- **Rust-only change, no-op elsewhere**: `fail_closed` only alters the *Rust*
+  codegen. Combining it with a non-rust target no longer raises — the flag is
+  silently ignored for TS/js/python (hardened at the runtime-library level:
+  `cbor.ts` / `cbor.js` / `wire/cbor.py`) and for Wave-2 (per Phase 4).
 
 ## What the flag changes (all opt-in, all Rust)
 
@@ -103,7 +115,8 @@ arm.
 enum DecodeError {
     Truncated, TrailingBytes, InvalidUtf8,
     UnsupportedInfo(u8), UnsupportedMajor(u8),
-    NonIntegerMapKey, IntOverflow,
+    NonIntegerMapKey, DuplicateMapKey(i64), IntOverflow,
+    NonCanonicalInt(u64), NegativeMapKey(i64),   // D2 strict-canonical (below)
     MissingKey(i64),
     WrongType { expected: &'static str },
     UnknownEnum { enum_name: &'static str, value: i64 },
@@ -113,21 +126,58 @@ enum DecodeError {
 Every variant is reachable only from *input* bytes; `Display` is implemented; it
 is `no_std`-safe (`core::fmt`).
 
+## Strict-canonical decode (D2, ratified)
+
+The decoder accepts exactly the bytes the canonical encoder can emit — the law
+`decode(bytes)` ok ⇒ `encode(decode(bytes)) == bytes`. Two checks realize it in
+the runtime (decode-only; encode is untouched and stays byte-identical):
+
+- **`NonCanonicalInt`** — in `read_arg`, after reading a multi-byte argument that
+  would fit a shorter width (`info=24 && v<24`, `25 && v≤0xFF`, `26 && v≤0xFFFF`,
+  `27 && v≤0xFFFF_FFFF`). Rejects non-minimal integer encodings.
+- **`NegativeMapKey`** — in the raw map arm, a CBOR map key `< 0` (distinct from
+  `NonIntegerMapKey`). Canonical taut field tags are non-negative, so this never
+  fires on a well-formed taut message (schema `map<int,V>` rides an array of
+  `{1:key,2:value}` pair-structs, not a raw negative-keyed CBOR map).
+
+The same two checks are mirrored in the Python/TS/js runtimes; the four Wave-1
+codecs are gated GREEN by `tautc parity` (the allowlist holds only Wave-2 now).
+
 ## Files
 
 - `taut/src/taut/gen/rust.py` — `_emit_enum` / `_emit_message` /
   `_from_cbor_fail_closed` / `_decode_try` (+ `_decode_try_elem`) / `_rust_int_type`,
   all gated on `fail_closed`. The default path (`_from_cbor_default`, `_decode`)
   is untouched.
-- `taut/src/taut/gen/scaffold.py` — `rust_api(fail_closed=…)`, `emit(fail_closed=…)`,
-  runtime-resource swap (`cbor.rs → cbor_fail_closed.rs`), rust-only guard.
-- `taut/src/taut/cli.py` — `--fail-closed`.
+- `taut/src/taut/gen/scaffold.py` — `emit(fail_closed=True)` **default flip** (D1),
+  `rust_api(fail_closed=…)`, runtime-resource swap (`cbor.rs → cbor_fail_closed.rs`),
+  the `_LEGACY_CODEC_BANNER` stamped on the opt-out path; the old rust-only *guard*
+  is now a **no-op note** (fail-closed is silently ignored for non-rust langs).
+- `taut/src/taut/cli.py` — `--legacy-codec` (deprecated opt-out + warning),
+  `--fail-closed` (redundant no-op alias + note).
 - `taut/src/taut/gen/runtime/cbor_fail_closed.rs` — the hardened runtime template
-  (encode byte-identical to `cbor.rs`; adds `DecodeError` + fallible decode).
-- `taut/src/tests/test_rust.py` — the fail-closed gates (shape + off-by-default +
-  rustc-driven behavior: u64::MAX round-trip and every bad input → typed error).
+  (encode byte-identical to `cbor.rs`; adds `DecodeError` + fallible decode + the
+  D2 `NonCanonicalInt` / `NegativeMapKey` checks).
+- `taut/src/taut/wire/cbor.py`, `…/gen/runtime/typescript/cbor.ts`,
+  `…/gen/runtime/cbor.js` — the same D2 strict-canonical checks in the Python/TS/js
+  runtimes (Wave-1 parity).
+- `taut/corpus/parity/allowlist.json` — Wave-1 de-listed (all four gated GREEN);
+  only Wave-2 remains allowlisted.
+- `taut/src/tests/test_rust.py` — the fail-closed gates (shape + legacy opt-out
+  byte-identity + emit-default-is-fail-closed + banner + non-rust no-op +
+  rustc-driven behavior: out-of-i64 reject and every bad input → typed error).
 
 ## Reference adoption: `taut-shape-rs`
+
+> **Drift note (2026-07-10, D2 landing).** The vendored
+> `crates/taut-shape/src/cbor.rs` is pinned at an **older taut rev** (`70e17b7`)
+> and has already drifted from the current source: it predates the
+> `DuplicateMapKey` variant + duplicate-key check, and now also the D2
+> `NonCanonicalInt` / `NegativeMapKey` checks. **Follow-up:** a deliberate
+> re-vendor (pin bump) should bring `cbor.rs` + `generated.rs` current in one move
+> and re-run `cargo test --workspace`. Not done as part of the D2/D1 landing —
+> a partial D2-only patch would be incoherent and a full re-vendor pulls in
+> unrelated drift, both out of scope for the pinned rev.
 
 `taut-shape-rs` (the reference `log` node/client, the impl razel patterns on) is
 migrated to the hardened mode as the worked example:
@@ -157,20 +207,24 @@ committed `log.v0.json`), the rs/ts/py interop matrix (36/36), taut-shape-rs
 razel pins taut by release/rev (like gwz) and invokes:
 
 ```
-tautc gen <razel.taut.py> -o <gen-dir> -l rust --api-only --with-runtime --fail-closed
+tautc gen <razel.taut.py> -o <gen-dir> -l rust --api-only --with-runtime
 ```
 
-which emits `api.rs` (fallible `from_cbor -> Result<_, DecodeError>`, `i128`
-ints) + a hardened `cbor.rs` (fallible `try_decode`). razel decodes socket bytes
+(post-v0.8.0 the `--fail-closed` flag is redundant — it's the default now — but
+still accepted as a no-op.) This emits `api.rs` (fallible
+`from_cbor -> Result<_, DecodeError>`, `i64` ints) + a hardened `cbor.rs`
+(fallible `try_decode`). razel decodes socket bytes
 with `cbor::try_decode(bytes)?` then `Msg::from_cbor(&c)?` — a malformed or
 hostile frame is a typed `DecodeError`, never a panic or a wrapped integer.
 
-## gwz migration (if/when it adopts hardening)
+## gwz migration (post-v0.8.0 flip)
 
-gwz is unaffected today: it regenerates `gwz-core/src/protocol/generated.rs` +
-`cbor.rs` **without** `--fail-closed`, so it gets today's bytes exactly. To
-adopt the hardening later, gwz re-runs its regen with `--fail-closed`
-(`--with-runtime` if it re-vendors `cbor.rs`), then updates its call sites: every
+**The default flipped**, so the migration logic inverts: a gwz regen with no flag
+now emits the *fail-closed* codec. Options: (a) **pin** taut < v0.8.0 (or its
+current generated files) — unaffected; (b) **opt out** by adding `--legacy-codec`
+to its regen to keep today's bytes exactly (deprecated; gone @ v0.10.0); or
+(c) **adopt** the hardening — regen with no flag (`--with-runtime` if it re-vendors
+`cbor.rs`), then update its call sites: every
 `Msg::from_cbor(&c)` becomes `Msg::from_cbor(&c)?` (its decode entry points
 return `Result`), int fields it reads become `i128` (narrow with `as u64`/`as
 u32` at the engine boundary, as taut-shape-rs does), and — if it runs

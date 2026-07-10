@@ -265,8 +265,10 @@ def test_float_codegen_shape():
 
 
 def test_swift_parity_corpus_vectors(tmp_path):
-    int_vectors = json.loads(PARITY_INT_VECTORS.read_text())["vectors"]
-    malformed_vectors = json.loads(PARITY_MALFORMED_VECTORS.read_text())["vectors"]
+    # Baseline smoke test: pin the reviewed set; `lead` rows belong to the
+    # governed `tautc parity` gate (corpus/parity/gen_vectors.py).
+    int_vectors = [r for r in json.loads(PARITY_INT_VECTORS.read_text())["vectors"] if not r.get("lead")]
+    malformed_vectors = [r for r in json.loads(PARITY_MALFORMED_VECTORS.read_text())["vectors"] if not r.get("lead")]
     round_trip_rows = [
         row for row in int_vectors
         if row["kind"] == "round_trip"

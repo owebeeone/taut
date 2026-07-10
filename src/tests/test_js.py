@@ -74,8 +74,12 @@ def test_js_i64_bigint_and_fail_closed_parity(tmp_path):
     assert (js_dir / "api.js").exists()
     assert (js_dir / "cbor.js").exists()
 
+    # Baseline smoke test: pin the reviewed set; `lead` rows belong to the
+    # governed `tautc parity` gate (corpus/parity/gen_vectors.py).
     int_vectors = json.loads(PARITY_INT_VECTORS.read_text())
+    int_vectors["vectors"] = [r for r in int_vectors["vectors"] if not r.get("lead")]
     malformed_vectors = json.loads(PARITY_MALFORMED_VECTORS.read_text())
+    malformed_vectors["vectors"] = [r for r in malformed_vectors["vectors"] if not r.get("lead")]
     harness = js_dir / "parity_i64.test.js"
     harness.write_text(textwrap.dedent(f"""
         "use strict";

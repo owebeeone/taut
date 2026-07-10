@@ -227,6 +227,11 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
         services=[],
         runtime=True,
         forward_compat=True,
+        # legacy (infallible) codec: this test's Rust program calls
+        # `Decision::from_cbor(&c) -> Self` / `Host::from_cbor(&d).to_cbor()`
+        # directly. The residual/ext behaviour is orthogonal to the D1 flip;
+        # pin it to the legacy codec so the program keeps compiling.
+        fail_closed=False,
     )
     rust_dir = generated / "rust"
     assert (rust_dir / "api.rs").exists()
@@ -448,7 +453,10 @@ _FC = schema(
 
 
 def _rust_parity_int_rows() -> tuple[str, str]:
-    rows = json.loads((ROOT / "corpus" / "parity" / "int.vectors.json").read_text())["vectors"]
+    # Baseline smoke test: pin the reviewed set; `lead` rows are the governed
+    # `tautc parity` gate's job (see corpus/parity/gen_vectors.py).
+    rows = [r for r in json.loads((ROOT / "corpus" / "parity" / "int.vectors.json").read_text())["vectors"]
+            if not r.get("lead")]
     round_trip = []
     encode_fail = []
     for row in rows:
@@ -479,7 +487,8 @@ def _rust_parity_int_rows() -> tuple[str, str]:
 
 
 def _rust_parity_malformed_rows() -> str:
-    rows = json.loads((ROOT / "corpus" / "parity" / "malformed.vectors.json").read_text())["vectors"]
+    rows = [r for r in json.loads((ROOT / "corpus" / "parity" / "malformed.vectors.json").read_text())["vectors"]
+            if not r.get("lead")]
     out = []
     for row in rows:
         expect = row["expect"]
@@ -527,28 +536,57 @@ def test_rust_fail_closed_enum_from_wire_is_fallible():
     assert "pub fn wire(self) -> i64" in rs
 
 
-def test_rust_fail_closed_is_off_by_default_and_byte_identical():
-    # Default output must be exactly today's: infallible from_cbor, i64 ints,
-    # panicking from_wire, no DecodeError import.
-    default = scaffold.rust_api(_FC)
-    assert "pub fn from_cbor(c: &Cbor) -> Self {" in default
-    assert "Result<Self, DecodeError>" not in default
-    assert "DecodeError" not in default
-    assert "pub n: i64," in default
-    assert "i128" not in default
-    assert "pub fn from_wire(v: i64) -> Self {" in default
-    assert 'panic!("bad Color wire value' in default
-    # and the flag genuinely changes the output
-    assert scaffold.rust_api(_FC, fail_closed=True) != default
+def test_legacy_codec_opt_out_is_byte_identical():
+    # D1: fail-closed is the default now; the `--legacy-codec` opt-out
+    # (fail_closed=False) restores today's pre-v0.8.0 codec body byte-for-byte:
+    # infallible from_cbor, i64 ints, panicking from_wire, no DecodeError import.
+    legacy = scaffold.rust_api(_FC, fail_closed=False)
+    assert "pub fn from_cbor(c: &Cbor) -> Self {" in legacy
+    assert "Result<Self, DecodeError>" not in legacy
+    assert "DecodeError" not in legacy
+    assert "pub n: i64," in legacy
+    assert "i128" not in legacy
+    assert "pub fn from_wire(v: i64) -> Self {" in legacy
+    assert 'panic!("bad Color wire value' in legacy
+    # and the fail-closed codec genuinely differs
+    assert scaffold.rust_api(_FC, fail_closed=True) != legacy
 
 
-def test_fail_closed_rejects_non_rust_targets(tmp_path):
-    # The flag is Rust-only today; refuse it for other targets rather than
-    # silently emitting unhardened code.
-    with pytest.raises(ValueError):
-        scaffold.emit(_FC, tmp_path, langs=["rust", "python"], services=[], fail_closed=True)
-    # rust-only is fine
-    scaffold.emit(_FC, tmp_path, langs=["rust"], services=[], fail_closed=True)
+def test_emit_default_is_fail_closed(tmp_path):
+    # D1 (ratified): `tautc gen` / scaffold.emit default to the fail-closed codec.
+    generated = tmp_path / "gen"
+    scaffold.emit(_FC, generated, langs=["rust"], services=[], runtime=True)  # no fail_closed kwarg
+    api = (generated / "rust" / "api.rs").read_text()
+    assert "pub fn from_cbor(c: &Cbor) -> Result<Self, DecodeError>" in api
+    assert "use crate::cbor::{Cbor, DecodeError};" in api
+    assert "DEPRECATED (--legacy-codec)" not in api               # no banner on the default path
+    # the vendored runtime is the hardened one (typed try_decode), under the same name
+    assert "pub fn try_decode" in (generated / "rust" / "cbor.rs").read_text()
+
+
+def test_legacy_codec_emit_stamps_deprecation_banner(tmp_path):
+    # The opt-out path stamps a one-line deprecation banner into the generated
+    # header while keeping the legacy (fail-open) codec body + panicking runtime.
+    generated = tmp_path / "gen"
+    scaffold.emit(_FC, generated, langs=["rust"], services=[], runtime=True, fail_closed=False)
+    api = (generated / "rust" / "api.rs").read_text()
+    assert api.startswith("// DEPRECATED (--legacy-codec):")
+    assert "removed at v0.10.0" in api
+    assert "pub fn from_cbor(c: &Cbor) -> Self {" in api          # legacy body preserved
+    assert "pub fn try_decode" not in (generated / "rust" / "cbor.rs").read_text()
+
+
+def test_fail_closed_is_a_noop_for_non_rust_targets(tmp_path):
+    # D1: fail-closed is the default and a NO-OP for non-rust targets — combining it
+    # with e.g. python no longer raises (it raised pre-flip); only rust is hardened,
+    # and the python output is identical whether fail_closed is True or False.
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    written = scaffold.emit(_FC, a, langs=["rust", "python"], services=[], fail_closed=True)
+    assert {"api.rs", "api.py"} <= {p.name for p in written}
+    assert "Result<Self, DecodeError>" in (a / "rust" / "api.rs").read_text()
+    scaffold.emit(_FC, b, langs=["python"], services=[], fail_closed=False)
+    assert (a / "python" / "api.py").read_text() == (b / "python" / "api.py").read_text()
 
 
 def test_rust_fail_closed_runtime_decode_is_fail_closed(tmp_path):

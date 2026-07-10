@@ -559,6 +559,17 @@ _LANGS = {
 }
 
 
+# D1 opt-out (--legacy-codec) deprecation banner, stamped into the generated Rust
+# api header when the LEGACY (fail-open) codec is emitted. One line (§ task); the
+# codec body itself stays byte-for-byte today's legacy output.
+_LEGACY_CODEC_BANNER = (
+    "// DEPRECATED (--legacy-codec): fail-OPEN legacy codec (from_cbor -> Self, "
+    "panics on malformed input). Fail-closed decode is the taut v0.8.0 default; this "
+    "opt-out is removed at v0.10.0 — regenerate without --legacy-codec to migrate. "
+    "See dev-docs/RustFailClosed.md.\n"
+)
+
+
 def emit(
     schema: Schema,
     out_dir: Path,
@@ -567,7 +578,7 @@ def emit(
     services: list[str] | None = None,
     runtime: bool = False,
     forward_compat: bool = False,
-    fail_closed: bool = False,
+    fail_closed: bool = True,
 ) -> list[Path]:
     """Generate per-language code from an IR (the engine behind the `tautc` CLI).
 
@@ -582,16 +593,20 @@ def emit(
       that preserves unknown/newer-version tags (Rust today). Off by default.
       An IR that declares extensions requires it for compiled targets (D14:
       extensions ride the residual space) — otherwise generation is a build error.
-    - `fail_closed`: (Rust only, opt-in) when True, generated `from_cbor` returns
-      `Result<Self, DecodeError>` and `from_wire` is fallible — decode never
-      panics on malformed/untrusted input — and a CBOR `int` outside the frozen
-      `i64` subset is a typed error (no silent u64 wrap, no wider carry). With
-      `runtime=True` the matching fail-closed `cbor.rs` (typed `DecodeError`,
-      bounds-checked `try_decode` + `try_*` accessors) is vendored instead of the
-      panicking one.
-      Off by default: the default output is byte-for-byte today's, so a consumer
-      who regenerates without the flag is unaffected. Intended for an untrusted
-      wire boundary (e.g. a socket) — see dev-docs/RustFailClosed.md.
+    - `fail_closed`: (Rust codegen) **the default since v0.8.0 (D1, ratified).**
+      When True, generated Rust `from_cbor` returns `Result<Self, DecodeError>` and
+      `from_wire` is fallible — decode never panics on malformed/untrusted input —
+      and a CBOR `int` outside the frozen `i64` subset is a typed error (no silent
+      u64 wrap, no wider carry). With `runtime=True` the matching fail-closed
+      `cbor.rs` (typed `DecodeError`, bounds-checked `try_decode` + `try_*`
+      accessors) is vendored under the same name.
+      Pass `fail_closed=False` (CLI `--legacy-codec`) for the deprecated legacy
+      opt-out — byte-for-byte today's pre-v0.8.0 codec body (panicking `from_cbor`),
+      with a one-line deprecation banner stamped into the generated header. The
+      opt-out is removed at v0.10.0.
+      **Non-rust targets: a no-op** — TS/js/python harden at the runtime-library
+      level (cbor.ts/cbor.js/wire/cbor.py) and Wave-2 gains it per Phase 4; the flag
+      is ignored for them. See dev-docs/RustFailClosed.md.
 
     `api.{ext}` (types + codec) is always written per language; client/server are
     `client.{ext}` for a lone service, `client_{svc}.{ext}` when several.
@@ -607,14 +622,12 @@ def emit(
             f"({'/'.join(sorted(_GENERATED))}) requires forward_compat (extensions ride "
             "the residual space) — pass --forward-compat"
         )
-    if fail_closed and any(l != "rust" for l in lang_keys):
-        # fail-closed codegen is Rust-only today; refuse silently-ignoring it for
-        # other targets so the flag never gives a false sense of hardening.
-        raise ValueError(
-            "--fail-closed is only supported for the rust target today; "
-            f"drop the other lang(s) {sorted(l for l in lang_keys if l != 'rust')} "
-            "or the flag"
-        )
+    # D1 (ratified): fail-closed is the DEFAULT codec. It only changes the *Rust*
+    # codegen (fallible from_cbor + the hardened vendored cbor.rs); for every other
+    # target it is a NO-OP — TS/js/python harden at the runtime-library level
+    # (cbor.ts / cbor.js / wire/cbor.py) and Wave-2 targets gain it per Phase 4. So
+    # non-rust langs are NOT rejected here (that would break the default path); the
+    # flag is simply ignored for them (only the rust branch below reads it).
     svc_names = list(services) if services is not None else list(schema.services)
     missing = [s for s in svc_names if s not in schema.services]
     if missing:
@@ -626,11 +639,15 @@ def emit(
         d = out_dir / lang
         d.mkdir(parents=True, exist_ok=True)
         api_path = d / f"api.{ext}"
-        # Only the Rust generator takes fail_closed (guarded above to rust-only).
+        # Only the Rust generator's output depends on fail_closed; other langs don't
+        # receive the kwarg, so the flag is a no-op for them (see the D1 note above).
         api_kwargs = {"forward_compat": forward_compat}
         if lang == "rust":
             api_kwargs["fail_closed"] = fail_closed
-        api_path.write_text(api_fn(schema, **api_kwargs))
+        api_text = api_fn(schema, **api_kwargs)
+        if lang == "rust" and not fail_closed:
+            api_text = _LEGACY_CODEC_BANNER + api_text   # D1 opt-out deprecation banner
+        api_path.write_text(api_text)
         written.append(api_path)
         if runtime and lang in _RUNTIMES:
             for rel, resource in _RUNTIMES[lang]:

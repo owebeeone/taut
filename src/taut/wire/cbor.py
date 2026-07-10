@@ -163,14 +163,24 @@ def _read_arg(data: bytes, offset: int, info: int) -> tuple[int, int]:
     if info < 24:
         return info, offset
     if info == 24:
-        return _take(data, offset, 1)[0], offset + 1
-    if info == 25:
-        return int.from_bytes(_take(data, offset, 2), "big"), offset + 2
-    if info == 26:
-        return int.from_bytes(_take(data, offset, 4), "big"), offset + 4
-    if info == 27:
-        return int.from_bytes(_take(data, offset, 8), "big"), offset + 8
-    raise DecodeError("UnsupportedInfo", info=info)
+        value, end = _take(data, offset, 1)[0], offset + 1
+        fits_shorter = value < 24
+    elif info == 25:
+        value, end = int.from_bytes(_take(data, offset, 2), "big"), offset + 2
+        fits_shorter = value <= 0xFF
+    elif info == 26:
+        value, end = int.from_bytes(_take(data, offset, 4), "big"), offset + 4
+        fits_shorter = value <= 0xFFFF
+    elif info == 27:
+        value, end = int.from_bytes(_take(data, offset, 8), "big"), offset + 8
+        fits_shorter = value <= 0xFFFFFFFF
+    else:
+        raise DecodeError("UnsupportedInfo", info=info)
+    # Strict-canonical (D2): a multi-byte argument that fits a shorter width is
+    # non-minimal — the canonical encoder never emits it, so reject it.
+    if fits_shorter:
+        raise DecodeError("NonCanonicalInt", value=value)
+    return value, end
 
 
 def _decode(data: bytes, offset: int) -> tuple[Any, int]:
@@ -213,6 +223,8 @@ def _decode(data: bytes, offset: int) -> tuple[Any, int]:
             key, offset = _decode(data, offset)
             if not isinstance(key, int) or isinstance(key, bool):
                 raise DecodeError("NonIntegerMapKey")
+            if key < 0:
+                raise DecodeError("NegativeMapKey", key=key)
             if key in result:
                 raise DecodeError("DuplicateMapKey", key=key)
             val, offset = _decode(data, offset)

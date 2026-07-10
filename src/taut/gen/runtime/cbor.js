@@ -351,27 +351,38 @@ function requireBytes(data, off, length) {
 
 function readArg(data, off, info) {
   if (info < 24) return [BigInt(info), off];
+  let value;
+  let next;
+  let fitsShorter;
   if (info === 24) {
     requireBytes(data, off, 1);
-    return [BigInt(data[off]), off + 1];
-  }
-  if (info === 25) {
+    value = BigInt(data[off]);
+    next = off + 1;
+    fitsShorter = value < 24n;
+  } else if (info === 25) {
     requireBytes(data, off, 2);
-    return [(BigInt(data[off]) << 8n) | BigInt(data[off + 1]), off + 2];
-  }
-  if (info === 26) {
+    value = (BigInt(data[off]) << 8n) | BigInt(data[off + 1]);
+    next = off + 2;
+    fitsShorter = value <= 0xffn;
+  } else if (info === 26) {
     requireBytes(data, off, 4);
-    let v = 0n;
-    for (let j = 0; j < 4; j++) v = (v << 8n) | BigInt(data[off + j]);
-    return [v, off + 4];
-  }
-  if (info === 27) {
+    value = 0n;
+    for (let j = 0; j < 4; j++) value = (value << 8n) | BigInt(data[off + j]);
+    next = off + 4;
+    fitsShorter = value <= 0xffffn;
+  } else if (info === 27) {
     requireBytes(data, off, 8);
-    let v = 0n;
-    for (let j = 0; j < 8; j++) v = (v << 8n) | BigInt(data[off + j]);
-    return [v, off + 8];
+    value = 0n;
+    for (let j = 0; j < 8; j++) value = (value << 8n) | BigInt(data[off + j]);
+    next = off + 8;
+    fitsShorter = value <= 0xffffffffn;
+  } else {
+    throw new DecodeError("UnsupportedInfo", { info });
   }
-  throw new DecodeError("UnsupportedInfo", { info });
+  // Strict-canonical (D2): a multi-byte argument that fits a shorter width is
+  // non-minimal — the canonical encoder never emits it, so reject it.
+  if (fitsShorter) throw new DecodeError("NonCanonicalInt", { value: stringValue(value) });
+  return [value, next];
 }
 
 function readLength(data, off, info) {
@@ -443,6 +454,7 @@ function dec(data, off0) {
       for (let i = 0; i < n; i++) {
         const [k, o2] = dec(data, o);
         if (!k || k.kind !== INT) throw new DecodeError("NonIntegerMapKey");
+        if (k.i < 0n) throw new DecodeError("NegativeMapKey", { key: k.i });
         const rawKey = normalizeMapKeyForDecode(k.i);
         const id = mapKeyId(rawKey);
         if (seen.has(id)) throw new DecodeError("DuplicateMapKey", { key: rawKey });

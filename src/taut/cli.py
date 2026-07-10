@@ -46,10 +46,24 @@ def _cmd_gen(args: argparse.Namespace) -> int:
         services: list[str] | None = []
     else:
         services = _split(args.service)  # None => all services in the IR
+    # D1 (ratified): fail-closed is the DEFAULT codec since v0.8.0. `--legacy-codec`
+    # is the deprecated opt-out (removed at v0.10.0); `--fail-closed` is now a no-op.
+    fail_closed = not args.legacy_codec
+    if args.legacy_codec:
+        print("tautc gen: WARNING --legacy-codec emits the DEPRECATED fail-open Rust "
+              "codec (from_cbor -> Self; panics on malformed input). It is removed at "
+              "taut v0.10.0 — migrate by regenerating without --legacy-codec.",
+              file=sys.stderr)
+    if args.fail_closed:
+        msg = ("tautc gen: note --fail-closed is now the default and a no-op "
+               "(fail-closed decode became the v0.8.0 default).")
+        if args.legacy_codec:
+            msg += " It conflicts with --legacy-codec, which wins (legacy codec emitted)."
+        print(msg, file=sys.stderr)
     written = scaffold.emit(
         schema, Path(args.out), langs=_split(args.lang), services=services,
         runtime=args.with_runtime, forward_compat=args.forward_compat,
-        fail_closed=args.fail_closed,
+        fail_closed=fail_closed,
     )
     for p in written:
         print(p)
@@ -111,13 +125,15 @@ def _cmd_json(args: argparse.Namespace) -> int:
 
 def _cmd_parity(args: argparse.Namespace) -> int:
     try:
-        lines = parity.validate_all(target=args.target)
+        outcome = parity.run_gate(target=args.target, run_compiled=not args.no_compile)
     except parity.ParityValidationError as exc:
         print(f"parity: {exc}", file=sys.stderr)
         return 2
-    for line in lines:
+    for line in outcome.lines:
         print(line)
-    return 0
+    # Nonzero ONLY on a governance violation: a gated target failing, or a green
+    # target still allowlisted. Observed reds on allowlisted targets do not fail.
+    return 1 if outcome.violations else 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -136,10 +152,13 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--forward-compat", action="store_true",
                    help="generated structs carry a wire_residual field preserving unknown/newer tags (Rust; required if the IR has extensions)")
     g.add_argument("--fail-closed", action="store_true",
-                   help="(Rust only, opt-in) fallible decode: from_cbor -> Result<_, DecodeError>, "
-                        "never panics on malformed/untrusted input; a CBOR int outside the frozen i64 "
-                        "subset is a typed error (no silent u64 wrap, no wider carry). With --with-runtime "
-                        "vendors the hardened cbor.rs. Default output is byte-identical to omitting the flag.")
+                   help="(deprecated no-op) fail-closed decode is the DEFAULT Rust codec since taut "
+                        "v0.8.0; this flag is accepted for back-compat but has no effect and will be removed.")
+    g.add_argument("--legacy-codec", action="store_true",
+                   help="(deprecated opt-out) emit the LEGACY fail-open Rust codec — today's pre-v0.8.0 "
+                        "output byte-for-byte (from_cbor -> Self; panics on malformed input; default cbor.rs). "
+                        "Warns on use and stamps a deprecation banner into the generated header. Sunset: "
+                        "removed at taut v0.10.0 (D1 two-minor rule). No-op for non-rust targets.")
     g.set_defaults(func=_cmd_gen)
 
     c = sub.add_parser("corpus", help="derive a golden conformance corpus (+ parity harness) from an IR")
@@ -158,8 +177,14 @@ def main(argv: list[str] | None = None) -> int:
     j.add_argument("--indent", type=int, help="pretty-print JSON with this indent (CBOR -> JSON only)")
     j.set_defaults(func=_cmd_json)
 
-    pr = sub.add_parser("parity", help="validate the shared codec-parity corpus and target allowlist")
-    pr.add_argument("-t", "--target", choices=parity.TARGETS, help="show status for one codec target")
+    pr = sub.add_parser(
+        "parity",
+        help="run the leading cross-language codec-parity gate (Wave-1 replay + allowlist governance). "
+             "SUPPLEMENTS `tautc corpus` — never replaces the message golden corpora.")
+    pr.add_argument("-t", "--target", choices=parity.TARGETS,
+                    help="replay only this target's harness (default: all Wave-1 — rust,python,typescript,js)")
+    pr.add_argument("--no-compile", action="store_true",
+                    help="skip the compiled/subprocess targets; run only the direct Python harness")
     pr.set_defaults(func=_cmd_parity)
 
     args = p.parse_args(argv)

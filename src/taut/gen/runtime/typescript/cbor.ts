@@ -34,7 +34,9 @@ export type DecodeErrorTag =
   | "DuplicateMapKey"
   | "MissingKey"
   | "WrongType"
-  | "UnknownEnum";
+  | "UnknownEnum"
+  | "NonCanonicalInt"
+  | "NegativeMapKey";
 
 export interface DecodeErrorFields {
   info?: number;
@@ -292,31 +294,40 @@ function requireBytes(data: Uint8Array, off: number, count: number): void {
 
 function readArg(data: Uint8Array, off: number, info: number): [bigint, number] {
   if (info < 24) return [BigInt(info), off];
+  let value: bigint;
+  let next: number;
+  let fitsShorter: boolean;
   if (info === 24) {
     requireBytes(data, off, 1);
-    return [BigInt(data[off]), off + 1];
-  }
-  if (info === 25) {
+    value = BigInt(data[off]);
+    next = off + 1;
+    fitsShorter = value < 24n;
+  } else if (info === 25) {
     requireBytes(data, off, 2);
-    return [BigInt((data[off] << 8) | data[off + 1]), off + 2];
-  }
-  if (info === 26) {
+    value = BigInt((data[off] << 8) | data[off + 1]);
+    next = off + 2;
+    fitsShorter = value <= 0xffn;
+  } else if (info === 26) {
     requireBytes(data, off, 4);
-    return [
-      BigInt(data[off]) << 24n |
-        BigInt(data[off + 1]) << 16n |
-        BigInt(data[off + 2]) << 8n |
-        BigInt(data[off + 3]),
-      off + 4,
-    ];
-  }
-  if (info === 27) {
+    value = BigInt(data[off]) << 24n |
+      BigInt(data[off + 1]) << 16n |
+      BigInt(data[off + 2]) << 8n |
+      BigInt(data[off + 3]);
+    next = off + 4;
+    fitsShorter = value <= 0xffffn;
+  } else if (info === 27) {
     requireBytes(data, off, 8);
-    let bn = 0n;
-    for (let i = 0; i < 8; i++) bn = (bn << 8n) | BigInt(data[off + i]);
-    return [bn, off + 8];
+    value = 0n;
+    for (let i = 0; i < 8; i++) value = (value << 8n) | BigInt(data[off + i]);
+    next = off + 8;
+    fitsShorter = value <= 0xffffffffn;
+  } else {
+    throw new DecodeError("UnsupportedInfo", { info });
   }
-  throw new DecodeError("UnsupportedInfo", { info });
+  // Strict-canonical (D2): a multi-byte argument that fits a shorter width is
+  // non-minimal — the canonical encoder never emits it, so reject it.
+  if (fitsShorter) throw new DecodeError("NonCanonicalInt", { value: value.toString() });
+  return [value, next];
 }
 
 function readLength(data: Uint8Array, off: number, info: number): [number, number] {
@@ -372,7 +383,8 @@ function dec(data: Uint8Array, off: number): [CborValue, number] {
     for (let i = 0; i < n; i++) {
       const [k, o2] = dec(data, o);
       if (typeof k !== "bigint") throw new DecodeError("NonIntegerMapKey");
-      if (k < 0n || k > BigInt(Number.MAX_SAFE_INTEGER)) throw new DecodeError("NonIntegerMapKey");
+      if (k < 0n) throw new DecodeError("NegativeMapKey", { key: k });
+      if (k > BigInt(Number.MAX_SAFE_INTEGER)) throw new DecodeError("NonIntegerMapKey");
       const key = Number(k);
       const token = k.toString();
       if (seen.has(token)) throw new DecodeError("DuplicateMapKey", { key });

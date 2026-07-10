@@ -35,8 +35,14 @@ def _assert_error(exc: BaseException, expect: dict[str, Any]) -> None:
         assert str(exc.payload[key]) == str(value)
 
 
+def _baseline(vectors: list[dict]) -> list[dict]:
+    # Pin the reviewed set; `lead` rows (strict-canonical D2 etc.) belong to the
+    # governed `tautc parity` gate (see corpus/parity/gen_vectors.py).
+    return [row for row in vectors if not row.get("lead")]
+
+
 def test_python_replays_i64_int_vectors():
-    for row in _load(INT_VECTORS)["vectors"]:
+    for row in _baseline(_load(INT_VECTORS)["vectors"]):
         value = _intbox(row["value"])
         if row["kind"] == "round_trip":
             wire = codec.encode(SCHEMA, row["message"], value)
@@ -51,7 +57,7 @@ def test_python_replays_i64_int_vectors():
 
 
 def test_python_replays_malformed_vectors():
-    for row in _load(MALFORMED_VECTORS)["vectors"]:
+    for row in _baseline(_load(MALFORMED_VECTORS)["vectors"]):
         wire = bytes.fromhex(row["bytes"])
         with pytest.raises(codec.DecodeError) as got:
             if row["stage"] == "raw_decode":

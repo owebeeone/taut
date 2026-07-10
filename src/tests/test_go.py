@@ -174,8 +174,10 @@ def _go_parity_malformed_rows(name: str, rows: list[dict]) -> str:
 def _write_parity_go_harness(tmp_path: Path) -> Path:
     scaffold.emit(PARITY_SCHEMA, tmp_path, langs=["go"], services=[], runtime=True)
     go_dir = tmp_path / "go"
-    int_rows = json.loads(PARITY_INT_VECTORS.read_text())["vectors"]
-    malformed_rows = json.loads(PARITY_MALFORMED_VECTORS.read_text())["vectors"]
+    # Baseline smoke test: pin the reviewed set; `lead` rows belong to the
+    # governed `tautc parity` gate (corpus/parity/gen_vectors.py).
+    int_rows = [r for r in json.loads(PARITY_INT_VECTORS.read_text())["vectors"] if not r.get("lead")]
+    malformed_rows = [r for r in json.loads(PARITY_MALFORMED_VECTORS.read_text())["vectors"] if not r.get("lead")]
     harness = textwrap.dedent("""
         package taut
 

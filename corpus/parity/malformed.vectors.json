@@ -89,6 +89,38 @@
       "bytes": "1863",
       "expect": {"tag": "UnknownEnum", "enum": "Mode", "value": "99"},
       "why": "Mode has no member with wire value 99"
+    },
+    {
+      "name": "non-canonical-int-2byte",
+      "stage": "raw_decode",
+      "bytes": "190005",
+      "expect": {"tag": "NonCanonicalInt", "value": "5"},
+      "why": "value 5 in a 2-byte argument (0x19 0x0005); canonical is the immediate 0x05 (width 25)",
+      "lead": true
+    },
+    {
+      "name": "non-canonical-int-8byte",
+      "stage": "raw_decode",
+      "bytes": "1b0000000000000005",
+      "expect": {"tag": "NonCanonicalInt", "value": "5"},
+      "why": "value 5 in an 8-byte argument; canonical is the immediate 0x05 (width 27)",
+      "lead": true
+    },
+    {
+      "name": "negative-map-key",
+      "stage": "raw_decode",
+      "bytes": "a12000",
+      "expect": {"tag": "NegativeMapKey", "key": "-1"},
+      "why": "raw CBOR map key -1 (major-1); the canonical encoder only emits non-negative field tags",
+      "lead": true
+    },
+    {
+      "name": "nested-truncated-string",
+      "stage": "raw_decode",
+      "bytes": "a100636162",
+      "expect": {"tag": "Truncated"},
+      "why": "text string nested inside a map claims 3 bytes but only 2 are present",
+      "lead": true
     }
   ]
 }

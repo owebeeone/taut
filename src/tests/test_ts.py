@@ -331,8 +331,12 @@ def test_typescript_codec_parity_i64_if_node(tmp_path):
     assert "by_id: Map<bigint, bigint>;" in api
 
     export_to(schema, ts_dir / "parity_int.ir.json")
-    (ts_dir / "int.vectors.json").write_text(PARITY_INT_VECTORS.read_text())
-    (ts_dir / "malformed.vectors.json").write_text(PARITY_MALFORMED_VECTORS.read_text())
+    # Baseline smoke test: pin the reviewed set; `lead` rows belong to the
+    # governed `tautc parity` gate (corpus/parity/gen_vectors.py).
+    for name, src in [("int.vectors.json", PARITY_INT_VECTORS), ("malformed.vectors.json", PARITY_MALFORMED_VECTORS)]:
+        doc = json.loads(src.read_text())
+        doc["vectors"] = [r for r in doc["vectors"] if not r.get("lead")]
+        (ts_dir / name).write_text(json.dumps(doc))
     harness = _write_parity_harness(ts_dir)
 
     subprocess.run(

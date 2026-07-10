@@ -6,7 +6,24 @@
 > Phase 4 to "fail-closed decode + an `i64` range check." **TS/JS remain the one exactness exception:** full
 > codec parity over `i64` requires `bigint`, because `number` is not faithful above `2^53`. The Rust
 > fail-closed path is being reverted `i128`→`i64` now (separate agent). **fail-closed decode is the real
-> parity property; wide-int churn razel doesn't need is gone.** Two items to ratify (§0). LOC = floors. Log: §7.
+> parity property; wide-int churn razel doesn't need is gone.** LOC = floors. Log: §7.
+>
+> **rev6 (2026-07-07): D1 + D2 RATIFIED (Gianni: "go ahead with the recommendations") — execution started.**
+> D1 = fail-closed default as (B), opt-out `--legacy-codec` sunsets per the two-minor rule (flip @ v0.8.0 →
+> delete @ v0.10.0; literals confirmed in `CodecContract.md` at the flip release). D2 = strict-canonical
+> decode (`NonCanonicalInt` / `NegativeMapKey` / `DuplicateMapKey` unconditional). Phase 0 (the RED gate)
+> is building; Phase 1 follows.
+>
+> **rev7 (2026-07-10): D2 + D1 LANDED for Wave-1.** D2 — `NonCanonicalInt` (non-minimal int arg) and
+> `NegativeMapKey` (raw map key < 0) are now rejected in all four Wave-1 codecs (rust `cbor_fail_closed.rs`,
+> python `wire/cbor.py`, ts `cbor.ts`, js `cbor.js`); `tautc parity` shows rust/python/typescript/js
+> **gated + GREEN** and the Wave-1 allowlist is emptied (only Wave-2 remains). D1 — `tautc gen` / `emit()`
+> emit the fail-closed codec **by default**; `--legacy-codec` is the deprecated byte-for-byte opt-out (warns +
+> banner, sunset v0.10.0), `--fail-closed` is a redundant no-op alias, and the flag is a no-op for non-rust
+> targets. `CodecContract.md` not yet created — sunset literals recorded in the CLI help + `RustFailClosed.md`.
+> **Follow-ups (out of scope, separate pins):** re-vendor `taut-shape-rs/…/cbor.rs` (drifted at rev `70e17b7`,
+> pre-`DuplicateMapKey`); retarget `glade/wire-rs` onto the fail-closed runtime (no documented regen command;
+> its generated codec + `lib.rs` tests assume the panicking runtime).
 
 ## 0. North star + scope + decisions to ratify
 
@@ -27,14 +44,18 @@ go, kotlin, java) are in scope for codec parity. The rs/py/ts-only thing is the 
 layer (`taut-shape-*`) — a separate concern this plan sits beneath (§6). Sequenced: **Wave 1 = rs/py/ts(+js)**
 (live boundaries — razel socket, gryth) Phases 1-3; **Wave 2 = cpp/swift/go/kotlin/java** Phase 4.
 
-**⚖️ Decisions to ratify:**
-- **D1 — default vs opt-in + sunset.** Recommend fail-closed becomes the **default contract** as **(B)
-  fallible generated API + hardened runtime** (razel needs (B)); legacy behind a **deprecated opt-out** with a
-  **named sunset** (`TBD@D1` — a concrete `taut vX.Y` at ratification; stated in `CodecContract.md` before
-  Phase 1.1). Migration: pinned unaffected; regen-in-window migrates or opts-out; after the sunset, breaking.
-- **D2 — decode strictness.** `DuplicateMapKey` rejection is **decided**. Open: **strict canonical**
-  (reject non-minimal int encodings + negative raw map keys — *recommended*) **vs permissive**. Shapes
-  `malformed.vectors.json` → needed before Phase-0 vectors freeze.
+**⚖️ Decisions — RATIFIED 2026-07-07 (Gianni: "go ahead with the recommendations"):**
+- **D1 — RATIFIED: fail-closed is the default contract**, as **(B) fallible generated API + hardened
+  runtime**. Legacy stays behind a deprecated opt-out (`--legacy-codec`) that warns on use. **Sunset rule:**
+  the opt-out survives **two minor releases after the flip release** — current release is v0.7.0, so the flip
+  lands in **v0.8.0** and the opt-out (+ the legacy runtime template) is **deleted at v0.10.0** (versions
+  derived from the ratified rule; `CodecContract.md` records the literal numbers when the flip release is
+  cut). Migration: pinned consumers unaffected; regen-in-window migrates or opts out; after v0.10.0,
+  regeneration is intentionally breaking.
+- **D2 — RATIFIED: strict-canonical decode.** The decoder accepts exactly the bytes the canonical encoder
+  could emit: non-minimal integer encodings → `NonCanonicalInt`; negative raw map keys → `NegativeMapKey`;
+  (with the already-decided `DuplicateMapKey`). Law: `decode(bytes)` ok ⇒ `encode(decode(bytes)) == bytes`.
+  `malformed.vectors.json` includes these rows unconditionally.
 - *(D3 from rev4 — the encode surface — is **RESOLVED by the `i64` decision, no ratification needed.** With a
   native `i64` carrier an out-of-subset value is unrepresentable — the type IS the guard — so encode stays
   **byte-identical and infallible**; no fallible `try_encode`, no `EncodeError`. Verified: the Rust revert kept
@@ -81,10 +102,12 @@ structural keys *and* any out-of-subset int).
 **2b. Canonical error-tag vocabulary** (Rust-only `DecodeError` → language-neutral taut artifact): `Truncated ·
 TrailingBytes · InvalidUtf8 · UnsupportedInfo{info} · UnsupportedMajor{major} · NonIntegerMapKey · IntOverflow
 (= outside i64) · DuplicateMapKey · MissingKey{tag} · WrongType{expected} · UnknownEnum{enum, value}` (decode);
-`IntOutOfSubset` (encode). **Conditional on D2-strict:** `NonCanonicalInt`, `NegativeMapKey`.
+`IntOutOfSubset` (encode; real only for unbounded-carrier languages per the D3 resolution). **Per D2-strict
+(ratified):** `NonCanonicalInt`, `NegativeMapKey` — unconditional members of the vocabulary.
 
-**2c. Strictness.** Fail-closed = reject: **duplicate map key → `DuplicateMapKey`** (decided); non-minimal
-ints + negative raw keys → **D2**.
+**2c. Strictness (D2 ratified: strict-canonical).** Fail-closed = reject: duplicate map key →
+`DuplicateMapKey`; non-minimal int encodings → `NonCanonicalInt`; negative raw map keys → `NegativeMapKey`.
+The decoder accepts exactly what the canonical encoder can emit (`decode` ok ⇒ byte-identical re-encode).
 
 ## 3. Phases
 
@@ -99,8 +122,9 @@ language-neutral but a target is **gated only once its real replay harness lands
   - a **raw-CBOR** decode vector (in 0.2, `stage: raw_decode`) with a major-0 value `> i64::MAX` → `IntOverflow`.
   (~150 LOC.)
 - **0.2 — Malformed-input vectors, richly typed.** `{ bytes, stage: raw_decode|from_cbor|from_wire, schema,
-  expect:{tag, …payload}, why }`; every §2b tag + a nested failure; D2-strict rows iff D2=strict. Hex-authored
-  + per-vector `why`. `…/malformed.vectors.json`. (~300 LOC.)
+  expect:{tag, …payload}, why }`; every §2b tag + a nested failure; the D2-strict rows (`NonCanonicalInt`,
+  `NegativeMapKey`, `DuplicateMapKey`) are included (D2 ratified). Hex-authored + per-vector `why`.
+  `…/malformed.vectors.json`. (~300 LOC.)
 - **0.3 — Per-target replay harness, RED-staged + governed.** Wave-1 harnesses run now: Rust
   `rust_vectors_fail_closed` (`try_decode`/`Result`; encode-fail rows are construction/validation checks for
   dynamic carriers, not a new Rust `try_encode`; resolve the UNVERIFIED

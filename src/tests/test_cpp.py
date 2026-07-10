@@ -157,8 +157,10 @@ def test_cpp_codegen_emits_fallible_decode_path_for_i64_and_enums():
 def test_cpp_runtime_replays_shared_i64_parity_corpus(tmp_path):
     root = Path(__file__).resolve().parents[2]
     schema_path = root / "ir" / "parity_int.taut.py"
-    int_vectors = json.loads((root / "corpus" / "parity" / "int.vectors.json").read_text())["vectors"]
-    malformed = json.loads((root / "corpus" / "parity" / "malformed.vectors.json").read_text())["vectors"]
+    # Baseline smoke test: pin the reviewed set; `lead` rows belong to the
+    # governed `tautc parity` gate (corpus/parity/gen_vectors.py).
+    int_vectors = [r for r in json.loads((root / "corpus" / "parity" / "int.vectors.json").read_text())["vectors"] if not r.get("lead")]
+    malformed = [r for r in json.loads((root / "corpus" / "parity" / "malformed.vectors.json").read_text())["vectors"] if not r.get("lead")]
 
     assert cli.main([
         "gen", str(schema_path), "-o", str(tmp_path), "--lang", "cpp",

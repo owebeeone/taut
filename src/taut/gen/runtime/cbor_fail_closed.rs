@@ -57,6 +57,14 @@ pub enum DecodeError {
     /// value above `i64::MAX`, a major-1 value below `i64::MIN`, or a map key
     /// wider than `i64`. Rejected here rather than silently wrapped or widened.
     IntOverflow,
+    /// A multi-byte integer argument that would fit a shorter form (non-minimal).
+    /// The canonical encoder never emits it, so strict-canonical decode (D2)
+    /// rejects it — `decode(bytes)` ok ⇒ `encode(decode(bytes)) == bytes`.
+    NonCanonicalInt(u64),
+    /// A raw CBOR map key that was a negative integer. Canonical taut field tags
+    /// are non-negative, so a negative raw key is out-of-contract (D2). Distinct
+    /// from [`DecodeError::NonIntegerMapKey`] (a non-integer key).
+    NegativeMapKey(i64),
     /// A required map key was absent (missing field).
     MissingKey(i64),
     /// A value had the wrong CBOR type for the field being decoded.
@@ -84,6 +92,8 @@ impl core::fmt::Display for DecodeError {
             DecodeError::NonIntegerMapKey => write!(f, "non-integer map key"),
             DecodeError::DuplicateMapKey(k) => write!(f, "duplicate map key {k}"),
             DecodeError::IntOverflow => write!(f, "integer out of range for target"),
+            DecodeError::NonCanonicalInt(v) => write!(f, "non-canonical integer encoding of {v}"),
+            DecodeError::NegativeMapKey(k) => write!(f, "negative map key {k}"),
             DecodeError::MissingKey(k) => write!(f, "missing map key {k}"),
             DecodeError::WrongType { expected } => write!(f, "expected CBOR {expected}"),
             DecodeError::UnknownEnum { enum_name, value } => {
@@ -469,28 +479,41 @@ fn take(data: &[u8], off: usize, len: usize) -> Result<&[u8], DecodeError> {
 }
 
 fn read_arg(data: &[u8], off: usize, info: u8) -> Result<(u64, usize), DecodeError> {
-    match info {
-        n if n < 24 => Ok((n as u64, off)),
+    let (value, next) = match info {
+        n if n < 24 => return Ok((n as u64, off)),
         24 => {
             let b = take(data, off, 1)?;
-            Ok((b[0] as u64, off + 1))
+            (b[0] as u64, off + 1)
         }
         25 => {
             let b = take(data, off, 2)?;
-            Ok((u16::from_be_bytes([b[0], b[1]]) as u64, off + 2))
+            (u16::from_be_bytes([b[0], b[1]]) as u64, off + 2)
         }
         26 => {
             let b = take(data, off, 4)?;
-            Ok((u32::from_be_bytes([b[0], b[1], b[2], b[3]]) as u64, off + 4))
+            (u32::from_be_bytes([b[0], b[1], b[2], b[3]]) as u64, off + 4)
         }
         27 => {
             let b = take(data, off, 8)?;
             let mut a = [0u8; 8];
             a.copy_from_slice(b);
-            Ok((u64::from_be_bytes(a), off + 8))
+            (u64::from_be_bytes(a), off + 8)
         }
-        _ => Err(DecodeError::UnsupportedInfo(info)),
+        _ => return Err(DecodeError::UnsupportedInfo(info)),
+    };
+    // Strict-canonical (D2): a multi-byte argument whose value fits a shorter
+    // width is non-minimal — the canonical encoder never emits it, so reject it.
+    let fits_shorter = match info {
+        24 => value < 24,
+        25 => value <= 0xFF,
+        26 => value <= 0xFFFF,
+        27 => value <= 0xFFFF_FFFF,
+        _ => false,
+    };
+    if fits_shorter {
+        return Err(DecodeError::NonCanonicalInt(value));
     }
+    Ok((value, next))
 }
 
 fn dec(data: &[u8], off: usize) -> Result<(Cbor, usize), DecodeError> {
@@ -548,6 +571,7 @@ fn dec(data: &[u8], off: usize) -> Result<(Cbor, usize), DecodeError> {
                     // Map keys are i64 (CBOR field tags). An out-of-i64 key was
                     // already rejected as IntOverflow when `dec` read it above,
                     // so here it is simply the decoded value.
+                    Cbor::Int(i) if i < 0 => return Err(DecodeError::NegativeMapKey(i)),
                     Cbor::Int(i) => i,
                     _ => return Err(DecodeError::NonIntegerMapKey),
                 };

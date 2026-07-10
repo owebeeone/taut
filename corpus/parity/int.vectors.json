@@ -78,6 +78,14 @@
       "message": "IntBox",
       "value": {"n": "18446744073709551615", "by_id": []},
       "expect": {"tag": "IntOutOfSubset"}
+    },
+    {
+      "name": "safe-int-plus-two",
+      "kind": "round_trip",
+      "message": "IntBox",
+      "value": {"n": "9007199254740993", "by_id": []},
+      "cbor": "a2011b00200000000000010280",
+      "lead": true
     }
   ]
 }

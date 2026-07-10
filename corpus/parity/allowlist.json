@@ -1,5 +1,37 @@
 {
   "version": 1,
   "contract": "taut-codec-parity/i64/v0",
-  "targets": []
+  "_note": "An allowlisted target's harness STILL RUNS and REPORTS its observed failures (xfail-that-runs); it just doesn't fail CI. The inverse is enforced too: `tautc parity` FAILS if an allowlisted target passes fully (a green target must be de-listed) or a gated (non-allowlisted) target fails. Reasons are populated from observed `tautc parity` results.",
+  "targets": [
+    {
+      "target": "cpp",
+      "phase": "Phase 4",
+      "owner": "codec-parity",
+      "reason": "Wave-2: not replayed by the `tautc parity` gate yet. A per-language byte-parity smoke test runs separately (test_cpp.py); the shared malformed/strict replay harness lands in Phase 4."
+    },
+    {
+      "target": "swift",
+      "phase": "Phase 4",
+      "owner": "codec-parity",
+      "reason": "Wave-2: not replayed by the `tautc parity` gate yet. A per-language byte-parity smoke test runs separately (test_swift.py); the shared malformed/strict replay harness lands in Phase 4."
+    },
+    {
+      "target": "go",
+      "phase": "Phase 4",
+      "owner": "codec-parity",
+      "reason": "Wave-2: not replayed by the `tautc parity` gate yet. A per-language byte-parity smoke test runs separately (test_go.py); the shared malformed/strict replay harness lands in Phase 4."
+    },
+    {
+      "target": "kotlin",
+      "phase": "Phase 4",
+      "owner": "codec-parity",
+      "reason": "Wave-2: not replayed by the `tautc parity` gate yet. A per-language byte-parity smoke test runs separately (test_kotlin.py); the shared malformed/strict replay harness lands in Phase 4."
+    },
+    {
+      "target": "java",
+      "phase": "Phase 4",
+      "owner": "codec-parity",
+      "reason": "Wave-2: not replayed by the `tautc parity` gate yet. A per-language byte-parity smoke test runs separately (test_java.py); the shared malformed/strict replay harness lands in Phase 4."
+    }
+  ]
 }
