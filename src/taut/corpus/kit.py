@@ -78,7 +78,11 @@ def rust_vectors(schema: Schema, corpus: dict[str, dict]) -> str:
     lines.append("pub fn reencode(message: &str, c: &crate::Cbor) -> crate::Cbor {")
     lines.append("    match message {")
     for m in messages:
-        lines.append(f'        "{m}" => crate::{m}::from_cbor(c).to_cbor(),')
+        # from_cbor is fallible (`Result<_, DecodeError>`); golden vectors must
+        # decode, so a failure panics with the message name.
+        lines.append(
+            f'        "{m}" => crate::{m}::from_cbor(c).expect("corpus decode: {m}").to_cbor(),'
+        )
     lines.append('        other => panic!("reencode: unknown message {other}"),')
     lines.append("    }")
     lines.append("}")
