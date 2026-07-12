@@ -695,8 +695,12 @@ def test_kotlin_shared_int_parity_harness_if_kotlinc(tmp_path):
     harness = tmp_path / "parity_harness.kt"
     jar = tmp_path / "kotlin-int-parity.jar"
 
+    # Baseline smoke test: pin the reviewed set; `lead` rows belong to the
+    # governed `tautc parity` gate (corpus/parity/gen_vectors.py).
     int_doc = json.loads(PARITY_INT_PATH.read_text())
+    int_doc["vectors"] = [r for r in int_doc["vectors"] if not r.get("lead")]
     malformed_doc = json.loads(PARITY_MALFORMED_PATH.read_text())
+    malformed_doc["vectors"] = [r for r in malformed_doc["vectors"] if not r.get("lead")]
     api.write_text(kotlin.emit_types(PARITY))
     harness.write_text(_kotlin_parity_harness_source(int_doc, malformed_doc))
 
