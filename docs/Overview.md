@@ -33,22 +33,26 @@ contract `(name, in, out, shape)`, where **`shape` is the sole discriminator**:
 There's no separate "kind" axis: `unary` is just a member of the shape set, so
 illegal combinations can't be written. You don't hand-roll request/response
 plumbing or streaming semantics — you pick a shape and taut gives you the
-idiomatic API + sync for it. The (open, but implemented) set:
+idiomatic API + sync for it. The active canonical catalogue is:
 
 | Shape | Use it for | Reader sees |
 | --- | --- | --- |
 | **unary** | request → response (the default) | one value |
+| **value** | attributed multi-writer current state | immediate materialized winner (portable watch not yet claimed) |
 | **atom** | whole-state, latest-wins (presence, status, a list) | replacements |
 | **log** | append-only history (chat, an event feed) | replay then tail |
 | **stream** | live, ephemeral (terminal output, ticks) | live events, no replay |
 | **swmr** | single-writer snapshot + deltas (a file, a doc view) | snapshot(+offset) then deltas |
-| **snapshot_delta** | snapshot carrying a resume offset, then deltas | same handoff, generalized |
+| **snapshot_delta** | fixed SWMR expiry-recovery profile | snapshot carrying resume offset, then deltas |
 | **crdt** | multi-writer convergent (collaborative fields) | ops; merge via a bound engine |
 
 The shape is the contract; the transport binding (WebSocket+JSON today, others
 later) and the sync machinery are derived, not written per endpoint. Building a
 server is then just writing handlers (plain functions) and registering them
 against the contract — see [Server.md](Server.md).
+
+Catalogue membership and runtime capability are separate: a target or adapter
+must reject every shape/version/operation it does not explicitly implement.
 
 ## What taut decouples (and never fuses)
 

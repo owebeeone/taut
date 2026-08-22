@@ -169,23 +169,27 @@ To **implement** a service (handlers + serving), see [Server.md](Server.md).
 ## 6. Delivery-shape catalog
 
 A method's `shape` selects behavior + sync; its `out` slots must be a subset of
-the shape's slots (`events`). The shape set is an **open registry**
-(`taut.ir.shapes.SHAPES` + `register_shape`) — since shape is the discriminator,
-adding a shape *is* adding a method-kind, so it is deliberately not a sealed enum:
+the shape's slots (`events`). Schema authors select an active name from the
+validated canonical registry (`taut.ir.shapes.SHAPES`). Compiler extensions can
+register a complete `ShapeSpec` only with an implementation-capability identity;
+runtime adapters still gate their own exact support.
 
-| shape | payload · history · initiation · writers | out slots | intended API |
+| shape | class / core | out slots | normalized intent |
 | --- | --- | --- | --- |
-| `unary` | whole · none · pull · single | `value` | request → response (the default) |
-| `atom` | whole-state · latest · pull\|push · single | `replace` | get / set / subscribe-replace |
-| `log` | whole · append-only · pull\|push · source | `append` | append / read-from-offset / tail |
-| `stream` | whole-or-delta · none · push · source | `event` | subscribe (live only) |
-| `swmr` | delta · reconstructible · push · single | `snapshot`,`delta`,`reset` | snapshot(+offset) / subscribe-deltas |
-| `snapshot_delta` | delta · reconstructible · push · single | `snapshot`,`delta` | snapshot carrying resume offset, then deltas |
-| `crdt` | ops · reconstructible · push-bidi · multi-merge | `op`,`sync` | local-apply / merge-remote / sync |
+| `unary` | interaction / — | `value` | one request → one response (default) |
+| `value` | engine / value | `value` | attributed multi-writer LWW; portable v0 operations are immediate read/set, not watch |
+| `atom` | engine / atom | `replace` | single-writer latest mailbox with versioned replacement |
+| `log` | engine / log | `append` | retained scalar-cursor records with explicit expiry |
+| `stream` | engine / stream | `event` | live-only delivery; overflow policy still unbound |
+| `swmr` | engine / swmr | `snapshot`,`delta`,`reset` | one bound writer; snapshot + deltas + in-band reset/repair |
+| `snapshot_delta` | profile / swmr | `snapshot`,`delta` | SWMR core with fixed expiry/out-of-band recovery |
+| `crdt` | engine / crdt | `op`,`sync` | attributed replica ops, causal position, anti-entropy |
 
 Rules:
-- Use a shape by name; you cannot expose raw axis combinations. Extension = adding
-  a new *implemented* shape to the registry.
+- Use an active shape by name; raw axis combinations and arbitrary strings are
+  rejected. Registry recognition does not imply a target runtime capability.
+- Unknown names fail closed. `message`, `exchange`, and `window` are not Taut
+  delivery shapes; `text_crdt` is reserved but inactive.
 - **SWMR / snapshot_delta invariant:** the snapshot MUST carry the offset the
   delta feed resumes from (`resume_seq`), and readers must apply deltas
   contiguously — no gap, no double-apply. This handoff is corpus-pinned.

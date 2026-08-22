@@ -4,6 +4,10 @@ Status: captured from the working `trial/py/` slice (no codegen).
 Purpose: record the shapes that actually emerged, ready to extract into the IR in
 Phase 1. Build-prompt §8.0 / tautPlan §9 DoD item 5.
 
+Historical catalogue note (2026-08-22): these are discovery observations, not
+the current catalogue. The canonical classification is
+[`TautShapeCatalogDecision.md`](../../dev-docs/TautShapeCatalogDecision.md).
+
 The slice runs and is green: `cd trial/py && python3 -m pytest tests/` → 14 passed.
 
 ## What got built

@@ -45,6 +45,8 @@ def test_rust_generator_emits_float_scalar_codec():
     assert "(2, Cbor::Float(*v))" in out
     assert "x: c.get(1).float()" in out
     assert "maybe: { let v = c.get(2); if v.is_null() { None } else { Some(v.float()) } }" in out
+    assert '"M" => crate::cbor::encode(&M::from_cbor(&c).to_cbor()),' in out
+    assert '.expect("decode: M")' not in out
 
 
 def test_rust_runtime_matches_float_vectors(tmp_path):

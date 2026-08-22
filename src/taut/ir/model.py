@@ -80,12 +80,12 @@ class MessageDef:
 class MethodDef:
     """One endpoint = the minimal contract `(name, in, out, shape)` (D22).
 
-    - `shape` is the **sole discriminator** (a name in the open shape registry);
+    - `shape` is the **sole discriminator** (an active canonical registry name);
       `unary` is the degenerate "delivered once" shape.
     - `params` is `in` — the named inputs (the handler's kwargs), over existing
       messages/scalars; no synthetic args-messages.
-    - `out` binds a type to each of the shape's delivery slots (`SHAPES[shape]
-      ["events"]`). For `unary` that's the single return (slot `value`); for
+    - `out` binds a type to each of the shape's delivery slots
+      (`SHAPES[shape].events`). For `unary` that's the single return (slot `value`); for
       `swmr` it's `{snapshot, delta}`; etc.
 
     `kind`/`output`/`events` are **derived views**, not stored fields — computed
@@ -96,7 +96,7 @@ class MethodDef:
     name: str
     role: str                                    # out | in | ctl | td | hdl | query | dx
     shape: str                                   # sole discriminator; "unary" = once
-    out: tuple[tuple[str, TypeRef], ...] = ()    # slot -> type, slots ⊆ SHAPES[shape]["events"]
+    out: tuple[tuple[str, TypeRef], ...] = ()    # slot -> type, slots ⊆ SHAPES[shape].events
     params: tuple[tuple[str, TypeRef], ...] = () # `in`
 
     def streams(self) -> bool:

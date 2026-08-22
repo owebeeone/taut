@@ -42,7 +42,7 @@ def _method_json(m: MethodDef) -> dict:
 def schema_json(schema: Schema) -> dict:
     return {
         "version": 1,
-        "shapes": {name: {**spec, "events": sorted(spec["events"])} for name, spec in SHAPES.items()},
+        "shapes": {name: spec.to_json() for name, spec in SHAPES.items()},
         "enums": [
             {"name": e.name, "members": e.members}
             for e in schema.enums.values()

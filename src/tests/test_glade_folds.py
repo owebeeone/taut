@@ -21,12 +21,16 @@ def test_every_vector_matches_reference():
         assert run(case) == case["expect"], f"fold mismatch for {case['name']}"
 
 
-def test_lww_tiebreak_is_lamport_then_origin():
+def test_lww_tiebreak_is_lamport_then_origin_then_seq():
     a = {"origin": "a", "seq": 2, "lamport": 5, "prev": None, "payload": b"A"}
     b = {"origin": "b", "seq": 1, "lamport": 5, "prev": None, "payload": b"B"}
     # equal lamport -> higher origin id wins, regardless of arrival order
     assert fold_value([a, b]) == b"B"
     assert fold_value([b, a]) == b"B"
+
+    a_next = {"origin": "a", "seq": 3, "lamport": 5, "prev": None, "payload": b"A-next"}
+    assert fold_value([a, a_next]) == b"A-next"
+    assert fold_value([a_next, a]) == b"A-next"
 
 
 def test_fold_is_order_independent_and_idempotent():

@@ -665,7 +665,7 @@ presence.taut.py       required, optional, null, missing field
 collections.taut.py    list, map, bytes
 unknowns.taut.py       cross-version v1/v2 preservation
 extensions.taut.py     extension-band message accessors
-services.taut.py       unary, atom, log, stream, swmr, crdt slots
+services.taut.py       unary, value, atom, log, stream, swmr, snapshot_delta, crdt slots
 ```
 
 `tautc extensions test` SHOULD run:

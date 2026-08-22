@@ -5,8 +5,8 @@ materialized state. M-LIMP needs two folds; both are pure functions of the
 op-set, so convergence is guaranteed when every replica folds the same set:
 
   - `value` (lww register): whole-payload last-writer-wins. Winner = max by
-    `(lamport, origin)` — the faithful tiebreak (GladeSubstrateV1 §2), the
-    glade analogue of taut ReferenceDoc's `(seq, actor)` lww stamp.
+    `(lamport, origin, seq)`. The first two components are the GladeSubstrateV1
+    §2 stamp; `seq` makes malformed/reused same-origin Lamport values converge.
   - `log` (append): deterministic causal interleave. Order by
     `(lamport, origin, seq)`; trivially convergent.
 
@@ -52,7 +52,7 @@ def fold_value(ops: list[dict]) -> Any:
     live = _dedup(ops)
     if not live:
         return None
-    return max(live, key=lambda o: (o["lamport"], o["origin"]))["payload"]
+    return max(live, key=lambda o: (o["lamport"], o["origin"], o["seq"]))["payload"]
 
 
 def fold_log(ops: list[dict]) -> list:
@@ -78,11 +78,12 @@ def _op(origin: str, seq: int, lamport: int, payload: bytes, prev: bytes | None 
 
 def vectors() -> list[dict]:
     """Each case: name, fold, ops, and the hand-reviewed expected result.
-    Covers concurrent writes, lamport/origin tiebreaks, out-of-order arrival,
+    Covers concurrent writes, lamport/origin/seq tiebreaks, out-of-order arrival,
     duplicate delivery, and equivocation (detection, not a fold result)."""
     a1 = _op("a", 1, 1, b"A1")
     b1 = _op("b", 1, 2, b"B1")            # higher lamport than a1
     a2 = _op("a", 2, 2, b"A2")            # same lamport as b1 -> origin breaks tie
+    a3 = _op("a", 3, 2, b"A3")            # same origin/lamport -> seq breaks tie
     return [
         # value (lww)
         {"name": "value/single", "fold": "value", "ops": [a1], "expect": b"A1"},
@@ -90,6 +91,8 @@ def vectors() -> list[dict]:
          "ops": [a1, b1], "expect": b"B1"},                       # B1 wins on lamport
         {"name": "value/tiebreak-origin", "fold": "value",
          "ops": [a2, b1], "expect": b"B1"},                       # lamport tie -> "b" > "a"
+        {"name": "value/tiebreak-seq", "fold": "value",
+         "ops": [a3, a2], "expect": b"A3"},                       # reused clock -> higher seq
         {"name": "value/out-of-order", "fold": "value",
          "ops": [b1, a1], "expect": b"B1"},                       # order-independent
         {"name": "value/duplicate", "fold": "value",

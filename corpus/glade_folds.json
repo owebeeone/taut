@@ -56,6 +56,27 @@
     "expect": "4231"
   },
   {
+    "name": "value/tiebreak-seq",
+    "fold": "value",
+    "ops": [
+      {
+        "origin": "a",
+        "seq": 3,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4133"
+      },
+      {
+        "origin": "a",
+        "seq": 2,
+        "lamport": 2,
+        "prev": null,
+        "payload": "4132"
+      }
+    ],
+    "expect": "4133"
+  },
+  {
     "name": "value/out-of-order",
     "fold": "value",
     "ops": [

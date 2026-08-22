@@ -28,6 +28,16 @@ def test_json_round_trips():
     assert schema_from_json(schema_json(s)) == s
 
 
+def test_catalogue_metadata_only_change_is_not_a_method_change():
+    s = load_schema(IR_PATH)
+    old_data = schema_json(s)
+    new_data = json.loads(json.dumps(old_data))
+    new_data["shapes"]["atom"]["position"] = "future-version-metadata"
+    old = schema_from_json(old_data)
+    new = schema_from_json(new_data)
+    assert compat.diff(old, new) == []
+
+
 def test_accepts_compatible_added_optional_field():
     old = schema(Msg("A", F("x", 1, STR)))
     new = schema(Msg("A", F("x", 1, STR), F("y", 2, INT, optional=True)))

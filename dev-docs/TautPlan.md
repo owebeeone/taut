@@ -1,6 +1,11 @@
 # taut — Build Plan
 
 Status: working draft (Phase 0 plan)
+
+Historical catalogue note (2026-08-22): this plan predates the canonical
+[`TautShapeCatalogDecision.md`](../../dev-docs/TautShapeCatalogDecision.md).
+Use that decision and `src/taut/ir/shapes.py` for current names and boundaries;
+the Phase 0 lists below explain original discovery only.
 Owner: Gianni
 Companion specs: the "taut" build prompt (north-star brief);
 `../../dev-docs/glade/GladeSurfacePrecis.md` (the model);

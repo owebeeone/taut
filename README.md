@@ -45,7 +45,7 @@ the rest:
 | **`required`** | removed in proto3 | kept as a *governance assertion*, enforced by the evolution gate (never a decode error) |
 | **Forward-compat (unknown fields)** | dropped in 3.0, restored in **3.5** — and **binary only** (the JSON mapping drops them) | opt-in unknown-field preservation (raw tags re-emitted in canonical order) |
 | **Services / RPC** | `service`/`rpc`, but the transport *is* gRPC: HTTP/2 + codegen + runtime | `(name, in, out, shape)`; transport-agnostic (reference: JSON envelope + CBOR payload) |
-| **Streaming** | gRPC client/server/bidi streams | first-class **delivery shapes**: `atom` / `log` / `stream` / `swmr` / `snapshot_delta` / `crdt` |
+| **Streaming** | gRPC client/server/bidi streams | first-class streaming **delivery engines/profiles**: `atom` / `log` / `stream` / `swmr` / `snapshot_delta` / `crdt` |
 | **Schema evolution** | field-number rules + `reserved`; breaking-change detection is **external** (buf, protolock) | a **built-in structural breaking-change gate**, runnable in CI |
 | **Extensions** | proto2 had them; proto3 dropped them (use `Any`) | declared, typed **side-channels** at a reserved tag band |
 | **Read the whole spec** | large surface | the IR fits on a screen |
@@ -101,10 +101,12 @@ SCHEMA = schema(
   comments) — retired tags/names can never be reused, and `next_id` is checked.
 - **Methods are the minimal contract `(name, in, out, shape)`.** `shape` is the
   *sole* discriminator: `unary` (request→response, the default) is just the
-  degenerate member of an **open shape registry**, alongside streaming shapes
-  `atom` (latest-wins state), `log` (append-only), `stream` (live), `swmr`
+  degenerate member of the **validated canonical shape registry**, alongside
+  `value` (attributed LWW state) and streaming shapes `atom` (latest-wins
+  state), `log` (append-only), `stream` (live), `swmr`
   (snapshot+delta), `snapshot_delta`, and `crdt`. `out` binds a type per the
-  shape's delivery slots. There is no separate "kind" axis to disagree — illegal
+  shape's delivery slots. Registry recognition is separate from adapter runtime
+  capability. There is no separate "kind" axis to disagree — illegal
   states are unrepresentable. (See [Reference §5–6](docs/Reference.md).)
 
 A **validator** rejects incoherent IR (dangling refs, duplicate tags, out-slots

@@ -305,11 +305,11 @@ def _emit(schema: Schema, golden: dict) -> str:
     lines.append("    let c = crate::cbor::decode(bytes);")
     lines.append("    match message {")
     for m in schema.messages.values():
-        # from_cbor is fallible (`Result<_, DecodeError>`); roundtrip input is
-        # corpus bytes, so a decode failure panics with the message name.
+        # This corpus emitter uses the legacy infallible message decoder above;
+        # fail-closed package codegen is owned by scaffold.rust_api/emit.
         lines.append(
             f'        "{m.name}" => crate::cbor::encode('
-            f'&{m.name}::from_cbor(&c).expect("decode: {m.name}").to_cbor()),'
+            f'&{m.name}::from_cbor(&c).to_cbor()),'
         )
     lines.append('        _ => panic!("unknown message {}", message),')
     lines.append("    }")

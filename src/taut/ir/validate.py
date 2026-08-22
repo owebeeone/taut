@@ -107,7 +107,7 @@ def validate(schema: Schema) -> list[str]:
             if meth.shape not in SHAPES:
                 errors.append(f"{ctx}: unknown delivery shape {meth.shape!r}")
             else:
-                allowed = SHAPES[meth.shape]["events"]
+                allowed = SHAPES[meth.shape].events
                 if not meth.out:
                     errors.append(
                         f"{ctx}: method must bind out (slots for {meth.shape!r}: "

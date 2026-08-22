@@ -1,5 +1,11 @@
 # taut — Decisions Log
 
+Catalogue supersession (2026-08-22): the workspace-level
+[`TautShapeCatalogDecision.md`](../../dev-docs/TautShapeCatalogDecision.md) is
+authoritative for shape names, engine/profile classes, and extension rules. D22's
+sole-discriminator decision remains; its earlier open-registry rationale and the
+older shape lists below are historical.
+
 Pinned design rulings from the refinement pass, so the next build is unambiguous.
 Status tags: **BUILT** (in code + tested) · **DECIDED** (agreed, not yet built) ·
 **SPEC** (designed in another doc, not built) · **DEFERRED** (intentionally later)
