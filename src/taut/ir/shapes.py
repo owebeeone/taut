@@ -12,7 +12,7 @@ an arbitrary string can therefore never acquire implicit streaming behaviour.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Iterable, Literal, Mapping
 
@@ -41,7 +41,7 @@ class ShapeSpec:
     recovery: str
     merge: str
     lifecycle: str
-    fixed_profile: Mapping[str, str] = MappingProxyType({})
+    fixed_profile: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "events", frozenset(self.events))
