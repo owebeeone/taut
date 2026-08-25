@@ -54,7 +54,7 @@
       "name": "atom",
       "class": "engine",
       "core": "atom",
-      "contract_version": "v1-draft",
+      "contract_version": "v1",
       "fixed_profile": {},
       "delivery": "stream",
       "events": [
@@ -106,7 +106,7 @@
       "name": "stream",
       "class": "engine",
       "core": "stream",
-      "contract_version": "unbound",
+      "contract_version": "v1",
       "fixed_profile": {},
       "delivery": "stream",
       "events": [
@@ -131,7 +131,7 @@
       "name": "swmr",
       "class": "engine",
       "core": "swmr",
-      "contract_version": "v1-draft",
+      "contract_version": "v1",
       "fixed_profile": {},
       "delivery": "stream",
       "events": [
@@ -161,7 +161,7 @@
       "name": "snapshot_delta",
       "class": "profile",
       "core": "swmr",
-      "contract_version": "v1-draft",
+      "contract_version": "v1",
       "fixed_profile": {
         "recovery": "expire"
       },
@@ -191,7 +191,7 @@
       "name": "crdt",
       "class": "engine",
       "core": "crdt",
-      "contract_version": "unbound",
+      "contract_version": "v1",
       "fixed_profile": {},
       "delivery": "stream",
       "events": [
@@ -199,11 +199,12 @@
         "sync"
       ],
       "operations": [
-        "local_apply",
-        "merge_remote",
+        "apply",
+        "bootstrap",
+        "read",
         "sync"
       ],
-      "payload": "ops",
+      "payload": "opaque-ops",
       "history": "reconstructible",
       "initiation": "push-bidi",
       "writers": "multi-merge",
@@ -212,6 +213,37 @@
       "position": "causal_vector",
       "recovery": "anti_entropy",
       "merge": "profile_defined_convergent",
+      "lifecycle": "replica_sync"
+    },
+    "text_crdt": {
+      "name": "text_crdt",
+      "class": "profile",
+      "core": "crdt",
+      "contract_version": "v1",
+      "fixed_profile": {
+        "payload": "text_crdt.profile/v1"
+      },
+      "delivery": "stream",
+      "events": [
+        "op",
+        "sync"
+      ],
+      "operations": [
+        "bootstrap",
+        "delete",
+        "insert",
+        "read",
+        "sync"
+      ],
+      "payload": "text-ops",
+      "history": "reconstructible",
+      "initiation": "push-bidi",
+      "writers": "multi-merge",
+      "ordering": "causal_per_origin",
+      "retention": "convergence_safe",
+      "position": "causal_vector",
+      "recovery": "anti_entropy",
+      "merge": "stable_item_text",
       "lifecycle": "replica_sync"
     }
   },

@@ -32,8 +32,11 @@ requires = ["setuptools>=77", "setuptools-scm>=8"]   # version from git tags (v0
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-tag_regex = "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
-fallback_version = "0.0.0"
+fallback_version = "0.9.0"
+
+[tool.setuptools_scm.tag]
+prefix = "v"
+strict = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
