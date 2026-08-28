@@ -293,7 +293,8 @@
       "members": {
         "value": 0,
         "log": 1,
-        "stream": 2
+        "stream": 2,
+        "swmr": 3
       }
     }
   ],

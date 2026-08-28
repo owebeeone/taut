@@ -51,12 +51,14 @@ def curated_values() -> dict[str, tuple[str, dict]]:
     op_chain = _op(key=b"\x01\x02", origin="o", seq=5, prev=sh32, lamport=9,
                    refs=[_head("o2", 3, b""), _head("o3", 1, None)],
                    shape="log", payload=b"hello")
+    op_swmr = _op(origin="writer-a", shape="swmr", payload=b"\x01\x00snapshot")
     sh_multi = {"share": "sh", "glade_id": "g", "key": b"",
                 "heads": [_head("a", 7, b"\x01" * 32), _head("b", 0, b"\x02" * 32)]}
     return {
         # --- op envelope edge cases ---
         "edge/op-min": ("Op", op_min),
         "edge/op-chain": ("Op", op_chain),
+        "edge/op-swmr": ("Op", op_swmr),
         # --- resume / heads ---
         "edge/streamheads-multi": ("StreamHeads", sh_multi),
         "edge/heads-frame": ("Heads", {"streams": [sh_multi]}),

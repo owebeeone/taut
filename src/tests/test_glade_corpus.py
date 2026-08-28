@@ -42,3 +42,15 @@ def test_glade_op_chain_and_null_key_edges():
     # equivocation is a first-class error code
     _m, err = values["edge/error-equivocation"]
     assert err["code"] == "equivocation"
+
+
+def test_glade_shape_enum_appends_swmr_without_renumbering_existing_shapes():
+    schema = load_schema(IR_PATH)
+    assert schema.enums["Shape"].members == {
+        "value": 0,
+        "log": 1,
+        "stream": 2,
+        "swmr": 3,
+    }
+    _message, op = glade_values(schema)["edge/op-swmr"]
+    assert op["shape"] == "swmr"

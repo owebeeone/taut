@@ -57,7 +57,7 @@ SCHEMA = schema(
          protocol=4, retention=5, internal=6),
     # Declared shape of a stream (drives the fold). Mirrors taut shapes; carried
     # as a STR on Op.shape, enumerated here for the wire vocabulary.
-    Enum("Shape", value=0, log=1, stream=2),
+    Enum("Shape", value=0, log=1, stream=2, swmr=3),
 
     # ---- addressing + ordering --------------------------------------------
     # A point in one origin's log, plus that origin's chain head hash (GQ-9).
