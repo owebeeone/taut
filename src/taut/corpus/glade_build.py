@@ -52,6 +52,7 @@ def curated_values() -> dict[str, tuple[str, dict]]:
                    refs=[_head("o2", 3, b""), _head("o3", 1, None)],
                    shape="log", payload=b"hello")
     op_swmr = _op(origin="writer-a", shape="swmr", payload=b"\x01\x00snapshot")
+    op_crdt = _op(origin="editor-a", shape="crdt", payload=b'{"kind":"insert"}')
     sh_multi = {"share": "sh", "glade_id": "g", "key": b"",
                 "heads": [_head("a", 7, b"\x01" * 32), _head("b", 0, b"\x02" * 32)]}
     return {
@@ -59,6 +60,7 @@ def curated_values() -> dict[str, tuple[str, dict]]:
         "edge/op-min": ("Op", op_min),
         "edge/op-chain": ("Op", op_chain),
         "edge/op-swmr": ("Op", op_swmr),
+        "edge/op-crdt": ("Op", op_crdt),
         # --- resume / heads ---
         "edge/streamheads-multi": ("StreamHeads", sh_multi),
         "edge/heads-frame": ("Heads", {"streams": [sh_multi]}),

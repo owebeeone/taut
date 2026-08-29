@@ -44,13 +44,14 @@ def test_glade_op_chain_and_null_key_edges():
     assert err["code"] == "equivocation"
 
 
-def test_glade_shape_enum_appends_swmr_without_renumbering_existing_shapes():
+def test_glade_shape_enum_appends_swmr_and_crdt_without_renumbering_existing_shapes():
     schema = load_schema(IR_PATH)
     assert schema.enums["Shape"].members == {
         "value": 0,
         "log": 1,
         "stream": 2,
         "swmr": 3,
+        "crdt": 4,
     }
     _message, op = glade_values(schema)["edge/op-swmr"]
     assert op["shape"] == "swmr"

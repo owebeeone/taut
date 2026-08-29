@@ -294,7 +294,8 @@
         "value": 0,
         "log": 1,
         "stream": 2,
-        "swmr": 3
+        "swmr": 3,
+        "crdt": 4
       }
     }
   ],
