@@ -173,7 +173,9 @@ The consumer must share the owner's CBOR runtime (for example,
 pin the owner schema/package alongside its generator. Do not install a
 second generated `cbor` module in that consumer: Rust treats those runtime
 types as distinct even when their source is identical. This option provides
-type references, not package discovery or dependency-version resolution.
+type references, not package discovery or dependency-version resolution. The
+generator refuses a nonempty external-type map together with `--with-runtime`
+so this shared-runtime requirement cannot be bypassed accidentally.
 
 These are the *reference* emitters; they read the exported `.ir.json`, and so can
 a generator you write — `tautc` is a convenience, not a requirement.

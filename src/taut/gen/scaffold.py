@@ -630,6 +630,11 @@ def emit(
     unknown = [l for l in lang_keys if l not in _LANGS]
     if unknown:
         raise ValueError(f"unknown lang(s) {unknown}; known: {sorted(_LANGS)}")
+    if runtime and rust_external_types:
+        raise ValueError(
+            "external Rust types cannot be generated with runtime=True: "
+            "the owner crate must supply the shared runtime"
+        )
     _GENERATED = {"rust", "cpp", "swift", "go", "kotlin", "js", "java"}
     if schema.extensions and not forward_compat and (_GENERATED & set(lang_keys)):
         raise ValueError(

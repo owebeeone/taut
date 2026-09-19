@@ -59,3 +59,19 @@ def test_external_mapping_is_explicitly_rust_only(tmp_path):
     _, consumer = objects()
     with pytest.raises(ValueError, match='Rust'):
         emit(consumer, tmp_path, langs=['python'], rust_external_types={'Packet': 'owner::Packet'})
+
+
+@pytest.mark.parametrize('langs', [['rust'], ['rust', 'python']])
+def test_external_types_refuse_vendored_runtime_before_writing(langs, tmp_path):
+    _, consumer = objects()
+    output = tmp_path / 'output'
+    with pytest.raises(ValueError, match='external Rust types.*runtime'):
+        emit(
+            consumer,
+            output,
+            langs=langs,
+            services=[],
+            runtime=True,
+            rust_external_types={'Packet': 'owner::api::Packet'},
+        )
+    assert not output.exists()
