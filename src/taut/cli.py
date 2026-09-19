@@ -64,6 +64,8 @@ def _cmd_gen(args: argparse.Namespace) -> int:
         schema, Path(args.out), langs=_split(args.lang), services=services,
         runtime=args.with_runtime, forward_compat=args.forward_compat,
         fail_closed=fail_closed,
+        rust_external_types=(json.loads(Path(args.rust_external_types).read_text())
+                             if args.rust_external_types else None),
     )
     for p in written:
         print(p)
@@ -147,6 +149,7 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("-l", "--lang", help="comma-separated targets (default: all): python,typescript,rust,cpp")
     g.add_argument("-s", "--service", help="comma-separated services for client/server stubs (default: all in the IR)")
     g.add_argument("--api-only", action="store_true", help="emit only api (types + encoders/decoders), no client/server")
+    g.add_argument("--rust-external-types", metavar="JSON", help="name-to-Rust-path map for types owned by a dependency; compose its schema and share its CBOR runtime")
     g.add_argument("--with-runtime", action="store_true",
                    help="also emit the vendored CBOR runtime for compiled targets (rust->cbor.rs, cpp->taut/cbor.hpp)")
     g.add_argument("--forward-compat", action="store_true",

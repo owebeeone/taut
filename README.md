@@ -160,6 +160,21 @@ hand-vendoring. Example: razel (a Rust build daemon) authors
 `ir/razel.taut.py` and generates its Rust wire layer with
 `tautc gen ir/razel.taut.py -o razel/gen --lang rust --api-only`.
 
+For Rust schemas composed with a dependency's exported schema,
+`--rust-external-types types.json` reuses the dependency's native types. The
+JSON object maps schema names to Rust paths, for example
+`{"Packet": "owner::api::Packet", "Kind": "owner::api::Kind"}`. Keep the
+complete dependency definitions in the composed IR; mapped types become
+`pub use` declarations instead of duplicate structs or enums. Unmapped types
+are generated normally. Other language targets still generate their types.
+
+The consumer must share the owner's CBOR runtime (for example,
+`pub use owner::cbor;` at the crate root), use compatible codec options, and
+pin the owner schema/package alongside its generator. Do not install a
+second generated `cbor` module in that consumer: Rust treats those runtime
+types as distinct even when their source is identical. This option provides
+type references, not package discovery or dependency-version resolution.
+
 These are the *reference* emitters; they read the exported `.ir.json`, and so can
 a generator you write — `tautc` is a convenience, not a requirement.
 

@@ -241,18 +241,26 @@ def _rs_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def rust_api(schema: Schema, forward_compat: bool = False, fail_closed: bool = False) -> str:
+def rust_api(schema: Schema, forward_compat: bool = False, fail_closed: bool = False,
+             external_types: dict[str, str] | None = None) -> str:
+    from .rust_external import imports
+
+    external_imports = imports(schema, external_types)
+    external = external_types or {}
     out = ["// GENERATED native Rust types + codec — do not edit.", "#![allow(dead_code)]"]
     if fail_closed:
         # fail-closed decode returns the runtime's typed error type.
         out.append("use crate::cbor::{Cbor, DecodeError};")
     else:
         out.append("use crate::cbor::Cbor;")
+    out.extend(external_imports)
     out.append("")
     for e in schema.enums.values():
-        out += _rust._emit_enum(e.name, e.members, fail_closed) + [""]
+        if e.name not in external:
+            out += _rust._emit_enum(e.name, e.members, fail_closed) + [""]
     for m in schema.messages.values():
-        out += _rust._emit_message(m, forward_compat, fail_closed) + [""]
+        if m.name not in external:
+            out += _rust._emit_message(m, forward_compat, fail_closed) + [""]
     return "\n".join(out).rstrip() + "\n"
 
 
@@ -579,6 +587,7 @@ def emit(
     runtime: bool = False,
     forward_compat: bool = False,
     fail_closed: bool = True,
+    rust_external_types: dict[str, str] | None = None,
 ) -> list[Path]:
     """Generate per-language code from an IR (the engine behind the `tautc` CLI).
 
@@ -612,6 +621,12 @@ def emit(
     `client.{ext}` for a lone service, `client_{svc}.{ext}` when several.
     """
     lang_keys = list(langs) if langs is not None else list(_LANGS)
+    if rust_external_types is not None:
+        from .rust_external import imports
+
+        if "rust" not in lang_keys:
+            raise ValueError("Rust external types require a Rust generation target")
+        imports(schema, rust_external_types)
     unknown = [l for l in lang_keys if l not in _LANGS]
     if unknown:
         raise ValueError(f"unknown lang(s) {unknown}; known: {sorted(_LANGS)}")
@@ -644,6 +659,7 @@ def emit(
         api_kwargs = {"forward_compat": forward_compat}
         if lang == "rust":
             api_kwargs["fail_closed"] = fail_closed
+            api_kwargs["external_types"] = rust_external_types
         api_text = api_fn(schema, **api_kwargs)
         if lang == "rust" and not fail_closed:
             api_text = _LEGACY_CODEC_BANNER + api_text   # D1 opt-out deprecation banner
