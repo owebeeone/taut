@@ -530,6 +530,14 @@ def test_rust_fail_closed_emits_fallible_from_cbor_and_i64_ints():
     assert "maybe: { let v = c.try_get(4)?; if v.is_null() { None } else { Some(v.try_int()?) } }," in rs
 
 
+def test_rust_missing_ok_only_relaxes_selected_optional_slot():
+    s = schema(Msg("M", F("old", 1, STR, optional=True),
+                   F("new", 2, STR, optional=True, missing_ok=True)))
+    rs = scaffold.rust_api(s, fail_closed=True)
+    assert "old: { let v = c.try_get(1)?; if v.is_null() { None } else { Some(v.try_text()?) } }," in rs
+    assert "new: { let v = c.try_get_opt(2)?; match v { None => None, Some(v) => if v.is_null() { None } else { Some(v.try_text()?) } } }," in rs
+
+
 def test_rust_fail_closed_enum_from_wire_is_fallible():
     rs = scaffold.rust_api(_FC, fail_closed=True)
     assert "pub fn from_wire(v: i64) -> Result<Self, DecodeError>" in rs
@@ -704,6 +712,117 @@ def test_rust_fail_closed_runtime_decode_is_fail_closed(tmp_path):
     """))
 
     bin_path = tmp_path / "fail_closed"
+    subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
+    subprocess.run([str(bin_path)], check=True)
+
+
+@pytest.mark.parametrize("fail_closed", [False, True])
+def test_rust_missing_ok_runtime_behavior_for_both_codecs(tmp_path, fail_closed):
+    """Compile generated code and exercise absent/null/malformed slots.
+
+    The legacy optional slot remains a required nullable map entry.  Only the
+    opted-in slot accepts absence; a present wrong type remains an error in both
+    codec modes.
+    """
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        pytest.skip("rustc not available")
+
+    from taut.ir.dsl import F, Msg, schema
+
+    s = schema(
+        Msg(
+            "M",
+            F("required", 1, STR),
+            F("strict_optional", 2, STR, optional=True),
+            F("missing_optional", 3, STR, optional=True, missing_ok=True),
+        )
+    )
+    generated = tmp_path / ("generated_closed" if fail_closed else "generated_default")
+    scaffold.emit(s, generated, langs=["rust"], services=[], runtime=True,
+                  fail_closed=fail_closed)
+    rust_dir = generated / "rust"
+    api_path = (rust_dir / "api.rs").as_posix()
+    cbor_path = (rust_dir / "cbor.rs").as_posix()
+    if fail_closed:
+        decode_missing_strict = "assert_eq!(M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into()))]),), Err(DecodeError::MissingKey(2)));"
+        decode_missing_required = "assert_eq!(M::from_cbor(&map(&[(2, Cbor::Null), (3, Cbor::Null)])), Err(DecodeError::MissingKey(1)));"
+        decode_malformed = "assert_eq!(M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into())), (2, Cbor::Null), (3, Cbor::Int(9))])), Err(DecodeError::WrongType { expected: \"text\" }));"
+        decode_valid = "let v = M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into())), (2, Cbor::Null)])).expect(\"valid\"); assert_eq!(v.missing_optional, None);"
+        imports = "use cbor::{Cbor, DecodeError};"
+    else:
+        decode_missing_strict = "assert!(std::panic::catch_unwind(|| M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into()))]))).is_err());"
+        decode_missing_required = "assert!(std::panic::catch_unwind(|| M::from_cbor(&map(&[(2, Cbor::Null), (3, Cbor::Null)]))).is_err());"
+        decode_malformed = "assert!(std::panic::catch_unwind(|| M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into())), (2, Cbor::Null), (3, Cbor::Int(9))]))).is_err());"
+        decode_valid = "let v = M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into())), (2, Cbor::Null)]) ); assert_eq!(v.missing_optional, None);"
+        imports = "use cbor::Cbor;"
+    test_rs = tmp_path / ("missing_ok_closed.rs" if fail_closed else "missing_ok_default.rs")
+    test_rs.write_text(textwrap.dedent(f"""
+        extern crate alloc;
+        #[path = "{cbor_path}"]
+        mod cbor;
+        #[path = "{api_path}"]
+        mod api;
+        {imports}
+        use api::M;
+
+        fn map(entries: &[(i64, Cbor)]) -> Cbor {{
+            Cbor::Map(entries.iter().map(|(k, v)| (*k, v.clone())).collect())
+        }}
+
+        #[test]
+        fn field_presence_and_malformed_values_are_scoped() {{
+            {decode_valid}
+            {decode_missing_strict}
+            {decode_missing_required}
+            {decode_malformed}
+            let nulled = M::from_cbor(&map(&[(1, Cbor::Text("ok".into())), (2, Cbor::Null), (3, Cbor::Null)]));
+            {"assert!(nulled.is_ok());" if fail_closed else "let _ = nulled;"}
+        }}
+    """))
+    bin_path = tmp_path / ("missing_ok_closed" if fail_closed else "missing_ok_default")
+    subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
+    subprocess.run([str(bin_path)], check=True)
+
+
+@pytest.mark.parametrize("fail_closed", [False, True])
+def test_rust_empty_message_requires_map_in_both_codecs(tmp_path, fail_closed):
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        pytest.skip("rustc not available")
+    from taut.ir.dsl import Msg, schema
+
+    generated = tmp_path / ("empty_closed" if fail_closed else "empty_default")
+    scaffold.emit(schema(Msg("Empty")), generated, langs=["rust"], services=[],
+                  runtime=True, fail_closed=fail_closed)
+    rust_dir = generated / "rust"
+    api_path = (rust_dir / "api.rs").as_posix()
+    cbor_path = (rust_dir / "cbor.rs").as_posix()
+    if fail_closed:
+        body = "assert_eq!(Empty::from_cbor(&Cbor::Bool(true)), Err(DecodeError::WrongType { expected: \"map\" }));"
+        imports = "use cbor::{Cbor, DecodeError};"
+        valid = "assert!(Empty::from_cbor(&Cbor::Map(vec![])).is_ok());"
+    else:
+        body = "assert!(std::panic::catch_unwind(|| Empty::from_cbor(&Cbor::Bool(true))).is_err());"
+        imports = "use cbor::Cbor;"
+        valid = "let _ = Empty::from_cbor(&Cbor::Map(vec![]));"
+    test_rs = tmp_path / ("empty_closed.rs" if fail_closed else "empty_default.rs")
+    test_rs.write_text(textwrap.dedent(f"""
+        extern crate alloc;
+        #[path = "{cbor_path}"]
+        mod cbor;
+        #[path = "{api_path}"]
+        mod api;
+        {imports}
+        use api::Empty;
+
+        #[test]
+        fn empty_message_checks_container_shape() {{
+            {valid}
+            {body}
+        }}
+    """))
+    bin_path = tmp_path / ("empty_closed_bin" if fail_closed else "empty_default_bin")
     subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
     subprocess.run([str(bin_path)], check=True)
 

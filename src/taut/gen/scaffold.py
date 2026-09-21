@@ -621,6 +621,19 @@ def emit(
     `client.{ext}` for a lone service, `client_{svc}.{ext}` when several.
     """
     lang_keys = list(langs) if langs is not None else list(_LANGS)
+    missing_ok_fields = [
+        f"{m.name}.{f.name}"
+        for m in schema.messages.values()
+        for f in m.fields
+        if f.missing_ok
+    ]
+    unsupported_missing_ok = set(lang_keys) - {"python", "rust"}
+    if missing_ok_fields and unsupported_missing_ok:
+        raise ValueError(
+            "missing_ok fields are supported only by Python and Rust generation; "
+            f"unsupported target(s): {sorted(unsupported_missing_ok)} "
+            f"for {missing_ok_fields}"
+        )
     if rust_external_types is not None:
         from .rust_external import imports
 

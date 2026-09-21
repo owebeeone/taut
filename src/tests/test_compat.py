@@ -46,6 +46,14 @@ def test_accepts_compatible_added_optional_field():
     assert "y (tag 2) added" in _details(compat.diff(old, new))
 
 
+def test_missing_ok_change_is_visible_and_one_way_compatible():
+    old = schema(Msg("A", F("x", 1, STR, optional=True)))
+    enabled = schema(Msg("A", F("x", 1, STR, optional=True, missing_ok=True)))
+    assert not compat.breaking(old, enabled)
+    assert any("missing_ok False->True" in c.detail for c in compat.diff(old, enabled))
+    assert any("missing_ok True->False" in c.detail for c in compat.breaking(enabled, old))
+
+
 def test_rejects_removed_field():
     old = schema(Msg("A", F("x", 1, STR), F("y", 2, INT)))
     new = schema(Msg("A", F("x", 1, STR)))

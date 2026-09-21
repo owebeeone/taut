@@ -6,7 +6,42 @@ import base64
 
 from taut.corpus.build import IR_PATH
 from taut.ir.load import load_schema
+from taut.ir.dsl import F, STR, Msg, schema
 from taut.wire import codec, jsoncodec
+
+
+def test_missing_ok_python_decode_is_per_field_and_rejects_malformed_values():
+    s = schema(Msg("M", F("old", 1, STR, optional=True),
+                   F("new", 2, STR, optional=True, missing_ok=True)))
+    assert codec.decode_struct(s, "M", {1: None, 2: None}, strict=True) == {
+        "old": None, "new": None
+    }
+    assert codec.decode_struct(s, "M", {1: None}, strict=True) == {
+        "old": None, "new": None
+    }
+    try:
+        codec.decode_struct(s, "M", {2: "ok"}, strict=True)
+    except codec.DecodeError as exc:
+        assert exc.tag == "MissingKey" and exc.key == 1
+    else:
+        raise AssertionError("strict legacy optional slot must remain required")
+    try:
+        codec.decode_struct(s, "M", {1: None, 2: 3}, strict=True)
+    except codec.DecodeError as exc:
+        assert exc.tag == "WrongType"
+    else:
+        raise AssertionError("present malformed missing_ok value must fail")
+
+
+def test_python_empty_message_requires_map():
+    s = schema(Msg("Empty"))
+    assert codec.decode_struct(s, "Empty", {}, strict=True) == {}
+    try:
+        codec.decode_struct(s, "Empty", True, strict=True)
+    except codec.DecodeError as exc:
+        assert exc.tag == "WrongType"
+    else:
+        raise AssertionError("strict empty message must reject non-map input")
 
 # razel's BuildResult exercises every wrinkle: enum, i64, list-of-message,
 # nested bytes, and an optional (present + absent).

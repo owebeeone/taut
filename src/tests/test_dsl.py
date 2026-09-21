@@ -2,6 +2,7 @@ import pytest
 
 from taut.ir.dsl import INT, STR, Enum, F, List, Msg, Params, Ref, method, schema, service
 from taut.ir.validate import validate
+from taut.ir.export import schema_json
 
 
 def test_keyword_message_and_fields_match_legacy_shape():
@@ -22,6 +23,22 @@ def test_keyword_message_and_fields_match_legacy_shape():
 
     assert preferred == legacy
     assert validate(preferred) == []
+
+
+def test_missing_ok_is_opt_in_for_optional_fields_only():
+    s = schema(Msg("M", F("new", 1, STR, optional=True, missing_ok=True)))
+    assert s.messages["M"].fields[0].missing_ok is True
+    assert validate(s) == []
+    assert validate(schema(Msg("M", F("required", 1, STR, missing_ok=True)))) == [
+        "M.required: missing_ok requires optional=True"
+    ]
+
+
+def test_missing_ok_serialization_is_additive():
+    baseline = schema_json(schema(Msg("M", F("old", 1, STR, optional=True))))
+    opted = schema_json(schema(Msg("M", F("new", 1, STR, optional=True, missing_ok=True))))
+    assert "missing_ok" not in baseline["messages"][0]["fields"][0]
+    assert opted["messages"][0]["fields"][0]["missing_ok"] is True
 
 
 def test_keyword_enum_matches_legacy_shape():

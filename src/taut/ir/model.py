@@ -60,6 +60,7 @@ class FieldDef:
     transient: bool = False    # present in the native type, never on the wire
     merge: str | None = None   # CRDT merge type for this field: "lww" | "counter"
                                # (design metadata; does not affect the wire encoding)
+    missing_ok: bool = False   # optional field may be absent as well as null
 
 
 @dataclass(frozen=True)

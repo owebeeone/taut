@@ -61,7 +61,7 @@ def schema_json(schema: Schema) -> dict:
                         "optional": f.optional,
                         "transient": f.transient,
                         "merge": f.merge,
-                    }
+                    } | ({"missing_ok": True} if f.missing_ok else {})
                     for f in m.fields
                 ],
             }

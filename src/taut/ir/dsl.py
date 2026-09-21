@@ -53,6 +53,7 @@ def _field_named(name: str, field: FieldDef) -> FieldDef:
             optional=field.optional,
             transient=field.transient,
             merge=field.merge,
+            missing_ok=field.missing_ok,
         )
     if field.name != name:
         raise TypeError(f"field name mismatch: keyword {name!r} names field {field.name!r}")
@@ -135,6 +136,7 @@ def F(
     optional: bool = False,
     transient: bool = False,
     merge: str | None = None,
+    missing_ok: bool = False,
 ) -> FieldDef:
     if len(args) == 3 and isinstance(args[0], str):
         name, tag, type = args
@@ -145,7 +147,8 @@ def F(
         raise TypeError("F expects F(name, tag, type) or F(tag, type)")
     if not isinstance(tag, int) or isinstance(tag, bool):
         raise TypeError("field tag must be an integer")
-    return FieldDef(name=name, tag=tag, type=type, optional=optional, transient=transient, merge=merge)
+    return FieldDef(name=name, tag=tag, type=type, optional=optional, transient=transient,
+                    merge=merge, missing_ok=missing_ok)
 
 
 def Msg(*args, reserved=(), next_id: int | None = None, **named_fields) -> MessageDef:
@@ -251,7 +254,8 @@ def schema(*decls, **named_decls) -> Schema:
     for d in decls:
         if isinstance(d, MessageDef):
             fields = tuple(
-                FieldDef(f.name, f.tag, _resolve(f.type, enum_names), f.optional, f.transient, f.merge)
+                FieldDef(f.name, f.tag, _resolve(f.type, enum_names), f.optional, f.transient,
+                         f.merge, f.missing_ok)
                 for f in d.fields
             )
             messages[d.name] = MessageDef(d.name, fields, d.reserved_tags, d.reserved_names, d.next_id)

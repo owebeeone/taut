@@ -61,7 +61,8 @@ def schema_from_json(data: dict) -> Schema:
     messages = {}
     for m in data["messages"]:
         fields = tuple(
-            FieldDef(f["name"], f["tag"], _typeref_from_json(f["type"]), f["optional"], f["transient"], f.get("merge"))
+            FieldDef(f["name"], f["tag"], _typeref_from_json(f["type"]), f["optional"],
+                     f["transient"], f.get("merge"), f.get("missing_ok", False))
             for f in m["fields"]
         )
         messages[m["name"]] = MessageDef(

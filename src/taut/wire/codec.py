@@ -155,7 +155,7 @@ def _from_wire(schema: Schema, tref: TypeRef, cv: Any, *, strict: bool = False) 
         for f in msg.wire_fields():
             known.add(f.tag)
             if f.tag not in cv:
-                if strict and not f.optional:
+                if strict and (not f.optional or not f.missing_ok):
                     raise DecodeError("MissingKey", key=f.tag)
                 out[f.name] = None
                 continue

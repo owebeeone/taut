@@ -18,6 +18,24 @@ pub enum Cbor {
 }
 
 impl Cbor {
+    pub fn is_map(&self) -> bool {
+        matches!(self, Cbor::Map(_))
+    }
+
+    /// Value for an integer map key, or `None` when the key is absent.
+    pub fn get_opt(&self, key: i64) -> Option<&Cbor> {
+        if let Cbor::Map(m) = self {
+            for (k, v) in m {
+                if *k == key {
+                    return Some(v);
+                }
+            }
+        } else {
+            panic!("not a map");
+        }
+        None
+    }
+
     /// Value for an integer map key (panics if absent / not a map).
     pub fn get(&self, key: i64) -> &Cbor {
         if let Cbor::Map(m) = self {

@@ -91,6 +91,9 @@ def _diff_messages(old: Schema, new: Schema, out: list[Change]) -> None:
                 out.append(Change("compatible", f"{name}.{of.name} required->optional"))
             if of.merge != nf.merge:
                 out.append(Change("breaking", f"{name}.{of.name} CRDT merge {of.merge}->{nf.merge}"))
+            if of.missing_ok != nf.missing_ok:
+                level = "compatible" if nf.missing_ok else "breaking"
+                out.append(Change(level, f"{name}.{of.name} missing_ok {of.missing_ok}->{nf.missing_ok}"))
             # a field kept by name but moved to a different tag
             same_name_new = new_by_name.get(of.name)
             if same_name_new is not None and same_name_new.tag != of.tag:

@@ -246,13 +246,20 @@ def _emit_message(msg, forward_compat: bool = False, fail_closed: bool = False) 
 
 def _from_cbor_default(msg, forward_compat: bool) -> list[str]:
     """Today's infallible `from_cbor` (panics on malformed input). Unchanged."""
-    out = ["    pub fn from_cbor(c: &Cbor) -> Self {", "        Self {"]
+    out = ["    pub fn from_cbor(c: &Cbor) -> Self {"]
+    if not msg.wire_fields():
+        out.append('        assert!(c.is_map(), "expected map");')
+    out.append("        Self {")
     for f in msg.fields:
         if f.transient:
             dec = "Default::default()"
         elif f.optional:
-            dec = (f"{{ let v = c.get({f.tag}); "
-                   f"if v.is_null() {{ None }} else {{ Some({_decode(f.type, 'v')}) }} }}")
+            if f.missing_ok:
+                dec = (f"{{ let v = c.get_opt({f.tag}); match v {{ None => None, Some(v) => "
+                       f"if v.is_null() {{ None }} else {{ Some({_decode(f.type, 'v')}) }} }} }}")
+            else:
+                dec = (f"{{ let v = c.get({f.tag}); "
+                       f"if v.is_null() {{ None }} else {{ Some({_decode(f.type, 'v')}) }} }}")
         else:
             dec = _decode(f.type, f"c.get({f.tag})")
         out.append(f"            {f.name}: {dec},")
@@ -269,13 +276,20 @@ def _from_cbor_fail_closed(msg, forward_compat: bool) -> list[str]:
     """Fail-closed `from_cbor`: returns `Result<Self, DecodeError>`, propagates
     a typed error with `?` on every missing key / wrong type / unknown enum
     arm / short field, and never panics on any input."""
-    out = ["    pub fn from_cbor(c: &Cbor) -> Result<Self, DecodeError> {", "        Ok(Self {"]
+    out = ["    pub fn from_cbor(c: &Cbor) -> Result<Self, DecodeError> {"]
+    if not msg.wire_fields():
+        out.append('        if !c.is_map() { return Err(DecodeError::WrongType { expected: "map" }); }')
+    out.append("        Ok(Self {")
     for f in msg.fields:
         if f.transient:
             dec = "Default::default()"
         elif f.optional:
-            dec = (f"{{ let v = c.try_get({f.tag})?; "
-                   f"if v.is_null() {{ None }} else {{ Some({_decode_try(f.type, 'v')}) }} }}")
+            if f.missing_ok:
+                dec = (f"{{ let v = c.try_get_opt({f.tag})?; match v {{ None => None, Some(v) => "
+                       f"if v.is_null() {{ None }} else {{ Some({_decode_try(f.type, 'v')}) }} }} }}")
+            else:
+                dec = (f"{{ let v = c.try_get({f.tag})?; "
+                       f"if v.is_null() {{ None }} else {{ Some({_decode_try(f.type, 'v')}) }} }}")
         else:
             dec = _decode_try(f.type, f"c.try_get({f.tag})?")
         out.append(f"            {f.name}: {dec},")
