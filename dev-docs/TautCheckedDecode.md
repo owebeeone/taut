@@ -1,5 +1,9 @@
 # Checked decode: one error and schema-declared bounds in Rust, TypeScript and Python
 
+**rev5, 2026-09-28:** presence is one keyword with three values, `optional=` `False`, `True` or
+`MISSING_OK` ("switch the notes to optional=MISSING_OK"; [TautOptions.md](TautOptions.md) OPT-M2),
+in place of rev4's field option. Changed: §0, the opt-in exception, CD-C1, CD-V2 and question 4.
+
 **rev4, 2026-09-28:** question 4 is ruled (a) ("ok"), and `missing_ok` becomes the first field
 option, `option.missing_ok(True)` ("add option field"; [TautOptions.md](TautOptions.md) OPT-D7).
 Changed: §0, the opt-in exception, CD-C1, CD-V2 and question 4.
@@ -54,6 +58,11 @@ adoption", question 4). glade's node step drops `checked.rs` ("drop checked.rs")
 it is `missing_ok`, and JS and TypeScript implement `missing_ok` in v0.10.0. `missing_ok` becomes an
 option ("add option field"): a field-level wire option, widening, so turning it on is compatible and
 turning it off breaking (TautOptions.md OPT-D7, OPT-K1).
+
+**OWNER, 2026-09-28 (rev5):** presence is one keyword instead ("switch the notes to
+optional=MISSING_OK"): `optional=` takes `False`, `True` or `MISSING_OK`, replacing rev4's field
+option (TautOptions.md OPT-M2). Question 4's ruling stands in those terms: adding an optional field
+is compatible only at `MISSING_OK`.
 
 The property this note makes precise: **for any input bytes, every decode entry point returns either
 a value or a `DecodeError`. It never panics, aborts, runs out of stack or throws anything else, and
@@ -155,14 +164,14 @@ has been since `bcf98b6` (`taut/src/taut/wire/codec.py:157-160`), and TypeScript
 (M11, M15).
 
 **The opt-in exception (rev3, from `bcf98b6`).** `F(..., optional=True, missing_ok=True)`, from
-v0.10.0 the field option `option.missing_ok(True)` (rev4; TautOptions.md OPT-D7), reads an absent
-key as null as well as a present null; it still refuses a present value of the wrong type
-and a message that is not a map (`taut/src/taut/gen/rust.py:287-289`; `cbor_fail_closed.rs:242-255`;
-`codec.py:158`). `validate` requires `optional=True` with it (`taut/src/taut/ir/validate.py:63-64`).
-The encoder is unchanged and still writes the key, so for such a field D2's law deliberately does not
-hold: a message read without the key re-encodes with it, as null. Only Python and Rust implement it
-today; `scaffold.emit` refuses every other target for a schema that uses it (`scaffold.py:624-636`),
-and TypeScript's IR-driven codec ignores it, reading every absent optional key as null. JS and
+v0.10.0 spelled `optional=MISSING_OK` (rev5; TautOptions.md OPT-M2), reads an absent key as null as
+well as a present null; it still refuses a present value of the wrong type and a message that is not
+a map (`taut/src/taut/gen/rust.py:287-289`; `cbor_fail_closed.rs:242-255`; `codec.py:158`).
+`validate` requires `optional=True` with it (`taut/src/taut/ir/validate.py:63-64`). The encoder is
+unchanged and still writes the key, so for such a field D2's law deliberately does not hold: a
+message read without the key re-encodes with it, as null. Only Python and Rust implement it today;
+`scaffold.emit` refuses every other target for a schema that uses it (`scaffold.py:624-636`), and
+TypeScript's IR-driven codec ignores it, reading every absent optional key as null. JS and
 TypeScript implement it in v0.10.0 (question 4, ruled). What the rule and the exception mean for
 `compat.py:11` is question 4.
 
@@ -265,9 +274,9 @@ bounds.vectors.json      new: 30 depth and length rows (§4.4, B1-B30), each wit
 
 The fixture `taut/ir/parity_int.taut.py` gains three messages for the schema-stage rows:
 `OptBox { note: str optional = 1, tags: list<str> = 2 }`; `Empty`, which has no fields; and, from
-rev3, `Late { note: str optional = 1 }`, whose field declares `option.missing_ok(True)`. Only Python
-and Rust generate a schema with a `missing_ok` field today (`taut/src/taut/gen/scaffold.py:624-636`),
-so `Late` also needs JS and TypeScript, which implement it in v0.10.0 (question 4, ruled). rev2 adds
+rev3, `Late`, whose one field is `note=F(1, STR, optional=MISSING_OK)` (rev5). Only Python and Rust
+generate a schema with a `missing_ok` field today (`taut/src/taut/gen/scaffold.py:624-636`), so
+`Late` also needs JS and TypeScript, which implement it in v0.10.0 (question 4, ruled). rev2 adds
 six for the bounds rows: `Tree64 { kids: list<Tree64> = 1 }` declaring `option.max_depth(64)`;
 `Tree128`, the same declaring 128; `Flat2 { v: list<int> = 1 }` declaring 2, its non-recursive
 nesting; `Sized8 { b: bytes = 1 }` declaring `option.max_encoded_len(8)`; and
@@ -463,9 +472,9 @@ reads it, so that `scaffold.emit` stops refusing JS for it. **TypeScript and Pyt
 change; their runtimes change (`cbor.ts`, `codec.ts`, `ext.ts`, and `schema.ts` for IR version 2;
 `wire/cbor.py`, `codec.py`, `ext.py`), among other things so that TypeScript refuses an absent
 optional field as `MissingKey`, as Python's strict decode already does, and, as question 4 rules,
-reads `missing_ok` from each field's `effective` in the IR (TautOptions.md OPT-I2). The exported IR
-becomes version 2, which readers accept beside version 1 (TautOptions.md OPT-I1). Encode is
-untouched, so every golden corpus (`glade.golden.json`, `log.v0.json` and the rest) stays
+reads `missing_ok` from the IR, where `bcf98b6` already writes it (`taut/src/taut/ir/export.py:64`).
+The exported IR becomes version 2, which readers accept beside version 1 (TautOptions.md OPT-I1).
+Encode is untouched, so every golden corpus (`glade.golden.json`, `log.v0.json` and the rest) stays
 byte-identical.
 
 **CD-V3 (PROPOSED): how the clients adopt it.** A consumer pinned below v0.10.0 is unaffected until
@@ -596,11 +605,11 @@ fn decode(bytes: &[u8]) -> Result<Inbound, DecodeError> { // in `impl Inbound`
 3. **TypeScript form.** (a) Throw `DecodeError` and nothing else. (b) Return `{ ok, value | error }`.
    (c) Both.
 4. **Absent optional field.** RULED (OWNER, 2026-09-28): `MissingKey` everywhere ("ok with the
-   MissingKey adoption"; CD-E5). Its consequence, RULED (a) (OWNER, rev4: "ok"), with `missing_ok` a
-   field option (TautOptions.md OPT-D7): `taut/src/taut/ir/compat.py:11` still classes
-   "add an *optional* field" as compatible, but only one direction is. An old reader keeps the new
-   field as an unknown tag, while a new reader refuses every message written before the field
-   existed, whether an old peer's or a stored record, such as glade's journals. rev3: `bcf98b6`
+   MissingKey adoption"; CD-E5). Its consequence, RULED (a) (OWNER, rev4: "ok"), spelled
+   `optional=MISSING_OK` from rev5 (TautOptions.md OPT-M2): `taut/src/taut/ir/compat.py:11` still
+   classes "add an *optional* field" as compatible, but only one direction is. An old reader keeps
+   the new field as an unknown tag, while a new reader refuses every message written before the
+   field existed, whether an old peer's or a stored record, such as glade's journals. rev3: `bcf98b6`
    already gives a way out, field by field. Added with `missing_ok=True`, a field reads such messages
    as null, so adding it is compatible both ways. The gate classes turning `missing_ok` on as
    compatible and off as breaking (`compat.py:94-96`), but still classes adding any optional field as
