@@ -10,7 +10,7 @@ combinations and anything outside the closed set, before any mechanism is derive
 
 from __future__ import annotations
 
-from .model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from .model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef, is_presence
 from .shapes import BAND_START, ROLES, SHAPES
 
 
@@ -60,8 +60,9 @@ def validate(schema: Schema) -> list[str]:
                 errors.append(f"{m.name}.{f.name}: the 'wire_' prefix is reserved by taut "
                               "(forward-compat residual field)")
             check_ref(f.type, f"{m.name}.{f.name}")
-            if f.missing_ok and not f.optional:
-                errors.append(f"{m.name}.{f.name}: missing_ok requires optional=True")
+            if not is_presence(f.optional):
+                errors.append(f"{m.name}.{f.name}: optional must be False, True or MISSING_OK, "
+                              f"not {f.optional!r}")
             if f.merge is not None:
                 if f.merge not in ("lww", "counter"):
                     errors.append(f"{m.name}.{f.name}: unknown CRDT merge {f.merge!r} (v1: lww | counter)")

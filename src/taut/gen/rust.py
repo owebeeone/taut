@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 
 from ..ir.load import load_schema
-from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 _TAUT = Path(__file__).resolve().parents[3]      # .../glial-dev/taut
 _REPO = _TAUT.parent                              # .../glial-dev (trial/ is a sibling)
@@ -254,7 +254,7 @@ def _from_cbor_default(msg, forward_compat: bool) -> list[str]:
         if f.transient:
             dec = "Default::default()"
         elif f.optional:
-            if f.missing_ok:
+            if f.optional == MISSING_OK:
                 dec = (f"{{ let v = c.get_opt({f.tag}); match v {{ None => None, Some(v) => "
                        f"if v.is_null() {{ None }} else {{ Some({_decode(f.type, 'v')}) }} }} }}")
             else:
@@ -284,7 +284,7 @@ def _from_cbor_fail_closed(msg, forward_compat: bool) -> list[str]:
         if f.transient:
             dec = "Default::default()"
         elif f.optional:
-            if f.missing_ok:
+            if f.optional == MISSING_OK:
                 dec = (f"{{ let v = c.try_get_opt({f.tag})?; match v {{ None => None, Some(v) => "
                        f"if v.is_null() {{ None }} else {{ Some({_decode_try(f.type, 'v')}) }} }} }}")
             else:

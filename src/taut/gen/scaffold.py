@@ -21,7 +21,9 @@ from . import js as _js
 from . import kotlin as _kotlin
 from . import rust as _rust
 from . import swift as _swift
-from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef
+from ..ir.model import (
+    MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef,
+)
 
 # Compiled targets whose generated code imports external runtime modules. Maps
 # lang -> list of (output path relative to its lang dir, vendored resource file).
@@ -625,12 +627,12 @@ def emit(
         f"{m.name}.{f.name}"
         for m in schema.messages.values()
         for f in m.fields
-        if f.missing_ok
+        if f.optional == MISSING_OK
     ]
     unsupported_missing_ok = set(lang_keys) - {"python", "rust"}
     if missing_ok_fields and unsupported_missing_ok:
         raise ValueError(
-            "missing_ok fields are supported only by Python and Rust generation; "
+            "optional=MISSING_OK fields are supported only by Python and Rust generation; "
             f"unsupported target(s): {sorted(unsupported_missing_ok)} "
             f"for {missing_ok_fields}"
         )

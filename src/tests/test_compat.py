@@ -7,7 +7,7 @@ import pytest
 
 from taut.corpus.build import IR_JSON_PATH, IR_PATH
 from taut.ir import compat
-from taut.ir.dsl import BOOL, INT, STR, Enum, F, Msg, Ref, method, schema, service
+from taut.ir.dsl import BOOL, INT, MISSING_OK, STR, Enum, F, Msg, Ref, method, schema, service
 from taut.ir.export import schema_json
 from taut.ir.load import load_schema, schema_from_json
 
@@ -46,12 +46,17 @@ def test_accepts_compatible_added_optional_field():
     assert "y (tag 2) added" in _details(compat.diff(old, new))
 
 
-def test_missing_ok_change_is_visible_and_one_way_compatible():
-    old = schema(Msg("A", F("x", 1, STR, optional=True)))
-    enabled = schema(Msg("A", F("x", 1, STR, optional=True, missing_ok=True)))
-    assert not compat.breaking(old, enabled)
-    assert any("missing_ok False->True" in c.detail for c in compat.diff(old, enabled))
-    assert any("missing_ok True->False" in c.detail for c in compat.breaking(enabled, old))
+def test_presence_is_a_ladder_graded_by_direction():
+    required = schema(Msg("A", F("x", 1, STR)))
+    nullable = schema(Msg("A", F("x", 1, STR, optional=True)))
+    missing = schema(Msg("A", F("x", 1, STR, optional=MISSING_OK)))
+    for old, new in ((required, nullable), (nullable, missing), (required, missing)):
+        assert not compat.breaking(old, new)
+    assert "A.x optional->missing_ok" in _details(compat.diff(nullable, missing))
+    assert "A.x required->missing_ok" in _details(compat.diff(required, missing))
+    assert "A.x missing_ok->optional" in _details(compat.breaking(missing, nullable))
+    assert "A.x missing_ok->required" in _details(compat.breaking(missing, required))
+    assert "A.x optional->required" in _details(compat.breaking(nullable, required))
 
 
 def test_rejects_removed_field():

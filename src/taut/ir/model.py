@@ -51,16 +51,27 @@ class EnumDef:
     members: dict[str, int]   # native member name -> integer wire value
 
 
+# Presence, a field's `optional`: False (the default) requires the key and a non-null value; True
+# requires the key and lets its value be null; MISSING_OK also reads an absent key as null. The
+# encoder always writes the key. MISSING_OK is truthy, so `if f.optional` still means "may be null",
+# and this string is also its IR form.
+MISSING_OK = "missing_ok"
+
+
+def is_presence(value: object) -> bool:
+    """True for the three values a field's `optional` may take."""
+    return isinstance(value, bool) or (isinstance(value, str) and value == MISSING_OK)
+
+
 @dataclass(frozen=True)
 class FieldDef:
     name: str
     tag: int
     type: TypeRef
-    optional: bool = False
+    optional: bool | str = False   # False, True or MISSING_OK (above)
     transient: bool = False    # present in the native type, never on the wire
     merge: str | None = None   # CRDT merge type for this field: "lww" | "counter"
                                # (design metadata; does not affect the wire encoding)
-    missing_ok: bool = False   # optional field may be absent as well as null
 
 
 @dataclass(frozen=True)

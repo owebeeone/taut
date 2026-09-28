@@ -1,8 +1,13 @@
+import dataclasses
+
 import pytest
 
-from taut.ir.dsl import INT, STR, Enum, F, List, Msg, Params, Ref, method, schema, service
+from taut.ir.dsl import (
+    INT, MISSING_OK, STR, Enum, F, List, Msg, Params, Ref, method, schema, service,
+)
 from taut.ir.validate import validate
 from taut.ir.export import schema_json
+from taut.ir.load import schema_from_json
 
 
 def test_keyword_message_and_fields_match_legacy_shape():
@@ -25,20 +30,47 @@ def test_keyword_message_and_fields_match_legacy_shape():
     assert validate(preferred) == []
 
 
-def test_missing_ok_is_opt_in_for_optional_fields_only():
-    s = schema(Msg("M", F("new", 1, STR, optional=True, missing_ok=True)))
-    assert s.messages["M"].fields[0].missing_ok is True
+def test_missing_ok_is_a_third_value_of_optional():
+    s = schema(Msg("M", F("new", 1, STR, optional=MISSING_OK)))
+    field = s.messages["M"].fields[0]
+    assert field.optional == MISSING_OK
+    assert field.optional  # still truthy: the field may be null
+    assert not hasattr(field, "missing_ok")
     assert validate(s) == []
-    assert validate(schema(Msg("M", F("required", 1, STR, missing_ok=True)))) == [
-        "M.required: missing_ok requires optional=True"
+
+
+def test_optional_refuses_any_other_value_and_the_retired_keyword():
+    for bad in ("maybe", 1, 0, None):
+        with pytest.raises(TypeError):
+            F("x", 1, STR, optional=bad)
+    with pytest.raises(TypeError):
+        F("x", 1, STR, optional=True, missing_ok=True)
+
+
+def test_validate_refuses_an_optional_value_built_outside_the_dsl():
+    s = schema(Msg("M", F("x", 1, STR, optional=True)))
+    m = s.messages["M"]
+    broken = dataclasses.replace(m, fields=(dataclasses.replace(m.fields[0], optional="maybe"),))
+    assert validate(dataclasses.replace(s, messages={"M": broken})) == [
+        "M.x: optional must be False, True or MISSING_OK, not 'maybe'"
     ]
 
 
-def test_missing_ok_serialization_is_additive():
+def test_missing_ok_exports_as_a_value_of_optional_and_round_trips():
     baseline = schema_json(schema(Msg("M", F("old", 1, STR, optional=True))))
-    opted = schema_json(schema(Msg("M", F("new", 1, STR, optional=True, missing_ok=True))))
-    assert "missing_ok" not in baseline["messages"][0]["fields"][0]
-    assert opted["messages"][0]["fields"][0]["missing_ok"] is True
+    opted = schema_json(schema(Msg("M", F("new", 1, STR, optional=MISSING_OK))))
+    assert baseline["messages"][0]["fields"][0]["optional"] is True
+    field = opted["messages"][0]["fields"][0]
+    assert field["optional"] == "missing_ok"
+    assert "missing_ok" not in field
+    assert schema_from_json(opted).messages["M"].fields[0].optional == MISSING_OK
+
+
+def test_load_refuses_the_retired_missing_ok_key():
+    ir = schema_json(schema(Msg("M", F("new", 1, STR, optional=True))))
+    ir["messages"][0]["fields"][0]["missing_ok"] = True
+    with pytest.raises(ValueError, match="M.new: the IR key 'missing_ok' is retired"):
+        schema_from_json(ir)
 
 
 def test_keyword_enum_matches_legacy_shape():

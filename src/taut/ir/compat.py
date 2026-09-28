@@ -25,7 +25,12 @@ import sys
 from dataclasses import dataclass
 
 from .load import schema_from_json
-from .model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from .model import MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+
+# Presence is a ladder: each value reads every message the one before it reads, so a move up is
+# compatible and a move down breaking.
+_PRESENCE_RANK = {False: 0, True: 1, MISSING_OK: 2}
+_PRESENCE_NAME = {False: "required", True: "optional", MISSING_OK: "missing_ok"}
 
 
 @dataclass(frozen=True)
@@ -85,15 +90,13 @@ def _diff_messages(old: Schema, new: Schema, out: list[Change]) -> None:
                 out.append(Change("breaking", f"{name} tag {tag} reassigned {of.name}->{nf.name}"))
             if _wire(nf.type) != _wire(of.type):
                 out.append(Change("breaking", f"{name}.{of.name} wire-type changed"))
-            if of.optional and not nf.optional:
-                out.append(Change("breaking", f"{name}.{of.name} optional->required"))
-            elif not of.optional and nf.optional:
-                out.append(Change("compatible", f"{name}.{of.name} required->optional"))
+            if of.optional != nf.optional:
+                up = _PRESENCE_RANK[nf.optional] > _PRESENCE_RANK[of.optional]
+                out.append(Change("compatible" if up else "breaking",
+                                  f"{name}.{of.name} {_PRESENCE_NAME[of.optional]}->"
+                                  f"{_PRESENCE_NAME[nf.optional]}"))
             if of.merge != nf.merge:
                 out.append(Change("breaking", f"{name}.{of.name} CRDT merge {of.merge}->{nf.merge}"))
-            if of.missing_ok != nf.missing_ok:
-                level = "compatible" if nf.missing_ok else "breaking"
-                out.append(Change(level, f"{name}.{of.name} missing_ok {of.missing_ok}->{nf.missing_ok}"))
             # a field kept by name but moved to a different tag
             same_name_new = new_by_name.get(of.name)
             if same_name_new is not None and same_name_new.tag != of.tag:

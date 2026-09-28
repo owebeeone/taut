@@ -5,6 +5,12 @@ on what §0 does not settle. A document only: no code, corpus, fixture or versio
 ruled, it becomes decision **D27** in [TautDecisions.md](TautDecisions.md); D26 is
 [TautCheckedDecode.md](TautCheckedDecode.md), whose rev2 takes both of its bounds from this note.
 
+**rev6, 2026-09-29:** OPT-M2 is in the code, in the taut commit that carries this revision (owner:
+"go"). It adds `MISSING_OK` in the DSL, a three-valued `FieldDef.optional`, `"optional":
+"missing_ok"` in the IR, the gate's ladder, and the change in the Python codec, the Rust generator and
+the generator check. `missing_ok` is refused as a keyword and as an IR key. JS and TypeScript support
+stays with v0.10.0; gwz-dev's uses move next. Changed: OPT-M2's status.
+
 **rev5, 2026-09-28:** question 9 ruled: "no missing_ok support - transition all use to
 optional=MISSING_OK". There is no alias: the keyword, `FieldDef.missing_ok` and the IR's `missing_ok`
 key all go, the model and the IR carry the three values too, and every use moves (OPT-M2). Changed:
@@ -438,7 +444,8 @@ and from rev5 `missing_ok=` is gone (OPT-M2, question 9). Moved onto options, th
 
 **OPT-M2 (OWNER, 2026-09-28, rev4: "switch the notes to optional=MISSING_OK"; rev5: "no missing_ok
 support - transition all use to optional=MISSING_OK"; the rest PROPOSED): presence is one keyword with
-three values.** It replaces rev3's field option (OPT-D7).
+three values.** It replaces rev3's field option (OPT-D7). LANDED 2026-09-29 (rev6), all but JS and
+TypeScript support, which v0.10.0 brings.
 
 | `optional=` | the field's key | a present `null` | native type |
 |---|---|---|---|

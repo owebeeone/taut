@@ -60,9 +60,14 @@ def schema_from_json(data: dict) -> Schema:
     enums = {e["name"]: EnumDef(e["name"], dict(e["members"])) for e in data["enums"]}
     messages = {}
     for m in data["messages"]:
+        for f in m["fields"]:
+            if "missing_ok" in f:
+                raise ValueError(
+                    f"{m['name']}.{f['name']}: the IR key 'missing_ok' is retired; re-export the "
+                    "schema, which writes \"optional\": \"missing_ok\" instead")
         fields = tuple(
             FieldDef(f["name"], f["tag"], _typeref_from_json(f["type"]), f["optional"],
-                     f["transient"], f.get("merge"), f.get("missing_ok", False))
+                     f["transient"], f.get("merge"))
             for f in m["fields"]
         )
         messages[m["name"]] = MessageDef(

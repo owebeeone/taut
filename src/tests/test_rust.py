@@ -19,7 +19,7 @@ import pytest
 from taut import ext as py_ext
 from taut.gen import scaffold
 from taut.gen import rust
-from taut.ir.dsl import FLOAT, INT, STR, Enum, F, List, Map, Msg, Ref, schema
+from taut.ir.dsl import FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, schema
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor as py_cbor
@@ -532,7 +532,7 @@ def test_rust_fail_closed_emits_fallible_from_cbor_and_i64_ints():
 
 def test_rust_missing_ok_only_relaxes_selected_optional_slot():
     s = schema(Msg("M", F("old", 1, STR, optional=True),
-                   F("new", 2, STR, optional=True, missing_ok=True)))
+                   F("new", 2, STR, optional=MISSING_OK)))
     rs = scaffold.rust_api(s, fail_closed=True)
     assert "old: { let v = c.try_get(1)?; if v.is_null() { None } else { Some(v.try_text()?) } }," in rs
     assert "new: { let v = c.try_get_opt(2)?; match v { None => None, Some(v) => if v.is_null() { None } else { Some(v.try_text()?) } } }," in rs
@@ -735,7 +735,7 @@ def test_rust_missing_ok_runtime_behavior_for_both_codecs(tmp_path, fail_closed)
             "M",
             F("required", 1, STR),
             F("strict_optional", 2, STR, optional=True),
-            F("missing_optional", 3, STR, optional=True, missing_ok=True),
+            F("missing_optional", 3, STR, optional=MISSING_OK),
         )
     )
     generated = tmp_path / ("generated_closed" if fail_closed else "generated_default")

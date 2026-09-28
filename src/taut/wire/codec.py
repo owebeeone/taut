@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from . import cbor
 
 DecodeError = cbor.DecodeError
@@ -155,7 +155,7 @@ def _from_wire(schema: Schema, tref: TypeRef, cv: Any, *, strict: bool = False) 
         for f in msg.wire_fields():
             known.add(f.tag)
             if f.tag not in cv:
-                if strict and (not f.optional or not f.missing_ok):
+                if strict and f.optional != MISSING_OK:
                     raise DecodeError("MissingKey", key=f.tag)
                 out[f.name] = None
                 continue
