@@ -81,7 +81,9 @@ explicit.
 - **tag** — a positive integer, unique within the message. On the wire a message
   is a CBOR map keyed by tag; tags are the stable contract (rename a field freely,
   never reuse/renumber a tag).
-- **optional** — may be absent; encoded as CBOR `null` when `None`.
+- **optional** — may be `None` in the native type. On the wire it is still always written, as CBOR
+  `null` when `None`; a decoder refuses a message whose key for the field is missing (`MissingKey`), as
+  for a required field. See §8, *Missing versus null*.
 - **transient** — present in the *native* type but **never on the wire** (caches,
   indices, handles). The wire is a projection of the tagged, non-transient subset.
 - **merge** — marks a CRDT field; see §7.
@@ -226,6 +228,27 @@ int, bytes, text, array, integer-keyed map, bool, null. Core deterministic
 encoding — definite lengths, shortest-form ints, ascending map keys. Messages are
 maps keyed by field tag; enums are their integer value; transient fields are
 absent. The same bytes are produced by every language (the corpus proves it).
+
+### Missing versus null
+
+An unset optional field is written as CBOR `null`; its key is never left out. A decoder therefore
+reads a present `null` as `None`, and refuses a missing key with `MissingKey`, for optional and
+required fields alike.
+
+Why it settled here. The fail-closed codec, the default since v0.8.0, accepts exactly the bytes the
+canonical encoder could emit: `decode(bytes)` succeeds only if `encode(decode(bytes)) == bytes`
+(decision D2 of [the codec parity plan](../dev-docs/TautCodecParityPlan.md), ratified 2026-07-07).
+No conforming writer omits a field's key, and accepting a message without it would re-encode to
+different bytes. This replaced an earlier, lenient model
+([TautModules.md §2](../dev-docs/TautModules.md)) in which a missing field, even a required one,
+decoded to null. Rust and JavaScript follow the rule; Python and TypeScript still read a missing key
+as `None` until the checked-decode release brings them in line
+([TautCheckedDecode.md](../dev-docs/TautCheckedDecode.md)).
+
+What it means for evolving a schema: after an optional field is added, an old reader still reads new
+messages (it keeps the new tag as an unknown field, below), but a new reader refuses a message written
+before the field existed. Upgrade writers before readers, and re-encode stored messages before a new
+reader reads them.
 
 ### Forward compatibility (unknown-field preservation, default-on)
 
