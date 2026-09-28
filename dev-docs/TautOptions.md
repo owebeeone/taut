@@ -5,8 +5,13 @@ on what §0 does not settle. A document only: no code, corpus, fixture or versio
 ruled, it becomes decision **D27** in [TautDecisions.md](TautDecisions.md); D26 is
 [TautCheckedDecode.md](TautCheckedDecode.md), whose rev2 takes both of its bounds from this note.
 
-**Evidence.** Paths are from the glade-wz root; lines are at taut `1b5590f`, whose code is that of
-`7a5f616` (the commit added only TautCheckedDecode.md). **OWNER** marks the owner's direction,
+**rev2, 2026-09-28:** rebased onto taut's GitHub commits `3b84365`, `733e8a7` and `bcf98b6`
+(2026-09-19 to 22), which this checkout lacked when the note was written. `bcf98b6` adds a sixth
+field keyword, `missing_ok`: a wire property, which generators that lack it already refuse. Changed:
+the evidence pin, §0's keyword list, OPT-L2, OPT-L5, OPT-F2, OPT-K1 and OPT-M1.
+
+**Evidence.** Paths are from the glade-wz root; lines are at taut `bcf98b6` (rev2 re-pinned them
+from `7a5f616`, whose code the first version read). **OWNER** marks the owner's direction,
 **PROPOSED** this design, **READ** code read but not run. Nothing was run for this note.
 
 ## 0. The owner's direction
@@ -30,8 +35,8 @@ ruled, it becomes decision **D27** in [TautDecisions.md](TautDecisions.md); D26 
   parity corpus in every language, and a change of it is a compatibility change), *codegen* (changes
   generated code only) or *metadata* (no effect).
 - **The IR** gets an `options` map at each level; `tautc` resolves effective values and generators
-  read one each. The keywords `optional=`, `transient=`, `merge=`, `reserved=` and `next_id=` stay; a
-  later migration is recorded (§9), not done.
+  read one each. The keywords `optional=`, `transient=`, `merge=`, `missing_ok=` (rev2), `reserved=`
+  and `next_id=` stay; a later migration is recorded (§9), not done.
 - **`max_depth`**, the first option: wire, at file and message level, default 32, capped by a fixed
   ceiling of 128, a runtime constant rather than an option, so no schema can reopen the stack
   overflow. `tautc` refuses a declared value below the schema's own deepest non-recursive nesting or
@@ -139,7 +144,7 @@ OPTIONS["max_depth"] = OptionDef("max_depth", int, frozenset({"file", "message"}
 ```
 
 - **The constructor** refuses a value that is not an `int`, or is a `bool` (as `F` refuses a bool
-  tag, `taut/src/taut/ir/dsl.py:146-147`), or lies outside 1 to 128.
+  tag, `taut/src/taut/ir/dsl.py:148-149`), or lies outside 1 to 128.
 - **`tautc`** refuses, for every root, an effective value below the root's **non-recursive nesting**,
   which no conforming reader could decode, and re-checks 1 to 128 for IR loaded from JSON, which never
   ran the constructor (`taut/src/taut/cli.py:31-35` accepts `.ir.json`). The roots are every message
@@ -147,8 +152,8 @@ OPTIONS["max_depth"] = OptionDef("max_depth", int, frozenset({"file", "message"}
   non-recursive nesting" per root: a file-level value must cover the roots that inherit it.
 - **Non-recursive nesting** is the deepest a value reaches without a message repeating on the path: 0
   for a scalar or enum; 1 + that of `T` for `list<T>`; 2 + that of `V` for `map<K,V>`, whose wire is an
-  array of `{1: key, 2: value}` maps (`dsl.py:128-129`); for a message, 1 + the largest among its wire
-  fields (`taut/src/taut/ir/model.py:73-74`) and the extensions the schema declares, which may ride any
+  array of `{1: key, 2: value}` maps (`dsl.py:129-130`); for a message, 1 + the largest among its wire
+  fields (`taut/src/taut/ir/model.py:74-75`) and the extensions the schema declares, which may ride any
   message (TautDecisions.md D13), a message already on the path counting 0. `Tree` needs 2; glade's
   schema nests five deep (TautCheckedDecode.md CD-B1). A root that needs more than 128 is refused.
 - `tautc` SHOULD warn about a recursive message (a tree) that declares no bound: the default limits
@@ -186,7 +191,7 @@ OPTIONS["max_encoded_len"] = OptionDef("max_encoded_len", int, frozenset({"file"
 
 **OPT-L1 (PROPOSED): `taut/src/taut/ir/options.py`, new.** It holds `OptionDef`, `OptionValue`, the
 registry `OPTIONS`, both ceilings, the `option` namespace, `effective()` and the two floor checks, and
-imports only `model.py`. `option` follows `Ref`'s pattern (`dsl.py:109-120`): an object whose
+imports only `model.py`. `option` follows `Ref`'s pattern (`dsl.py:110-121`): an object whose
 attributes are the registered constructors, so `option.max_dept(16)` raises `AttributeError`, naming
 the known options, at import, and calling `option("ns.name", v)` raises `TypeError` while custom
 options are reserved (question 6). `dsl.py` re-exports it, since `.taut.py` modules import DSL names
@@ -197,47 +202,49 @@ from there (`taut/ir/parity_int.taut.py:14`). The Python raw decoder imports not
 
 **OPT-L2 (PROPOSED): `dsl.py`.**
 
-- `schema()` keeps every positional (`dsl.py:240-247`) but builds only enums, messages, services and
-  extensions from them (`:248-263`), so a positional of any other type is dropped without a word. It
+- `schema()` keeps every positional (`dsl.py:243-250`) but builds only enums, messages, services and
+  extensions from them (`:251-267`), so a positional of any other type is dropped without a word. It
   MUST sort positionals into declarations and option values, and raise `TypeError` on anything else.
-- `Msg()` takes only `F(...)` after its name (`:166-168`), `F()` only `(name, tag, type)` or
-  `(tag, type)` (`:139-145`), and `Enum()` only a name (`:99-106`). Each MUST also take trailing
+- `Msg()` takes only `F(...)` after its name (`:169-171`), `F()` only `(name, tag, type)` or
+  `(tag, type)` (`:141-147`), and `Enum()` only a name (`:100-107`). Each MUST also take trailing
   option values, of any option, since a wrong level is `tautc`'s to refuse (OPT-L4). The same option
-  twice at one level raises at import, as a message name given twice does (`:161-164`), itself a
+  twice at one level raises at import, as a message name given twice does (`:164-167`), itself a
   keyword collision the DSL works around: `Msg` takes a string keyword `name` as the message's name.
 - `_field_named`, `_message_named` and `_enum_named` rebuild a definition attribute by attribute
-  (`:48-56`, `:66-73`, `:83-84`), as does `schema()` (`:254`, `:257`), so each would drop a new
+  (`:48-57`, `:67-74`, `:84-85`), as does `schema()` (`:257-258`, `:261`), so each would drop a new
   `options` attribute silently. They MUST carry it, preferably through `dataclasses.replace`, so the
-  next attribute cannot be dropped either; `_resolve_method` (`:228-235`) too, once methods have options.
+  next attribute cannot be dropped either; `_resolve_method` (`:231-238`) too, once methods have options.
+  `bcf98b6` shows the cost: its new field attribute, `missing_ok`, had to be added by hand at each
+  rebuild (`:56`, `:258`), and in `export.py` and `load.py` too (OPT-L5).
 
 **OPT-L3 (PROPOSED): `model.py`.** `Schema`, `MessageDef`, `FieldDef` and `EnumDef`
-(`model.py:135-140`, `:65-74`, `:54-62`, `:48-51`) each gain `options: dict[str, object]`, empty by
+(`model.py:136-141`, `:66-75`, `:54-63`, `:48-51`) each gain `options: dict[str, object]`, empty by
 default: what was declared at that level, a dict in a frozen dataclass as `EnumDef.members` is
 (`:51`). Effective values are computed, not stored. `ServiceDef`, `MethodDef` and enum values gain the
 field when their level gets its first option.
 
 **OPT-L4 (PROPOSED): `validate.py`.** `validate` returns error strings and `validate_or_raise` raises
-them (`validate.py:17-18`, `:131-134`); `tautc` runs it before generating, building a corpus or
-converting JSON (`cli.py:44`, `:87`, `:108`). It gains, at every level: the name is registered; the
+them (`validate.py:17-18`, `:133-136`); `tautc` runs it before generating, building a corpus or
+converting JSON (`cli.py:44`, `:89`, `:110`). It gains, at every level: the name is registered; the
 level is among the definition's; the value has its type and range; and every root's effective bounds
 lie between its floors and the ceilings (OPT-D5, OPT-D6). It has no channel for warnings, so the
 SHOULD-warnings of OPT-D4 and OPT-D5 need one: a second list, or a `lint` beside `validate`.
 
 **OPT-L5 (PROPOSED): `export.py` and `load.py`.** `schema_json` writes `"version": 1`
-(`export.py:44`), and `schema_from_json` never reads it (`load.py:58-87`): it reads the keys it knows,
-defaults those added later (`merge` `:64`, `reserved_tags` and `reserved_names` `:69-70`, `services`
-`:74`, `extensions` `:86`) and ignores the rest, the derived `shapes` among them (`export.py:45`). A
-v0.9 loader given an IR with options would drop them silently. The export writes version 2 (OPT-I1);
-the loader accepts versions 1 and 2 only, reads `options` at every level, refuses an unknown name
-(OPT-F1) and checks `effective` (OPT-I3). `load_schema` (`load.py:30-40`) is unchanged: a DSL error
-surfaces when it executes the module.
+(`export.py:44`), and `schema_from_json` never reads it (`load.py:58-88`): it reads the keys it knows,
+defaults those added later (`merge` and `missing_ok` `:65`, `reserved_tags` and `reserved_names`
+`:70-71`, `services` `:75`, `extensions` `:87`) and ignores the rest, the derived `shapes` among them
+(`export.py:45`). A v0.9 loader given an IR with options would drop them silently. The export
+writes version 2 (OPT-I1); the loader accepts versions 1 and 2 only, reads `options` at every level,
+refuses an unknown name (OPT-F1) and checks `effective` (OPT-I3). `load_schema` (`load.py:30-40`) is
+unchanged: a DSL error surfaces when it executes the module.
 
 **OPT-L6 (PROPOSED): the decode entry points that name their root.** Python's `codec.decode`
 (`wire/codec.py:30-31`) and the JSON profile's `cbor_to_json` (`wire/jsoncodec.py:133`) resolve the
 message's bounds with `effective()` and pass them to the raw decoder. TypeScript's `decode` and
 `decodeRef` (`…/typescript/codec.ts:174`, `:183`) read them from the IR's `effective` through
 `SchemaIndex` (`…/typescript/schema.ts:73`). Generated Rust and JS have only `from_cbor` over a tree
-the caller decoded (`taut/src/taut/gen/rust.py:272`, `taut/src/taut/gen/js.py:83`); each message
+the caller decoded (`taut/src/taut/gen/rust.py:279`, `taut/src/taut/gen/js.py:83`); each message
 gains `MAX_DEPTH`, `MAX_ENCODED_LEN` and a `decode` from bytes that applies both (TautCheckedDecode.md
 CD-B3).
 
@@ -284,9 +291,11 @@ means a newer taut wrote it, and the IR is refused until the reader is upgraded.
 
 **OPT-F2 (PROPOSED): a generator that does not implement a wire option refuses a schema that
 declares it.** Each target lists the wire options it implements, beside `_LANGS`
-(`taut/src/taut/gen/scaffold.py:549-559`). Before writing anything, `scaffold.emit` refuses when a
+(`taut/src/taut/gen/scaffold.py:557-567`). Before writing anything, `scaffold.emit` refuses when a
 requested target lacks an option declared at any level, as it already refuses an IR with extensions
-but no forward-compat (`scaffold.py:618-624`). It never emits code that ignores a declared value.
+but no forward-compat (`scaffold.py:651-657`) and, since `bcf98b6`, a schema with a `missing_ok` field
+for any target but Python and Rust (`:624-636`), a list written inline rather than beside `_LANGS`.
+It never emits code that ignores a declared value.
 
 | Target | Codec | `max_depth` and `max_encoded_len` in v0.10.0 | A schema that declares one |
 |---|---|---|---|
@@ -302,7 +311,7 @@ recurse without one, panic on malformed input, and are allowlisted until Phase 4
 (`taut/corpus/parity/allowlist.json`; TautCheckedDecode.md G1). Refusing every schema would stop all
 five until then. Recommended: they keep generating a schema that declares no wire option, with a
 header saying that its decode enforces none of taut's bounds, as the legacy codec's banner did
-(`scaffold.py:565-570`). A declaration is the author asking for a bound, and it is refused (question 2).
+(`scaffold.py:573-578`). A declaration is the author asking for a bound, and it is refused (question 2).
 
 **OPT-F4 (PROPOSED): runtimes that read the IR refuse at load.** The Python and TypeScript codecs are
 driven by the schema at run time, so `schema_from_json` and TypeScript's `loadSchema`, which today
@@ -320,13 +329,13 @@ the generation parameters `tautc` passes a provider, is a different thing and ke
 **breaking**, both ways. Raising a bound lets new writers produce bytes that readers still at the old
 bound refuse; lowering it refuses bytes that old writers produced, which may be stored. For
 `max_encoded_len`, none counts as unbounded, so a first declaration lowers it. Neither is like adding
-an optional field, which an old reader keeps as an unknown tag (`taut/src/taut/ir/compat.py:11`; the
-other direction is TautCheckedDecode.md question 4): a reader cannot skip nesting that is too deep or
-input that is too long, it refuses the whole message. The gate compares effective values, not raw
-ones, so moving a declaration without changing an effective value is no change, and a new message
-that declares a bound is "message added", compatible as today (`compat.py:112`). `_diff_messages`
-(`compat.py:70-112`) gains the per-root comparison; `check_or_raise` (`:174-177`) refuses it under the
-same major version.
+an optional field, which an old reader keeps as an unknown tag (`taut/src/taut/ir/compat.py:11`) and a
+new reader, if the field is `missing_ok`, reads as null in old messages (TautCheckedDecode.md question
+4): a reader cannot skip nesting that is too deep or input that is too long, it refuses the whole
+message. The gate compares effective values, not raw ones, so moving a declaration without changing
+an effective value is no change, and a new message that declares a bound is "message added",
+compatible as today (`compat.py:115`). `_diff_messages` (`compat.py:70-115`) gains the per-root
+comparison; `check_or_raise` (`:177-180`) refuses it under the same major version.
 
 **OPT-K2 (PROPOSED): codegen and metadata.** A codegen change leaves the bytes alone and is
 wire-compatible; it may change the generated API, which the gate, judging only the wire, reports as a
@@ -336,7 +345,7 @@ compatible change with a note. A metadata change affects nothing; the gate may l
 was built from: generated Rust and JS as constants, Python and TypeScript in the IR they loaded.
 Until every reader and writer of a schema is rebuilt, they disagree on a changed bound, which is why
 the change is breaking. A reader older than taut v0.10.0 takes version 2 without checking
-(`load.py:58-87`; `schema.ts:107-109`) and ignores `options`, but applies no bound at all, so it is
+(`load.py:58-88`; `schema.ts:107-109`) and ignores `options`, but applies no bound at all, so it is
 no worse than today. From v0.10.0 on, readers refuse versions and names they do not know.
 
 **OPT-K4 (PROPOSED): taut's own numbers.** A default is part of the codec contract: changing one
@@ -385,15 +394,16 @@ readers of one root cannot.
 
 ## 9. The existing keywords, for a later migration
 
-**OPT-M1 (PROPOSED, recorded only).** The five keywords stay. Moved onto options, their classes would
+**OPT-M1 (PROPOSED, recorded only).** The six keywords stay. Moved onto options, their classes would
 be:
 
 | Keyword | Today | Class |
 |---|---|---|
-| `optional=` | `F` (`dsl.py:133-148`) | wire: a present null decodes to null, an absent key is `MissingKey` (TautCheckedDecode.md CD-E5, OWNER 2026-09-28) |
-| `transient=` | `F`; never on the wire (`model.py:60`, `:73-74`) | wire: it takes the field off the wire |
+| `optional=` | `F` (`dsl.py:134-151`) | wire: a present null decodes to null, an absent key is `MissingKey` unless the field is `missing_ok` (TautCheckedDecode.md CD-E5, OWNER 2026-09-28) |
+| `transient=` | `F`; never on the wire (`model.py:60`, `:74-75`) | wire: it takes the field off the wire |
 | `merge=` | `F`; "does not affect the wire encoding" (`model.py:61-62`) | unsettled: the model calls it metadata, but the gate calls a change breaking (`compat.py:93`), since replicas that merge differently diverge (question 7) |
-| `reserved=`, `next_id=` | `Msg` (`dsl.py:151-179`); checked (`validate.py:55-58`, `:70-75`) | metadata that `tautc` checks: they constrain how a schema may evolve, not its bytes |
+| `missing_ok=` (rev2) | `F`, with `optional=True` only (`model.py:63`; `validate.py:63-64`); Python and Rust implement it, and every other generator refuses it (`scaffold.py:624-636`) | wire: an absent key also decodes to null. The gate grades a change one way, on compatible and off breaking (`compat.py:94-96`), since it widens what readers accept and leaves writers alone; as an option it would be the first wire option that OPT-K1's both-ways rule does not fit |
+| `reserved=`, `next_id=` | `Msg` (`dsl.py:154-182`); checked (`validate.py:55-58`, `:72-77`) | metadata that `tautc` checks: they constrain how a schema may evolve, not its bytes |
 
 ## 10. Gaps and questions for the owner
 
@@ -411,10 +421,10 @@ be:
   meets, leaving the host's own bounds to its reader. An extension declared in another schema rides a
   host's residual without entering `tautc`'s nesting check.
 - **G4 Later levels.** How a method's or service's option combines with its slot's root message, and
-  the DSL form for an enum value's options (members are keywords, `dsl.py:99-106`), wait for the first
+  the DSL form for an enum value's options (members are keywords, `dsl.py:100-107`), wait for the first
   option that needs them.
 - **G5 Other unknown keys.** The loader still ignores unknown IR keys outside `options`
-  (`load.py:58-87`); only options are made strict here.
+  (`load.py:58-88`); only options are made strict here.
 - **G6 Wave 2** enforces neither bound until Phase 4 (OPT-F3).
 
 **Questions.** Each lists its alternatives; (a) is recommended.

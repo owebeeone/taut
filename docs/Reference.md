@@ -76,17 +76,21 @@ keyword (`title=F(2, STR)`), and uses `Ref.Name` for enum/message references.
 This keeps the governed names as Python identifiers while the integer tags stay
 explicit.
 
-`F(tag, type, *, optional=False, transient=False, merge=None)`:
+`F(tag, type, *, optional=False, transient=False, merge=None, missing_ok=False)`:
 
 - **tag** — a positive integer, unique within the message. On the wire a message
   is a CBOR map keyed by tag; tags are the stable contract (rename a field freely,
   never reuse/renumber a tag).
 - **optional** — may be `None` in the native type. On the wire it is still always written, as CBOR
   `null` when `None`; a decoder refuses a message whose key for the field is missing (`MissingKey`), as
-  for a required field. See §8, *Missing versus null*.
+  for a required field, unless the field is also `missing_ok`. See §8, *Missing versus null*.
 - **transient** — present in the *native* type but **never on the wire** (caches,
   indices, handles). The wire is a projection of the tagged, non-transient subset.
 - **merge** — marks a CRDT field; see §7.
+- **missing_ok** — only with `optional=True`: a decoder also reads a missing key as `None`, so a new
+  reader accepts messages written before the field existed. The encoder still writes the key. Python
+  and Rust support it; generating any other language refuses a schema that uses it. See §8, *Missing
+  versus null*.
 
 `Msg(*fields, reserved=(), next_id=None, **named_fields)` declares the message.
 When the message is anonymous, `schema(MessageName=Msg(...))` MUST provide the
@@ -233,7 +237,8 @@ absent. The same bytes are produced by every language (the corpus proves it).
 
 An unset optional field is written as CBOR `null`; its key is never left out. A decoder therefore
 reads a present `null` as `None`, and refuses a missing key with `MissingKey`, for optional and
-required fields alike.
+required fields alike. The one exception is opt-in: a field declared `optional=True,
+missing_ok=True` also reads a missing key as `None`.
 
 Why it settled here. The fail-closed codec, the default since v0.8.0, accepts exactly the bytes the
 canonical encoder could emit: `decode(bytes)` succeeds only if `encode(decode(bytes)) == bytes`
@@ -241,14 +246,18 @@ canonical encoder could emit: `decode(bytes)` succeeds only if `encode(decode(by
 No conforming writer omits a field's key, and accepting a message without it would re-encode to
 different bytes. This replaced an earlier, lenient model
 ([TautModules.md §2](../dev-docs/TautModules.md)) in which a missing field, even a required one,
-decoded to null. Rust and JavaScript follow the rule; Python and TypeScript still read a missing key
-as `None` until the checked-decode release brings them in line
+decoded to null. Rust, JavaScript and Python's `codec.decode` follow the rule (`decode_struct` is
+lenient unless called with `strict=True`); TypeScript still reads a missing optional key as `None`
+until the checked-decode release brings it in line
 ([TautCheckedDecode.md](../dev-docs/TautCheckedDecode.md)).
 
 What it means for evolving a schema: after an optional field is added, an old reader still reads new
 messages (it keeps the new tag as an unknown field, below), but a new reader refuses a message written
-before the field existed. Upgrade writers before readers, and re-encode stored messages before a new
-reader reads them.
+before the field existed. Adding the field with `missing_ok=True` avoids that: a new reader reads the
+field of such a message as `None`. For that field the round trip deliberately changes bytes, since
+re-encoding the message writes the key, as `null`. The breaking-change gate treats turning
+`missing_ok` on as compatible and turning it off as breaking. Without it, upgrade writers before
+readers, and re-encode stored messages before a new reader reads them.
 
 ### Forward compatibility (unknown-field preservation, default-on)
 

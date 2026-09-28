@@ -1,5 +1,13 @@
 # Checked decode: one error and schema-declared bounds in Rust, TypeScript and Python
 
+**rev3, 2026-09-28:** rebased onto taut's GitHub commits `3b84365`, `733e8a7` and `bcf98b6`
+(2026-09-19 to 22), which this checkout lacked when rev1 and rev2 were written. `bcf98b6` adds the
+field keyword `missing_ok`, an optional field whose absent key reads as null; makes Python's strict
+decode refuse any other absent optional key; and makes a message with no fields require a map in
+Rust. Changed: the evidence pins, §1 row 3, CD-E5, CD-C1, M11, M12, the new M16 and M17,
+§5.2-5.3's absent-field and empty-message findings, G2, CD-V1, CD-V2 and question 4. Every taut
+line is re-pinned to `bcf98b6`.
+
 **rev2, 2026-09-28:** depth from the `max_depth` option, [`TautOptions.md`](TautOptions.md); size
 from the `max_encoded_len` option; the owner's rulings on questions 4 and 6 recorded. Changed: the
 title, §0, §1, CD-E5, CD-B1-B5, CD-C1, CD-C2, CD-C4, §4.4, the absent-field findings in §5.2-5.3,
@@ -14,10 +22,11 @@ contract `taut-codec-parity/i64/v1`.
 [TautCodecParityPlan.md](TautCodecParityPlan.md) (D1, D2 ratified 2026-07-07; §2b's tag vocabulary)
 and, from rev2, [TautOptions.md](TautOptions.md) (the `max_depth` and `max_encoded_len` options).
 
-**Evidence.** Paths are from the glade-wz root; lines are at taut `7a5f616` (v0.9.1 + 3), glade
-`2a3c6f8`, taut-shape `9a75209`, taut-shape-rs `b442d07`, taut-shape-ts `137f843`; rev2's new taut
-lines are at `1b5590f`, whose code is `7a5f616`'s. **OWNER** marks a ruling, **PROPOSED** this
-design, **MEASURED** a run on 2026-09-28, **READ** code read but not run.
+**Evidence.** Paths are from the glade-wz root; lines are at taut `bcf98b6` (v0.9.1 + 6; rev3
+re-pinned them from `7a5f616`, whose code rev1 and rev2 read), glade `2a3c6f8`, taut-shape `9a75209`,
+taut-shape-rs `b442d07` (its rebase onto GitHub's `df13036`, a version bump, moved no cited line),
+taut-shape-ts `137f843`. **OWNER** marks a ruling, **PROPOSED** this design, **MEASURED** a run on
+2026-09-28, **READ** code read but not run.
 
 ## 0. The ruling this note implements
 
@@ -50,7 +59,7 @@ allowlisted (§8, G1).
 |---|---|---|
 | 1 | Error | Keep the one `DecodeError` each runtime already has and add two tags, `TooDeep{limit}` and `TooLarge{len, limit}`. Rust returns a `Result`, TypeScript throws and Python raises. One fixed order of checks decides which tag is reported. |
 | 2 | Bounds | Both are schema options (TautOptions.md), resolved per decode call from its root, so every reader of a root applies the same bounds and no typed call can change them. `max_depth`: default 32, ceiling 128; at the default, 32 nested arrays or maps decode and the 33rd is `TooDeep`. `max_encoded_len`: no default; where declared, carriers refuse a longer frame before allocating and decode raises `TooLarge`. |
-| 3 | Corpus | A new `taut/corpus/parity/bounds.vectors.json` (30 rows, each carrying the bounds it is decoded under) and 15 new rows in `malformed.vectors.json`. The gate and every client replay them, each client against the runtime copy it ships. |
+| 3 | Corpus | A new `taut/corpus/parity/bounds.vectors.json` (30 rows, each carrying the bounds it is decoded under) and 17 new rows in `malformed.vectors.json`. The gate and every client replay them, each client against the runtime copy it ships. |
 | 4 | Audit | No runtime bounds depth. On deep input Rust overflows its stack (an abort), Python raises `RecursionError` and TypeScript `RangeError`. There are also ten smaller divergences (M1-M14), and a gate that can report GREEN for rows that never ran. |
 | 5 | Version | taut **v0.10.0**, the release that already removes `--legacy-codec`. There is no opt-out of the bound. Clients adopt through a 0.10 shape release train. |
 | 6 | glade | Regenerate `wire-rs` from v0.10.0's fail-closed path; delete `checked.rs` and `wellformed.rs` but keep their tests (ruled); node and client-rs call the fallible API; client-rs's carrier gets `frame_len`, whose limit comes from glade's schema. client-ts moves later. |
@@ -118,10 +127,10 @@ that fails:
    the value.
 4. Bytes after the top-level item are `TrailingBytes`.
 5. Only then the schema stage. The message must be a map (`WrongType{map}`), even one with no
-   fields. Fields are checked in IR order: any field absent, required or optional, is `MissingKey`;
-   an optional field present as null is null; a wrong CBOR type is `WrongType`; an unknown enum
-   value is `UnknownEnum`. A `map<K,V>` entry checks for keys 1 and 2 before decoding either; a
-   repeated key is `DuplicateMapKey`.
+   fields. Fields are checked in IR order: any field absent, required or optional, is `MissingKey`,
+   except a `missing_ok` field, which is null (rev3); an optional field present as null is null; a
+   wrong CBOR type is `WrongType`; an unknown enum value is `UnknownEnum`. A `map<K,V>` entry checks
+   for keys 1 and 2 before decoding either; a repeated key is `DuplicateMapKey`.
 
 **An absent optional field is `MissingKey` (OWNER, 2026-09-28, reversing rev1).** The rule settled
 with the codec parity plan, which replaced the lenient model first settled in TautModules.md §2 and
@@ -132,8 +141,19 @@ when unset (`taut/docs/Reference.md:84`), so a map without the key is bytes no c
 emits, and accepting it would break the law. The plan counts TypeScript's and JavaScript's
 missing→`null` as failing open (`TautCodecParityPlan.md:77`), its Step 2.1 makes Python's missing a
 `MissingKey` (`:144-146`), and its review states the split: absent is `MissingKey`, present null is
-null (`TautCodecParityPlan-Review25.md:118`). So Rust and JS are right today, and Python and
-TypeScript change in v0.10.0 (M11, M15). What this means for `compat.py:11` is question 4.
+null (`TautCodecParityPlan-Review25.md:118`). So Rust and JS are right today, Python's strict decode
+has been since `bcf98b6` (`taut/src/taut/wire/codec.py:157-160`), and TypeScript changes in v0.10.0
+(M11, M15).
+
+**The opt-in exception (rev3, from `bcf98b6`).** `F(..., optional=True, missing_ok=True)` reads an
+absent key as null as well as a present null; it still refuses a present value of the wrong type
+and a message that is not a map (`taut/src/taut/gen/rust.py:287-289`; `cbor_fail_closed.rs:242-255`;
+`codec.py:158`). `validate` requires `optional=True` with it (`taut/src/taut/ir/validate.py:63-64`).
+The encoder is unchanged and still writes the key, so for such a field D2's law deliberately does not
+hold: a message read without the key re-encodes with it, as null. Only Python and Rust implement it;
+`scaffold.emit` refuses every other target for a schema that uses it (`scaffold.py:624-636`), and
+TypeScript's IR-driven codec ignores it, reading every absent optional key as null today. What the
+rule and the exception mean for `compat.py:11` is question 4.
 
 **CD-E6 (PROPOSED): payload words.** `WrongType.expected` is one of `int`, `float`, `bytes`,
 `text`, `bool`, `array` or `map` in every language; Rust and Python already use these words, while
@@ -185,7 +205,7 @@ instead (TautOptions.md §0, OPT-D5):
   `codec.decode(schema, message, data)` and TypeScript's `decode(schema, message, data)` read it from
   the schema (`taut/src/taut/wire/codec.py:30-31`; `taut/src/taut/gen/runtime/typescript/codec.ts:174`).
   Generated Rust and JS have only `from_cbor` over a decoded tree today
-  (`taut/src/taut/gen/rust.py:272`, `taut/src/taut/gen/js.py:83`), so each message gains `MAX_DEPTH`,
+  (`taut/src/taut/gen/rust.py:279`, `taut/src/taut/gen/js.py:83`), so each message gains `MAX_DEPTH`,
   `MAX_ENCODED_LEN` and a `decode` from bytes that applies both.
 - **Raw decode** knows no schema. It applies 32, or the depth its caller passes, capped at 128, and
   `TooDeep.limit` names the bound applied. Rust adds `try_decode_with(bytes, max_depth,
@@ -227,13 +247,17 @@ already accepts exactly 16 MiB (`glade/node/src/frame.rs:27`; test `glade/node/s
 allowlist.json           contract id -> taut-codec-parity/i64/v1
 gen_vectors.py           also writes bounds.vectors.json (rows written by hand, as today)
 int.vectors.json         rows unchanged; contract id bumped
-malformed.vectors.json   + 15 rows (§4.4, M1-M15)
+malformed.vectors.json   + 17 rows (§4.4, M1-M17)
 bounds.vectors.json      new: 30 depth and length rows (§4.4, B1-B30), each with its bounds;
                          "default_max_depth": 32, "max_depth_ceiling": 128
 ```
 
-The fixture `taut/ir/parity_int.taut.py` gains two messages for the schema-stage rows:
-`OptBox { note: str optional = 1, tags: list<str> = 2 }` and `Empty`, which has no fields. rev2 adds
+The fixture `taut/ir/parity_int.taut.py` gains three messages for the schema-stage rows:
+`OptBox { note: str optional = 1, tags: list<str> = 2 }`; `Empty`, which has no fields; and, from
+rev3, `Late { note: str optional missing_ok = 1 }`. Only Python and Rust generate a schema with a
+`missing_ok` field today (`taut/src/taut/gen/scaffold.py:624-636`), so `Late` needs JS and TypeScript
+to implement it (question 4 (a)); otherwise it and its rows move to a fixture of their own, which JS
+skips. rev2 adds
 six for the bounds rows: `Tree64 { kids: list<Tree64> = 1 }` declaring `option.max_depth(64)`;
 `Tree128`, the same declaring 128; `Flat2 { v: list<int> = 1 }` declaring 2, its non-recursive
 nesting; `Sized8 { b: bytes = 1 }` declaring `option.max_encoded_len(8)`; and
@@ -322,15 +346,17 @@ the bound its message resolves to, where the row tests one.
 | M8 map-key-2^53 | raw | `a11b002000000000000000` | accept | TS `NonIntegerMapKey` |
 | M9 wrong-type-text | from_cbor OptBox | `a201010280` | `WrongType{text}` | TS, JS `str` |
 | M10 wrong-type-array | from_cbor OptBox | `a201f60200` | `WrongType{array}` | TS `list` |
-| M11 optional-absent | from_cbor OptBox | `a10280` | `MissingKey{1}` | Python, TS accept, `note` null |
-| M12 empty-message-not-map | from_cbor Empty | `00` | `WrongType{map}` | Rust, JS accept |
+| M11 optional-absent | from_cbor OptBox | `a10280` | `MissingKey{1}` | TS accepts, `note` null; Python did until `bcf98b6` |
+| M12 empty-message-not-map | from_cbor Empty | `00` | `WrongType{map}` | JS accepts; Rust did until `bcf98b6` |
 | M13 map-field-duplicate | from_cbor IntBox | `a201000282a201050201a201050202` | `DuplicateMapKey{5}` | Rust, JS accept (last entry wins) |
 | M14 map-entry-keys-first | from_cbor IntBox | `a201000281a1016178` | `MissingKey{2}` | Rust, JS `WrongType{int}` |
 | M15 optional-present-null | from_cbor OptBox | `a201f60280` | accept, `note` null | — |
+| M16 missing-ok-absent (rev3) | from_cbor Late | `a0` | accept, `note` null | JS cannot generate `Late` |
+| M17 missing-ok-wrong-type (rev3) | from_cbor Late | `a10101` | `WrongType{text}` | TS `str`; JS cannot generate `Late` |
 
 The rows that test each rule: CD-B1, B1-B5 and B8-B10; CD-B2, B6, B7, B11, B12 and B20; CD-B3,
 B17-B27; CD-B4, B13-B16 and B28-B30; CD-B5, each pair at a bound and one beyond it (B1-B4, B13-B14,
-B17-B18, B21-B26, B28-B29); CD-E5, M1-M8, M11-M15 and B22, where depth is refused before the schema
+B17-B18, B21-B26, B28-B29); CD-E5, M1-M8, M11-M17 and B22, where depth is refused before the schema
 stage; CD-E6, M9 and M10.
 
 ## 5. The parity audit (2026-09-28)
@@ -346,21 +372,23 @@ Only existing suites were run, so every other result below is READ.
 
 | Finding | Where |
 |---|---|
-| **Unbounded recursion.** `dec` calls itself once per level of array or map, with no counter. A deep enough input overflows the stack, which aborts the process: it is not a panic, and no `catch_unwind` can stop it. The module's claim that "decode never panics on any byte input" holds only because an overflow is not a panic. There is no `TooDeep` variant. | `taut/src/taut/gen/runtime/cbor_fail_closed.rs:558`, `:568-569`; the claim `:19-24`; the enum `:40-82` |
-| A map's value is decoded before its key is checked. So `a2010001` gives `Truncated` where Python and TS give `DuplicateMapKey` (M4-M6). | `cbor_fail_closed.rs:568-580` |
-| The duplicate-key check compares each key with every earlier key, so its cost grows with the square of the map's size. Python uses a dict and TS a `Set`. | `cbor_fail_closed.rs:578`; `taut/src/taut/wire/cbor.py:228`; `taut/src/taut/gen/runtime/typescript/cbor.ts:389-391` |
-| `n as usize` truncates a length of 2^32 or more on a 32-bit target such as wasm32, so a 32-bit build can accept input that a 64-bit build calls `Truncated`. | `cbor_fail_closed.rs:543`, `:549` |
-| An absent optional field is `MissingKey`, because every field is read with `try_get`. rev2 keeps this as the rule (CD-E5); Python and TS, which return null, are the ones that change (M11). | `taut/src/taut/gen/rust.py:276-278`; `cbor_fail_closed.rs:211-222` |
-| A message with no fields never looks at its input, so it accepts any item (M12). | `taut/src/taut/gen/rust.py:268-289`; for example `taut-shape-rs/crates/taut-shape/src/generated.rs:273-276` |
+| **Unbounded recursion.** `dec` calls itself once per level of array or map, with no counter. A deep enough input overflows the stack, which aborts the process: it is not a panic, and no `catch_unwind` can stop it. The module's claim that "decode never panics on any byte input" holds only because an overflow is not a panic. There is no `TooDeep` variant. | `taut/src/taut/gen/runtime/cbor_fail_closed.rs:591`, `:601-602`; the claim `:19-24`; the enum `:40-82` |
+| A map's value is decoded before its key is checked. So `a2010001` gives `Truncated` where Python and TS give `DuplicateMapKey` (M4-M6). | `cbor_fail_closed.rs:601-613` |
+| The duplicate-key check compares each key with every earlier key, so its cost grows with the square of the map's size. Python uses a dict and TS a `Set`. | `cbor_fail_closed.rs:611`; `taut/src/taut/wire/cbor.py:228`; `taut/src/taut/gen/runtime/typescript/cbor.ts:389-391` |
+| `n as usize` truncates a length of 2^32 or more on a 32-bit target such as wasm32, so a 32-bit build can accept input that a 64-bit build calls `Truncated`. | `cbor_fail_closed.rs:576`, `:582` |
+| An absent optional field is `MissingKey`, because it is read with `try_get`. Since `bcf98b6` a `missing_ok` field is read with `try_get_opt`, which returns none for an absent key and still refuses a non-map. rev2 keeps `MissingKey` as the rule (CD-E5); TS, which returns null, is the one that changes (M11). | `taut/src/taut/gen/rust.py:286-292`; `cbor_fail_closed.rs:229-240`, `:242-255` |
+| A message with no fields never looked at its input, so it accepted any item (M12). `bcf98b6` makes both emitters check for a map first, the default one with an `assert!`; code generated before it still accepts any item until it is regenerated. | `taut/src/taut/gen/rust.py:250-251`, `:280-281`; still accepting, for example, `taut-shape-rs/crates/taut-shape/src/generated.rs:273-276` |
 | A `map<K,V>` field is collected into a `BTreeMap`, so a repeated key silently keeps the last entry (M13). Each entry decodes key 1 before checking that key 2 exists (M14). | `taut/src/taut/gen/rust.py:142-145` |
-| The shipped runtime still has functions that panic: `decode`, the infallible accessors, and `ext.rs` when the host is not a map. | `cbor_fail_closed.rs:141-193`, `:457-462`; `taut/src/taut/gen/runtime/ext.rs:18-23` |
-| The corpus emitter still writes the legacy codec, whatever D1 says, and glade's build copies it into `glade/wire-rs/src` along with the legacy `cbor.rs`. Removing `--legacy-codec` at v0.10.0 does not reach this path. | `taut/src/taut/gen/rust.py:299-305`; `taut/src/taut/corpus/glade_build.py:31-32`, `:114-123` |
+| The shipped runtime still has functions that panic: `decode`, the infallible accessors, and `ext.rs` when the host is not a map. | `cbor_fail_closed.rs:159-211`, `:490-495`; `taut/src/taut/gen/runtime/ext.rs:18-23` |
+| The corpus emitter still writes the legacy codec, whatever D1 says, and glade's build copies it into `glade/wire-rs/src` along with the legacy `cbor.rs`. Removing `--legacy-codec` at v0.10.0 does not reach this path. | `taut/src/taut/gen/rust.py:313-319`; `taut/src/taut/corpus/glade_build.py:31-32`, `:114-123` |
 
-`glade/wire-rs/src/cbor.rs` is byte-identical to taut's legacy `taut/src/taut/gen/runtime/cbor.rs`
-(MEASURED by `diff`): it indexes past the end (`cbor.rs:295`, `:276-287`), unwraps UTF-8 (`:317`),
-asserts on trailing bytes (`:269`), panics on unsupported items (`:290`, `:339`, `:364`, `:366`),
-wraps u64 into `i64` (`:302`, `:306`) and recurses without a bound (`:325`, `:335-336`); its
-generated `from_wire` panics too (`glade/wire-rs/src/generated.rs:57`, `:77`, `:109`, `:135`).
+`glade/wire-rs/src/cbor.rs` was byte-identical to taut's legacy `taut/src/taut/gen/runtime/cbor.rs` at
+`7a5f616` (MEASURED by `diff`); `bcf98b6` has since added `is_map` and `get_opt` to taut's copy (18
+lines, MEASURED), which glade's gains when `glade_build` next runs. glade's copy indexes past the
+end (`cbor.rs:295`, `:276-287`), unwraps UTF-8 (`:317`), asserts on trailing bytes (`:269`), panics
+on unsupported items (`:290`, `:339`, `:364`, `:366`), wraps u64 into `i64` (`:302`, `:306`) and
+recurses without a bound (`:325`, `:335-336`); its generated `from_wire` panics too
+(`glade/wire-rs/src/generated.rs:57`, `:77`, `:109`, `:135`).
 
 ### 5.3 Python and TypeScript (and JS)
 
@@ -371,10 +399,10 @@ generated `from_wire` panics too (`glade/wire-rs/src/generated.rs:57`, `:77`, `:
 | **TypeScript recursion is unbounded.** A `RangeError` escapes once V8 runs out of stack. | `taut/src/taut/gen/runtime/typescript/cbor.ts:373`, `:384`, `:392` |
 | TS calls a length or count above 2^53 − 1 `IntOverflow` (M1, M2); Rust and Python say `Truncated`. | `…/typescript/cbor.ts:333-337` |
 | TS refuses a raw map key above 2^53 − 1 as `NonIntegerMapKey` (M8). Rust, Python and JS accept it; JS keeps it as a `bigint`. | `…/typescript/cbor.ts:387`; `taut/src/taut/gen/runtime/cbor.js:172-175` |
-| TS says `WrongType{str}` and `WrongType{list}` where Rust and Python say `text` and `array` (M9, M10). | `…/typescript/codec.ts:113`, `:128`, `:131`; `cbor_fail_closed.rs:244`, `:265`; `codec.py:106`, `:131` |
+| TS says `WrongType{str}` and `WrongType{list}` where Rust and Python say `text` and `array` (M9, M10). | `…/typescript/codec.ts:113`, `:128`, `:131`; `cbor_fail_closed.rs:277`, `:298`; `codec.py:106`, `:131` |
 | TS's extension helper throws a plain `Error` when the host is not a map. | `…/typescript/ext.ts:17-22` |
-| Python and TS decode an absent optional field to null, strict or not, where the rule is `MissingKey` (CD-E5, M11). | `taut/src/taut/wire/codec.py:157-161`; `…/typescript/codec.ts:151-156` |
-| JS, the fourth gated codec: its recursion is unbounded; it checks additional info ≥ 28 before the major type (M7); it says `IntOverflow` for long lengths and `str` for text; an absent optional field is `MissingKey`, as the rule requires (M11); in a `map<K,V>` the last entry wins. | `cbor.js:444`, `:455`, `:462`, `:415`, `:388-391`, `:121`; `taut/src/taut/gen/js.py:90`, `:41-43` |
+| TS decodes an absent optional field to null, where the rule is `MissingKey` (CD-E5, M11), and has no `missing_ok`. Python did too until `bcf98b6`: its strict decode, which `codec.decode` uses, now refuses one unless the field is `missing_ok`, while `decode_struct`, lenient by default, still reads any absent field as null, even a required one. | `…/typescript/codec.ts:151-156`; `taut/src/taut/wire/codec.py:157-160`, `:31`, `:39` |
+| JS, the fourth gated codec: its recursion is unbounded; it checks additional info ≥ 28 before the major type (M7); it says `IntOverflow` for long lengths and `str` for text; an absent optional field is `MissingKey`, as the rule requires (M11); in a `map<K,V>` the last entry wins. It has no `missing_ok`, and generating JS for a schema that uses it is refused (M16, M17). | `cbor.js:444`, `:455`, `:462`, `:415`, `:388-391`, `:121`; `taut/src/taut/gen/js.py:90`, `:41-43`; `taut/src/taut/gen/scaffold.py:624-636` |
 
 taut-shape-ts's `cbor.ts` and `codec.ts` match taut's line for line below their provenance headers
 (MEASURED by `diff`), so every TS finding holds there too.
@@ -402,27 +430,33 @@ taut-shape-ts's `cbor.ts` and `codec.ts` match taut's line for line below their 
 
 **CD-V1 (PROPOSED): taut v0.10.0.** This is the next minor release, which already removes
 `--legacy-codec` and the legacy runtime template (`RustFailClosed.md:3-9`;
-`taut/src/taut/cli.py:157-161`). Before 1.0 a minor release may break things, and this one does: the
+`taut/src/taut/cli.py:160-164`). Before 1.0 a minor release may break things, and this one does: the
 new Rust variants break exhaustive matches, the bound refuses input that v0.9 accepted, and the TS
 payload words change. There is no opt-out and no deprecation window. The owner's words ("taut has only
 a few clients") allow this, and a depth bound requires it, since an opt-out would reopen the stack
 overflow. The parity contract becomes `taut-codec-parity/i64/v1`, and the decision is recorded as D26.
+taut's `3b84365`-`bcf98b6` are not yet released (the last tag is v0.9.1), so v0.10.0 also carries
+`missing_ok`, external Rust types and Python's stricter decode, unless a v0.9 release ships them first.
 
 **CD-V2 (PROPOSED): what changes for generated code.** **Rust:** every message gains `MAX_DEPTH`,
-`MAX_ENCODED_LEN` and a `decode` from bytes (CD-B3); every `from_cbor` first requires a map; an absent
-optional field stays `MissingKey`; a `map<K,V>` field refuses a repeated key and checks each entry
+`MAX_ENCODED_LEN` and a `decode` from bytes (CD-B3); every `from_cbor` first requires a map, as it
+already does since `bcf98b6`; an absent optional field stays `MissingKey` unless it is `missing_ok`;
+a `map<K,V>` field refuses a repeated key and checks each entry
 for keys 1 and 2 first. The vendored `cbor.rs` gains `DEFAULT_MAX_DEPTH`, `MAX_DEPTH_CEILING`, the
 two tags, `tag()`, `try_decode_max` and `try_decode_with`, reads the key before the value, converts
 lengths with `usize::try_from` and keeps duplicate keys in a set. The legacy path goes entirely (`--legacy-codec`, `fail_closed=False`, the
 legacy `cbor.rs` template, `decode()` and the accessors that panic); `ext.rs` becomes fallible
 (`ext_get -> Result<Option<Cbor>, DecodeError>`); `rust.py`'s corpus emitter and `glade_build`
 switch to the fail-closed path. **JS:** the same per-message constants and `decode`, the same
-`fromCbor` changes, and `cbor.js` as §5.3 lists. **TypeScript and Python:** no generated change;
+`fromCbor` changes, and `cbor.js` as §5.3 lists; with question 4 (a), `missing_ok` as Rust reads it,
+and `scaffold.emit` stops refusing JS for it. **TypeScript and Python:** no generated change;
 their runtimes change (`cbor.ts`, `codec.ts`, `ext.ts`, and `schema.ts` for IR version 2;
-`wire/cbor.py`, `codec.py`, `ext.py`), among other things so that an absent optional field is
-`MissingKey`. The exported IR becomes version 2, which readers accept beside version 1
-(TautOptions.md OPT-I1). Encode is untouched, so every golden corpus (`glade.golden.json`,
-`log.v0.json` and the rest) stays byte-identical.
+`wire/cbor.py`, `codec.py`, `ext.py`), among other things so that TypeScript refuses an absent
+optional field as `MissingKey`, as Python's strict decode already does, and, with question 4 (a),
+reads `missing_ok` from the IR, which exports it (`taut/src/taut/ir/export.py:64`). The exported
+IR becomes version 2, which readers accept beside version 1 (TautOptions.md OPT-I1). Encode is
+untouched, so every golden corpus (`glade.golden.json`, `log.v0.json` and the rest) stays
+byte-identical.
 
 **CD-V3 (PROPOSED): how the clients adopt it.** A consumer pinned below v0.10.0 is unaffected until
 it regenerates, as with D1. The shape packages move as one 0.10 release train, which the release
@@ -525,7 +559,8 @@ fn decode(bytes: &[u8]) -> Result<Inbound, DecodeError> { // in `impl Inbound`
 - **G2 The D2 law is not fully enforced.** Every decoder accepts raw map keys out of order,
   `map<K,V>` entries out of order (D24 requires them sorted) and floats wider than needed, so a
   successful decode does not yet guarantee a byte-identical re-encode (`TautCodecParityPlan.md:57`).
-  All languages agree here, so it is not a parity bug.
+  All languages agree here, so it is not a parity bug. An absent `missing_ok` field is different: a
+  declared exception, not a gap (rev3, CD-E5).
 - **G3 Amplification.** Each input byte can become one decoded item of tens of bytes (a Rust `Cbor`,
   `cbor_fail_closed.rs:125-134`, is 32), so a 16 MiB frame can decode to hundreds of MiB; a
   carrier's cap or `max_encoded_len` bounds the input, and nothing bounds the number of items.
@@ -554,11 +589,17 @@ fn decode(bytes: &[u8]) -> Result<Inbound, DecodeError> { // in `impl Inbound`
    MissingKey adoption"; CD-E5). Open, its consequence: `taut/src/taut/ir/compat.py:11` still classes
    "add an *optional* field" as compatible, but only one direction is. An old reader keeps the new
    field as an unknown tag, while a new reader refuses every message written before the field
-   existed, whether an old peer's or a stored record, such as glade's journals. (a) The gate classes
-   adding a field as breaking, so it never promises what decode refuses; a schema whose messages are
+   existed, whether an old peer's or a stored record, such as glade's journals. rev3: `bcf98b6`
+   already gives a way out, field by field. Added with `missing_ok=True`, a field reads such messages
+   as null, so adding it is compatible both ways. The gate classes turning `missing_ok` on as
+   compatible and off as breaking (`compat.py:94-96`), but still classes adding any optional field as
+   compatible. (a) The gate classes adding an optional field as compatible only when it is
+   `missing_ok`, and as breaking otherwise; JS and TypeScript implement `missing_ok` in v0.10.0, so
+   every Wave-1 codec reads it alike and the corpus covers it (M16, M17). (b) The gate classes adding
+   any field as breaking, so it never promises what decode refuses; a schema whose messages are
    stored adds one with a new major version and a rewrite of its stored records, decoded with the old
-   schema and re-encoded with the new. (b) Keep "compatible" and document the one direction; the gate
-   then passes changes that strand stored data. (c) Make an omitted optional field the canonical form
+   schema and re-encoded with the new. (c) Keep "compatible" and document the one direction; the gate
+   then passes changes that strand stored data. (d) Make an omitted optional field the canonical form
    of null, so adding one is compatible both ways and D2's law holds; but every encoder changes, and
    every stored record that holds a null becomes non-canonical, which strict decode then refuses.
 5. **Packaging.** (a) All in v0.10.0 with the legacy removal, no opt-out. (b) v0.10.0 removes legacy,
