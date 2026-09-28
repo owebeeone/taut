@@ -5,14 +5,21 @@ on what §0 does not settle. A document only: no code, corpus, fixture or versio
 ruled, it becomes decision **D27** in [TautDecisions.md](TautDecisions.md); D26 is
 [TautCheckedDecode.md](TautCheckedDecode.md), whose rev2 takes both of its bounds from this note.
 
+**rev3, 2026-09-28:** the owner's "ok - add option field": `missing_ok` becomes the first field
+option (OPT-D7), and a wire option may be *widening*, graded one way (OPT-D1, OPT-K1).
+TautCheckedDecode.md question 4 is ruled (a). Changed: §0, §1, OPT-D1, OPT-D2, OPT-D7 (new), OPT-L4,
+OPT-I1, OPT-I2, OPT-F2, OPT-K1, OPT-P2, OPT-M1, and questions 1 and 5; questions 9 and 10 are new.
+
 **rev2, 2026-09-28:** rebased onto taut's GitHub commits `3b84365`, `733e8a7` and `bcf98b6`
 (2026-09-19 to 22), which this checkout lacked when the note was written. `bcf98b6` adds a sixth
 field keyword, `missing_ok`: a wire property, which generators that lack it already refuse. Changed:
 the evidence pin, §0's keyword list, OPT-L2, OPT-L5, OPT-F2, OPT-K1 and OPT-M1.
 
 **Evidence.** Paths are from the glade-wz root; lines are at taut `bcf98b6` (rev2 re-pinned them
-from `7a5f616`, whose code the first version read). **OWNER** marks the owner's direction,
-**PROPOSED** this design, **READ** code read but not run. Nothing was run for this note.
+from `7a5f616`, whose code the first version read). rev3 also cites gwz-dev, a separate workspace:
+`gwz-transport` at `a7a36ae` and `gwz-core` at `4a0b7c8d`, the cited files clean. **OWNER** marks the
+owner's direction, **PROPOSED** this design, **READ** code read but not run. Nothing was run for this
+note.
 
 ## 0. The owner's direction
 
@@ -35,8 +42,8 @@ from `7a5f616`, whose code the first version read). **OWNER** marks the owner's 
   parity corpus in every language, and a change of it is a compatibility change), *codegen* (changes
   generated code only) or *metadata* (no effect).
 - **The IR** gets an `options` map at each level; `tautc` resolves effective values and generators
-  read one each. The keywords `optional=`, `transient=`, `merge=`, `missing_ok=` (rev2), `reserved=`
-  and `next_id=` stay; a later migration is recorded (§9), not done.
+  read one each. The keywords `optional=`, `transient=`, `merge=`, `reserved=` and `next_id=` stay;
+  a later migration is recorded (§9), not done. `missing_ok=` (rev2) moves now (rev3, below).
 - **`max_depth`**, the first option: wire, at file and message level, default 32, capped by a fixed
   ceiling of 128, a runtime constant rather than an option, so no schema can reopen the stack
   overflow. `tautc` refuses a declared value below the schema's own deepest non-recursive nesting or
@@ -45,6 +52,8 @@ from `7a5f616`, whose code the first version read). **OWNER** marks the owner's 
 - **Size, the second** ("I suppose we can use this mechanism for size"; "ok with max_size"), is
   **`max_encoded_len`** ("max_encoded_len? - bytes no"): it limits the encoded input's length, not an
   in-memory size. Its levels, default and ceiling are proposed in OPT-D6.
+- **`missing_ok`, the first field option** ("ok - add option field", rev3): the keyword that taut
+  `bcf98b6` added becomes an option, defined in OPT-D7.
 - **Protobuf** keeps depth out of the schema, as each reader's parser setting (C++ and Java 100, Go
   10,000). taut goes further, so that readers of one schema cannot disagree.
 
@@ -68,10 +77,11 @@ SCHEMA = schema(
 | 1 | Where | One new module, `taut/src/taut/ir/options.py`: the definitions, the `option` namespace, the resolver and the bound checks. `dsl.py` takes option values as positionals at every level; `model.py` stores what was declared; `validate.py` checks names, levels, values and bounds; `load.py` and `export.py` read and write IR version 2. |
 | 2 | IR | Version 2. Every level carries its raw `options` (`{}` when none); the file and each message also carry `effective`, every wire and codegen option resolved, defaults included. The loader recomputes `effective` and refuses a mismatch, so only Python ever resolves. |
 | 3 | Fail closed | An unknown name is refused at import, load and validation, whatever its class. A generator refuses a schema that declares a wire option it does not implement. In v0.10.0 rust, js, python and typescript implement both bounds; cpp, go, java, kotlin and swift refuse a schema that declares either, and mark what they still emit as unbounded. |
-| 4 | Compatibility | Changing a wire option's effective value at any root is breaking, both ways; moving a declaration without changing an effective value is no change. Codegen changes are wire-compatible; metadata changes change nothing. |
+| 4 | Compatibility | Changing a wire option's effective value at any root is breaking, both ways, unless the option is widening, as `missing_ok` is: turning that on is compatible, turning it off breaking. Moving a declaration without changing an effective value is no change. Codegen changes are wire-compatible; metadata changes change nothing. |
 | 5 | Corpus | Every row carries the bounds it is decoded under. A wire option brings rows at its default, at declared values, at its runtime ceiling if it has one, and rows pinning the root rule. Inheritance is computed only in Python and is unit-tested there. |
 | 6 | Protobuf | The same levels, custom options in parentheses, Editions resolving down the scope. Protobuf leaves depth and size to each reader; taut declares them with the schema. |
 | 7 | Size | `max_encoded_len`: file and message level, no default (a schema that declares none leaves size to its carriers), declared values at most 2^31 − 1. Carriers apply it before they allocate; decode raises `TooLarge` above it. |
+| 8 | Missing | `missing_ok` (OWNER): a wire option at field level only, default false, widening. An optional field declaring it reads an absent key as null. rust and python implement it today, js and typescript in v0.10.0, and Wave 2 refuses it. The keyword stays through v0.10.x as its alias. |
 
 ## 2. What an option is
 
@@ -87,6 +97,8 @@ class OptionDef:
     klass: str                  # "wire" | "codegen" | "metadata"
     inherits: tuple[str, ...]   # levels consulted, most specific first; () for none
     targets: frozenset[str] | None = None   # codegen: the generators it concerns; None for all
+    compat: str = "both-ways"   # wire: "both-ways", or "widening" for an option that relaxes only
+                                # what a decoder accepts (OPT-K1)
 ```
 
 A declared option is an `OptionValue(name, value)`, built by its typed constructor
@@ -95,10 +107,10 @@ and `inherits` names only levels in `levels`.
 
 **OPT-D2 (PROPOSED): what each class obliges.** **Wire:** every generator implements it or refuses a
 schema that declares it (OPT-F2); the parity corpus carries rows for it (OPT-P2); a change of its
-effective value is breaking (OPT-K1). **Codegen:** the definition names the generators it concerns
-(`targets`); a named generator that does not implement it refuses, as for wire, and any other
-ignores it by definition. **Metadata:** no generator reads it; it is exported, diffed for
-information and otherwise inert.
+effective value is breaking, or for a widening option a change that narrows it (OPT-K1).
+**Codegen:** the definition names the generators it concerns (`targets`); a named generator that
+does not implement it refuses, as for wire, and any other ignores it by definition. **Metadata:** no
+generator reads it; it is exported, diffed for information and otherwise inert.
 
 **OPT-D3 (PROPOSED): resolution.** An option's effective value at an element is the value declared at
 the first level of the definition's `inherits` that declares one, walking from the element out
@@ -187,6 +199,39 @@ OPTIONS["max_encoded_len"] = OptionDef("max_encoded_len", int, frozenset({"file"
   before it knows the root uses the largest effective value among the roots it may receive, none if
   any has none (CD-B4). It bounds the input, not what the input decodes to (TautCheckedDecode.md G3).
 
+**OPT-D7 (OWNER, 2026-09-28, rev3: "add option field"; the rest PROPOSED): `missing_ok`, the first
+field option.**
+
+```python
+OPTIONS["missing_ok"] = OptionDef("missing_ok", bool, frozenset({"field"}), default=False,
+                                  klass="wire", inherits=(), compat="widening")
+```
+
+- **What it does** is what the keyword `missing_ok=` has done since taut `bcf98b6`. An optional field
+  that declares it reads an absent key as null, as well as a present null, and still refuses a present
+  value of the wrong type. The encoder still writes the key, so for this field D2's law deliberately
+  does not hold (TautCheckedDecode.md CD-E5).
+- **Level: field only,** with no inheritance, so each field that may be missing says so where a reader
+  of the schema sees it (question 10). Unlike a bound, it is not resolved from a decode call's root
+  (OPT-D4): it belongs to its field, wherever the field's message is decoded.
+- **Checks.** The constructor takes only a `bool`. `tautc` refuses it on a field that is not
+  `optional=True`, as the keyword check does today (`taut/src/taut/ir/validate.py:63-64`).
+- **Spelling:** `F(3, Ref.Facts, option.missing_ok(True), optional=True)`. The keyword
+  `missing_ok=True` builds the same option, and declaring both raises at import, as the same option
+  twice at one level does (OPT-L2). How long the keyword lives is question 9. It is in use in
+  gwz-dev. gwz-transport's protocol sets it on six fields
+  (`gwz-transport/protocol/transport.taut.py:42-43`, `:74`, `:84-86`), and its exported IR carries
+  `"missing_ok": true` (OPT-I1). gwz-core's tests build twelve `FieldDef`s with `missing_ok` as the
+  seventh positional (`gwz-core/tests/transport_consumer/protocol/candidate.taut.py:77-107`), so the
+  alias covers the model's attribute (`taut/src/taut/ir/model.py:63`) as well as the keyword.
+- **Compatibility: widening** (OPT-K1). Turning it on is compatible and turning it off breaking, as
+  the gate grades the keyword today (`taut/src/taut/ir/compat.py:94-96`). With TautCheckedDecode.md
+  question 4 ruled (a), adding an optional field is compatible only when it declares `missing_ok`.
+- **Targets.** rust and python implement it today; js and typescript implement it in v0.10.0 (question
+  4, ruled); cpp, go, java, kotlin and swift refuse a schema that declares it (OPT-F2), as
+  `scaffold.emit` already does (`taut/src/taut/gen/scaffold.py:624-636`).
+- **Corpus:** M16 and M17, on the fixture message `Late` (TautCheckedDecode.md CD-C1, §4.4).
+
 ## 3. Where it lives and what changes (settles 1)
 
 **OPT-L1 (PROPOSED): `taut/src/taut/ir/options.py`, new.** It holds `OptionDef`, `OptionValue`, the
@@ -226,8 +271,9 @@ field when their level gets its first option.
 **OPT-L4 (PROPOSED): `validate.py`.** `validate` returns error strings and `validate_or_raise` raises
 them (`validate.py:17-18`, `:133-136`); `tautc` runs it before generating, building a corpus or
 converting JSON (`cli.py:44`, `:89`, `:110`). It gains, at every level: the name is registered; the
-level is among the definition's; the value has its type and range; and every root's effective bounds
-lie between its floors and the ceilings (OPT-D5, OPT-D6). It has no channel for warnings, so the
+level is among the definition's; the value has its type and range; every root's effective bounds
+lie between its floors and the ceilings (OPT-D5, OPT-D6); and each option's own conditions, such as
+`missing_ok` only on an optional field (OPT-D7). It has no channel for warnings, so the
 SHOULD-warnings of OPT-D4 and OPT-D5 need one: a second list, or a `lint` beside `validate`.
 
 **OPT-L5 (PROPOSED): `export.py` and `load.py`.** `schema_json` writes `"version": 1`
@@ -251,24 +297,27 @@ CD-B3).
 ## 4. The IR (settles 2)
 
 **OPT-I1 (PROPOSED): version 2.** A reader accepts versions 1 and 2 and refuses any other. A version-1
-IR cannot declare options, so its effective values are the defaults; the 20 exported `.ir.json` files
-in the workspace (READ: taut's corpus, taut-shape's and taut-shape-ts's six shape files each, glade's
-demo, glade-decl's three copies, taut's docs example) keep working and change only when re-exported.
-A new option does not change the version, since an older reader refuses its unknown name (OPT-F1);
-a change to the IR's structure does.
+IR declares no options, except that a field's `"missing_ok": true` (written since taut `bcf98b6`,
+`taut/src/taut/ir/export.py:64`; gwz-transport's `transport.ir.json` has six) is read as that field's
+option; version 2 writes it only under `options`. Otherwise a version-1 IR's effective values are the
+defaults. The 20 exported `.ir.json` files in the workspace (READ: taut's corpus, taut-shape's and
+taut-shape-ts's six shape files each, glade's demo, glade-decl's three copies, taut's docs example)
+keep working and change only when re-exported. A new option does not change the version, since an
+older reader refuses its unknown name (OPT-F1); a change to the IR's structure does.
 
 **OPT-I2 (PROPOSED): raw at every level, effective where it is used.** Every level carries `options`,
 the raw map as written, `{}` when none: at the top level for the file, and in each message, field and
 enum. Each service and method, and each enum value through its enum's `member_options`, carries one
 too, reserved so that their first option needs no new version; until then any name there is unknown
-and refused. The file and each message also carry `effective`: every wire and codegen option defined
-for that level, resolved (OPT-D3), defaults included.
+and refused. The file, each message and each field also carry `effective`: every wire and codegen
+option defined for that level, resolved (OPT-D3), defaults included; for a field, so far, `missing_ok`.
 
 ```json
 {"version": 2, "options": {"max_depth": 16}, "effective": {"max_depth": 16, "max_encoded_len": null},
  "messages": [{"name": "Tree", "options": {"max_depth": 64},
                "effective": {"max_depth": 64, "max_encoded_len": null},
-               "fields": [{"name": "children", "tag": 1, "options": {}, "...": "..."}]}]}
+               "fields": [{"name": "children", "tag": 1, "options": {},
+                           "effective": {"missing_ok": false}, "...": "..."}]}]}
 ```
 
 Raw values record what the author wrote, so the IR round-trips to the model and a diff shows where a
@@ -294,16 +343,17 @@ declares it.** Each target lists the wire options it implements, beside `_LANGS`
 (`taut/src/taut/gen/scaffold.py:557-567`). Before writing anything, `scaffold.emit` refuses when a
 requested target lacks an option declared at any level, as it already refuses an IR with extensions
 but no forward-compat (`scaffold.py:651-657`) and, since `bcf98b6`, a schema with a `missing_ok` field
-for any target but Python and Rust (`:624-636`), a list written inline rather than beside `_LANGS`.
-It never emits code that ignores a declared value.
+for any target but Python and Rust (`:624-636`), a list written inline rather than beside `_LANGS`;
+that check becomes this table's, with js and typescript added (OPT-D7). It never emits code that
+ignores a declared value.
 
-| Target | Codec | `max_depth` and `max_encoded_len` in v0.10.0 | A schema that declares one |
+| Target | Codec | `max_depth`, `max_encoded_len` and `missing_ok` in v0.10.0 | A schema that declares one |
 |---|---|---|---|
-| rust | generated `from_cbor` over the vendored `cbor.rs` | implements both: `MAX_DEPTH`, `MAX_ENCODED_LEN` and `decode` per message | generates |
-| js | generated `fromCbor` over the vendored `cbor.js` | implements both, as rust | generates |
-| python | types only (`scaffold.py:80-99`); `taut.wire.codec` decodes from the `Schema` | implements both in the runtime, through `effective()` | generates |
-| typescript | types only (`scaffold.py:163-177`); `codec.ts` decodes from the IR JSON | implements both in the runtime, from `effective` | generates |
-| cpp, go, java, kotlin, swift | generated; neither fail-closed nor bounded (`TautCodecParityPlan.md:78`) | implements neither | **refuses** |
+| rust | generated `from_cbor` over the vendored `cbor.rs` | implements all three: `MAX_DEPTH`, `MAX_ENCODED_LEN` and `decode` per message; `missing_ok` since `bcf98b6` | generates |
+| js | generated `fromCbor` over the vendored `cbor.js` | implements all three, as rust; `missing_ok` new | generates |
+| python | types only (`scaffold.py:80-99`); `taut.wire.codec` decodes from the `Schema` | implements all three in the runtime, through `effective()`; `missing_ok` since `bcf98b6` | generates |
+| typescript | types only (`scaffold.py:163-177`); `codec.ts` decodes from the IR JSON | implements all three in the runtime, from `effective`; `missing_ok` new | generates |
+| cpp, go, java, kotlin, swift | generated; neither fail-closed nor bounded (`TautCodecParityPlan.md:78`) | implements none | **refuses** |
 
 **OPT-F3 (PROPOSED): what Wave 2 emits for a schema that declares nothing.** Every schema has an
 effective `max_depth`, if only the default, and the five Wave-2 targets enforce no bound: they
@@ -326,16 +376,28 @@ the generation parameters `tautc` passes a provider, is a different thing and ke
 ## 6. Compatibility (settles 4)
 
 **OPT-K1 (PROPOSED): a wire option.** Changing a wire option's effective value at any root is
-**breaking**, both ways. Raising a bound lets new writers produce bytes that readers still at the old
-bound refuse; lowering it refuses bytes that old writers produced, which may be stored. For
-`max_encoded_len`, none counts as unbounded, so a first declaration lowers it. Neither is like adding
-an optional field, which an old reader keeps as an unknown tag (`taut/src/taut/ir/compat.py:11`) and a
-new reader, if the field is `missing_ok`, reads as null in old messages (TautCheckedDecode.md question
-4): a reader cannot skip nesting that is too deep or input that is too long, it refuses the whole
-message. The gate compares effective values, not raw ones, so moving a declaration without changing
-an effective value is no change, and a new message that declares a bound is "message added",
-compatible as today (`compat.py:115`). `_diff_messages` (`compat.py:70-115`) gains the per-root
-comparison; `check_or_raise` (`:177-180`) refuses it under the same major version.
+**breaking**, both ways, unless the option is widening (below). Raising a bound lets new writers
+produce bytes that readers still at the old bound refuse; lowering it refuses bytes that old writers
+produced, which may be stored. For `max_encoded_len`, none counts as unbounded, so a first
+declaration lowers it. Neither is like adding an optional field, which an old reader keeps as an
+unknown tag (`taut/src/taut/ir/compat.py:11`) and a new reader, if the field is `missing_ok`, reads
+as null in old messages (TautCheckedDecode.md question 4): a reader cannot skip nesting that is too
+deep or input that is too long, it refuses the whole message. The gate compares effective values,
+not raw ones, so moving a declaration without changing an effective value is no change, and a new
+message that declares a bound is "message added", compatible as today (`compat.py:115`).
+`_diff_messages` (`compat.py:70-115`) gains the per-root comparison; `check_or_raise` (`:177-180`)
+refuses it under the same major version.
+
+**A widening option** relaxes only what a decoder accepts and never changes what an encoder writes.
+Its definition says so (`compat="widening"`, OPT-D1), and `missing_ok` is the first (OPT-D7). Turning
+it on is compatible: a reader still accepts every message it accepted before, and writers are
+unchanged. Turning it off is breaking, since readers then refuse messages that older writers
+produced, which may be stored. A bound is never widening: raising one also lets writers produce what
+readers at the old bound refuse. The gate compares a field option field by field, as it grades the
+keyword today (`compat.py:94-96`). Adding an optional field is compatible only when the field
+declares `missing_ok` (TautCheckedDecode.md question 4, ruled (a)); otherwise `compat.py:11`'s
+"compatible" becomes "breaking", since a new reader refuses every message written before the field
+existed.
 
 **OPT-K2 (PROPOSED): codegen and metadata.** A codegen change leaves the bytes alone and is
 wire-compatible; it may change the generated API, which the gate, judging only the wire, reports as a
@@ -366,7 +428,9 @@ runtime's constants must equal (TautCheckedDecode.md CD-C2, CD-C4).
 accepted at the bound and refused one beyond it; at its runtime ceiling, if it has one; one pinning
 the root rule (OPT-D4); and, where a raw call caps its argument, one pinning the cap. For `max_depth`:
 B1-B12 and B17-B27, on fixture messages declaring 64, 2 and 128. For `max_encoded_len`: B13-B16 (raw
-calls) and B28-B30, on a fixture message declaring 8 (TautCheckedDecode.md CD-C1, §4.4).
+calls) and B28-B30, on a fixture message declaring 8 (TautCheckedDecode.md CD-C1, §4.4). For
+`missing_ok`, which is not a bound: M11 at its default (absent is `MissingKey`), M16 declared (absent
+reads as null) and M17 (a present wrong type is still refused), on `OptBox` and `Late`.
 
 **OPT-P3 (PROPOSED): what stays out of the corpus.** Resolution runs once, in Python, and every other
 runtime reads its result, so inheritance cannot differ by language: `options.py`'s unit tests cover
@@ -394,15 +458,14 @@ readers of one root cannot.
 
 ## 9. The existing keywords, for a later migration
 
-**OPT-M1 (PROPOSED, recorded only).** The six keywords stay. Moved onto options, their classes would
-be:
+**OPT-M1 (PROPOSED, recorded only).** Five keywords stay. The sixth, `missing_ok=`, is now an option
+(OPT-D7) and stays only as its alias (question 9). Moved onto options, the five's classes would be:
 
 | Keyword | Today | Class |
 |---|---|---|
 | `optional=` | `F` (`dsl.py:134-151`) | wire: a present null decodes to null, an absent key is `MissingKey` unless the field is `missing_ok` (TautCheckedDecode.md CD-E5, OWNER 2026-09-28) |
 | `transient=` | `F`; never on the wire (`model.py:60`, `:74-75`) | wire: it takes the field off the wire |
 | `merge=` | `F`; "does not affect the wire encoding" (`model.py:61-62`) | unsettled: the model calls it metadata, but the gate calls a change breaking (`compat.py:93`), since replicas that merge differently diverge (question 7) |
-| `missing_ok=` (rev2) | `F`, with `optional=True` only (`model.py:63`; `validate.py:63-64`); Python and Rust implement it, and every other generator refuses it (`scaffold.py:624-636`) | wire: an absent key also decodes to null. The gate grades a change one way, on compatible and off breaking (`compat.py:94-96`), since it widens what readers accept and leaves writers alone; as an option it would be the first wire option that OPT-K1's both-ways rule does not fit |
 | `reserved=`, `next_id=` | `Msg` (`dsl.py:154-182`); checked (`validate.py:55-58`, `:72-77`) | metadata that `tautc` checks: they constrain how a schema may evolve, not its bytes |
 
 ## 10. Gaps and questions for the owner
@@ -429,10 +492,10 @@ be:
 
 **Questions.** Each lists its alternatives; (a) is recommended.
 
-1. **Resolved values in the IR.** (a) Raw `options` at every level and `effective` at file and message
-   level, checked by the loader. (b) Raw only: the TypeScript runtime and every provider reimplement
-   inheritance and defaults, a new parity surface. (c) Effective only: the IR no longer records where
-   a value was declared, and cannot round-trip to the DSL.
+1. **Resolved values in the IR.** (a) Raw `options` at every level and `effective` at file, message
+   and field level, checked by the loader. (b) Raw only: the TypeScript runtime and every provider
+   reimplement inheritance and defaults, a new parity surface. (c) Effective only: the IR no longer
+   records where a value was declared, and cannot round-trip to the DSL.
 2. **Wave 2 in v0.10.0.** (a) Refuse a schema that declares either bound; emit the rest with a header
    saying their decode is unbounded. (b) Refuse every schema until Phase 4, the strictest reading of
    "never ignore the option". (c) Add both checks to the five runtimes now, as a panic or throw until
@@ -441,8 +504,9 @@ be:
    which needs each option's class in the IR, so that a reader can tell one it has never seen.
 4. **Levels in version 2.** (a) `options` at all seven levels now, so the later three need no new
    version. (b) The four named now, and version 3 when the others get options.
-5. **Changing a wire option.** (a) Breaking both ways. (b) Raising a bound compatible, accepting that
-   readers still at the old bound refuse new writers' bytes.
+5. **Changing a wire option.** (a) Breaking both ways, except a widening option such as `missing_ok`,
+   graded one way (OPT-K1). (b) Raising a bound compatible, accepting that readers still at the old
+   bound refuse new writers' bytes.
 6. **Custom options.** (a) `option("ns.name", v)` raises at import until custom options are designed.
    (b) Accepted there, then refused by `tautc` as unknown.
 7. **`merge` at the migration.** (a) A fourth class, *semantic*: no byte changes but what readers
@@ -453,3 +517,12 @@ be:
    every schema, such as glade's 16 MiB: uniform, but razel and taut-shape would have to declare more
    to keep what they accept today, and no safer, since only a carrier refuses before it allocates.
    (c) No ceiling, which lets a schema declare a bound a JVM or wasm32 reader cannot hold.
+9. **The `missing_ok=` keyword (rev3).** (a) An alias that builds the option, together with
+   `FieldDef`'s seventh positional, through v0.10.x, and removed at v0.11.0, once gwz-transport and
+   gwz-core's tests have moved to the option. (b) An alias for good: two spellings of one option.
+   (c) Removed at v0.10.0: gwz's schema and tests change when they regenerate for v0.10.0, which they
+   must do anyway.
+10. **`missing_ok`'s levels (rev3).** (a) Field only: each field that may be missing says so. (b)
+    Also message and file, inherited, so that a schema of stored records can make every optional
+    field missing at once, fields added later included. Turning it on is compatible, but the
+    exception to D2's law then covers every such field, needed or not.
