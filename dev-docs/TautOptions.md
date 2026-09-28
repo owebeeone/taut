@@ -5,6 +5,11 @@ on what §0 does not settle. A document only: no code, corpus, fixture or versio
 ruled, it becomes decision **D27** in [TautDecisions.md](TautDecisions.md); D26 is
 [TautCheckedDecode.md](TautCheckedDecode.md), whose rev2 takes both of its bounds from this note.
 
+**rev5, 2026-09-28:** question 9 ruled: "no missing_ok support - transition all use to
+optional=MISSING_OK". There is no alias: the keyword, `FieldDef.missing_ok` and the IR's `missing_ok`
+key all go, the model and the IR carry the three values too, and every use moves (OPT-M2). Changed:
+§0, §1, OPT-I1, OPT-M1, OPT-M2 and question 9.
+
 **rev4, 2026-09-28:** the owner switched presence to one keyword ("switch the notes to
 optional=MISSING_OK"): `optional=` takes `False`, `True` or `MISSING_OK` (OPT-M2), in place of rev3's
 field option. OPT-D7 and question 10 are withdrawn, and with them the widening rule and the
@@ -49,8 +54,8 @@ Nothing was run for this note.
   generated code only) or *metadata* (no effect).
 - **The IR** gets an `options` map at each level; `tautc` resolves effective values and generators
   read one each. The keywords `optional=`, `transient=`, `merge=`, `reserved=` and `next_id=` stay;
-  a later migration is recorded (§9), not done. `missing_ok=` (rev2) becomes an alias of
-  `optional=MISSING_OK` (rev4, below).
+  a later migration is recorded (§9), not done. `missing_ok=` (rev2) goes, and every use moves to
+  `optional=MISSING_OK` (rev5, below).
 - **`max_depth`**, the first option: wire, at file and message level, default 32, capped by a fixed
   ceiling of 128, a runtime constant rather than an option, so no schema can reopen the stack
   overflow. `tautc` refuses a declared value below the schema's own deepest non-recursive nesting or
@@ -61,7 +66,8 @@ Nothing was run for this note.
   in-memory size. Its levels, default and ceiling are proposed in OPT-D6.
 - **Presence** (rev4: "switch the notes to optional=MISSING_OK"): `optional=` takes `False`, `True`
   or `MISSING_OK`, the last also reading an absent key as null. It replaces the field option of rev3
-  ("ok - add option field"); OPT-M2 defines it.
+  ("ok - add option field"), and nothing named `missing_ok` survives ("no missing_ok support",
+  rev5). OPT-M2 defines it.
 - **Protobuf** keeps depth out of the schema, as each reader's parser setting (C++ and Java 100, Go
   10,000). taut goes further, so that readers of one schema cannot disagree.
 
@@ -89,7 +95,7 @@ SCHEMA = schema(
 | 5 | Corpus | Every row carries the bounds it is decoded under. A wire option brings rows at its default, at declared values, at its runtime ceiling if it has one, and rows pinning the root rule. Inheritance is computed only in Python and is unit-tested there. |
 | 6 | Protobuf | The same levels, custom options in parentheses, Editions resolving down the scope. Protobuf leaves depth and size to each reader; taut declares them with the schema. |
 | 7 | Size | `max_encoded_len`: file and message level, no default (a schema that declares none leaves size to its carriers), declared values at most 2^31 − 1. Carriers apply it before they allocate; decode raises `TooLarge` above it. |
-| 8 | Presence | `optional=` takes `False`, `True` or `MISSING_OK` (OWNER); the last also reads an absent key as null. It is a keyword, not an option: the model and the IR keep `bcf98b6`'s `optional` and `missing_ok`. rust and python implement it today, js and typescript in v0.10.0, and Wave 2 refuses it. `missing_ok=True` stays through v0.10.x as its alias. |
+| 8 | Presence | `optional=` takes `False`, `True` or `MISSING_OK` (OWNER); the last also reads an absent key as null. It is a keyword, not an option, and three-valued in the model and the IR too. Nothing named `missing_ok` is supported, and every use moves to `MISSING_OK` (OWNER). rust and python already have the behaviour, js and typescript get it in v0.10.0, and Wave 2 refuses it. |
 
 ## 2. What an option is
 
@@ -276,8 +282,9 @@ CD-B3).
 IR cannot declare options, so its effective values are the defaults. The 20 exported `.ir.json` files
 in the workspace (READ: taut's corpus, taut-shape's and taut-shape-ts's six shape files each, glade's
 demo, glade-decl's three copies, taut's docs example) keep working and change only when re-exported.
-A field's `"missing_ok": true`, written since taut `bcf98b6` (`taut/src/taut/ir/export.py:64`), is not
-an option and stays as it is in both versions (OPT-M2). A new option does not change the version,
+A field's `optional` also takes `"missing_ok"` (OPT-M2). The `missing_ok` key that taut `bcf98b6`
+writes (`taut/src/taut/ir/export.py:64`) is refused, with a message to re-export. A new option does not
+change the version,
 since an older reader refuses its unknown name (OPT-F1); a change to the IR's structure does.
 
 **OPT-I2 (PROPOSED): raw at every level, effective where it is used.** Every level carries `options`,
@@ -420,8 +427,7 @@ readers of one root cannot.
 ## 9. The existing keywords, for a later migration
 
 **OPT-M1 (PROPOSED, recorded only).** Five keywords stay; from rev4 `optional=` takes a third value,
-and `missing_ok=` stays only as that value's alias (OPT-M2, question 9). Moved onto options, their
-classes would be:
+and from rev5 `missing_ok=` is gone (OPT-M2, question 9). Moved onto options, their classes would be:
 
 | Keyword | Today | Class |
 |---|---|---|
@@ -430,8 +436,9 @@ classes would be:
 | `merge=` | `F`; "does not affect the wire encoding" (`model.py:61-62`) | unsettled: the model calls it metadata, but the gate calls a change breaking (`compat.py:93`), since replicas that merge differently diverge (question 7) |
 | `reserved=`, `next_id=` | `Msg` (`dsl.py:154-182`); checked (`validate.py:55-58`, `:72-77`) | metadata that `tautc` checks: they constrain how a schema may evolve, not its bytes |
 
-**OPT-M2 (OWNER, 2026-09-28, rev4: "switch the notes to optional=MISSING_OK"; the rest PROPOSED):
-presence is one keyword with three values.** It replaces rev3's field option (OPT-D7).
+**OPT-M2 (OWNER, 2026-09-28, rev4: "switch the notes to optional=MISSING_OK"; rev5: "no missing_ok
+support - transition all use to optional=MISSING_OK"; the rest PROPOSED): presence is one keyword with
+three values.** It replaces rev3's field option (OPT-D7).
 
 | `optional=` | the field's key | a present `null` | native type |
 |---|---|---|---|
@@ -440,26 +447,39 @@ presence is one keyword with three values.** It replaces rev3's field option (OP
 | `MISSING_OK` | may be absent, read as `None` | `None` | `T` or none |
 
 - **The DSL** exports `MISSING_OK` from `taut.ir.dsl`, beside `INT` and `STR`.
-  `F(5, INT, optional=MISSING_OK)` is what `bcf98b6` spells `optional=True, missing_ok=True`, and `F`
-  refuses any other value for `optional=`. So the combination `validate` refuses today, `missing_ok`
-  on a required field (`taut/src/taut/ir/validate.py:63-64`), can no longer be written in the DSL.
-- **The model and the IR do not change.** `F` stores `optional=True, missing_ok=True` in `FieldDef`
-  (`taut/src/taut/ir/model.py:59`, `:63`), and the export writes both keys, as `bcf98b6` does
-  (`export.py:64`). gwz-transport's exported IR, gwz-core's tests, which pass `missing_ok` as
-  `FieldDef`'s seventh positional
-  (`gwz-core/tests/transport_consumer/protocol/candidate.taut.py:77-107`), and every reader that
-  takes `optional` as a boolean keep working. `validate` still refuses `missing_ok` without
-  `optional` in IR JSON, which never runs `F`.
-- **The alias.** `missing_ok=True` beside `optional=True`, as gwz-transport's protocol writes it on
-  six fields (`gwz-transport/protocol/transport.taut.py:42-43`, `:74`, `:84-86`), means
-  `optional=MISSING_OK`; `missing_ok=` beside any other `optional=` value raises at import. How long
-  it lives is question 9.
+  `F(5, INT, optional=MISSING_OK)` does what `bcf98b6` spells `optional=True, missing_ok=True`, and `F`
+  refuses any other value for `optional=`. `F` no longer takes `missing_ok=`: it raises `TypeError`, as
+  for any unknown keyword. So the combination `validate` refuses today, `missing_ok` on a required
+  field (`taut/src/taut/ir/validate.py:63-64`), can no longer be written at all.
+- **The model and the IR carry the three values too** (rev5). `FieldDef.optional` holds `False`, `True`
+  or `MISSING_OK`, and `FieldDef.missing_ok` goes (`taut/src/taut/ir/model.py:59`, `:63`).
+  `MISSING_OK` is truthy, so every `if f.optional` keeps meaning "may be null"; only the decoders, the
+  gate and the generator check ask for `MISSING_OK` (`taut/src/taut/gen/rust.py:287`,
+  `taut/src/taut/wire/codec.py:158`, `compat.py:94-96`, `scaffold.py:624-636`). The export writes
+  `"optional": "missing_ok"` in place of `bcf98b6`'s key (`export.py:64`), and the loader refuses that
+  key with a message to re-export (`load.py:64-65`). A reader older than the change takes
+  `"missing_ok"` as a true `optional`, so it reads such a field as a plain optional one.
+- **Every use moves** (rev5), in gwz-dev, together with gwz-dev's own taut checkout (at `bcf98b6`),
+  since gwz's schemas import `MISSING_OK` from it:
+  - gwz-transport's protocol: six fields to `optional=MISSING_OK`
+    (`gwz-transport/protocol/transport.taut.py:42-43`, `:74`, `:84-86`), and its exported IR,
+    `gwz-transport/protocol/transport.ir.json`, re-exported.
+  - gwz-core's tests: twelve `FieldDef`s drop their seventh positional and take `MISSING_OK` as their
+    `optional` (`gwz-core/tests/transport_consumer/protocol/candidate.taut.py:77-107`), and the test
+    that asserts `field.missing_ok` checks `field.optional` instead
+    (`gwz-core/tests/transport_consumer/candidate/test_candidate.py:63`, `:88-89`).
+  - gwz's live design documents that name the keyword: `dev-docs/GwzCoreSessionDesign.md:531`,
+    `dev-docs/GwzCoreSessionPlan.md:166`, `gwz-core/dev-docs/GwzRemoteTransportPlacementA.md:16` and
+    `gwz-core/dev-docs/GwzRemoteTransportSetupFailureAmendment.md:29`. Review and verdict records
+    that quote it stay as written.
+  - In taut, its tests and `docs/Reference.md`, which documents the keyword until the code changes.
 - **Compatibility.** The three values form a ladder, each accepting every message the one before it
   accepts. The gate grades a move by direction, towards `MISSING_OK` compatible and away from it
-  breaking, as it already grades `optional` (`taut/src/taut/ir/compat.py:88-91`) and `missing_ok`
-  (`:94-96`). Adding an optional field is compatible only at `MISSING_OK` (TautCheckedDecode.md
-  question 4, ruled (a)).
-- **Targets.** rust and python implement `MISSING_OK` today, and js and typescript in v0.10.0
+  breaking. One comparison of `optional` replaces the gate's two checks today, of `optional`
+  (`taut/src/taut/ir/compat.py:88-91`) and of `missing_ok` (`:94-96`), which grade the same way.
+  Adding an optional field is compatible only at `MISSING_OK` (TautCheckedDecode.md question 4, ruled
+  (a)).
+- **Targets.** rust and python already have the behaviour, and js and typescript get it in v0.10.0
   (question 4, ruled). `scaffold.emit` keeps refusing the other five for a schema that uses it, with
   js and typescript taken off its list (`taut/src/taut/gen/scaffold.py:624-636`).
 - **At the later migration** (OPT-M1), `optional=` moves as one three-valued wire option, as
@@ -513,10 +533,9 @@ presence is one keyword with three values.** It replaces rev3's field option (OP
    every schema, such as glade's 16 MiB: uniform, but razel and taut-shape would have to declare more
    to keep what they accept today, and no safer, since only a carrier refuses before it allocates.
    (c) No ceiling, which lets a schema declare a bound a JVM or wasm32 reader cannot hold.
-9. **The `missing_ok=` keyword (rev3; rev4 narrows it).** (a) An alias for `optional=MISSING_OK`
-   through v0.10.x, removed at v0.11.0 once gwz-transport's six fields have moved; the model keeps
-   `FieldDef.missing_ok`, so gwz-core's tests need nothing. (b) An alias for good: two spellings of
-   one value. (c) Removed at v0.10.0: gwz-transport changes six fields when it regenerates for
-   v0.10.0, which it must do anyway.
+9. **The `missing_ok=` keyword.** RULED (OWNER, 2026-09-28, rev5): "no missing_ok support - transition
+   all use to optional=MISSING_OK". No alias in any form: the keyword, `FieldDef.missing_ok` and the
+   IR key all go, and every use moves (OPT-M2). The alternatives were an alias through v0.10.x, an
+   alias for good, and removal at v0.10.0 with gwz moving at its own regeneration.
 10. **`missing_ok`'s levels (rev3).** Withdrawn in rev4: `optional=` is a keyword, written on each
     field.
