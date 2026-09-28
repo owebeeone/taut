@@ -5,6 +5,10 @@ on what §0 does not settle. A document only: no code, corpus, fixture or versio
 ruled, it becomes decision **D27** in [TautDecisions.md](TautDecisions.md); D26 is
 [TautCheckedDecode.md](TautCheckedDecode.md), whose rev2 takes both of its bounds from this note.
 
+**rev7, 2026-09-29:** every use in gwz-dev has moved (gwz-transport `f8ebef7`, gwz-core `0b7fdf19`,
+gwz-dev `60fb142`, whose taut is at `9d46310`). gwz-core's fixture holds thirteen `FieldDef`s, not
+the twelve rev5 counted. Changed: OPT-M2's list.
+
 **rev6, 2026-09-29:** OPT-M2 is in the code, in the taut commit that carries this revision (owner:
 "go"). It adds `MISSING_OK` in the DSL, a three-valued `FieldDef.optional`, `"optional":
 "missing_ok"` in the IR, the gate's ladder, and the change in the Python codec, the Rust generator and
@@ -471,7 +475,7 @@ TypeScript support, which v0.10.0 brings.
   - gwz-transport's protocol: six fields to `optional=MISSING_OK`
     (`gwz-transport/protocol/transport.taut.py:42-43`, `:74`, `:84-86`), and its exported IR,
     `gwz-transport/protocol/transport.ir.json`, re-exported.
-  - gwz-core's tests: twelve `FieldDef`s drop their seventh positional and take `MISSING_OK` as their
+  - gwz-core's tests: thirteen `FieldDef`s drop their seventh positional and take `MISSING_OK` as their
     `optional` (`gwz-core/tests/transport_consumer/protocol/candidate.taut.py:77-107`), and the test
     that asserts `field.missing_ok` checks `field.optional` instead
     (`gwz-core/tests/transport_consumer/candidate/test_candidate.py:63`, `:88-89`).
