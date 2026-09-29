@@ -19,7 +19,7 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from ..wire import codec
 
 _TAUT = Path(__file__).resolve().parents[3]      # .../glial-dev/taut
@@ -114,6 +114,14 @@ def _decode_expr(t: TypeRef, acc: str) -> str:
     raise TypeError(t)
 
 
+def _duplicate_key_error(key_type: TypeRef, key: str) -> str:
+    """A `map<K,V>` field's repeated entry key. K is int, str or bool (`ir/validate.py`);
+    a str key is carried as text, a bool key as 0 or 1."""
+    if isinstance(key_type, Scalar) and key_type.kind == "str":
+        return f"DecodeError::duplicate_map_text_key({key})"
+    return f"DecodeError::duplicate_map_key({key})"
+
+
 def _try_scalar_method(t: Scalar) -> str:
     return {"int": "try_int", "float": "try_float", "bool": "try_bool",
             "str": "try_text", "bytes": "try_bytes"}[t.kind]
@@ -180,6 +188,12 @@ def _try_decode_value(t: TypeRef, acc: str, target: str, ret: str, tmp: str) -> 
             f"      {_base_type(t.value)} {val}{{}};",
         ]
         lines.extend("  " + line for line in _try_decode_value(t.key, f"*{key_cbor}.value", key, ret, f"{tmp}_k"))
+        # A repeated entry key is refused after the key decodes, before its value (CD-E5).
+        lines.extend([
+            f"      if ({target}.count({key}) != 0) {{",
+            f"        return DecodeResult<{ret}>::fail({_duplicate_key_error(t.key, key)});",
+            "      }",
+        ])
         lines.extend("  " + line for line in _try_decode_value(t.value, f"*{val_cbor}.value", val, ret, f"{tmp}_v"))
         lines.extend([
             f"      {target}[{key}] = {val};",
@@ -209,7 +223,10 @@ def _emit_from_cbor(msg, forward_compat: bool = False) -> list[str]:
     for f in msg.fields:
         if f.transient:
             continue  # native-only; left default
-        if f.optional:
+        if f.optional == MISSING_OK:  # an absent key reads as null, like a present null
+            lines.append(f"    {{ const Cbor* f = c.try_get_opt({f.tag}).value; "
+                         f"if (f != nullptr && !f->is_null()) {{ v.{f.name} = {_decode_expr(f.type, '(*f)')}; }} }}")
+        elif f.optional:
             lines.append(f"    {{ const auto& f = c.get({f.tag}); if (!f.is_null()) v.{f.name} = {_decode_expr(f.type, 'f')}; }}")
         elif isinstance(f.type, ListOf):
             lines.append(f"    for (const auto& x : c.get({f.tag}).as_array()) v.{f.name}.push_back({_decode_expr(f.type.elem, 'x')});")
@@ -227,31 +244,40 @@ def _emit_from_cbor(msg, forward_compat: bool = False) -> list[str]:
 
 
 def _emit_try_from_cbor(msg, forward_compat: bool = False) -> list[str]:
-    lines = [f"  static DecodeResult<{msg.name}> try_from_cbor(const Cbor& c) {{", f"    {msg.name} v{{}};"]
+    lines = [
+        f"  static DecodeResult<{msg.name}> try_from_cbor(const Cbor& c) {{",
+        f"    {msg.name} v{{}};",
+        "    auto __map = c.try_map();  // a message is a map, even one with no fields",
+        f"    if (!__map) {{ return DecodeResult<{msg.name}>::fail(__map.error); }}",
+    ]
     for f in msg.fields:
         if f.transient:
             continue
         field = f"__field_{f.tag}"
-        lines.append(f"    auto {field} = c.try_get({f.tag});")
-        if f.optional:
-            lines.append(f"    if (!{field}) return DecodeResult<{msg.name}>::fail({field}.error);")
-            lines.append(f"    if ({field}.value->is_null()) {{")
-            lines.append(f"      v.{f.name} = std::nullopt;")
-            lines.append("    } else {")
-            tmp = f"__value_{f.tag}"
-            lines.append(f"      {_base_type(f.type)} {tmp}{{}};")
-            nested = _try_decode_value(f.type, f"*{field}.value", tmp, msg.name, f"__decoded_{f.tag}")
-            lines.extend("  " + line for line in nested)
-            lines.append(f"      v.{f.name} = {tmp};")
-            lines.append("    }")
-        else:
+        if not f.optional:
+            lines.append(f"    auto {field} = c.try_get({f.tag});")
             lines.append(f"    if (!{field}) return DecodeResult<{msg.name}>::fail({field}.error);")
             lines.extend(_try_decode_value(f.type, f"*{field}.value", f"v.{f.name}", msg.name, f"__decoded_{f.tag}"))
+            continue
+        if f.optional == MISSING_OK:  # an absent key reads as null, like a present null
+            lines.append(f"    auto {field} = c.try_get_opt({f.tag});")
+            lines.append(f"    if (!{field}) {{ return DecodeResult<{msg.name}>::fail({field}.error); }}")
+            lines.append(f"    if ({field}.value == nullptr || {field}.value->is_null()) {{")
+        else:
+            lines.append(f"    auto {field} = c.try_get({f.tag});")
+            lines.append(f"    if (!{field}) return DecodeResult<{msg.name}>::fail({field}.error);")
+            lines.append(f"    if ({field}.value->is_null()) {{")
+        lines.append(f"      v.{f.name} = std::nullopt;")
+        lines.append("    } else {")
+        tmp = f"__value_{f.tag}"
+        lines.append(f"      {_base_type(f.type)} {tmp}{{}};")
+        nested = _try_decode_value(f.type, f"*{field}.value", tmp, msg.name, f"__decoded_{f.tag}")
+        lines.extend("  " + line for line in nested)
+        lines.append(f"      v.{f.name} = {tmp};")
+        lines.append("    }")
     if forward_compat:
         known = " && ".join(f"kv.first != {f.tag}" for f in msg.wire_fields()) or "true"
-        lines.append("    auto __map = c.try_map();")
-        lines.append(f"    if (!__map) return DecodeResult<{msg.name}>::fail(__map.error);")
-        lines.append(f"    for (const auto& kv : *__map.value) if ({known}) v.wire_residual.push_back(kv);")
+        lines.append(f"    for (const auto& kv : *__map.value) {{ if ({known}) {{ v.wire_residual.push_back(kv); }} }}")
     lines.append(f"    return DecodeResult<{msg.name}>::success(v);")
     lines.append("  }")
     return lines

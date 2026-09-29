@@ -9,11 +9,13 @@ from pathlib import Path
 import pytest
 
 from taut import cli, ext
+from taut.corpus import parity, parity_cpp
 from taut.corpus import resext_build as resext
 from taut.gen import cpp as cpp_gen
+from taut.gen import scaffold
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
-from taut.ir.dsl import FLOAT, INT, F, List, Map, Msg, schema as mk
+from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, schema as mk
 from taut.wire import cbor, codec
 
 
@@ -113,14 +115,6 @@ def _cpp_rows(rows: list[dict], keys: list[str]) -> str:
     return ",\n".join(rendered)
 
 
-def _cpp_int_literal(value: str) -> str:
-    if value == "-9223372036854775808":
-        return "std::numeric_limits<long long>::min()"
-    if value == "9223372036854775807":
-        return "std::numeric_limits<long long>::max()"
-    return f"{value}LL"
-
-
 def test_cpp_codegen_threads_float_scalar_and_list():
     hpp = cpp_gen._emit_types(S_SCALAR_LIST)
     assert "double x;" in hpp
@@ -154,346 +148,233 @@ def test_cpp_codegen_emits_fallible_decode_path_for_i64_and_enums():
     assert "auto __decoded_2_v = (*__decoded_2_val_cbor.value).try_int();" in hpp
 
 
-def test_cpp_runtime_replays_shared_i64_parity_corpus(tmp_path):
-    root = Path(__file__).resolve().parents[2]
-    schema_path = root / "ir" / "parity_int.taut.py"
-    # Baseline smoke test: pin the reviewed set; `lead` rows belong to the
-    # governed `tautc parity` gate (corpus/parity/gen_vectors.py).
-    int_vectors = [r for r in json.loads((root / "corpus" / "parity" / "int.vectors.json").read_text())["vectors"] if not r.get("lead")]
-    malformed = [r for r in json.loads((root / "corpus" / "parity" / "malformed.vectors.json").read_text())["vectors"] if not r.get("lead")]
+def test_cpp_passes_the_parity_gate():
+    """Every row of the shared corpus through the gate's C++ runner (`tautc parity -t cpp`)."""
+    report = parity_cpp.run()
+    if not report.available:
+        pytest.skip(report.skip_reason)
+    failures = [f"{r.name}: {r.detail}" for r in report.failures]
+    assert report.green, "\n".join([report.fault, *failures])
+    # Only an encode-fail row may be satisfied by the type system; every other row ran.
+    satisfied = {r.name for r in report.results if r.status == parity.TYPE_SATISFIED}
+    assert satisfied == {r["name"] for r in parity.int_rows() if r["kind"] == "encode_fail"}
 
-    assert cli.main([
-        "gen", str(schema_path), "-o", str(tmp_path), "--lang", "cpp",
-        "--api-only", "--with-runtime",
-    ]) == 0
 
-    round_rows = []
-    encode_rows = []
-    for row in int_vectors:
-        value = row["value"]
-        if row["kind"] == "round_trip":
-            pairs = value["by_id"]
-            by_id = "{}" if not pairs else "{" + ", ".join(
-                "{" + _cpp_int_literal(k) + ", " + _cpp_int_literal(v) + "}" for k, v in pairs
-            ) + "}"
-            round_rows.append(
-                "{"
-                + ", ".join([
-                    _cpp_string_literal(row["name"]),
-                    _cpp_int_literal(value["n"]),
-                    by_id,
-                    _cpp_string_literal(row["cbor"]),
-                ])
-                + "}"
-            )
-        elif row["kind"] == "encode_fail":
-            encode_rows.append(
-                "{"
-                + ", ".join([
-                    _cpp_string_literal(row["name"]),
-                    _cpp_string_literal(value["n"]),
-                    _cpp_string_literal(row["expect"]["tag"]),
-                ])
-                + "}"
-            )
+# Inputs beyond the shared corpus, each with the result Python (the reference) gives:
+# CD-E5's order of checks and D2's strictness where the corpus has a single row.
+BEYOND_THE_CORPUS = [
+    # name, stage, schema, hex, expected
+    ("map-key-is-a-tag", "raw_decode", "", "a1c000", "UnsupportedMajor;major=6"),
+    ("map-key-reserved-info", "raw_decode", "", "a17f", "UnsupportedInfo;info=31"),
+    ("map-key-invalid-utf8", "raw_decode", "", "a161ff00", "InvalidUtf8"),
+    ("map-key-truncated-text", "raw_decode", "", "a16278", "Truncated"),
+    ("map-key-bool", "raw_decode", "", "a1f500", "NonIntegerMapKey"),
+    ("map-key-overflow", "raw_decode", "", "a13b800000000000000000", "IntOverflow;value=-9223372036854775809"),
+    ("map-key-negative-after-an-entry", "raw_decode", "", "a2000020", "NegativeMapKey;key=-1"),
+    ("nested-map-key-negative", "raw_decode", "", "a101a12000", "NegativeMapKey;key=-1"),
+    ("non-canonical-negative-int", "raw_decode", "", "3800", "NonCanonicalInt;value=0"),
+    ("non-canonical-4-byte-int", "raw_decode", "", "1a0000ffff", "NonCanonicalInt;value=65535"),
+    ("non-canonical-8-byte-int", "raw_decode", "", "1b00000000ffffffff", "NonCanonicalInt;value=4294967295"),
+    ("canonical-8-byte-int", "raw_decode", "", "1b0000000100000000", "accept"),
+    ("non-canonical-text-length", "raw_decode", "", "5800", "NonCanonicalInt;value=0"),
+    ("non-canonical-array-count", "raw_decode", "", "9817" + "00" * 23, "NonCanonicalInt;value=23"),
+    ("non-canonical-map-count", "raw_decode", "", "b9000100f6", "NonCanonicalInt;value=1"),
+    ("float-width-is-not-checked", "raw_decode", "", "fb0000000000000000", "accept"),
+    ("simple-value-24", "raw_decode", "", "f818", "UnsupportedInfo;info=24"),
+    ("simple-value-23", "raw_decode", "", "f7", "UnsupportedInfo;info=23"),
+    ("indefinite-array", "raw_decode", "", "9f", "UnsupportedInfo;info=31"),
+    ("tag-with-info-31", "raw_decode", "", "df", "UnsupportedMajor;major=6"),
+    ("text-length-over-2^32", "raw_decode", "", "7b00000001000000006161", "Truncated"),
+    ("array-count-over-2^32", "raw_decode", "", "9b000000010000000001", "Truncated"),
+    ("text-truncated-before-utf8", "raw_decode", "", "62c3", "Truncated"),
+    ("text-surrogate", "raw_decode", "", "63eda080", "InvalidUtf8"),
+    ("empty-input", "raw_decode", "", "", "Truncated"),
+    ("required-field-null", "from_cbor", "IntBox", "a201f60280", "WrongType;expected=int"),
+    ("map-field-not-an-array", "from_cbor", "IntBox", "a2010002a0", "WrongType;expected=array"),
+    ("map-entry-not-a-map", "from_cbor", "IntBox", "a20100028100", "WrongType;expected=map"),
+    ("map-entry-key-1-first", "from_cbor", "IntBox", "a201000281a0", "MissingKey;key=1"),
+    ("map-duplicate-before-its-value", "from_cbor", "IntBox", "a201000282a201050201a2010502f6",
+     "DuplicateMapKey;key=5"),
+    ("enum-field-unknown", "from_cbor", "EnumBox", "a1011863", "UnknownEnum;enum=Mode;value=99"),
+    ("list-item-wrong-type", "from_cbor", "OptBox", "a201f6028101", "WrongType;expected=text"),
+    ("message-not-a-map", "from_cbor", "OptBox", "80", "WrongType;expected=map"),
+    ("empty-message-ignores-unknown-fields", "from_cbor", "Empty", "a10100", "accept"),
+    ("enum-wire-negative", "from_wire", "Mode", "20", "UnknownEnum;enum=Mode;value=-1"),
+    ("enum-wire-not-an-int", "from_wire", "Mode", "f6", "WrongType;expected=int"),
+]
 
-    mal_rows = []
-    for row in malformed:
-        expect = row["expect"]
-        mal_rows.append(
-            "{"
-            + ", ".join([
-                _cpp_string_literal(row["name"]),
-                _cpp_string_literal(row["stage"]),
-                _cpp_string_literal(row.get("schema", "")),
-                _cpp_string_literal(row["bytes"]),
-                _cpp_string_literal(expect["tag"]),
-                "true" if "key" in expect else "false",
-                _cpp_int_literal(str(expect.get("key", "0"))),
-                "true" if "info" in expect else "false",
-                str(expect.get("info", 0)),
-                "true" if "major" in expect else "false",
-                str(expect.get("major", 0)),
-                _cpp_string_literal(expect.get("expected", "")),
-                _cpp_string_literal(expect.get("enum", "")),
-                _cpp_string_literal(str(expect.get("value", ""))),
-            ])
-            + "}"
-        )
 
-    source = textwrap.dedent("""\
-        #include "api.hpp"
+def test_cpp_decode_matches_python_beyond_the_corpus(monkeypatch):
+    """The gate's C++ runner, with the rows above appended to the corpus, stays green."""
+    schema = parity.parity_schema()
+    extra = []
+    for name, stage, message, hexed, expected in BEYOND_THE_CORPUS:
+        row = {"name": f"beyond-{name}", "stage": stage, "schema": message, "bytes": hexed,
+               "why": "C++ decodes as Python does"}
+        if expected == "accept":
+            row["expect"] = {"accept": True}
+        else:
+            tag, payload = parity.parse_error(expected)
+            row["expect"] = {"tag": tag, **payload}
+        extra.append(row)
+    # The table is the reference's behaviour, not a guess.
+    observed = [(row["name"], parity._observe_python(schema, row)) for row in extra]
+    assert [(name, outcome) for name, (outcome, _) in observed if outcome == parity.UNTYPED] == []
+    assert [parity.judge("python", row, *seen) for row, (_, seen) in zip(extra, observed)] == \
+        [(parity.PASS, "")] * len(extra)
 
-        #include <cstdlib>
-        #include <cstdint>
-        #include <iostream>
-        #include <limits>
-        #include <map>
-        #include <string>
-        #include <string_view>
+    corpus = parity.malformed_rows()
+    monkeypatch.setattr(parity, "malformed_rows", lambda: [*corpus, *extra])
+    report = parity_cpp.run()
+    if not report.available:
+        pytest.skip(report.skip_reason)
+    assert len(report.results) == len(parity.int_rows()) + len(corpus) + len(extra)
+    failures = [f"{r.name}: {r.detail}" for r in report.failures]
+    assert report.green, "\n".join([report.fault, *failures])
 
-        struct RoundRow {
-            const char* name;
-            long long n;
-            std::map<long long, long long> by_id;
-            const char* cbor;
-        };
 
-        struct EncodeFailRow {
-            const char* name;
-            const char* n;
-            const char* tag;
-        };
+# Decode observations over one generated schema: `name<TAB>value` per line.
+_OBSERVE = r"""
+#include "api.hpp"
 
-        struct MalRow {
-            const char* name;
-            const char* stage;
-            const char* schema;
-            const char* bytes;
-            const char* tag;
-            bool has_key;
-            long long key;
-            bool has_info;
-            unsigned info;
-            bool has_major;
-            unsigned major;
-            const char* expected;
-            const char* enum_name;
-            const char* value;
-        };
+#include <iostream>
+#include <list>
+#include <string>
+#include <string_view>
 
-        static const RoundRow round_rows[] = {
-        ROUND_ROWS
-        };
+namespace {
 
-        static const EncodeFailRow encode_fail_rows[] = {
-        ENCODE_ROWS
-        };
+// The input bytes outlive every decoded value, whose text views them.
+std::string_view bytes_of(std::string_view hex) {
+    static std::list<std::string> kept;
+    std::string out;
+    for (std::size_t i = 0; i + 1 < hex.size(); i += 2) {
+        out.push_back(static_cast<char>(std::stoi(std::string(hex.substr(i, 2)), nullptr, 16)));
+    }
+    kept.push_back(std::move(out));
+    return kept.back();
+}
 
-        static const MalRow malformed_rows[] = {
-        MAL_ROWS
-        };
+std::string hexof(const taut::Buf& b) {
+    static constexpr char digits[] = "0123456789abcdef";
+    std::string out;
+    for (std::size_t i = 0; i < b.n; ++i) {
+        out.push_back(digits[b.d[i] >> 4]);
+        out.push_back(digits[b.d[i] & 0x0f]);
+    }
+    return out;
+}
 
-        int hex_nibble(char c) {
-            if (c >= '0' && c <= '9') return c - '0';
-            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-            std::abort();
-        }
+std::string describe(const taut::DecodeError& e) {
+    using T = taut::DecodeErrorTag;
+    switch (e.tag) {
+        case T::WrongType:
+            return std::string("WrongType;expected=") + e.expected;
+        case T::MissingKey:
+            return "MissingKey;key=" + std::to_string(e.key);
+        case T::DuplicateMapKey:
+            return "DuplicateMapKey;key=" + (e.key_is_text ? std::string(e.key_text) : std::to_string(e.key));
+        default:
+            return "tag#" + std::to_string(static_cast<int>(e.tag));
+    }
+}
 
-        std::string from_hex(std::string_view hex) {
-            std::string out;
-            out.reserve(hex.size() / 2);
-            for (std::size_t i = 0; i < hex.size(); i += 2) {
-                out.push_back(static_cast<char>((hex_nibble(hex[i]) << 4) | hex_nibble(hex[i + 1])));
-            }
-            return out;
-        }
+template <class M>
+taut::DecodeResult<M> decode(std::string_view hex) {
+    auto raw = taut::try_decode(bytes_of(hex));
+    if (!raw) {
+        return taut::DecodeResult<M>::fail(raw.error);
+    }
+    return M::try_from_cbor(raw.value);
+}
 
-        std::string_view view(const std::string& s) {
-            return std::string_view(s.data(), s.size());
-        }
+template <class M>
+std::string outcome_of(std::string_view hex) {
+    auto r = decode<M>(hex);
+    if (!r) {
+        return "err " + describe(r.error);
+    }
+    return "ok";
+}
 
-        std::string to_hex(std::string_view data) {
-            static constexpr char digits[] = "0123456789abcdef";
-            std::string out;
-            out.reserve(data.size() * 2);
-            for (unsigned char byte : data) {
-                out.push_back(digits[byte >> 4]);
-                out.push_back(digits[byte & 0x0f]);
-            }
-            return out;
-        }
+}  // namespace
+"""
 
-        std::string buf_hex(const taut::Buf& b) {
-            return to_hex(std::string_view(reinterpret_cast<const char*>(b.d), b.n));
-        }
 
-        taut::DecodeErrorTag tag_from_name(std::string_view name) {
-            using T = taut::DecodeErrorTag;
-            if (name == "Truncated") return T::Truncated;
-            if (name == "TrailingBytes") return T::TrailingBytes;
-            if (name == "InvalidUtf8") return T::InvalidUtf8;
-            if (name == "UnsupportedInfo") return T::UnsupportedInfo;
-            if (name == "UnsupportedMajor") return T::UnsupportedMajor;
-            if (name == "NonIntegerMapKey") return T::NonIntegerMapKey;
-            if (name == "IntOverflow") return T::IntOverflow;
-            if (name == "DuplicateMapKey") return T::DuplicateMapKey;
-            if (name == "MissingKey") return T::MissingKey;
-            if (name == "WrongType") return T::WrongType;
-            if (name == "UnknownEnum") return T::UnknownEnum;
-            std::abort();
-        }
+def _observe(tmp_path: Path, s, main: str) -> dict[str, str]:
+    scaffold.emit(s, tmp_path, langs=["cpp"], services=[], runtime=True)
+    run = _compile_and_run_cpp(tmp_path, _OBSERVE + main, "observe")
+    return dict(line.split("\t", 1) for line in run.stdout.splitlines())
 
-        const char* tag_name(taut::DecodeErrorTag tag) {
-            using T = taut::DecodeErrorTag;
-            switch (tag) {
-                case T::Truncated: return "Truncated";
-                case T::TrailingBytes: return "TrailingBytes";
-                case T::InvalidUtf8: return "InvalidUtf8";
-                case T::UnsupportedInfo: return "UnsupportedInfo";
-                case T::UnsupportedMajor: return "UnsupportedMajor";
-                case T::NonIntegerMapKey: return "NonIntegerMapKey";
-                case T::IntOverflow: return "IntOverflow";
-                case T::DuplicateMapKey: return "DuplicateMapKey";
-                case T::MissingKey: return "MissingKey";
-                case T::WrongType: return "WrongType";
-                case T::UnknownEnum: return "UnknownEnum";
-            }
-            return "?";
-        }
 
-        bool overflow_payload_matches(const taut::DecodeError& error, std::string_view value) {
-            if (value.empty()) return true;
-            const std::uint64_t just_outside = 1ULL << 63;
-            if (value == "9223372036854775808") {
-                return !error.negative_overflow && error.unsigned_value == just_outside;
-            }
-            if (value == "-9223372036854775809") {
-                return error.negative_overflow && error.unsigned_value == just_outside;
-            }
-            return false;
-        }
+S_MISSING_OK = mk(Msg("Late", F("note", 1, STR, optional=MISSING_OK)),
+                  Msg("Opt", F("note", 1, STR, optional=True)))
 
-        bool error_matches(const taut::DecodeError& error, const MalRow& row) {
-            if (error.tag != tag_from_name(row.tag)) return false;
-            using T = taut::DecodeErrorTag;
-            switch (error.tag) {
-                case T::UnsupportedInfo:
-                    return !row.has_info || error.info == row.info;
-                case T::UnsupportedMajor:
-                    return !row.has_major || error.major == row.major;
-                case T::DuplicateMapKey:
-                case T::MissingKey:
-                    return !row.has_key || error.key == row.key;
-                case T::WrongType:
-                    return std::string_view(row.expected).empty()
-                        || std::string_view(error.expected ? error.expected : "") == row.expected;
-                case T::UnknownEnum:
-                    return (std::string_view(row.enum_name).empty()
-                            || std::string_view(error.enum_name ? error.enum_name : "") == row.enum_name)
-                        && (std::string_view(row.value).empty() || std::to_string(error.value) == row.value);
-                case T::IntOverflow:
-                    return overflow_payload_matches(error, row.value);
-                default:
-                    return true;
-            }
-        }
 
-        bool outside_i64(std::string_view value) {
-            return value == "9223372036854775808"
-                || value == "-9223372036854775809"
-                || value == "18446744073709551615";
-        }
+def test_cpp_missing_ok_reads_an_absent_key_as_null_and_still_refuses_wrong_types(tmp_path):
+    observed = _observe(tmp_path, S_MISSING_OK, r"""
+template <class M>
+std::string note_of(std::string_view hex) {
+    auto r = decode<M>(hex);
+    if (!r) {
+        return "err " + describe(r.error);
+    }
+    return r.value.note.has_value() ? "text " + std::string(*r.value.note) : "null";
+}
 
-        int mismatches = 0;
+// The unchecked constexpr path reads an absent MISSING_OK key as null too.
+static_assert(!taut::Late::from_cbor(taut::parse(std::string_view("\xa0", 1))).note.has_value());
+static_assert(*taut::Late::from_cbor(taut::parse(std::string_view("\xa1\x01\x61x", 4))).note == "x");
 
-        void fail(std::string_view note, std::string_view got, std::string_view expect) {
-            ++mismatches;
-            std::cerr << "mismatch " << note << "\\n  got    " << got << "\\n  expect " << expect << "\\n";
-        }
+int main() {
+    std::cout << "late-absent\t" << note_of<taut::Late>("a0") << "\n";
+    std::cout << "late-null\t" << note_of<taut::Late>("a101f6") << "\n";
+    std::cout << "late-text\t" << note_of<taut::Late>("a1016178") << "\n";
+    std::cout << "late-wrong-type\t" << note_of<taut::Late>("a10101") << "\n";
+    std::cout << "late-not-a-map\t" << note_of<taut::Late>("00") << "\n";
+    std::cout << "opt-absent\t" << note_of<taut::Opt>("a0") << "\n";
+    std::cout << "opt-null\t" << note_of<taut::Opt>("a101f6") << "\n";
+    taut::Buf unset;
+    taut::Late{}.to_cbor(unset);
+    std::cout << "late-unset-encodes\t" << hexof(unset) << "\n";
+    return 0;
+}
+""")
+    assert observed == {
+        "late-absent": "null",
+        "late-null": "null",
+        "late-text": "text x",
+        "late-wrong-type": "err WrongType;expected=text",
+        "late-not-a-map": "err WrongType;expected=map",
+        "opt-absent": "err MissingKey;key=1",
+        "opt-null": "null",
+        "late-unset-encodes": "a101f6",
+    }
 
-        void expect_error(const MalRow& row, const taut::DecodeError& error) {
-            if (!error_matches(error, row)) fail(row.name, tag_name(error.tag), row.tag);
-        }
 
-        void run_round_trip() {
-            for (const auto& row : round_rows) {
-                taut::IntBox box{row.n, row.by_id};
-                taut::Buf b;
-                box.to_cbor(b);
-                std::string got = buf_hex(b);
-                if (got != row.cbor) fail(row.name, got, row.cbor);
+S_MAP_KEYS = mk(Msg("ByInt", F("m", 1, Map(INT, INT))),
+                Msg("ByText", F("m", 1, Map(STR, INT))),
+                Msg("ByBool", F("m", 1, Map(BOOL, INT))))
 
-                std::string wire = from_hex(row.cbor);
-                auto decoded = taut::try_decode(view(wire));
-                if (!decoded) {
-                    fail(row.name, tag_name(decoded.error.tag), "valid decode");
-                    continue;
-                }
-                auto msg = taut::IntBox::try_from_cbor(decoded.value);
-                if (!msg) {
-                    fail(row.name, tag_name(msg.error.tag), "valid IntBox");
-                    continue;
-                }
-                if (msg.value.n != row.n || msg.value.by_id != row.by_id) {
-                    fail(row.name, "decoded value mismatch", "same native value");
-                }
-                taut::Buf round;
-                msg.value.to_cbor(round);
-                got = buf_hex(round);
-                if (got != row.cbor) fail(row.name, got, row.cbor);
-            }
-        }
 
-        void run_encode_fail() {
-            for (const auto& row : encode_fail_rows) {
-                if (std::string_view(row.tag) != "IntOutOfSubset") {
-                    fail(row.name, row.tag, "IntOutOfSubset");
-                }
-                if (!outside_i64(row.n)) {
-                    fail(row.name, row.n, "outside native long long");
-                }
-            }
-        }
-
-        void run_malformed() {
-            for (const auto& row : malformed_rows) {
-                std::string bytes = from_hex(row.bytes);
-                if (std::string_view(row.stage) == "raw_decode") {
-                    auto decoded = taut::try_decode(view(bytes));
-                    if (decoded) fail(row.name, "decoded", row.tag);
-                    else expect_error(row, decoded.error);
-                } else if (std::string_view(row.stage) == "from_cbor") {
-                    auto decoded = taut::try_decode(view(bytes));
-                    if (!decoded) {
-                        fail(row.name, tag_name(decoded.error.tag), "valid raw CBOR before from_cbor");
-                    } else if (std::string_view(row.schema) == "IntBox") {
-                        auto msg = taut::IntBox::try_from_cbor(decoded.value);
-                        if (msg) fail(row.name, "decoded IntBox", row.tag);
-                        else expect_error(row, msg.error);
-                    } else {
-                        fail(row.name, row.schema, "known from_cbor schema");
-                    }
-                } else if (std::string_view(row.stage) == "from_wire") {
-                    auto decoded = taut::try_decode(view(bytes));
-                    if (!decoded) {
-                        fail(row.name, tag_name(decoded.error.tag), "valid enum wire int");
-                        continue;
-                    }
-                    auto wire = decoded.value.try_int();
-                    if (!wire) {
-                        fail(row.name, tag_name(wire.error.tag), "valid enum wire int");
-                        continue;
-                    }
-                    if (std::string_view(row.schema) == "Mode") {
-                        auto mode = taut::try_Mode_from_wire(wire.value);
-                        if (mode) fail(row.name, "decoded Mode", row.tag);
-                        else expect_error(row, mode.error);
-                    } else {
-                        fail(row.name, row.schema, "known from_wire schema");
-                    }
-                } else {
-                    fail(row.name, row.stage, "known stage");
-                }
-            }
-        }
-
-        int main() {
-            run_round_trip();
-            run_encode_fail();
-            run_malformed();
-            if (mismatches != 0) return 1;
-            std::cout << "C++ parity corpus mismatches=0\\n";
-            return 0;
-        }
-    """)
-    source = source.replace("ROUND_ROWS", ",\n".join(round_rows))
-    source = source.replace("ENCODE_ROWS", ",\n".join(encode_rows))
-    source = source.replace("MAL_ROWS", ",\n".join(mal_rows))
-
-    run = _compile_and_run_cpp(tmp_path, source, "cpp_i64_parity")
-    assert "C++ parity corpus mismatches=0" in run.stdout
+def test_cpp_map_field_refuses_a_repeated_entry_key_of_each_key_kind(tmp_path):
+    observed = _observe(tmp_path, S_MAP_KEYS, r"""
+int main() {
+    std::cout << "int\t" << outcome_of<taut::ByInt>("a10182a201050201a201050202") << "\n";
+    std::cout << "text\t" << outcome_of<taut::ByText>("a10182a201616b0201a201616b0202") << "\n";
+    std::cout << "bool\t" << outcome_of<taut::ByBool>("a10182a201f50201a201f50202") << "\n";
+    std::cout << "before-its-value\t" << outcome_of<taut::ByText>("a10182a201616b0201a201616b02f6") << "\n";
+    std::cout << "distinct\t" << outcome_of<taut::ByText>("a10182a201616a0201a201616b0202") << "\n";
+    return 0;
+}
+""")
+    assert observed == {
+        "int": "err DuplicateMapKey;key=5",
+        "text": "err DuplicateMapKey;key=k",
+        "bool": "err DuplicateMapKey;key=1",
+        "before-its-value": "err DuplicateMapKey;key=k",
+        "distinct": "ok",
+    }
 
 
 def test_cpp_generated_scalar_list_float_static_asserts_cxx20(tmp_path):
