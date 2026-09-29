@@ -256,12 +256,14 @@ def rust_api(schema: Schema, forward_compat: bool = False,
            "use crate::cbor::{Cbor, DecodeError};"]
     out.extend(external_imports)
     out.append("")
+    # Bounded decode: the file's bounds, and each message's with its typed `decode`.
+    out += _rust._emit_file_bounds(schema) + [""]
     for e in schema.enums.values():
         if e.name not in external:
             out += _rust._emit_enum(e.name, e.members) + [""]
     for m in schema.messages.values():
         if m.name not in external:
-            out += _rust._emit_message(m, forward_compat) + [""]
+            out += _rust._emit_message(m, schema, forward_compat) + [""]
     return "\n".join(out).rstrip() + "\n"
 
 

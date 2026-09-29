@@ -7,11 +7,13 @@
 //!
 //! They fail closed (TautCheckedDecode.md CD-E4): whatever the host bytes, each
 //! returns its result or a [`DecodeError`], and a host that is not a map is
-//! `WrongType { expected: "map" }`. A tag below the extension band is the
-//! caller's error, not the input's, so each panics on one, before it reads the
-//! host.
+//! `WrongType { expected: "map" }`. Not knowing the host's root, they read it
+//! at the depth ceiling with no length bound, the only bounds every valid host
+//! meets, and leave the host's own bounds to its reader (TautOptions.md G3). A
+//! tag below the extension band is the caller's error, not the input's, so
+//! each panics on one, before it reads the host.
 
-use crate::cbor::{encode, try_decode, Cbor, DecodeError};
+use crate::cbor::{encode, try_decode_with, Cbor, DecodeError, MAX_DEPTH_CEILING};
 
 const BAND_START: i64 = 1 << 20;
 
@@ -21,13 +23,10 @@ fn check_band(tag: i64) {
     }
 }
 
-/// The host's top-level map entries; a host that is not a map is
-/// `WrongType { expected: "map" }`.
+/// The host's top-level map entries, read at the depth ceiling with no length
+/// bound; a host that is not a map is `WrongType { expected: "map" }`.
 fn host_map(host: &[u8]) -> Result<Vec<(i64, Cbor)>, DecodeError> {
-    // TODO(D1): read the host at the depth ceiling with no length bound, the
-    // only bounds every valid host meets (TautOptions.md G3), once D1 gives the
-    // raw decode its depth parameter.
-    match try_decode(host)? {
+    match try_decode_with(host, MAX_DEPTH_CEILING, None)? {
         Cbor::Map(m) => Ok(m),
         _ => Err(DecodeError::WrongType { expected: "map" }),
     }

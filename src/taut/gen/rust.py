@@ -8,9 +8,15 @@ compiled target (P5). Emits `trial/rs/src/generated.rs`:
   - a `roundtrip(message, bytes)` dispatcher
   - the golden corpus as `VECTORS: &[(name, message, hex)]`
 
-Decode is fail-closed everywhere: `from_wire`, `from_cbor` and `roundtrip` return
-`Result<_, DecodeError>` and never panic on input. The legacy (panicking) codec was
-removed at v0.10.0 (TautCheckedDecode.md question 5).
+Decode is fail-closed everywhere: `from_wire`, `from_cbor`, `decode` and `roundtrip`
+return `Result<_, DecodeError>` and never panic on input. The legacy (panicking) codec
+was removed at v0.10.0 (TautCheckedDecode.md question 5).
+
+Decode is bounded (TautCheckedDecode.md CD-B3; TautOptions.md OPT-D4, OPT-L6). Each
+message's `MAX_DEPTH` and `MAX_ENCODED_LEN` are its effective `max_depth` and
+`max_encoded_len`, resolved here by `options.effective`, and its `decode` reads bytes
+under them: the whole call is bounded by its root, whatever it nests. The file's own
+values, at module level, serve a root that is not a message.
 
 Rust has no std JSON parser, so generating data/types beats pulling a crate — and
 native structs are exactly what a compiled target wants ahead of time.
@@ -23,6 +29,7 @@ from pathlib import Path
 
 from ..ir.load import load_schema
 from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.options import effective
 
 _TAUT = Path(__file__).resolve().parents[3]      # .../glial-dev/taut
 _REPO = _TAUT.parent                              # .../glial-dev (trial/ is a sibling)
@@ -187,7 +194,25 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     return out
 
 
-def _emit_message(msg, forward_compat: bool = False) -> list[str]:
+def _bound_consts(schema: Schema, message: str | None, indent: str) -> list[str]:
+    """`MAX_DEPTH` and `MAX_ENCODED_LEN` for a decode rooted at `message`, or, for None, at a
+    type that is not a message: the effective values, resolved once, here (TautOptions.md
+    OPT-D3), `max_encoded_len`'s None being no length bound."""
+    depth = effective(schema, "max_depth", message=message)
+    length = effective(schema, "max_encoded_len", message=message)
+    return [f"{indent}pub const MAX_DEPTH: usize = {depth};",
+            f"{indent}pub const MAX_ENCODED_LEN: Option<usize> = {'None' if length is None else f'Some({length})'};"]
+
+
+def _emit_file_bounds(schema: Schema) -> list[str]:
+    """The file's bounds at module level, for a decode rooted at a type that is not a message,
+    such as an RPC slot's `list<T>` (TautOptions.md OPT-D4)."""
+    return ["// The file's bounds, for a decode rooted at a type that is not a message:",
+            "// `cbor::try_decode_with(bytes, MAX_DEPTH, MAX_ENCODED_LEN)`.",
+            *_bound_consts(schema, None, "")]
+
+
+def _emit_message(msg, schema: Schema, forward_compat: bool = False) -> list[str]:
     out = ["#[derive(Clone, Debug, PartialEq, Default)]", f"pub struct {msg.name} {{"]
     for f in msg.fields:
         out.append(f"    pub {f.name}: {_field_type(f)},")
@@ -197,6 +222,7 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
         out.append("    pub wire_residual: Vec<(i64, Cbor)>,")
     out.append("}")
     out.append(f"impl {msg.name} {{")
+    out += _bound_consts(schema, msg.name, "    ")
     # encoded (tag, expr) pairs for the known wire fields (deterministic minimal CBOR).
     pairs = []
     for f in msg.wire_fields():
@@ -221,6 +247,10 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
         out.append("        ])")
     out.append("    }")
     out += _from_cbor(msg, forward_compat)
+    # The typed entry point from bytes: the raw decode under this root's bounds, then from_cbor.
+    out += ["    pub fn decode(bytes: &[u8]) -> Result<Self, DecodeError> {",
+            "        Self::from_cbor(&crate::cbor::try_decode_with(bytes, Self::MAX_DEPTH, Self::MAX_ENCODED_LEN)?)",
+            "    }"]
     out.append("}")
     return out
 
@@ -261,22 +291,23 @@ def _emit(schema: Schema, golden: dict) -> str:
         "#![allow(dead_code)]",
         "use crate::cbor::{Cbor, DecodeError};",
         "",
+        *_emit_file_bounds(schema),
+        "",
     ]
     for e in schema.enums.values():
         lines += _emit_enum(e.name, e.members) + [""]
     for m in schema.messages.values():
-        lines += _emit_message(m) + [""]
+        lines += _emit_message(m, schema) + [""]
 
     # roundtrip dispatcher: bytes -> typed struct -> bytes, fail-closed like the
     # package codegen (scaffold.rust_api), whose message decoders it shares.
-    lines.append("/// `bytes` decoded as `message` and encoded again. Malformed input is a")
-    lines.append("/// `DecodeError`; a `message` the schema lacks is the caller's error and panics.")
+    lines.append("/// `bytes` decoded as `message`, under its bounds, and encoded again. Malformed")
+    lines.append("/// input is a `DecodeError`; a `message` the schema lacks is the caller's error and panics.")
     lines.append("pub fn roundtrip(message: &str, bytes: &[u8]) -> Result<Vec<u8>, DecodeError> {")
-    lines.append("    let c = crate::cbor::try_decode(bytes)?;")
     lines.append("    match message {")
     for m in schema.messages.values():
         lines.append(
-            f'        "{m.name}" => {m.name}::from_cbor(&c).map(|v| crate::cbor::encode(&v.to_cbor())),'
+            f'        "{m.name}" => {m.name}::decode(bytes).map(|v| crate::cbor::encode(&v.to_cbor())),'
         )
     lines.append('        _ => panic!("unknown message {}", message),')
     lines.append("    }")

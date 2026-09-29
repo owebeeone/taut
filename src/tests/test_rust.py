@@ -21,7 +21,10 @@ from taut import ext as py_ext
 from taut.corpus import glade_build, parity, parity_rust, toolchains
 from taut.gen import scaffold
 from taut.gen import rust
-from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, schema
+from taut.ir import options
+from taut.ir.dsl import (
+    BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, option, schema,
+)
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor as py_cbor
@@ -32,6 +35,8 @@ RESEXT_SCHEMA = load_schema(ROOT / "ir" / "resext.taut.py")
 PARITY_SCHEMA = load_schema(ROOT / "ir" / "parity_int.taut.py")
 # The one Rust runtime, which `tautc gen --with-runtime` vendors as `cbor.rs`.
 CBOR_RS = ROOT / "src" / "taut" / "gen" / "runtime" / "cbor_fail_closed.rs"
+# The extension helpers, vendored beside it as `ext.rs`.
+EXT_RS = ROOT / "src" / "taut" / "gen" / "runtime" / "ext.rs"
 
 
 def test_rust_generator_emits_float_scalar_codec():
@@ -52,8 +57,10 @@ def test_rust_generator_emits_float_scalar_codec():
     assert "x: c.try_get(1)?.try_float()?," in out
     assert "maybe: { let v = c.try_get(2)?; if v.is_null() { None } else { Some(v.try_float()?) } }," in out
     assert "pub fn roundtrip(message: &str, bytes: &[u8]) -> Result<Vec<u8>, DecodeError> {" in out
-    assert "let c = crate::cbor::try_decode(bytes)?;" in out
-    assert '"M" => M::from_cbor(&c).map(|v| crate::cbor::encode(&v.to_cbor())),' in out
+    # Each message decodes from bytes through its typed entry point, under its root's bounds
+    # (TautCheckedDecode.md CD-B3), never a raw decode at the defaults and then `from_cbor`.
+    assert '"M" => M::decode(bytes).map(|v| crate::cbor::encode(&v.to_cbor())),' in out
+    assert "try_decode(bytes)" not in out
     assert '.expect("decode: M")' not in out
 
 
@@ -767,6 +774,8 @@ _TAGGED_ERRORS = {
     "MissingKey": "DecodeError::MissingKey(2)",
     "WrongType": 'DecodeError::WrongType { expected: "map" }',
     "UnknownEnum": 'DecodeError::UnknownEnum { enum_name: "Mode", value: 99 }',
+    "TooDeep": "DecodeError::TooDeep { limit: 32 }",
+    "TooLarge": "DecodeError::TooLarge { len: 4, limit: 3 }",
 }
 
 _RUNTIME_ERRORS_TEST = r"""
@@ -839,10 +848,10 @@ fn a_length_beyond_the_input_is_truncated_whatever_its_size() {
 
 def test_rust_runtime_errors_carry_their_tag_and_key_as_text(tmp_path):
     """CD-E2 and question 9 at the runtime: `DecodeError::tag()` names each variant as the
-    gate does, `DuplicateMapKey` carries the key as a `MapKey` whose text is the parity
-    contract's, a raw map's repeated key is found in a set, and a length beyond the input
-    is `Truncated` whatever its size."""
-    assert set(_TAGGED_ERRORS) <= parity.DECODE_TAGS
+    gate does, every tag the gate knows included, `DuplicateMapKey` carries the key as a
+    `MapKey` whose text is the parity contract's, a raw map's repeated key is found in a set,
+    and a length beyond the input is `Truncated` whatever its size."""
+    assert set(_TAGGED_ERRORS) == parity.DECODE_TAGS
     rustc = shutil.which("rustc")
     if rustc is None:
         pytest.skip("rustc not available")
@@ -1353,6 +1362,483 @@ def test_rust_fail_closed_replays_shared_i64_parity_corpus(tmp_path):
     bin_path = tmp_path / "parity_vectors"
     subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
     subprocess.run([str(bin_path)], check=True)
+
+
+# =============================================================================
+# The bounds (D26: TautCheckedDecode.md §3, CD-E4; D27: TautOptions.md OPT-D4, OPT-L6, G3):
+# the runtime's raw decode, each message's typed decode from bytes, the extension helpers.
+# The gate replays B1-B30 through the first two (`test_rust_passes_the_parity_gate`).
+# =============================================================================
+
+def _compile_and_run_tests(rustc: str, tmp_path: Path, name: str, source: str) -> None:
+    """Build `source` as a Rust test crate and run its tests."""
+    test_rs = tmp_path / f"{name}.rs"
+    test_rs.write_text(source)
+    bin_path = tmp_path / name
+    subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
+    subprocess.run([str(bin_path)], check=True)
+
+
+_BOUNDS_RUNTIME_TEST = r"""
+extern crate alloc;
+#[path = "@CBOR@"]
+mod cbor;
+
+use cbor::{
+    encode, try_decode, try_decode_max, try_decode_with, Cbor, DecodeError, DEFAULT_MAX_DEPTH,
+    MAX_DEPTH_CEILING,
+};
+
+/// `count` copies of `unit`, then `leaf`.
+fn nest(unit: &[u8], count: usize, leaf: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(unit.len() * count + leaf.len());
+    for _ in 0..count {
+        out.extend_from_slice(unit);
+    }
+    out.extend_from_slice(leaf);
+    out
+}
+
+/// `depth` nested arrays, the innermost empty.
+fn arrays(depth: usize) -> Vec<u8> {
+    nest(&[0x81], depth - 1, &[0x80])
+}
+
+/// `depth` nested maps, each holding the next at key 0, the innermost empty.
+fn maps(depth: usize) -> Vec<u8> {
+    nest(&[0xa1, 0x00], depth - 1, &[0xa0])
+}
+
+fn too_deep(limit: usize) -> Result<Cbor, DecodeError> {
+    Err(DecodeError::TooDeep { limit })
+}
+
+fn too_large(len: usize, limit: usize) -> Result<Cbor, DecodeError> {
+    Err(DecodeError::TooLarge { len, limit })
+}
+
+/// Decoded, and its tree encodes to the same bytes again.
+fn round_trips(decoded: Result<Cbor, DecodeError>, bytes: &[u8]) {
+    assert_eq!(decoded.map(|c| encode(&c)), Ok(bytes.to_vec()));
+}
+
+#[test]
+fn the_constants_are_tauts() {
+    assert_eq!(DEFAULT_MAX_DEPTH, @DEFAULT_MAX_DEPTH@);
+    assert_eq!(MAX_DEPTH_CEILING, @MAX_DEPTH_CEILING@);
+}
+
+#[test]
+fn a_top_level_container_has_depth_1_and_try_decode_applies_32() {
+    round_trips(try_decode(&arrays(32)), &arrays(32));
+    assert_eq!(try_decode(&arrays(33)), too_deep(32));
+    round_trips(try_decode(&maps(32)), &maps(32));
+    assert_eq!(try_decode(&maps(33)), too_deep(32));
+    // A scalar inside the 32nd container adds no depth.
+    let leaf = nest(&[0x81], 32, &[0x00]);
+    round_trips(try_decode(&leaf), &leaf);
+    // Arrays and maps count alike: 16 of each and one array more, then 15 of each and two.
+    assert_eq!(try_decode(&nest(&[0x81, 0xa1, 0x00], 16, &[0x80])), too_deep(32));
+    let mixed = nest(&[0x81, 0xa1, 0x00], 15, &[0x81, 0x80]);
+    round_trips(try_decode(&mixed), &mixed);
+}
+
+#[test]
+fn a_map_key_sits_one_deeper_than_its_map() {
+    // An array key of the 32nd container is refused for its depth before its type.
+    assert_eq!(try_decode(&nest(&[0x81], 31, &[0xa1, 0x80, 0x00])), too_deep(32));
+    assert_eq!(try_decode(&nest(&[0x81], 30, &[0xa1, 0x80, 0x00])), Err(DecodeError::NonIntegerMapKey));
+}
+
+#[test]
+fn a_container_is_refused_once_its_head_is_read_and_before_its_first_item() {
+    // With its item missing it is still TooDeep (B6); empty, it is refused all the same.
+    assert_eq!(try_decode(&nest(&[0x81], 33, &[])), too_deep(32));
+    assert_eq!(try_decode(&nest(&[0x81], 32, &[0xa0])), too_deep(32));
+    // A head's own faults come first: one never completed is Truncated (B7), one longer
+    // than needed NonCanonicalInt.
+    assert_eq!(try_decode(&nest(&[0x81], 32, &[0x9b, 0x00])), Err(DecodeError::Truncated));
+    assert_eq!(try_decode(&nest(&[0x81], 32, &[0x98, 0x01])), Err(DecodeError::NonCanonicalInt(1)));
+}
+
+#[test]
+fn deep_input_is_too_deep_never_a_stack_overflow() {
+    // 100,000 levels (B9, B10). The check bounds the recursion, so no input exhausts the
+    // stack, whatever depth the caller asks for.
+    let deep_arrays = arrays(100_000);
+    let deep_maps = maps(100_000);
+    assert_eq!(try_decode(&deep_arrays), too_deep(32));
+    assert_eq!(try_decode(&deep_maps), too_deep(32));
+    assert_eq!(try_decode_with(&deep_arrays, usize::MAX, None), too_deep(128));
+    assert_eq!(try_decode_with(&deep_maps, 1_000, None), too_deep(128));
+}
+
+#[test]
+fn a_callers_depth_applies_capped_at_the_ceiling() {
+    round_trips(try_decode_with(&arrays(128), 128, None), &arrays(128));
+    assert_eq!(try_decode_with(&arrays(129), 128, None), too_deep(128));
+    // Above the ceiling the ceiling applies, and TooDeep names the bound applied (B27).
+    round_trips(try_decode_with(&arrays(128), 1_000, None), &arrays(128));
+    assert_eq!(try_decode_with(&arrays(129), 1_000, None), too_deep(128));
+    assert_eq!(try_decode_with(&maps(129), usize::MAX, None), too_deep(128));
+    // Below the default, down to 1: a top-level container, with nothing nested in it.
+    round_trips(try_decode_with(&[0xa1, 0x01, 0x81, 0x00], 2, None), &[0xa1, 0x01, 0x81, 0x00]);
+    assert_eq!(try_decode_with(&[0xa1, 0x01, 0x81, 0x80], 2, None), too_deep(2));
+    assert_eq!(try_decode_with(&[0x80], 1, None), Ok(Cbor::Array(vec![])));
+    assert_eq!(try_decode_with(&[0x81, 0x00], 1, None), Ok(Cbor::Array(vec![Cbor::Int(0)])));
+    assert_eq!(try_decode_with(&[0x81, 0x80], 1, None), too_deep(1));
+    assert_eq!(try_decode_with(&[0x07], 1, None), Ok(Cbor::Int(7)));
+}
+
+#[test]
+#[should_panic(expected = "max_depth must be at least 1")]
+fn a_depth_of_0_is_the_callers_error_before_the_input_is_read() {
+    // Read, this empty input would be Truncated.
+    let _ = try_decode_with(&[], 0, None);
+}
+
+#[test]
+#[should_panic(expected = "max_depth must be at least 1")]
+fn a_depth_of_0_is_the_callers_error_before_the_length_bound() {
+    let _ = try_decode_with(&[0x00, 0x00], 0, Some(1));
+}
+
+#[test]
+fn a_length_bound_is_checked_before_any_byte_is_read() {
+    let four = [0x83, 0x01, 0x02, 0x03];
+    round_trips(try_decode_max(&four, 4), &four);                     // B13, exactly at the bound
+    assert_eq!(try_decode_max(&four, 3), too_large(4, 3));            // B14
+    assert_eq!(try_decode_max(&[0xc0; 4], 3), too_large(4, 3));       // B15, never parsed
+    assert_eq!(try_decode_max(&[], 0), Err(DecodeError::Truncated));  // B16
+    assert_eq!(try_decode_max(&[0x00], 0), too_large(1, 0));
+    // Before the depth bound, whatever depth the caller passes.
+    assert_eq!(try_decode_with(&arrays(33), 32, Some(32)), too_large(33, 32));
+    assert_eq!(try_decode_with(&arrays(100_000), 1, Some(99_999)), too_large(100_000, 99_999));
+    round_trips(try_decode_with(&arrays(33), 64, Some(33)), &arrays(33));
+    // With no length bound any length decodes; with one, exactly its length does.
+    let long = encode(&Cbor::Bytes(vec![7; 100_000]));
+    round_trips(try_decode_with(&long, 32, None), &long);
+    round_trips(try_decode_max(&long, long.len()), &long);
+    assert_eq!(try_decode_max(&long, long.len() - 1), too_large(long.len(), long.len() - 1));
+    round_trips(try_decode_max(&long, usize::MAX), &long);
+}
+
+#[test]
+fn try_decode_and_try_decode_max_are_try_decode_with_at_the_default_depth() {
+    let inputs = [
+        vec![],
+        vec![0x00],
+        vec![0x00, 0x00],
+        vec![0x81, 0x80],
+        vec![0xa2, 0x01, 0x00, 0x01],
+        vec![0xc0],
+        vec![0x5b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
+        arrays(32),
+        arrays(33),
+        maps(33),
+        arrays(100_000),
+    ];
+    for input in &inputs {
+        let head = &input[..input.len().min(4)];
+        assert_eq!(try_decode(input), try_decode_with(input, DEFAULT_MAX_DEPTH, None), "{head:02x?}");
+        for limit in [0, 1, 4, 64, usize::MAX] {
+            assert_eq!(
+                try_decode_max(input, limit),
+                try_decode_with(input, DEFAULT_MAX_DEPTH, Some(limit)),
+                "{head:02x?} {limit}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_bound_errors_carry_the_bounds_applied() {
+    let deep = DecodeError::TooDeep { limit: 32 };
+    let large = DecodeError::TooLarge { len: 4, limit: 3 };
+    assert_eq!((deep.tag(), large.tag()), ("TooDeep", "TooLarge"));
+    assert!(deep.to_string().contains("32"), "{deep}");
+    assert!(large.to_string().contains('4') && large.to_string().contains('3'), "{large}");
+}
+"""
+
+
+def test_rust_runtime_bounds_depth_and_length(tmp_path):
+    """CD-B1-B5 and question 1 in the runtime: `DEFAULT_MAX_DEPTH` and `MAX_DEPTH_CEILING`,
+    taut's numbers; `try_decode` at depth 32; `try_decode_with`'s depth capped at 128, with
+    `TooDeep.limit` the bound applied, and 0 the caller's error; the length bound before any
+    byte is read (`try_decode_max`); and 100,000 levels refused, never a stack overflow."""
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        pytest.skip("rustc not available")
+    source = (_BOUNDS_RUNTIME_TEST.replace("@CBOR@", CBOR_RS.as_posix())
+              .replace("@DEFAULT_MAX_DEPTH@", str(options.DEFAULT_MAX_DEPTH))
+              .replace("@MAX_DEPTH_CEILING@", str(options.MAX_DEPTH_CEILING)))
+    _compile_and_run_tests(rustc, tmp_path, "bounds_runtime", source)
+
+
+# A file that declares both bounds, a message overriding each, and one inheriting both, as
+# test_bounds.py's `FILED` for Python, the reference.
+_BOUNDED = schema(
+    option.max_depth(3), option.max_encoded_len(16),
+    Enum("Mode", ok=0, alt=1),
+    Msg("Tree", F("kids", 1, List(Ref("Tree"))), option.max_depth(64), next_id=2),
+    Msg("Plain", F("v", 1, List(INT)), next_id=2),
+    Msg("Sized", F("b", 1, BYTES), option.max_encoded_len(8), next_id=2),
+)
+
+
+def _impl_block(rs: str, name: str) -> str:
+    """The generated `impl <name> { ... }`."""
+    start = rs.index(f"\nimpl {name} {{\n")
+    return rs[start:rs.index("\n}\n", start) + 3]
+
+
+def _module_lines(rs: str) -> list[str]:
+    """The generated file's lines at module level."""
+    return [line for line in rs.splitlines() if line and not line[0].isspace()]
+
+
+def _rs_len(length: object) -> str:
+    return "None" if length is None else f"Some({length})"
+
+
+def test_rust_each_message_gets_its_bounds_and_a_decode_from_bytes():
+    """CD-B3, OPT-L6: every message's effective `max_depth` and `max_encoded_len` as
+    constants, and `decode`, its typed entry point from bytes, which applies both; the
+    file's values at module level serve a root that is not a message (OPT-D4). The package
+    codegen and the corpus emitter alike."""
+    for rs in (scaffold.rust_api(_BOUNDED), scaffold.rust_api(_BOUNDED, forward_compat=True),
+               rust._emit(_BOUNDED, {})):
+        module = _module_lines(rs)
+        assert "pub const MAX_DEPTH: usize = 3;" in module
+        assert "pub const MAX_ENCODED_LEN: Option<usize> = Some(16);" in module
+        for name, depth, length in (("Tree", 64, 16), ("Plain", 3, 16), ("Sized", 3, 8)):
+            block = _impl_block(rs, name)
+            assert f"    pub const MAX_DEPTH: usize = {depth};" in block
+            assert f"    pub const MAX_ENCODED_LEN: Option<usize> = Some({length});" in block
+            assert "    pub fn decode(bytes: &[u8]) -> Result<Self, DecodeError> {" in block
+            assert "crate::cbor::try_decode_with(bytes, Self::MAX_DEPTH, Self::MAX_ENCODED_LEN)?" in block
+    # Nothing declared: the defaults, and no length bound.
+    plain = scaffold.rust_api(schema(Msg("M", F("x", 1, INT))))
+    assert {"pub const MAX_DEPTH: usize = 32;", "pub const MAX_ENCODED_LEN: Option<usize> = None;"} <= set(
+        _module_lines(plain))
+    assert "    pub const MAX_ENCODED_LEN: Option<usize> = None;" in _impl_block(plain, "M")
+
+
+def test_rust_message_bounds_are_the_effective_options():
+    """Each fixture message's constants are `taut.ir.options.effective`'s, resolved when the
+    code is generated (OPT-D3): its own declaration, else the file's, else the default."""
+    rs = scaffold.rust_api(PARITY_SCHEMA)
+    for name in PARITY_SCHEMA.messages:
+        block = _impl_block(rs, name)
+        depth = options.effective(PARITY_SCHEMA, "max_depth", message=name)
+        length = options.effective(PARITY_SCHEMA, "max_encoded_len", message=name)
+        assert f"    pub const MAX_DEPTH: usize = {depth};" in block, name
+        assert f"    pub const MAX_ENCODED_LEN: Option<usize> = {_rs_len(length)};" in block, name
+    assert _impl_block(rs, "Tree64").count("MAX_DEPTH: usize = 64;") == 1
+    assert "    pub const MAX_ENCODED_LEN: Option<usize> = Some(8);" in _impl_block(rs, "Sized8")
+
+
+_TYPED_BOUNDS_TEST = r"""
+extern crate alloc;
+#[path = "@CBOR@"]
+mod cbor;
+#[path = "@API@"]
+mod api;
+#[path = "@GENERATED@"]
+mod generated;
+
+use api::{Plain, Sized, Tree};
+use cbor::{encode, try_decode_with, Cbor, DecodeError};
+
+fn unhex(s: &str) -> Vec<u8> {
+    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+}
+
+/// `prefix`, then `count` zero bytes.
+fn zeros(prefix: &str, count: usize) -> Vec<u8> {
+    let mut out = unhex(prefix);
+    out.resize(out.len() + count, 0);
+    out
+}
+
+#[test]
+fn each_root_has_its_effective_bounds() {
+    assert_eq!((Tree::MAX_DEPTH, Tree::MAX_ENCODED_LEN), (64, Some(16)));
+    assert_eq!((Plain::MAX_DEPTH, Plain::MAX_ENCODED_LEN), (3, Some(16)));
+    assert_eq!((Sized::MAX_DEPTH, Sized::MAX_ENCODED_LEN), (3, Some(8)));
+    assert_eq!((api::MAX_DEPTH, api::MAX_ENCODED_LEN), (3, Some(16)));
+}
+
+#[test]
+fn a_message_root_applies_its_own_bounds() {
+    // Tree{[Tree{[]}]}: 4 deep, within Tree's own 64 though the file says 3.
+    let trees = unhex("a10181a10180");
+    assert_eq!(Tree::decode(&trees).map(|t| encode(&t.to_cbor())), Ok(trees.clone()));
+    // 4 deep for Plain: refused before the schema stage would find WrongType{int}.
+    assert_eq!(Plain::decode(&unhex("a10181818100")), Err(DecodeError::TooDeep { limit: 3 }));
+    // 16 bytes, the file's length bound, decode; 17 do not, whatever the message.
+    assert_eq!(Plain::decode(&zeros("a1018d", 13)).map(|p| p.v), Ok(vec![0; 13]));
+    let over = zeros("a1018e", 14);
+    assert_eq!(Plain::decode(&over), Err(DecodeError::TooLarge { len: 17, limit: 16 }));
+    assert_eq!(Tree::decode(&over), Err(DecodeError::TooLarge { len: 17, limit: 16 }));
+    // Sized declares 8 of its own (B28, B29).
+    assert_eq!(Sized::decode(&unhex("a101450102030405")).map(|s| s.b), Ok(vec![1, 2, 3, 4, 5]));
+    assert_eq!(Sized::decode(&unhex("a10146010203040506")), Err(DecodeError::TooLarge { len: 9, limit: 8 }));
+}
+
+#[test]
+fn a_root_that_is_not_a_message_uses_the_files_bounds() {
+    let file = |bytes: &[u8]| try_decode_with(bytes, api::MAX_DEPTH, api::MAX_ENCODED_LEN);
+    // [Tree{[]}]: 3 deep.
+    let one = file(&unhex("81a10180")).unwrap();
+    let trees = one.try_array().unwrap().iter().map(Tree::from_cbor).collect::<Result<Vec<_>, _>>();
+    assert_eq!(trees.map(|t| t.len()), Ok(1));
+    // [Tree{[Tree{[]}]}]: 5 deep, beyond the file's 3 though Tree declares 64.
+    assert_eq!(file(&unhex("81a10181a10180")), Err(DecodeError::TooDeep { limit: 3 }));
+    assert_eq!(file(&zeros("50", 16)), Err(DecodeError::TooLarge { len: 17, limit: 16 }));
+}
+
+#[test]
+fn decode_is_the_raw_decode_under_its_roots_bounds_then_from_cbor() {
+    let inputs = [
+        "", "00", "a0", "a10180", "a1018100", "a10181a10180", "a10181818100", "a101450102030405",
+        "a10146010203040506", "a1018e0000000000000000000000000000", "a10180ff", "a2010002f6",
+    ];
+    for hex in inputs {
+        let bytes = unhex(hex);
+        let raw = |depth, len| try_decode_with(&bytes, depth, len);
+        assert_eq!(
+            Tree::decode(&bytes),
+            raw(Tree::MAX_DEPTH, Tree::MAX_ENCODED_LEN).and_then(|c| Tree::from_cbor(&c)),
+            "{hex}"
+        );
+        assert_eq!(
+            Plain::decode(&bytes),
+            raw(Plain::MAX_DEPTH, Plain::MAX_ENCODED_LEN).and_then(|c| Plain::from_cbor(&c)),
+            "{hex}"
+        );
+        assert_eq!(
+            Sized::decode(&bytes),
+            raw(Sized::MAX_DEPTH, Sized::MAX_ENCODED_LEN).and_then(|c| Sized::from_cbor(&c)),
+            "{hex}"
+        );
+    }
+}
+
+#[test]
+fn the_corpus_emitters_roundtrip_decodes_through_the_same_entry_point() {
+    let trees = unhex("a10181a10180");
+    assert_eq!(generated::roundtrip("Tree", &trees), Ok(trees.clone()));
+    assert_eq!(generated::roundtrip("Plain", &trees), Err(DecodeError::TooDeep { limit: 3 }));
+    assert_eq!(
+        generated::roundtrip("Sized", &unhex("a10146010203040506")),
+        Err(DecodeError::TooLarge { len: 9, limit: 8 })
+    );
+    assert_eq!((generated::Tree::MAX_DEPTH, generated::MAX_DEPTH), (64, 3));
+}
+"""
+
+
+def test_rust_typed_decode_applies_its_roots_bounds(tmp_path):
+    """OPT-D4 in generated code: `X::decode` applies `X`'s bounds to the whole call, a message
+    nested inside changing nothing; a root that is not a message decodes under the file's; and
+    `decode` is exactly the raw decode under those bounds, then `from_cbor`."""
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        pytest.skip("rustc not available")
+    generated = tmp_path / "generated"
+    scaffold.emit(_BOUNDED, generated, langs=["rust"], services=[], runtime=True)
+    corpus_rs = tmp_path / "corpus_generated.rs"
+    corpus_rs.write_text(rust._emit(_BOUNDED, {}))
+    source = (_TYPED_BOUNDS_TEST.replace("@CBOR@", (generated / "rust" / "cbor.rs").as_posix())
+              .replace("@API@", (generated / "rust" / "api.rs").as_posix())
+              .replace("@GENERATED@", corpus_rs.as_posix()))
+    _compile_and_run_tests(rustc, tmp_path, "typed_bounds", source)
+
+
+_EXT_BOUNDS_TEST = r"""
+extern crate alloc;
+#[path = "@CBOR@"]
+mod cbor;
+#[path = "@EXT@"]
+mod ext;
+
+use cbor::{encode, Cbor, DecodeError};
+
+const TAG: i64 = 1 << 20;
+
+/// A host map whose unknown field 7 holds `arrays` nested arrays: 1 + `arrays` deep.
+fn host(arrays: usize) -> Vec<u8> {
+    let mut out = vec![0xa1, 0x07];
+    out.resize(out.len() + arrays - 1, 0x81);
+    out.push(0x80);
+    out
+}
+
+#[test]
+fn a_host_is_read_at_the_depth_ceiling() {
+    let at_ceiling = host(127);
+    assert_eq!(ext::ext_get(&at_ceiling, TAG), Ok(None));
+    assert_eq!(ext::ext_clear(&at_ceiling, TAG), Ok(at_ceiling.clone()));
+    let strapped = ext::ext_set(&at_ceiling, TAG, Cbor::Int(5)).unwrap();
+    assert_eq!(ext::ext_get(&strapped, TAG), Ok(Some(Cbor::Int(5))));
+    // 129 deep, and far beyond: refused at the ceiling, never a stack overflow.
+    let too_deep = Some(DecodeError::TooDeep { limit: 128 });
+    for deeper in [host(128), host(100_000)] {
+        assert_eq!(ext::ext_get(&deeper, TAG).err(), too_deep);
+        assert_eq!(ext::ext_set(&deeper, TAG, Cbor::Null).err(), too_deep);
+        assert_eq!(ext::ext_clear(&deeper, TAG).err(), too_deep);
+    }
+}
+
+#[test]
+fn a_host_is_read_with_no_length_bound() {
+    let big = encode(&Cbor::Map(vec![(1, Cbor::Int(1)), (7, Cbor::Bytes(vec![b'x'; 100_000]))]));
+    let strapped = ext::ext_set(&big, TAG, Cbor::Int(5)).unwrap();
+    assert_eq!(ext::ext_get(&strapped, TAG), Ok(Some(Cbor::Int(5))));
+    assert_eq!(ext::ext_clear(&strapped, TAG), Ok(big));
+}
+"""
+
+
+def test_rust_ext_helpers_read_the_host_at_the_ceiling_with_no_length_bound(tmp_path):
+    """G3, CD-E4: not knowing the host's root, the helpers read it at the depth ceiling with no
+    length bound, the only bounds every valid host meets, as Python's `ext.py` does."""
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        pytest.skip("rustc not available")
+    assert "TODO" not in EXT_RS.read_text()
+    source = _EXT_BOUNDS_TEST.replace("@CBOR@", CBOR_RS.as_posix()).replace("@EXT@", EXT_RS.as_posix())
+    _compile_and_run_tests(rustc, tmp_path, "ext_bounds", source)
+
+
+def test_rust_runner_embeds_segments_and_expands_them_itself():
+    """The bounds protocol, item 5: rows enter the runner's source as segments, so the
+    100,000-deep rows stay one line each, and the runner expands them."""
+    source = parity_rust._source(Path("generated"))
+    deepest = max(parity.bounds_rows(), key=lambda row: row["len"])
+    assert deepest["len"] > 100_000
+    for row in parity.decode_rows():
+        assert json.dumps(row["name"]) in source, row["name"]
+    assert parity.row_bytes(deepest).hex()[:4_000] not in source
+    assert len(source) < 100_000
+
+
+def test_rust_runner_reports_an_expansion_that_is_not_its_len_as_untyped(monkeypatch):
+    """Item 5's failure path: a row whose segments do not expand to its `len` is reported as
+    `untyped`, never decoded."""
+    if toolchains.find_rustc() is None:
+        pytest.skip("rustc not available")
+    rows = parity.bounds_rows()
+    wrong = {**rows[0], "len": rows[0]["len"] + 1}
+    monkeypatch.setattr(parity, "bounds_rows", lambda: [wrong, *rows[1:]])
+    report = parity_rust.run()
+    assert report.available and not report.fault, report.fault
+    judged = {r.name: r for r in report.results if r.kind == "bounds"}
+    assert judged.pop(wrong["name"]).detail.startswith(
+        f"untyped bytes expand to {rows[0]['len']} bytes, len is {wrong['len']}")
+    assert {r.status for r in judged.values()} == {parity.PASS}
 
 
 # =============================================================================

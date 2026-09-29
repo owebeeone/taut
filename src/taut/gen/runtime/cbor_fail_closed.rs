@@ -23,10 +23,28 @@
 //!      untrusted wire boundary (a socket) needs no `catch_unwind` guard around
 //!      decode. The legacy runtime's panicking `decode` and accessors were
 //!      removed at taut v0.10.0.
+//!   3. Decode is bounded (TautCheckedDecode.md §3). An array or map has depth
+//!      one more than the arrays and maps around it, and one deeper than the
+//!      call's depth bound is [`DecodeError::TooDeep`] once its head is read;
+//!      recursion goes no deeper than the bound, so no input can exhaust the
+//!      stack. With a length bound, longer input is [`DecodeError::TooLarge`]
+//!      before a byte is read. [`try_decode`] applies [`DEFAULT_MAX_DEPTH`];
+//!      [`try_decode_max`] adds a length bound, and [`try_decode_with`] takes
+//!      both, its depth capped at [`MAX_DEPTH_CEILING`]. A generated message's
+//!      `decode` passes its root's bounds (TautOptions.md OPT-D4).
 
 use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec::Vec;
+
+/// The depth bound where the caller gives none: 32 nested arrays and maps
+/// decode, and the 33rd is [`DecodeError::TooDeep`] (CD-B1). taut's
+/// `DEFAULT_MAX_DEPTH`, the `max_depth` option's default.
+pub const DEFAULT_MAX_DEPTH: usize = 32;
+
+/// The deepest bound any decode applies: [`try_decode_with`] applies it in
+/// place of a larger `max_depth` (CD-B3). taut's `MAX_DEPTH_CEILING`.
+pub const MAX_DEPTH_CEILING: usize = 128;
 
 /// A repeated map key, as [`DecodeError::DuplicateMapKey`] reports it: the int
 /// key of a raw CBOR map or of a `map<int,V>` field, or the key of a `map<str,V>`
@@ -115,6 +133,20 @@ pub enum DecodeError {
         /// The offending wire value.
         value: i64,
     },
+    /// An array or map nested deeper than the call's depth bound, refused once
+    /// its head is read and before its first item (CD-B1, CD-B2).
+    TooDeep {
+        /// The depth bound the call applied.
+        limit: usize,
+    },
+    /// Input longer than the call's length bound, refused before any byte of it
+    /// is read (CD-B4).
+    TooLarge {
+        /// The input's length in bytes.
+        len: usize,
+        /// The length bound the call applied.
+        limit: usize,
+    },
 }
 
 impl DecodeError {
@@ -136,6 +168,8 @@ impl DecodeError {
             DecodeError::MissingKey(_) => "MissingKey",
             DecodeError::WrongType { .. } => "WrongType",
             DecodeError::UnknownEnum { .. } => "UnknownEnum",
+            DecodeError::TooDeep { .. } => "TooDeep",
+            DecodeError::TooLarge { .. } => "TooLarge",
         }
     }
 }
@@ -157,6 +191,10 @@ impl core::fmt::Display for DecodeError {
             DecodeError::WrongType { expected } => write!(f, "expected CBOR {expected}"),
             DecodeError::UnknownEnum { enum_name, value } => {
                 write!(f, "unknown {enum_name} wire value {value}")
+            }
+            DecodeError::TooDeep { limit } => write!(f, "CBOR nested deeper than {limit}"),
+            DecodeError::TooLarge { len, limit } => {
+                write!(f, "CBOR input of {len} bytes is longer than {limit}")
             }
         }
     }
@@ -472,10 +510,42 @@ fn enc(v: &Cbor, out: &mut Vec<u8>) {
     }
 }
 
-/// Fail-closed decode: returns [`DecodeError`] — never panics — on any byte
-/// input (malformed, truncated, unknown value, wrong shape, trailing bytes).
+/// Fail-closed decode at the default depth bound, [`DEFAULT_MAX_DEPTH`], with no
+/// length bound: returns [`DecodeError`] — never panics — on any byte input
+/// (malformed, truncated, too deep, unknown value, wrong shape, trailing bytes).
 pub fn try_decode(data: &[u8]) -> Result<Cbor, DecodeError> {
-    let (v, off) = dec(data, 0)?;
+    try_decode_with(data, DEFAULT_MAX_DEPTH, None)
+}
+
+/// [`try_decode`] with a length bound: input longer than `max_encoded_len` is
+/// [`DecodeError::TooLarge`] before any byte is read (CD-B4).
+pub fn try_decode_max(data: &[u8], max_encoded_len: usize) -> Result<Cbor, DecodeError> {
+    try_decode_with(data, DEFAULT_MAX_DEPTH, Some(max_encoded_len))
+}
+
+/// Fail-closed decode under the caller's bounds (CD-B3). An array or map at
+/// depth `max_depth` + 1 is [`DecodeError::TooDeep`] (a top-level one has depth
+/// 1); a `max_depth` above [`MAX_DEPTH_CEILING`] applies the ceiling, and
+/// `TooDeep`'s `limit` names the bound applied. With `max_encoded_len`, longer
+/// input is [`DecodeError::TooLarge`], checked first (CD-E5).
+///
+/// # Panics
+///
+/// If `max_depth` is 0, the caller's error, not the input's: it panics before
+/// it reads the input.
+pub fn try_decode_with(
+    data: &[u8],
+    max_depth: usize,
+    max_encoded_len: Option<usize>,
+) -> Result<Cbor, DecodeError> {
+    assert!(max_depth >= 1, "max_depth must be at least 1, not {max_depth}");
+    let limit = max_depth.min(MAX_DEPTH_CEILING);
+    if let Some(bound) = max_encoded_len {
+        if data.len() > bound {
+            return Err(DecodeError::TooLarge { len: data.len(), limit: bound });
+        }
+    }
+    let (v, off) = dec(data, 0, 0, limit)?;
     if off != data.len() {
         return Err(DecodeError::TrailingBytes);
     }
@@ -527,7 +597,18 @@ fn read_arg(data: &[u8], off: usize, info: u8) -> Result<(u64, usize), DecodeErr
     Ok((value, next))
 }
 
-fn dec(data: &[u8], off: usize) -> Result<(Cbor, usize), DecodeError> {
+/// A container whose head is read, inside `depth` others: [`DecodeError::TooDeep`]
+/// if it would sit deeper than `limit`, before its first item is read (CD-B2).
+/// Checked before `dec` recurses, it bounds the recursion by `limit`.
+fn enter(depth: usize, limit: usize) -> Result<(), DecodeError> {
+    if depth >= limit {
+        return Err(DecodeError::TooDeep { limit });
+    }
+    Ok(())
+}
+
+/// The item at `off`, inside `depth` arrays and maps, under depth bound `limit`.
+fn dec(data: &[u8], off: usize, depth: usize, limit: usize) -> Result<(Cbor, usize), DecodeError> {
     let initial = *data.get(off).ok_or(DecodeError::Truncated)?;
     let major = initial >> 5;
     let info = initial & 0x1f;
@@ -566,9 +647,10 @@ fn dec(data: &[u8], off: usize) -> Result<(Cbor, usize), DecodeError> {
         }
         4 => {
             let (n, mut o) = read_arg(data, off, info)?;
+            enter(depth, limit)?;
             let mut a = Vec::new();
             for _ in 0..n {
-                let (v, o2) = dec(data, o)?;
+                let (v, o2) = dec(data, o, depth + 1, limit)?;
                 a.push(v);
                 o = o2;
             }
@@ -576,6 +658,7 @@ fn dec(data: &[u8], off: usize) -> Result<(Cbor, usize), DecodeError> {
         }
         5 => {
             let (n, mut o) = read_arg(data, off, info)?;
+            enter(depth, limit)?;
             let mut m = Vec::new();
             // The keys read so far: a repeated key costs a lookup, not a scan.
             let mut seen = BTreeSet::new();
@@ -583,7 +666,7 @@ fn dec(data: &[u8], off: usize) -> Result<(Cbor, usize), DecodeError> {
                 // An entry's key is read and checked before its value is read
                 // (CD-E5), so a bad key is reported even when the value is
                 // missing or malformed.
-                let (k, o2) = dec(data, o)?;
+                let (k, o2) = dec(data, o, depth + 1, limit)?;
                 let ki = match k {
                     // Map keys are i64 (CBOR field tags). An out-of-i64 key was
                     // already rejected as IntOverflow when `dec` read it above,
@@ -595,7 +678,7 @@ fn dec(data: &[u8], off: usize) -> Result<(Cbor, usize), DecodeError> {
                 if !seen.insert(ki) {
                     return Err(DecodeError::DuplicateMapKey(MapKey::Int(ki)));
                 }
-                let (v, o3) = dec(data, o2)?;
+                let (v, o3) = dec(data, o2, depth + 1, limit)?;
                 m.push((ki, v));
                 o = o3;
             }
