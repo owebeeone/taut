@@ -16,6 +16,8 @@ public enum CborError: Error, Equatable, CustomStringConvertible {
     case missingKey(Int64)
     case wrongType(String)
     case unknownEnum(String, Int64)
+    case nonCanonicalInt(UInt64)
+    case negativeMapKey(Int64)
 
     public var parityTag: String {
         switch self {
@@ -30,6 +32,8 @@ public enum CborError: Error, Equatable, CustomStringConvertible {
         case .missingKey: return "MissingKey"
         case .wrongType: return "WrongType"
         case .unknownEnum: return "UnknownEnum"
+        case .nonCanonicalInt: return "NonCanonicalInt"
+        case .negativeMapKey: return "NegativeMapKey"
         }
     }
 
@@ -57,6 +61,10 @@ public enum CborError: Error, Equatable, CustomStringConvertible {
             return "WrongType(expected: \(expected))"
         case let .unknownEnum(name, value):
             return "UnknownEnum(enum: \(name), value: \(value))"
+        case let .nonCanonicalInt(value):
+            return "NonCanonicalInt(value: \(value))"
+        case let .negativeMapKey(key):
+            return "NegativeMapKey(key: \(key))"
         }
     }
 }
@@ -89,6 +97,17 @@ public extension Cbor {
             return v
         }
         throw CborError.missingKey(key)
+    }
+
+    /// Like `tryGet`, but an absent key is nil (a MISSING_OK field); a non-map still fails.
+    func tryGetOpt(_ key: Int64) throws -> Cbor? {
+        guard case let .map(m) = self else {
+            throw CborError.wrongType("map")
+        }
+        for (k, v) in m where k == key {
+            return v
+        }
+        return nil
     }
 
     func tryInt() throws -> Int64 {
@@ -153,11 +172,14 @@ public func decodeDictionary<K: Hashable, V>(
 ) throws -> [K: V] {
     var out: [K: V] = [:]
     for entry in try c.tryArray() {
-        let keyValue = try decodeKey(try entry.tryGet(1))
+        // Keys 1 and 2 must both be present before either is decoded.
+        let rawKey = try entry.tryGet(1)
+        let rawValue = try entry.tryGet(2)
+        let keyValue = try decodeKey(rawKey)
         if out[keyValue] != nil {
             throw CborError.duplicateMapKey((keyValue as? Int64) ?? 0)
         }
-        out[keyValue] = try decodeValue(try entry.tryGet(2))
+        out[keyValue] = try decodeValue(rawValue)
     }
     return out
 }
@@ -260,28 +282,39 @@ private func requireBytes(_ data: [UInt8], _ off: Int, _ count: Int) throws {
 }
 
 private func readArg(_ data: [UInt8], _ off: Int, _ info: UInt8) throws -> (UInt64, Int) {
-    if info < 24 { return (UInt64(info), off) }
-    if info == 24 {
-        try requireBytes(data, off, 1)
-        return (UInt64(data[off]), off + 1)
+    if info < 24 {
+        return (UInt64(info), off)
     }
-    if info == 25 {
-        try requireBytes(data, off, 2)
-        return ((UInt64(data[off]) << 8) | UInt64(data[off + 1]), off + 2)
+    let width: Int
+    let shorterMax: UInt64   // the largest argument a shorter form holds
+    switch info {
+    case 24:
+        width = 1
+        shorterMax = 23
+    case 25:
+        width = 2
+        shorterMax = 0xff
+    case 26:
+        width = 4
+        shorterMax = 0xffff
+    case 27:
+        width = 8
+        shorterMax = 0xffff_ffff
+    default:
+        throw CborError.unsupportedInfo(info)
     }
-    if info == 26 {
-        try requireBytes(data, off, 4)
-        var v: UInt64 = 0
-        for j in 0..<4 { v = (v << 8) | UInt64(data[off + j]) }
-        return (v, off + 4)
+    try requireBytes(data, off, width)
+    var v: UInt64 = 0
+    for j in 0..<width {
+        v = (v << 8) | UInt64(data[off + j])
     }
-    if info == 27 {
-        try requireBytes(data, off, 8)
-        var v: UInt64 = 0
-        for j in 0..<8 { v = (v << 8) | UInt64(data[off + j]) }
-        return (v, off + 8)
+    // Strict-canonical (D2): an argument that fits a shorter form is non-minimal,
+    // which the canonical encoder never writes. Lengths and counts included;
+    // floats are read in `dec` and exempt.
+    guard v > shorterMax else {
+        throw CborError.nonCanonicalInt(v)
     }
-    throw CborError.unsupportedInfo(info)
+    return (v, off + width)
 }
 
 private func checkedCount(_ data: [UInt8], _ off: Int, _ n: UInt64) throws -> Int {
@@ -346,10 +379,9 @@ private func dec(_ data: [UInt8], _ off0: Int) throws -> (Cbor, Int) {
         let k = try checkedCount(data, o, n)
         return (.text(try decodeUtf8(data[o..<o + k])), o + k)
     case 4:
+        // No up-front count check: items are read in order, so the first bad item
+        // is reported, and each consumes a byte, so a huge count ends at Truncated.
         let (n, o0) = try readArg(data, off, info)
-        guard n <= UInt64(data.count - o0) else {
-            throw CborError.truncated
-        }
         var o = o0
         var a = [Cbor]()
         for _ in 0..<n {
@@ -359,10 +391,8 @@ private func dec(_ data: [UInt8], _ off0: Int) throws -> (Cbor, Int) {
         }
         return (.array(a), o)
     case 5:
+        // As for arrays: entries are read in order, each key before its value.
         let (n, o0) = try readArg(data, off, info)
-        guard n <= UInt64((data.count - o0) / 2) else {
-            throw CborError.truncated
-        }
         var o = o0
         var m = [(Int64, Cbor)]()
         var seen = Set<Int64>()
@@ -370,6 +400,9 @@ private func dec(_ data: [UInt8], _ off0: Int) throws -> (Cbor, Int) {
             let (rawKey, o2) = try dec(data, o)
             guard case let .int(key) = rawKey else {
                 throw CborError.nonIntegerMapKey
+            }
+            guard key >= 0 else {
+                throw CborError.negativeMapKey(key)
             }
             guard !seen.contains(key) else {
                 throw CborError.duplicateMapKey(key)

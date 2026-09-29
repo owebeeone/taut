@@ -1,6 +1,7 @@
 """Swift generator: native structs + enums + CBOR codec, forward-compat residual,
-and Swift-keyword escaping. When swiftc is available, the vendored runtime is
-also checked against the byte-exact float corpus."""
+Swift-keyword escaping and `optional=MISSING_OK`. When swiftc is available, the
+vendored runtime is also checked against the byte-exact float corpus, and the
+shared parity corpus is replayed through the gate's runner (`tautc parity -t swift`)."""
 
 import json
 import os
@@ -13,9 +14,10 @@ from pathlib import Path
 
 from taut import ext
 from taut.corpus.build import IR_PATH
+from taut.corpus import parity_swift
 from taut.corpus import resext_build as rb
-from taut.gen import swift
-from taut.ir.dsl import FLOAT, INT, F, List, Map, Msg, schema as mk
+from taut.gen import scaffold, swift
+from taut.ir.dsl import FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, schema as mk
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec
@@ -29,12 +31,14 @@ ROOT = Path(__file__).resolve().parents[2]
 FLOAT_VECTORS = ROOT / "corpus" / "float_vectors.json"
 RESIDUAL_VECTORS = ROOT / "corpus" / "residual_vectors.json"
 EXT_VECTORS = ROOT / "corpus" / "ext_vectors.json"
-PARITY_IR = ROOT / "ir" / "parity_int.taut.py"
-PARITY_INT_VECTORS = ROOT / "corpus" / "parity" / "int.vectors.json"
-PARITY_MALFORMED_VECTORS = ROOT / "corpus" / "parity" / "malformed.vectors.json"
 SWIFT_CBOR = ROOT / "src/taut/gen/runtime/cbor.swift"
 SWIFT_EXT = ROOT / "src/taut/gen/runtime/ext.swift"
 RESEXT_FUZZ_SEED = 0x55_0202
+# `Late` reads an absent note as null (MISSING_OK); `Opt`, for contrast, requires the key.
+MISSING_OK_SCHEMA = mk(
+    Msg("Late", F("note", 1, STR, optional=MISSING_OK)),
+    Msg("Opt", F("note", 1, STR, optional=True)),
+)
 
 
 def _require_swiftc():
@@ -64,26 +68,6 @@ def _write_resext_model(tmp_path):
 
 def _swift_string(value: str) -> str:
     return json.dumps(value)
-
-
-def _swift_i64(value: str) -> str:
-    if value == "-9223372036854775808":
-        return "Int64.min"
-    if value == "9223372036854775807":
-        return "Int64.max"
-    return value
-
-
-def _swift_intbox(value: dict[str, object]) -> str:
-    entries = value["by_id"]
-    if entries:
-        by_id = "[" + ", ".join(
-            f"{_swift_i64(str(k))}: {_swift_i64(str(v))}"
-            for k, v in entries
-        ) + "]"
-    else:
-        by_id = "[:]"
-    return f"IntBox(n: {_swift_i64(str(value['n']))}, by_id: {by_id})"
 
 
 def _swift_support() -> str:
@@ -264,107 +248,74 @@ def test_float_codegen_shape():
     assert "return try v.tryFloat()" in s
 
 
-def test_swift_parity_corpus_vectors(tmp_path):
-    # Baseline smoke test: pin the reviewed set; `lead` rows belong to the
-    # governed `tautc parity` gate (corpus/parity/gen_vectors.py).
-    int_vectors = [r for r in json.loads(PARITY_INT_VECTORS.read_text())["vectors"] if not r.get("lead")]
-    malformed_vectors = [r for r in json.loads(PARITY_MALFORMED_VECTORS.read_text())["vectors"] if not r.get("lead")]
-    round_trip_rows = [
-        row for row in int_vectors
-        if row["kind"] == "round_trip"
-    ]
-    encode_fail_count = sum(1 for row in int_vectors if row["kind"] == "encode_fail")
-    round_trip_swift = ",\n".join(
-        f"    ({_swift_string(row['name'])}, {_swift_string(row['cbor'])}, {{ {_swift_intbox(row['value'])} }})"
-        for row in round_trip_rows
-    )
-    malformed_blob = "\n".join(
-        "|".join([
-            row["name"],
-            row["stage"],
-            row.get("schema", ""),
-            row["bytes"],
-            row["expect"]["tag"],
-        ])
-        for row in malformed_vectors
-    )
+def test_swift_parity_gate_is_green():
+    # The shared corpus, lead rows included, through the gate's own Swift runner
+    # (`tautc parity -t swift`): every row reported, judged on tag and payload.
+    report = parity_swift.run()
+    if not report.available:
+        pytest.skip(report.skip_reason)
+    failures = [f"{r.name}: {r.detail}" for r in report.failures]
+    assert report.green, "\n".join([report.fault, *failures])
 
-    model = tmp_path / "Parity.swift"
-    model.write_text(swift.emit_types(load_schema(PARITY_IR)))
+
+def test_missing_ok_generates_for_swift(tmp_path):
+    scaffold.emit(MISSING_OK_SCHEMA, tmp_path, langs=["swift"], services=[])
+    api = (tmp_path / "swift" / "api.swift").read_text()
+    late = api[api.index("public struct Late"):api.index("public struct Opt")]
+    opt = api[api.index("public struct Opt"):]
+    assert "try c.tryGetOpt(1)" in late
+    assert "tryGetOpt" not in opt
+    assert "try c.tryGet(1)" in opt
+    # encode is unchanged: an unset note is still written, as null
+    assert "(1, (note.map { Cbor.text($0) } ?? Cbor.null))" in late
+
+
+def test_swift_missing_ok_reads_absent_as_null(tmp_path):
+    _require_swiftc()
+    scaffold.emit(MISSING_OK_SCHEMA, tmp_path / "gen", langs=["swift"], services=[], runtime=True)
+    generated = tmp_path / "gen" / "swift"
     harness = tmp_path / "main.swift"
-    harness.write_text(_swift_support() + textwrap.dedent(f"""
-        let roundTripRows: [(String, String, () -> IntBox)] = [
-        {round_trip_swift}
-        ]
-        let malformedBlob = {_swift_string(malformed_blob)}
-        let encodeFailRows = {encode_fail_count}
-        var mismatches = 0
+    harness.write_text(_swift_support() + textwrap.dedent("""
+        func observe(_ work: () throws -> String?) -> String {
+            do {
+                return "ok " + ((try work()) ?? "null")
+            } catch let error as CborError {
+                return "err \\(error)"
+            } catch {
+                return "untyped \\(error)"
+            }
+        }
 
-        func check(_ condition: Bool, _ message: String) {{
-            if !condition {{
-                print(message)
-                mismatches += 1
-            }}
-        }}
+        func late(_ wire: String) -> String {
+            return observe { try Late.fromCbor(tryDecode(bytes(fromHex: wire))).note }
+        }
 
-        func expectError(_ name: String, expectedTag: String, _ work: () throws -> Void) {{
-            do {{
-                try work()
-                check(false, "\\(name): decoded successfully")
-            }} catch let error as CborError {{
-                check(error.parityTag == expectedTag, "\\(name): \\(error.parityTag) != \\(expectedTag) (\\(error))")
-            }} catch {{
-                check(false, "\\(name): non-CborError \\(error)")
-            }}
-        }}
+        func opt(_ wire: String) -> String {
+            return observe { try Opt.fromCbor(tryDecode(bytes(fromHex: wire))).note }
+        }
 
-        for (name, expected, makeValue) in roundTripRows {{
-            let value = makeValue()
-            let encoded = hex(encode(value.toCbor()))
-            check(encoded == expected, "round trip encode \\(name): \\(encoded) != \\(expected)")
-
-            do {{
-                let decoded = try IntBox.fromCbor(tryDecode(bytes(fromHex: expected)))
-                check(decoded.n == value.n, "round trip n \\(name): \\(decoded.n) != \\(value.n)")
-                check(decoded.by_id == value.by_id, "round trip by_id \\(name): \\(decoded.by_id) != \\(value.by_id)")
-                let reencoded = hex(encode(decoded.toCbor()))
-                check(reencoded == expected, "round trip reencode \\(name): \\(reencoded) != \\(expected)")
-            }} catch {{
-                check(false, "round trip decode \\(name): \\(error)")
-            }}
-        }}
-
-        for parts in fields(malformedBlob) {{
-            let name = String(parts[0])
-            let stage = String(parts[1])
-            let schema = String(parts[2])
-            let wire = String(parts[3])
-            let expectedTag = String(parts[4])
-
-            expectError(name, expectedTag: expectedTag) {{
-                if stage == "raw_decode" {{
-                    _ = try tryDecode(bytes(fromHex: wire))
-                }} else if stage == "from_cbor" && schema == "IntBox" {{
-                    _ = try IntBox.fromCbor(tryDecode(bytes(fromHex: wire)))
-                }} else if stage == "from_wire" && schema == "Mode" {{
-                    _ = try Mode.fromCbor(tryDecode(bytes(fromHex: wire)))
-                }} else {{
-                    throw CborError.wrongType("known parity stage")
-                }}
-            }}
-        }}
-
-        check(encodeFailRows == 3, "unexpected encode-fail count \\(encodeFailRows)")
-
-        if mismatches != 0 {{
-            fatalError("swift parity mismatches=\\(mismatches)")
-        }}
-        print("swift parity round_trip=\\(roundTripRows.count) malformed=\\(fields(malformedBlob).count) encode_fail_unrepresentable=\\(encodeFailRows) mismatches=0")
+        for wire in ["a0", "a101f6", "a1016178", "a10101", "00"] {
+            print("Late \\(wire) \\(late(wire))")
+        }
+        print("Late encode \\(hex(encode(Late(note: nil).toCbor())))")
+        for wire in ["a0", "a101f6"] {
+            print("Opt \\(wire) \\(opt(wire))")
+        }
         """))
-    exe = _compile_swift(tmp_path, [SWIFT_CBOR, model, harness], "swift-parity-corpus")
+    exe = _compile_swift(tmp_path, [generated / "cbor.swift", generated / "api.swift", harness],
+                         "swift-missing-ok")
     run = subprocess.run([str(exe)], text=True, capture_output=True)
     assert run.returncode == 0, run.stderr + run.stdout
-    assert "swift parity round_trip=7 malformed=12 encode_fail_unrepresentable=3 mismatches=0" in run.stdout
+    assert run.stdout.splitlines() == [
+        "Late a0 ok null",                                  # absent key: null
+        "Late a101f6 ok null",                              # present null: null
+        "Late a1016178 ok x",
+        "Late a10101 err WrongType(expected: text)",        # a wrong type still fails
+        "Late 00 err WrongType(expected: map)",             # and so does a non-map
+        "Late encode a101f6",                               # encode still writes the key
+        "Opt a0 err MissingKey(key: 1)",                    # plain optional: absent is MissingKey
+        "Opt a101f6 ok null",
+    ]
 
 
 def test_swift_resext_corpus_vectors(tmp_path):

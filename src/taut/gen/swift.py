@@ -6,7 +6,7 @@ residual just rides along (no merge needed, unlike C++).
 
 from __future__ import annotations
 
-from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 # Swift reserved words — field names / enum cases that collide get backtick-escaped
 # (e.g. razel's `VersionInfo.protocol`).
@@ -151,11 +151,19 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     out.append("    }")
     # fromCbor
     out.append(f"    public static func fromCbor(_ c: Cbor) throws -> {msg.name} {{")
+    if not msg.wire_fields():
+        # no field lookup refuses a non-map here, so check it (CD-E5: even an empty message)
+        out.append("        guard case .map = c else {")
+        out.append('            throw CborError.wrongType("map")')
+        out.append("        }")
     args = []
     for f in msg.fields:
         if f.transient:
             continue  # native-only; init default applies
-        if f.optional:
+        if f.optional == MISSING_OK:
+            # an absent key reads as null, like a present null; a non-map still fails
+            args.append(f"{_id(f.name)}: try {{ guard let v = try c.tryGetOpt({f.tag}) else {{ return nil }}; if v.isNull {{ return nil }}; return {_decode(f.type, 'v')} }}()")
+        elif f.optional:
             args.append(f"{_id(f.name)}: try {{ let v = try c.tryGet({f.tag}); if v.isNull {{ return nil }}; return {_decode(f.type, 'v')} }}()")
         else:
             args.append(f"{_id(f.name)}: {_decode(f.type, f'c.tryGet({f.tag})')}")
