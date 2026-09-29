@@ -131,7 +131,7 @@ def from_json(schema: Schema, message: str, text: str) -> dict[str, Any]:
 # --- CBOR bytes <-> JSON text (the headline: point at the IR, go both ways) ---
 
 def cbor_to_json(schema: Schema, message: str, data: bytes, *, indent: int | None = None) -> str:
-    """Deterministic-CBOR bytes -> canonical JSON text."""
+    """Deterministic-CBOR bytes -> canonical JSON text, under `message`'s bounds (OPT-L6)."""
     return to_json(schema, message, codec.decode(schema, message, data), indent=indent)
 
 

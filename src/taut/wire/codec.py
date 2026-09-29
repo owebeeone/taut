@@ -10,13 +10,19 @@ adapter layered on top. The wire is a projection of the *tagged* subset:
   - list     -> CBOR array
   - scalar   -> passthrough (int/str/bytes/bool); float fields coerce value->float
   - optional -> always emitted; None -> CBOR null (deterministic; no omission)
+
+Decoding bytes is rooted at one type, whose effective `max_depth` and
+`max_encoded_len` bound the whole call (TautOptions.md OPT-D4, OPT-L6); a message
+nested inside does not change them. `decode_struct` reads a tree the caller has
+already decoded, and applies no bound of its own (TautOptions.md G1).
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from ..ir.model import MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.options import effective
 from . import cbor
 
 DecodeError = cbor.DecodeError
@@ -27,8 +33,25 @@ def encode(schema: Schema, message: str, value: dict[str, Any]) -> bytes:
     return cbor.dumps(encode_struct(schema, message, value))
 
 
+def bounds(schema: Schema, root: TypeRef) -> tuple[int, int | None]:
+    """`(max_depth, max_encoded_len)` for a decode rooted at `root`: a message's effective
+    values, and for any other root the file's, defaults included (OPT-D3, OPT-D4). None is no
+    length bound. `cbor.loads` checks both again."""
+    message = root.name if isinstance(root, MsgRef) else None
+    return (cast(int, effective(schema, "max_depth", message=message)),
+            cast("int | None", effective(schema, "max_encoded_len", message=message)))
+
+
 def decode(schema: Schema, message: str, data: bytes) -> dict[str, Any]:
-    return decode_struct(schema, message, cbor.loads(data), strict=True)
+    """Bytes -> native dict, rooted at `message`: its bounds, then the strict schema stage."""
+    return decode_ref(schema, MsgRef(message), data)
+
+
+def decode_ref(schema: Schema, tref: TypeRef, data: bytes) -> Any:
+    """Bytes -> native value, rooted at any type, such as a method slot's `list<Tree>`."""
+    max_depth, max_encoded_len = bounds(schema, tref)
+    struct = cbor.loads(data, max_depth=max_depth, max_encoded_len=max_encoded_len)
+    return _from_wire(schema, tref, struct, strict=True)
 
 
 def encode_struct(schema: Schema, message: str, value: dict[str, Any]) -> dict[int, Any]:
