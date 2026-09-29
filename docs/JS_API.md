@@ -18,7 +18,7 @@ Writes, into `<out>/js/`:
 
 | file | what |
 | --- | --- |
-| `api.js` | native types (class/enum) + `toCbor`/`fromCbor` |
+| `api.js` | native types (class/enum) + `toCbor`/`fromCbor`/`decode` |
 | `cbor.js` | the deterministic-CBOR runtime (`Cbor`, `encode`, `decode`) |
 | `ext.js` | extension accessors (`extSet`/`extGet`/`extClear`) |
 | `client.js` / `server.js` | typed stubs over a transport (see [Server.md](Server.md)) |
@@ -53,16 +53,23 @@ Field mapping: `INT → number`, `STR → string`, `BYTES → Uint8Array`, `BOOL
 
 ## 3. Encode / decode
 
-A message ↔ CBOR bytes goes through the generated `toCbor`/`fromCbor` plus the
-runtime `encode`/`decode`:
+A message ↔ CBOR bytes goes through the generated `toCbor` plus the runtime `encode`,
+and back through the generated `decode`:
 
 ```js
-const { encode, decode } = require("./cbor.js");
+const { encode } = require("./cbor.js");
 const { Task } = require("./api.js");
 
-const bytes = encode(task.toCbor());      // Uint8Array — serialize
-const task = Task.fromCbor(decode(bytes)); // deserialize
+const bytes = encode(task.toCbor());  // Uint8Array — serialize
+const task = Task.decode(bytes);      // deserialize, under Task's bounds
 ```
+
+`Task.decode(bytes)` applies the message's bounds, the read-only `Task.MAX_DEPTH` (32
+unless the schema declares `max_depth`) and `Task.MAX_ENCODED_LEN` (`null` unless it
+declares `max_encoded_len`). Input longer than the length bound throws a `DecodeError`
+tagged `TooLarge` (`len`, `limit`) before a byte is read; an array or map nested deeper
+than the depth bound, `TooDeep` (`limit`). `Task.fromCbor(decode(bytes))` still reads a
+message, but under the raw decode's defaults, not the message's bounds.
 
 ## 4. The `Cbor` runtime (`cbor.js`)
 
@@ -79,8 +86,14 @@ CFloat(x)  // { kind, f }      CArr(a)    // { kind, arr }
 CMap(m)    // { kind, map }    (m: array of [intKey, Cbor])   CNull()
 
 encode(c) // -> Uint8Array
-decode(data) // -> Cbor   (data: Uint8Array)
+decode(data, { maxDepth, maxEncodedLen }) // -> Cbor   (data: Uint8Array; options optional)
 ```
+
+`decode` knows no schema. It applies depth bound `maxDepth`, `DEFAULT_MAX_DEPTH` (32)
+when absent and at most `MAX_DEPTH_CEILING` (128), and no length bound unless
+`maxEncodedLen` is given; a top-level array or map has depth 1. A depth below 1 or a
+negative length throws `RangeError`, and a bound that is not an integer, `TypeError`.
+Malformed input throws only `DecodeError`.
 
 Accessors (read the tagged shape): `cget(c, key)` (map value by int tag — throws if
 absent), `cmapEntries(c)` (the `[key, Cbor]` array, or `[]` if not a map), `isNull(c)`.
@@ -121,8 +134,9 @@ const decision = got ? Decision.fromCbor(got) : null;
 const stripped = extClear(raw, 0x100001);
 ```
 
-A below-band `tag` throws; a non-map host throws. The host app decodes its own message
-obliviously — the extension rides in `wireResidual` and survives.
+A below-band `tag` throws; a non-map host throws. Not knowing the host's schema, the
+helpers read it at the depth ceiling (128) with no length bound. The host app decodes its
+own message obliviously — the extension rides in `wireResidual` and survives.
 
 ## 7. Consuming the runtime
 

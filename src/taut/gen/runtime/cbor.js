@@ -4,6 +4,12 @@
 // bool, null), core-deterministic (definite length, shortest-form ints/floats,
 // ascending map keys). Hand-rolled, no dependencies. Codec integer values are
 // BigInt so every i64 value is exact; raw map keys remain structural field tags.
+//
+// Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one
+// more than the arrays and maps around it, and one deeper than the call's depth
+// bound is TooDeep{limit}; with a length bound, longer input is TooLarge{len, limit}
+// before a byte is read. For any input bytes decode returns a value or throws
+// DecodeError, nothing else. The parity corpus pins the two depth numbers to taut's.
 
 const INT = 0, BYTES = 1, TEXT = 2, ARR = 3, MAP = 4, BOOL = 5, NULL = 6, FLOAT = 7;
 
@@ -11,6 +17,9 @@ const INT_MIN = -(1n << 63n);
 const INT_MAX = (1n << 63n) - 1n;
 const UINT64_MAX = (1n << 64n) - 1n;
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+
+const DEFAULT_MAX_DEPTH = 32;   // the depth bound where none is given (CD-B1)
+const MAX_DEPTH_CEILING = 128;  // no call applies a deeper bound (CD-B3)
 
 function stringValue(value) {
   return typeof value === "bigint" ? value.toString() : String(value);
@@ -49,6 +58,8 @@ function formatDecodeError(tag, payload) {
     case "UnknownEnum": return `unknown ${payload.enum} enum value ${payload.value}`;
     case "NonCanonicalInt": return "non-canonical integer encoding";
     case "NegativeMapKey": return `negative CBOR map key ${payload.key}`;
+    case "TooDeep": return `CBOR nesting deeper than ${payload.limit}`;
+    case "TooLarge": return `CBOR input of ${payload.len} bytes, over the limit of ${payload.limit}`;
     default: return tag;
   }
 }
@@ -466,16 +477,78 @@ function readFloat64(data, off) {
   return _view.getFloat64(0, false);
 }
 
-function decode(data) {
-  const [v, off] = dec(data, 0);
-  if (off !== data.length) throw new DecodeError("TrailingBytes");
+// Decode one item that fills `data` (CD-E5), under the bounds its caller passes (CD-B3):
+// `decode(data, { maxDepth, maxEncodedLen })`. With a length bound, input longer than it
+// is TooLarge{len, limit} before a byte is read. A top-level array or map has depth 1,
+// and one deeper than the depth bound is TooDeep{limit} once its head is read, `limit`
+// naming the bound applied: 32 where none is given, the ceiling where it is above it.
+function decode(data, options = {}) {
+  const { maxDepth, maxEncodedLen } = decodeBounds(options);
+  if (maxEncodedLen !== null && data.length > maxEncodedLen) {
+    throw new DecodeError("TooLarge", { len: data.length, limit: maxEncodedLen });
+  }
+  const [v, off] = dec(data, 0, 0, maxDepth);
+  if (off !== data.length) {
+    throw new DecodeError("TrailingBytes");
+  }
   return v;
 }
 
-// One item's head, then its body (CD-E5). The major type is checked before the
-// additional info: major 6 is UnsupportedMajor whatever its info, and info 28-31 is
+// A bound as a caller's error names it: a number itself, else its type.
+function describeBound(value) {
+  return typeof value === "number" ? String(value) : `a ${typeof value}`;
+}
+
+// The bounds decode applies: `maxDepth`, 32 where it is absent and at most the ceiling;
+// `maxEncodedLen`, none where it is absent or null. A depth below 1 or a negative length
+// is the caller's error, a RangeError; a bound that is not an integer, an option decode
+// does not know, or options that are not an object, a TypeError. Neither is a
+// DecodeError, and each is thrown before a byte is read.
+function decodeBounds(options) {
+  if (typeof options !== "object" || options === null) {
+    throw new TypeError(`decode options must be an object, not ${options === null ? "null" : `a ${typeof options}`}`);
+  }
+  for (const name of Object.keys(options)) {
+    if (name !== "maxDepth" && name !== "maxEncodedLen") {
+      throw new TypeError(`unknown decode option ${name}; known: maxDepth, maxEncodedLen`);
+    }
+  }
+  let maxDepth = DEFAULT_MAX_DEPTH;
+  if (options.maxDepth !== undefined) {
+    if (!Number.isInteger(options.maxDepth)) {
+      throw new TypeError(`maxDepth must be an integer, not ${describeBound(options.maxDepth)}`);
+    }
+    if (options.maxDepth < 1) {
+      throw new RangeError(`maxDepth must be at least 1, not ${options.maxDepth}`);
+    }
+    maxDepth = Math.min(options.maxDepth, MAX_DEPTH_CEILING);
+  }
+  let maxEncodedLen = null;
+  if (options.maxEncodedLen !== undefined && options.maxEncodedLen !== null) {
+    if (!Number.isInteger(options.maxEncodedLen)) {
+      throw new TypeError(`maxEncodedLen must be an integer or null, not ${describeBound(options.maxEncodedLen)}`);
+    }
+    if (options.maxEncodedLen < 0) {
+      throw new RangeError(`maxEncodedLen must not be negative, not ${options.maxEncodedLen}`);
+    }
+    maxEncodedLen = options.maxEncodedLen;
+  }
+  return { maxDepth, maxEncodedLen };
+}
+
+// An array or map whose head is read, inside `depth` others: refused before its first
+// item if it would sit deeper than `limit` (CD-B2).
+function enter(depth, limit) {
+  if (depth >= limit) {
+    throw new DecodeError("TooDeep", { limit });
+  }
+}
+
+// One item's head, then its body (CD-E5), inside `depth` arrays and maps, under depth
+// bound `limit`, so it recurses at most `limit` deep. The major type is checked before
+// the additional info: major 6 is UnsupportedMajor whatever its info, and info 28-31 is
 // UnsupportedInfo from readArg (majors 0-5) or the major-7 arm.
-function dec(data, off0) {
+function dec(data, off0, depth, limit) {
   if (off0 >= data.length) {
     throw new DecodeError("Truncated");
   }
@@ -506,9 +579,10 @@ function dec(data, off0) {
     }
     case 4: {
       let [n, o] = readCount(data, off, info);
+      enter(depth, limit);
       const a = [];
       for (let i = 0; i < n; i++) {
-        const [v, o2] = dec(data, o);
+        const [v, o2] = dec(data, o, depth + 1, limit);
         a.push(v);
         o = o2;
       }
@@ -516,32 +590,49 @@ function dec(data, off0) {
     }
     case 5: {
       let [n, o] = readCount(data, off, info);
+      enter(depth, limit);
       const m = [];
       const seen = new Set();
       for (let i = 0; i < n; i++) {
-        const [k, o2] = dec(data, o);
-        if (!k || k.kind !== INT) throw new DecodeError("NonIntegerMapKey");
-        if (k.i < 0n) throw new DecodeError("NegativeMapKey", { key: k.i });
+        const [k, o2] = dec(data, o, depth + 1, limit);
+        if (!k || k.kind !== INT) {
+          throw new DecodeError("NonIntegerMapKey");
+        }
+        if (k.i < 0n) {
+          throw new DecodeError("NegativeMapKey", { key: k.i });
+        }
         const rawKey = normalizeMapKeyForDecode(k.i);
         const id = mapKeyId(rawKey);
-        if (seen.has(id)) throw new DecodeError("DuplicateMapKey", { key: rawKey });
+        if (seen.has(id)) {
+          throw new DecodeError("DuplicateMapKey", { key: rawKey });
+        }
         seen.add(id);
-        const [v, o3] = dec(data, o2);
+        const [v, o3] = dec(data, o2, depth + 1, limit);
         m.push([rawKey, v]);
         o = o3;
       }
       return [rawCMap(m), o];
     }
     case 7:
-      if (info === 20) return [CBool(false), off];
-      if (info === 21) return [CBool(true), off];
-      if (info === 22) return [CNull(), off];
+      if (info === 20) {
+        return [CBool(false), off];
+      }
+      if (info === 21) {
+        return [CBool(true), off];
+      }
+      if (info === 22) {
+        return [CNull(), off];
+      }
       if (info === 25) {
         requireBytes(data, off, 2);
         return [CFloat(halfToNumber((data[off] << 8) | data[off + 1])), off + 2];
       }
-      if (info === 26) return [CFloat(readFloat32(data, off)), off + 4];
-      if (info === 27) return [CFloat(readFloat64(data, off)), off + 8];
+      if (info === 26) {
+        return [CFloat(readFloat32(data, off)), off + 4];
+      }
+      if (info === 27) {
+        return [CFloat(readFloat64(data, off)), off + 8];
+      }
       throw new DecodeError("UnsupportedInfo", { info });
     default:
       throw new DecodeError("UnsupportedMajor", { major });
@@ -549,6 +640,8 @@ function dec(data, off0) {
 }
 
 module.exports = {
+  DEFAULT_MAX_DEPTH,
+  MAX_DEPTH_CEILING,
   CInt,
   CFloat,
   CText,

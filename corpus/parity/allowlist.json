@@ -16,18 +16,6 @@
       "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.rust builds rust's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
     },
     {
-      "target": "js",
-      "phase": "D1",
-      "owner": "codec-parity",
-      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.js builds js's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
-    },
-    {
-      "target": "js/fc",
-      "phase": "D1",
-      "owner": "codec-parity",
-      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.js builds js's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
-    },
-    {
       "target": "cpp",
       "phase": "D1",
       "owner": "codec-parity",

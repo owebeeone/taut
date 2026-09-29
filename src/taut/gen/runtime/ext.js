@@ -6,10 +6,12 @@
 //
 // They fail closed (TautCheckedDecode.md CD-E4): for any host bytes each returns or
 // throws DecodeError, nothing else, and a host that is not a map is WrongType{map}.
-// A tag below the band is the caller's error, a RangeError thrown before the host
-// is read.
+// Not knowing the host's root, they read it at the depth ceiling with no length
+// bound, the only bounds every valid host meets, and leave the host's own bounds to
+// its reader (TautOptions.md G3). A tag below the band is the caller's error, a
+// RangeError thrown before the host is read.
 
-const { CMap, decode, encode, expectMap } = require("./cbor.js");
+const { CMap, MAX_DEPTH_CEILING, decode, encode, expectMap } = require("./cbor.js");
 
 const BAND_START = 2 ** 20;
 
@@ -21,7 +23,7 @@ function checkTag(tag) {
 
 function hostMap(hostBytes, tag) {
   checkTag(tag);
-  return expectMap(decode(hostBytes));
+  return expectMap(decode(hostBytes, { maxDepth: MAX_DEPTH_CEILING }));
 }
 
 function extSet(hostBytes, tag, value) {

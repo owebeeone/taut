@@ -12,9 +12,13 @@ import textwrap
 import pytest
 from taut import cli, ext
 from taut.corpus.build import IR_PATH
+from taut.corpus import parity, parity_js, toolchains
 from taut.corpus import resext_build as rb
 from taut.gen import js, scaffold
-from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, schema as mk
+from taut.ir import options
+from taut.ir.dsl import (
+    BOOL, FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, Ref, extension, option, schema as mk,
+)
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec
@@ -210,6 +214,22 @@ function decodeAs(message, hex, show) {
     const fields = ["key", "expected"].filter((f) => e[f] !== undefined);
     return [e.tag, ...fields.map((f) => `${f}=${e[f]}`)].join(";");
   }
+}
+
+// A call's outcome as the parity gate reports one: `ok` and the hex of `show(value)`, or the
+// DecodeError's `Tag;field=value...` with every payload field, or `untyped` for anything else.
+const PAYLOAD = ["info", "major", "key", "expected", "enum", "value", "len", "limit"];
+function outcome(call, show) {
+  let value;
+  try {
+    value = call();
+  } catch (e) {
+    if (e == null || e.name !== "DecodeError" || typeof e.tag !== "string") {
+      return `untyped ${e && e.name}: ${e && e.message}`;
+    }
+    return [e.tag, ...PAYLOAD.filter((f) => e[f] !== undefined).map((f) => `${f}=${e[f]}`)].join(";");
+  }
+  return `ok ${toHex(show(value))}`;
 }
 '''
 
@@ -574,3 +594,320 @@ def test_js_resext_residual_and_extension_parity(tmp_path):
     result = subprocess.run([node, str(harness)], check=True, text=True, capture_output=True)
     assert f"seed={RESEXT_FUZZ_SEED}" in result.stdout
     assert "mismatches=0" in result.stdout
+
+
+# --- bounds (D26: TautCheckedDecode.md §3, CD-E4; D27: TautOptions.md OPT-D4, OPT-L6, G3) ----
+
+PARITY_FIXTURE = parity.parity_schema()
+# A file that declares both bounds, a message that overrides one and one that inherits both (as
+# in test_bounds.py), so the generated constants show `effective`'s inheritance.
+FILED = mk(option.max_depth(3), option.max_encoded_len(16),
+           Msg("Tree", F("kids", 1, List(Ref("Tree"))), option.max_depth(64), next_id=2),
+           Msg("Plain", F("v", 1, List(INT)), next_id=2))
+EXT_TAG = BAND_START + 1
+# Python's side of the extension helpers: a file whose tight bounds no helper applies.
+EXT = mk(option.max_depth(2), option.max_encoded_len(8),
+         Msg("Host", F("id", 1, INT), next_id=2),
+         Msg("Decision", F("backend", 1, STR), F("hops", 2, INT), next_id=3),
+         extension("Decision", tag=EXT_TAG))
+
+
+def _nest(opener: str, count: int, leaf: str) -> str:
+    """`count` copies of `opener`, then `leaf`, as hex: `_nest("81", 31, "80")` is 32 arrays."""
+    return opener * count + leaf
+
+
+def _python_outcome(call, show) -> str:
+    """What the prelude's `outcome` reports, from Python, the reference."""
+    try:
+        value = call()
+    except cbor.DecodeError as exc:
+        return parity.format_error(exc.tag, exc.payload)
+    return f"ok {show(value).hex()}"
+
+
+def _js_limits(limits: dict) -> dict:
+    """A raw call's limits, named as Python's `loads` names them, as cbor.js's options (CD-B3)."""
+    names = {"max_depth": "maxDepth", "max_encoded_len": "maxEncodedLen"}
+    return {names[name]: value for name, value in limits.items()}
+
+
+_BIG = cbor.dumps(b"x" * 100_000).hex()
+# Raw inputs beyond the corpus's B rows (as test_cbor.py's), each with the limits its call passes.
+RAW_BOUNDS = [
+    ("", {}),
+    *[(_nest(opener, 31, leaf), {}) for opener, leaf in (("81", "80"), ("a100", "a0"), ("81", "a0"))],
+    *[(_nest(opener, 32, leaf), {})
+      for opener, leaf in (("81", "80"), ("a100", "a0"), ("81", "a0"), ("a100", "80"), ("81", "00"), ("a100", "00"))],
+    *[(_nest("81a100", 16, leaf), {}) for leaf in ("00", "80", "a0")],
+    # a top-level container has depth 1, and a map's key is one of its items
+    *[(hexed, {"max_depth": 1}) for hexed in ("00", "6161", "80", "a0", "8100", "a10000", "820102",
+                                              "8180", "81a0", "a10080", "a100a0", "820180", "a18000")],
+    ("a18000", {"max_depth": 2}),
+    # a depth argument applies as given; above the ceiling, the ceiling
+    *[(_nest("81", count, "80"), {"max_depth": depth})
+      for depth in (1, 2, 5, 31, 33, 64, 127, 128) for count in (depth - 1, depth)],
+    *[(_nest("81", count, "80"), {"max_depth": depth}) for depth in (129, 1000, 2**31, 2**64) for count in (127, 128)],
+    # the depth is checked once a container's head is complete, before its first item
+    (_nest("81", 33, ""), {}), (_nest("a100", 32, "a1"), {}),
+    *[(_nest("81", 32, head), {}) for head in ("9bffffffffffffffff", "bbffffffffffffffff", "98", "9900",
+                                               "9a000000", "9b00", "b8", "bb00000000000000", "9800", "9c", "bf")],
+    # far past any bound, and past node's stack
+    *[(_nest(opener, 100_000, leaf), limits) for opener, leaf in (("81", "80"), ("a100", "a0"), ("81a100", "80"))
+      for limits in ({}, {"max_depth": 128}, {"max_depth": 10**9})],
+    # the length bound, checked before any byte is read; none unless one is passed
+    ("83010203", {"max_encoded_len": 4}), ("83010203", {"max_encoded_len": 2**40}),
+    ("83010203", {"max_encoded_len": 3}), ("c0c0c0c0", {"max_encoded_len": 3}),
+    (_nest("81", 40, "80"), {"max_encoded_len": 10}), (_nest("81", 40, "80"), {"max_depth": 1, "max_encoded_len": 10}),
+    ("0000", {"max_encoded_len": 1}), ("", {"max_encoded_len": 0}), ("00", {"max_encoded_len": 0}),
+    (_BIG, {}), (_BIG, {"max_encoded_len": len(_BIG) // 2}), (_BIG, {"max_encoded_len": len(_BIG) // 2 - 1}),
+]
+
+
+def test_js_raw_decode_applies_the_callers_bounds_as_python_does(tmp_path):
+    """cbor.js's `decode(data, { maxDepth, maxEncodedLen })` (CD-B1-B5, CD-E5): a top-level array
+    or map has depth 1, and one deeper than the bound is TooDeep{limit} once its head is complete;
+    a depth above the ceiling applies the ceiling; a length bound refuses longer input as TooLarge
+    before a byte is read. Each outcome is what Python's `cbor.loads`, the reference, reports."""
+    cases = [[hexed, _js_limits(limits)] for hexed, limits in RAW_BOUNDS]
+    got = _run_js(tmp_path, TEXT_AND_KEYS, f"""
+        const cases = {json.dumps(cases)};
+        console.log(JSON.stringify(cases.map(([hex, limits]) => outcome(() => decode(fromHex(hex), limits), encode))));
+    """)
+    want = [_python_outcome(lambda: cbor.loads(bytes.fromhex(hexed), **limits), cbor.dumps)
+            for hexed, limits in RAW_BOUNDS]
+    assert got == want
+    assert {"TooDeep;limit=1", "TooDeep;limit=32", "TooDeep;limit=128", "TooLarge;len=4;limit=3",
+            "Truncated"} <= set(want)
+
+
+def test_js_raw_decode_refuses_a_bad_bound_as_the_callers_error(tmp_path):
+    """A depth below 1 or a negative length is a RangeError; a bound that is not an integer, an
+    option decode does not know, or options that are not an object, a TypeError. Each is the
+    caller's error, never a DecodeError, thrown before any byte is read (Python's ValueError and
+    TypeError). An absent option, and a null length, is the default."""
+    got = _run_js(tmp_path, TEXT_AND_KEYS, """
+        const refused = {
+          depthZero: { maxDepth: 0 },
+          depthNegative: { maxDepth: -1 },
+          depthFarNegative: { maxDepth: -(2 ** 64) },
+          lengthNegative: { maxEncodedLen: -1 },
+          lengthFarNegative: { maxEncodedLen: -(2 ** 64) },
+          depthNull: { maxDepth: null },
+          depthFraction: { maxDepth: 32.5 },
+          depthText: { maxDepth: "32" },
+          depthBool: { maxDepth: true },
+          depthBigInt: { maxDepth: 32n },
+          depthNaN: { maxDepth: NaN },
+          depthInfinite: { maxDepth: Infinity },
+          lengthFraction: { maxEncodedLen: 4.5 },
+          lengthText: { maxEncodedLen: "4" },
+          lengthBool: { maxEncodedLen: false },
+          lengthBigInt: { maxEncodedLen: 4n },
+          lengthInfinite: { maxEncodedLen: Infinity },
+          unknownOption: { max_depth: 5 },
+          notAnObject: 32,
+          nullOptions: null,
+        };
+        const out = {};
+        for (const [name, options] of Object.entries(refused)) {
+          out[name] = ["", "00", "c0c0c0c0"].map((hex) => {
+            try {
+              decode(fromHex(hex), options);
+            } catch (e) {
+              return e.name;
+            }
+            return "no error";
+          });
+        }
+        const nested = fromHex("818100");
+        out.defaults = [undefined, {}, { maxDepth: undefined, maxEncodedLen: undefined }, { maxEncodedLen: null }]
+          .map((options) => outcome(() => decode(nested, options), encode));
+        out.given = [{ maxDepth: 1 }, { maxDepth: 2 }, { maxEncodedLen: 2 }, { maxEncodedLen: 3 }]
+          .map((options) => outcome(() => decode(nested, options), encode));
+        console.log(JSON.stringify(out));
+    """)
+    ranges = ("depthZero", "depthNegative", "depthFarNegative", "lengthNegative", "lengthFarNegative")
+    assert {name: got.pop(name) for name in ranges} == {name: ["RangeError"] * 3 for name in ranges}
+    assert got.pop("defaults") == ["ok 818100"] * 4
+    assert got.pop("given") == ["TooDeep;limit=1", "ok 818100", "TooLarge;len=3;limit=2", "ok 818100"]
+    assert got == {name: ["TypeError"] * 3 for name in got} and len(got) == 15
+
+
+def test_js_runtime_exports_the_two_depth_numbers(tmp_path):
+    """cbor.js's DEFAULT_MAX_DEPTH and MAX_DEPTH_CEILING are taut's (CD-B3)."""
+    got = _run_js(tmp_path, TEXT_AND_KEYS, """
+        const { DEFAULT_MAX_DEPTH, MAX_DEPTH_CEILING } = require("./cbor.js");
+        console.log(JSON.stringify([DEFAULT_MAX_DEPTH, MAX_DEPTH_CEILING]));
+    """)
+    assert got == [options.DEFAULT_MAX_DEPTH, options.MAX_DEPTH_CEILING] == [32, 128]
+
+
+def test_js_messages_carry_their_effective_bounds_as_constants(tmp_path):
+    """Each generated class has MAX_DEPTH and MAX_ENCODED_LEN, null for none: its effective values,
+    as `taut.ir.options.effective` resolves them at generation, the file's where the message
+    declares none (CD-B3, CD-V2; TautOptions.md OPT-D3). They are constants: assigning one throws
+    in strict code and changes nothing."""
+    for name, schema in (("fixture", PARITY_FIXTURE), ("filed", FILED)):
+        got = _run_js(tmp_path / name, schema, """
+            const bounds = {};
+            for (const [name, value] of Object.entries(api)) {
+              if (typeof value === "function" && typeof value.fromCbor === "function") {
+                bounds[name] = [value.MAX_DEPTH, value.MAX_ENCODED_LEN];
+              }
+            }
+            const first = Object.keys(bounds)[0];
+            let assigned = "no error";
+            try {
+              api[first].MAX_DEPTH = 1;
+            } catch (e) {
+              assigned = e.name;
+            }
+            console.log(JSON.stringify({ bounds, assigned, after: api[first].MAX_DEPTH }));
+        """)
+        assert got["bounds"] == {message: [options.effective(schema, "max_depth", message=message),
+                                           options.effective(schema, "max_encoded_len", message=message)]
+                                 for message in schema.messages}, name
+        first = next(iter(schema.messages))
+        assert (got["assigned"], got["after"]) == ("TypeError", got["bounds"][first][0]), name
+    assert got["bounds"] == {"Tree": [64, 16], "Plain": [3, 16]}
+
+
+# Typed inputs beyond the corpus's B rows (as test_bounds.py's): a message's own bounds and its file's.
+TYPED_BOUNDS = [
+    (FILED, "Tree", "a10181a10180"),                    # Tree{[Tree{[]}]}: 4 deep, its own 64
+    (FILED, "Plain", "a10181818100"),                   # 4 deep, the file's 3, before WrongType{int}
+    (FILED, "Plain", "a1018d" + "00" * 13),             # 16 bytes, the file's length bound
+    (FILED, "Plain", "a1018e" + "00" * 14),             # 17 bytes
+    (FILED, "Tree", "a1018e" + "00" * 14),              # its own depth, the file's length
+    *[(PARITY_FIXTURE, message, _nest(opener, 100_000, "80"))
+      for message, opener in (("Tree64", "a10181"), ("Tree128", "a10181"), ("Holds64", "a10181"), ("IntBox", "81"))],
+]
+
+
+def test_js_typed_decode_applies_its_roots_bounds(tmp_path):
+    """`X.decode(bytes)` applies X.MAX_DEPTH and X.MAX_ENCODED_LEN through the raw decode, then
+    `fromCbor` (CD-B3; TautOptions.md OPT-D4, OPT-L6): the root's own bounds, else its file's, and
+    input 100,000 deep is TooDeep at the root's bound. Each outcome is what Python's
+    `codec.decode` reports."""
+    for name, schema in (("fixture", PARITY_FIXTURE), ("filed", FILED)):
+        cases = [[message, hexed] for owner, message, hexed in TYPED_BOUNDS if owner is schema]
+        got = _run_js(tmp_path / name, schema, f"""
+            const cases = {json.dumps(cases)};
+            console.log(JSON.stringify(cases.map(([message, hex]) =>
+              outcome(() => api[message].decode(fromHex(hex)), (value) => encode(value.toCbor())))));
+        """)
+        want = [_python_outcome(lambda: codec.decode(schema, message, bytes.fromhex(hexed)),
+                                lambda value: codec.encode(schema, message, value))
+                for message, hexed in cases]
+        assert got == want, name
+    assert want == ["ok a10181a10180", "TooDeep;limit=3", "ok a1018d" + "00" * 13,
+                    "TooLarge;len=17;limit=16", "TooLarge;len=17;limit=16"]
+
+
+def test_js_typed_decode_takes_no_bound(tmp_path):
+    """No call can raise or lower its root's bounds (CD-B3): `decode` takes the bytes alone, and a
+    second argument changes nothing."""
+    row = next(row for row in parity.bounds_rows() if row["name"] == "depth-65-declared")
+    got = _run_js(tmp_path, PARITY_FIXTURE, f"""
+        const deep = fromHex("{parity.row_bytes(row).hex()}");
+        console.log(JSON.stringify([
+          api.Tree64.decode.length,
+          outcome(() => api.Tree64.decode(deep, {{ maxDepth: 128 }}), (value) => encode(value.toCbor())),
+        ]));
+    """)
+    assert got == [1, "TooDeep;limit=64"]
+
+
+def _ext_host(arrays: int) -> bytes:
+    """A host map whose unknown field 7 holds `arrays` nested arrays: 1 + `arrays` deep."""
+    return bytes.fromhex("a107" + _nest("81", arrays - 1, "80"))
+
+
+def test_js_extension_helpers_read_a_host_at_the_ceiling_with_no_length_bound(tmp_path):
+    """The helpers cannot name the host's root, so they read it at the depth ceiling with no length
+    bound, the only bounds every valid host meets (CD-E4; TautOptions.md G3), as Python's do: a
+    host 128 deep is read and one 129 deep is TooDeep{128}, and a host of 100,000 bytes is read,
+    whatever its file declares."""
+    hosts = {"at-ceiling": _ext_host(127), "over-ceiling": _ext_host(128), "far-over": _ext_host(100_000),
+             "big": cbor.dumps({1: 1, 7: b"x" * 100_000})}
+    decision = {"backend": "b7", "hops": 1}
+    got = _run_js(tmp_path, TEXT_AND_KEYS, f"""
+        const {{ CInt, CMap, CText }} = require("./cbor.js");
+        const {{ extClear, extGet, extSet }} = require("./ext.js");
+        const hosts = {json.dumps({name: host.hex() for name, host in hosts.items()})};
+        const out = {{}};
+        for (const [name, hex] of Object.entries(hosts)) {{
+          const host = fromHex(hex);
+          out[name] = [
+            outcome(() => extGet(host, {EXT_TAG}), (value) => (value === null ? new Uint8Array(0) : encode(value))),
+            outcome(() => extSet(host, {EXT_TAG}, CMap([[1, CText("b7")], [2, CInt(1n)]])), (bytes) => bytes),
+            outcome(() => extClear(host, {EXT_TAG}), (bytes) => bytes),
+          ];
+        }}
+        console.log(JSON.stringify(out));
+    """)
+    want = {name: [
+        _python_outcome(lambda: ext.ext_get(EXT, host, "Decision", EXT_TAG), lambda value: b""),
+        _python_outcome(lambda: ext.ext_set(EXT, host, "Decision", EXT_TAG, decision), lambda wire: wire),
+        _python_outcome(lambda: ext.ext_clear(host, EXT_TAG), lambda wire: wire),
+    ] for name, host in hosts.items()}
+    assert got == want
+    assert got["over-ceiling"] == got["far-over"] == ["TooDeep;limit=128"] * 3
+    assert got["big"][2] == f"ok {hosts['big'].hex()}"
+
+
+def _needs_node() -> None:
+    if toolchains.find_node() is None:
+        pytest.skip("node is not installed")
+
+
+def test_js_parity_gate_is_green():
+    """`tautc parity -t js`: every int, malformed and bounds row through the generated JS codec,
+    as js and js/fc, each held to the gate's governance: GREEN, or RED and allowlisted."""
+    _needs_node()
+    reports, violations = parity.governed_variants(parity_js.run)
+    assert violations == [], "\n".join(violations)
+    assert [(report.target, report.available) for report in reports] == [("js", True), ("js/fc", True)]
+
+
+def test_the_js_runner_reports_its_runtimes_own_constants(monkeypatch):
+    """The #constants line comes from cbor.js's DEFAULT_MAX_DEPTH and MAX_DEPTH_CEILING (the bounds
+    protocol, item 1), so a runtime whose default drifts fails its target."""
+    _needs_node()
+    generate = parity.generate
+
+    def drifted(name, out_dir, **emit_options):
+        failed = generate(name, out_dir, **emit_options)
+        runtime = out_dir / "js" / "cbor.js"
+        source = runtime.read_text()
+        assert "const DEFAULT_MAX_DEPTH = 32;" in source
+        runtime.write_text(source.replace("const DEFAULT_MAX_DEPTH = 32;", "const DEFAULT_MAX_DEPTH = 31;"))
+        return failed
+
+    monkeypatch.setattr(parity, "generate", drifted)
+    report = parity_js.run()
+    assert report.fault.splitlines()[0] == (
+        "#constants default_max_depth=31;max_depth_ceiling=128, expected default_max_depth=32;max_depth_ceiling=128")
+
+
+def test_the_js_runner_reports_a_row_that_expands_to_another_length_as_untyped(monkeypatch):
+    """The runner expands a row's segments itself and reports an expansion whose length is not the
+    row's `len` as untyped (the bounds protocol, item 5), a from_cbor row with its bounds."""
+    _needs_node()
+    write = parity.write_json_rows
+
+    def misstated(dest, schema=None):
+        write(dest, schema)
+        path = dest / parity.BOUNDS_VECTORS.name
+        data = json.loads(path.read_text())
+        for row in data["vectors"]:
+            if row["name"] in ("depth-33-arrays", "depth-2-declared"):
+                row["len"] += 1
+        path.write_text(json.dumps(data))
+
+    monkeypatch.setattr(parity, "write_json_rows", misstated)
+    report = parity_js.run()
+    assert not report.fault
+    assert {r.name: r.detail.split(" ")[0] for r in report.failures} == {
+        "depth-33-arrays": "untyped", "depth-2-declared": "untyped"}

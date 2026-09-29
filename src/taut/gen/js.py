@@ -5,11 +5,17 @@ int); optionals are nullable, and an `optional=MISSING_OK` field also reads an
 absent key as null; forward-compat residual rides along (cbor.js's
 encode sorts map keys). Codec integer fields are BigInt so every i64 value is
 exact.
+
+Each class is a decode root (TautCheckedDecode.md CD-B3, TautOptions.md OPT-L6): it
+carries its effective bounds as read-only `MAX_DEPTH` and `MAX_ENCODED_LEN` (null for
+none), resolved by `taut.ir.options.effective` here at generation, and `decode(bytes)`
+applies both through cbor.js's raw decode before `fromCbor`.
 """
 
 from __future__ import annotations
 
 from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.options import effective
 
 
 def _key_order(key: TypeRef) -> str:
@@ -67,9 +73,17 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     ]
 
 
-def _emit_message(msg, forward_compat: bool = False) -> list[str]:
+def _emit_message(schema: Schema, msg, forward_compat: bool = False) -> list[str]:
     wire = list(msg.wire_fields())
-    out = [f"class {msg.name} {{", "  constructor(o = {}) {"]
+    max_depth = effective(schema, "max_depth", message=msg.name)
+    max_encoded_len = effective(schema, "max_encoded_len", message=msg.name)
+    out = [
+        f"class {msg.name} {{",
+        # The decode root's effective bounds (CD-B3), read-only so no caller can change them.
+        f"  static get MAX_DEPTH() {{ return {max_depth}; }}",
+        f"  static get MAX_ENCODED_LEN() {{ return {'null' if max_encoded_len is None else max_encoded_len}; }}",
+        "  constructor(o = {}) {",
+    ]
     for f in msg.fields:
         out.append(f"    this.{f.name} = o.{f.name};")
     if forward_compat:
@@ -109,6 +123,11 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
         out.append(f"    {{ const k = new Set([{known}]); v.wireResidual = cmapEntries(c).filter((kv) => !k.has(kv[0])); }}")
     out.append("    return v;")
     out.append("  }")
+    # decode: bytes -> this message, under its own bounds and no caller's (CD-B3)
+    out.append("  static decode(bytes) {")
+    out.append(f"    return {msg.name}.fromCbor(decode(bytes, "
+               f"{{ maxDepth: {msg.name}.MAX_DEPTH, maxEncodedLen: {msg.name}.MAX_ENCODED_LEN }}));")
+    out.append("  }")
     out.append("}")
     return out
 
@@ -116,7 +135,7 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
 def emit_types(schema: Schema, forward_compat: bool = False) -> str:
     out = ['"use strict";',
            "// GENERATED native JS types + codec — do not edit. Pairs with cbor.js.",
-           'const { CInt, CFloat, CText, CBytes, CBool, CArr, CMap, CNull, cget, cgetOrNull, mapFromCbor, cmapEntries, compareCodePoints, isNull, expectInt, expectFloat, expectText, expectBytes, expectBool, expectArray, expectMap, enumFromWire, enumFromCbor } = require("./cbor.js");',
+           'const { CInt, CFloat, CText, CBytes, CBool, CArr, CMap, CNull, cget, cgetOrNull, mapFromCbor, cmapEntries, compareCodePoints, isNull, expectInt, expectFloat, expectText, expectBytes, expectBool, expectArray, expectMap, enumFromWire, enumFromCbor, decode } = require("./cbor.js");',
            ""]
     names = []
     for e in schema.enums.values():
@@ -125,7 +144,7 @@ def emit_types(schema: Schema, forward_compat: bool = False) -> str:
         names.append(f"{e.name}FromWire")
         names.append(f"{e.name}FromCbor")
     for m in schema.messages.values():
-        out += _emit_message(m, forward_compat) + [""]
+        out += _emit_message(schema, m, forward_compat) + [""]
         names.append(m.name)
     out.append("module.exports = { " + ", ".join(names) + " };")
     return "\n".join(out) + "\n"
