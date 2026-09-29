@@ -3,6 +3,17 @@
 // subset (int, float, bytes, text, array, int-keyed map, bool, null), same core
 // deterministic encoding (definite length, shortest-form ints, ascending map
 // keys). Maps use integer keys only — they carry field tags.
+//
+// Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one
+// more than the arrays and maps around it, and one deeper than the call's depth
+// bound is TooDeep{limit}; with a length bound, longer input is TooLarge{len,
+// limit} before a byte is read. For any input bytes `decode` returns a value or
+// throws DecodeError, nothing else.
+
+// The depth bound where a call passes none, and the deepest bound any call applies
+// (CD-B1, CD-B3). The parity corpus pins both to taut's (TautOptions.md OPT-L1).
+export const DEFAULT_MAX_DEPTH = 32;
+export const MAX_DEPTH_CEILING = 128;
 
 export class CborFloat {
   readonly value: number;
@@ -41,7 +52,9 @@ export type DecodeErrorTag =
   | "WrongType"
   | "UnknownEnum"
   | "NonCanonicalInt"
-  | "NegativeMapKey";
+  | "NegativeMapKey"
+  | "TooDeep"
+  | "TooLarge";
 
 export interface DecodeErrorFields {
   info?: number;
@@ -50,6 +63,8 @@ export interface DecodeErrorFields {
   value?: string;
   expected?: string;
   enum?: string;
+  len?: number; // TooLarge: the input's length
+  limit?: number; // TooDeep and TooLarge: the bound applied
 }
 
 export class DecodeError extends Error {
@@ -60,6 +75,8 @@ export class DecodeError extends Error {
   readonly value?: string;
   readonly expected?: string;
   readonly enum?: string;
+  readonly len?: number;
+  readonly limit?: number;
 
   constructor(tag: DecodeErrorTag, fields: DecodeErrorFields = {}) {
     const detail = Object.entries(fields).map(([k, v]) => `${k}=${String(v)}`).join(" ");
@@ -384,7 +401,17 @@ function readCount(data: Uint8Array, off: number, info: number): [number, number
   return [Number(n < cap ? n : cap), o];
 }
 
-function dec(data: Uint8Array, off: number): [CborValue, number] {
+// A container whose head is read, inside `depth` others: refused before its first
+// item if it would sit deeper than `limit` (CD-B2). So a torn head is Truncated, and
+// a complete one too deep is TooDeep even if its items are missing.
+function enter(depth: number, limit: number): void {
+  if (depth >= limit) {
+    throw new DecodeError("TooDeep", { limit });
+  }
+}
+
+// The item at `off`, inside `depth` arrays and maps, under depth bound `limit`.
+function dec(data: Uint8Array, off: number, depth: number, limit: number): [CborValue, number] {
   requireBytes(data, off, 1);
   const initial = data[off];
   const major = initial >> 5;
@@ -418,9 +445,10 @@ function dec(data: Uint8Array, off: number): [CborValue, number] {
   }
   if (major === 4) {
     let [n, o] = readCount(data, off, info);
+    enter(depth, limit);
     const arr: CborValue[] = [];
     for (let i = 0; i < n; i++) {
-      const [v, o2] = dec(data, o);
+      const [v, o2] = dec(data, o, depth + 1, limit);
       arr.push(v);
       o = o2;
     }
@@ -428,11 +456,12 @@ function dec(data: Uint8Array, off: number): [CborValue, number] {
   }
   if (major === 5) {
     let [n, o] = readCount(data, off, info);
+    enter(depth, limit);
     const m = new Map<MapKey, CborValue>();
     for (let i = 0; i < n; i++) {
       // The key first: its item, then NonIntegerMapKey, NegativeMapKey and
       // DuplicateMapKey, and only then the value (CD-E5).
-      const [k, o2] = dec(data, o);
+      const [k, o2] = dec(data, o, depth + 1, limit);
       if (typeof k !== "bigint") {
         throw new DecodeError("NonIntegerMapKey");
       }
@@ -443,7 +472,7 @@ function dec(data: Uint8Array, off: number): [CborValue, number] {
       if (m.has(key)) {
         throw new DecodeError("DuplicateMapKey", { key });
       }
-      const [v, o3] = dec(data, o2);
+      const [v, o3] = dec(data, o2, depth + 1, limit);
       m.set(key, v);
       o = o3;
     }
@@ -481,8 +510,57 @@ function dec(data: Uint8Array, off: number): [CborValue, number] {
   throw new DecodeError("UnsupportedMajor", { major });
 }
 
-export function decode(data: Uint8Array): CborValue {
-  const [value, off] = dec(data, 0);
-  if (off !== data.length) throw new DecodeError("TrailingBytes");
+// What a raw decode call may pass (CD-B3, CD-B4): a depth bound, DEFAULT_MAX_DEPTH
+// when absent and capped at MAX_DEPTH_CEILING, and a length bound in bytes, none when
+// absent or null. A typed decode passes its root's effective values (codec.ts).
+export interface DecodeLimits {
+  maxDepth?: number;
+  maxEncodedLen?: number | null;
+}
+
+// The depth bound a call applies. A value that is not an integer of at least 1 is the
+// caller's error, not the input's: a TypeError or RangeError, never a DecodeError.
+function depthBound(maxDepth: unknown): number {
+  if (maxDepth === undefined) {
+    return DEFAULT_MAX_DEPTH;
+  }
+  if (typeof maxDepth !== "number") {
+    throw new TypeError(`maxDepth must be an integer, not ${String(maxDepth)}`);
+  }
+  if (!Number.isInteger(maxDepth) || maxDepth < 1) {
+    throw new RangeError(`maxDepth must be an integer of at least 1, not ${maxDepth}`);
+  }
+  return Math.min(maxDepth, MAX_DEPTH_CEILING);
+}
+
+// The length bound a call applies, or null for none; as for depth, a bad one is the
+// caller's error.
+function lengthBound(maxEncodedLen: unknown): number | null {
+  if (maxEncodedLen === undefined || maxEncodedLen === null) {
+    return null;
+  }
+  if (typeof maxEncodedLen !== "number") {
+    throw new TypeError(`maxEncodedLen must be an integer or null, not ${String(maxEncodedLen)}`);
+  }
+  if (!Number.isInteger(maxEncodedLen) || maxEncodedLen < 0) {
+    throw new RangeError(`maxEncodedLen must be a non-negative integer, not ${maxEncodedLen}`);
+  }
+  return maxEncodedLen;
+}
+
+// Decode one item that fills `data`, throwing DecodeError on any fault (CD-E5): with
+// a length bound, longer input is TooLarge before any byte is read; a top-level array
+// or map has depth 1, and one deeper than the depth bound is TooDeep{limit}, the
+// bound applied, once its head is read.
+export function decode(data: Uint8Array, limits: DecodeLimits = {}): CborValue {
+  const limit = depthBound(limits.maxDepth);
+  const maxLen = lengthBound(limits.maxEncodedLen);
+  if (maxLen !== null && data.length > maxLen) {
+    throw new DecodeError("TooLarge", { len: data.length, limit: maxLen });
+  }
+  const [value, off] = dec(data, 0, 0, limit);
+  if (off !== data.length) {
+    throw new DecodeError("TrailingBytes");
+  }
   return value;
 }

@@ -7,8 +7,8 @@ parity corpus's bytes; the fixture's messages, valid and with a value replaced, 
 a key added; each of those cut short, with a byte changed or with a head spliced in; and random
 bytes. Each input goes through every entry point: the raw decode, each message's typed decode,
 the enum's, TypeScript's `decodeRef` at roots that are not messages, and the three extension
-helpers with the input as their host. Deep nesting waits on D1, the depth bound: its tests are
-strict xfails.
+helpers with the input as their host. Deep nesting is TooDeep in TypeScript, which D1 bounded;
+JavaScript's deep-nesting test waits on its own D1 step, a strict xfail.
 """
 
 from __future__ import annotations
@@ -342,7 +342,8 @@ def test_js_deep_nesting_is_too_deep_at_every_entry_point(tmp_path):
     assert _mismatches(DEEP, report, [_js_view(_python(bytes.fromhex(h))) for h in DEEP]) == []
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=D1_DEPTH)
 def test_typescript_deep_nesting_is_too_deep_at_every_entry_point(tmp_path):
+    """TooDeep{32} at every root with the default bounds, and TooDeep{128} for the extension
+    helpers, which read a host at the ceiling (TautOptions.md G3)."""
     report = _ts_report(tmp_path, DEEP)
     assert _mismatches(DEEP, report, [_python(bytes.fromhex(h)) for h in DEEP]) == []

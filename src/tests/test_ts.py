@@ -8,12 +8,14 @@ import json
 import random
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from taut import cli, ext
+from taut.corpus import parity, parity_typescript, toolchains
 from taut.corpus import resext_build as rb
 from taut.gen import scaffold
 from taut.ir.dsl import (
@@ -21,7 +23,8 @@ from taut.ir.dsl import (
 )
 from taut.ir.export import export_to
 from taut.ir.load import load_schema
-from taut.ir.options import effective_map
+from taut.ir.model import ListOf, MsgRef, Scalar, TypeRef
+from taut.ir.options import DEFAULT_MAX_DEPTH, MAX_DEPTH_CEILING, effective_map
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec
 
@@ -435,7 +438,7 @@ def _run_node_tests(node: str, ts_dir: Path, harness: Path) -> None:
 # by name and a string tag (TautCheckedDecode.md CD-E3), and is reported as its tag
 # and payload fields, as strings, the way the parity gate compares them (CD-C4).
 _TS_OUTCOME = """
-const PAYLOAD = ["info", "major", "key", "expected", "enum", "value"];
+const PAYLOAD = ["info", "major", "key", "expected", "enum", "value", "len", "limit"];
 
 function hexToBytes(hex: string): Uint8Array {
   return Uint8Array.from(Buffer.from(hex, "hex"));
@@ -532,12 +535,18 @@ _RAW_EDGES = [
 ]
 
 
-def _python_raw_outcome(hex_bytes: str) -> dict[str, str]:
+def _python_outcome(call: Callable[[], Any]) -> dict[str, str]:
+    """`call()`'s outcome as `_TS_OUTCOME`'s `outcome` reports one: a DecodeError's tag and
+    payload, as strings, or accept."""
     try:
-        cbor.loads(bytes.fromhex(hex_bytes))
+        call()
     except cbor.DecodeError as exc:
         return {"tag": exc.tag, **{name: str(value) for name, value in exc.payload.items()}}
     return {"accept": "true"}
+
+
+def _python_raw_outcome(hex_bytes: str, limits: dict[str, Any] | None = None) -> dict[str, str]:
+    return _python_outcome(lambda: cbor.loads(bytes.fromhex(hex_bytes), **(limits or {})))
 
 
 def test_typescript_checked_decode_matches_python_on_lengths_counts_and_keys_if_node(tmp_path):
@@ -975,6 +984,334 @@ test("loadSchema refuses a version, or an effective value, that it cannot honour
 """.lstrip()
     )
     _run_node_tests(node, ts_dir, harness)
+
+
+# Decode bounds (TautCheckedDecode.md §3; TautV010Plan.md D1). Raw decode's (CD-B1-B5, question
+# 1): the default depth where a call passes none, the caller's depth capped at the ceiling, and
+# the caller's length, each at its bound and one beyond it, with the order of checks around them
+# (CD-E5). TypeScript must report what Python, the reference, reports.
+_RAW_BOUNDS: list[tuple[str, str, dict[str, Any]]] = [
+    ("32 arrays, the default bound", "81" * 31 + "80", {}),
+    ("33 arrays", "81" * 32 + "80", {}),
+    ("32 maps", "a100" * 31 + "a0", {}),
+    ("33 maps", "a100" * 32 + "a0", {}),
+    ("an int inside the 32nd array adds no depth", "81" * 32 + "00", {}),
+    ("the 33rd head complete and its item missing", "81" * 33, {}),
+    ("the 33rd head torn", "81" * 32 + "9b00", {}),
+    ("100,000 arrays", "81" * 99_999 + "80", {}),
+    ("100,000 maps", "a100" * 99_999 + "a0", {}),
+    ("an array as a map key, at the default", "a18000", {}),
+    ("depth 1: an empty array", "80", {"max_depth": 1}),
+    ("depth 1: a map of ints", "a10100", {"max_depth": 1}),
+    ("depth 1: an array in an array", "8180", {"max_depth": 1}),
+    ("depth 1: an array as a map value", "a10180", {"max_depth": 1}),
+    ("depth 1: an array as a map key, depth before the key's type", "a18000", {"max_depth": 1}),
+    ("depth 64", "81" * 63 + "80", {"max_depth": 64}),
+    ("depth 64, one beyond", "81" * 64 + "80", {"max_depth": 64}),
+    ("the ceiling", "81" * 127 + "80", {"max_depth": 128}),
+    ("the ceiling, one beyond", "81" * 128 + "80", {"max_depth": 128}),
+    ("above the ceiling applies the ceiling", "81" * 128 + "80", {"max_depth": 129}),
+    ("far above the ceiling applies the ceiling", "81" * 128 + "80", {"max_depth": 2**53 - 1}),
+    ("100,000 arrays at the ceiling", "81" * 99_999 + "80", {"max_depth": 1000}),
+    ("a length at its bound", "83010203", {"max_encoded_len": 4}),
+    ("a length one beyond", "83010203", {"max_encoded_len": 3}),
+    ("a length beyond, before any byte is read", "c0c0c0c0", {"max_encoded_len": 3}),
+    ("empty at length 0", "", {"max_encoded_len": 0}),
+    ("one byte at length 0", "00", {"max_encoded_len": 0}),
+    ("length before depth", "8180", {"max_depth": 1, "max_encoded_len": 1}),
+    ("depth once the length passes", "8180", {"max_depth": 1, "max_encoded_len": 2}),
+    ("null is no length bound", "8180", {"max_encoded_len": None}),
+]
+
+
+def test_typescript_raw_decode_bounds_depth_and_length_as_python_does_if_node(tmp_path):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+
+    ts_dir = _emit_late(tmp_path)
+    cases = [{"note": note, "hex": h, "limits": limits, "expect": _python_raw_outcome(h, limits)}
+             for note, h, limits in _RAW_BOUNDS]
+    assert {c["expect"].get("tag", "accept") for c in cases} == {
+        "accept", "TooDeep", "TooLarge", "Truncated", "NonIntegerMapKey"}
+    (ts_dir / "raw_bounds.json").write_text(json.dumps({
+        "cases": cases,
+        "numbers": {"default_max_depth": DEFAULT_MAX_DEPTH, "max_depth_ceiling": MAX_DEPTH_CEILING},
+    }))
+
+    harness = ts_dir / "raw_bounds.test.ts"
+    harness.write_text(
+        """
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { DEFAULT_MAX_DEPTH, MAX_DEPTH_CEILING, decode as cborDecode, encode as cborEncode } from "./cbor.ts";
+
+const { cases, numbers } = JSON.parse(readFileSync("raw_bounds.json", "utf8"));
+""".lstrip()
+        + _TS_OUTCOME
+        + """
+// A case's limits as its call passes them; a limit the case leaves out is not passed.
+function limitsOf(c: any): { maxDepth?: number; maxEncodedLen?: number | null } {
+  const limits: { maxDepth?: number; maxEncodedLen?: number | null } = {};
+  if ("max_depth" in c.limits) {
+    limits.maxDepth = c.limits.max_depth;
+  }
+  if ("max_encoded_len" in c.limits) {
+    limits.maxEncodedLen = c.limits.max_encoded_len;
+  }
+  return limits;
+}
+
+function thrown(fn: () => unknown): any {
+  try {
+    fn();
+  } catch (e) {
+    return e;
+  }
+  assert.fail("expected an error");
+}
+
+test("the runtime exports taut's depth numbers: the default bound and the ceiling", () => {
+  assert.equal(DEFAULT_MAX_DEPTH, numbers.default_max_depth);
+  assert.equal(MAX_DEPTH_CEILING, numbers.max_depth_ceiling);
+});
+
+test("raw decode bounds depth and length as Python does", () => {
+  for (const c of cases) {
+    assert.deepEqual(outcome(() => cborDecode(hexToBytes(c.hex), limitsOf(c))), c.expect, c.note);
+  }
+});
+
+test("a value decoded at its bound re-encodes to its bytes", () => {
+  for (const c of cases.filter((c: any) => c.expect.accept)) {
+    assert.equal(bytesToHex(cborEncode(cborDecode(hexToBytes(c.hex), limitsOf(c)))), c.hex, c.note);
+  }
+});
+
+test("TooDeep carries the bound applied, and TooLarge the input's length and the bound, as numbers", () => {
+  const deep = thrown(() => cborDecode(hexToBytes("81".repeat(200) + "80"), { maxDepth: 500 }));
+  assert.equal(deep.name, "DecodeError");
+  assert.equal(deep.tag, "TooDeep");
+  assert.equal(deep.limit, 128);
+  assert.equal(deep.len, undefined);
+  const large = thrown(() => cborDecode(hexToBytes("c0c0"), { maxEncodedLen: 1 }));
+  assert.equal(large.name, "DecodeError");
+  assert.equal(large.tag, "TooLarge");
+  assert.equal(large.len, 2);
+  assert.equal(large.limit, 1);
+});
+
+test("a bound out of range is the caller's error, thrown before a byte is read", () => {
+  const data = hexToBytes("c0"); // never decodes: the caller's error comes first
+  for (const maxDepth of [0, -1, 1.5, NaN, Infinity, -Infinity]) {
+    assert.throws(() => cborDecode(data, { maxDepth }), RangeError, String(maxDepth));
+  }
+  for (const maxEncodedLen of [-1, 0.5, NaN, Infinity, -Infinity]) {
+    assert.throws(() => cborDecode(data, { maxEncodedLen }), RangeError, String(maxEncodedLen));
+  }
+  for (const maxDepth of ["16", 16n, null, true]) {
+    assert.throws(() => cborDecode(data, { maxDepth } as never), TypeError, String(maxDepth));
+  }
+  for (const maxEncodedLen of ["16", 16n, true]) {
+    assert.throws(() => cborDecode(data, { maxEncodedLen } as never), TypeError, String(maxEncodedLen));
+  }
+});
+"""
+    )
+    _run_node_tests(node, ts_dir, harness)
+
+
+# Typed decode's bounds (TautOptions.md OPT-D4, OPT-L6): a call applies its root's effective
+# values, a message's own or, for any other root, the file's. `_bounds_schema`'s file declares
+# depth 16 and length 4096, `Tree` depth 64, `Blob` length 2^20, and `Plain` nothing.
+_TYPED_ROOTS: dict[str, tuple[TypeRef, dict[str, Any]]] = {
+    "Tree": (MsgRef("Tree"), {"k": "msg", "name": "Tree"}),
+    "Blob": (MsgRef("Blob"), {"k": "msg", "name": "Blob"}),
+    "Plain": (MsgRef("Plain"), {"k": "msg", "name": "Plain"}),
+    "list<Tree>": (ListOf(MsgRef("Tree")), {"k": "list", "elem": {"k": "msg", "name": "Tree"}}),
+    "int": (Scalar("int"), {"k": "scalar", "scalar": "int"}),
+}
+_TYPED_BOUNDS: list[tuple[str, str, str]] = [
+    ("Tree at its own depth, 64", "Tree", "a10181" * 31 + "a10180"),
+    ("Tree one beyond", "Tree", "a10181" * 32 + "a10180"),
+    ("list<Tree> at the file's depth, 16: the schema stage decides", "list<Tree>", "81" + "a10181" * 7 + "a0"),
+    ("list<Tree> one beyond: the file's bound, not Tree's", "list<Tree>", "81" + "a10181" * 7 + "a10180"),
+    ("list<Tree> within the file's depth", "list<Tree>", "81" + "a10181" * 6 + "a10180"),
+    ("Plain at the file's depth, in an unknown field", "Plain", "a2010002" + "81" * 14 + "80"),
+    ("Plain one beyond", "Plain", "a2010002" + "81" * 15 + "80"),
+    ("Plain at the file's length", "Plain", "a201000259" + f"{4089:04x}" + "00" * 4089),
+    ("Plain one byte beyond", "Plain", "a201000259" + f"{4090:04x}" + "00" * 4090),
+    ("Plain beyond, before any byte is read", "Plain", "c0" * 4097),
+    ("Tree takes the file's length", "Tree", "c0" * 4097),
+    ("Blob beyond the file's length, within its own", "Blob", "a10159" + f"{4096:04x}" + "00" * 4096),
+    ("an int root takes the file's length", "int", "c0" * 4097),
+    ("an int root", "int", "00"),
+]
+
+
+def test_typescript_typed_decode_applies_its_roots_effective_bounds_if_node(tmp_path):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+
+    s = _bounds_schema()
+    ts_dir = _emit_ts(s, tmp_path, "bounds.ir.json")
+    v2 = json.loads((ts_dir / "bounds.ir.json").read_text())
+    cases = [{"note": note, "root": root, "hex": h,
+              "expect": _python_outcome(lambda root=root, h=h: codec.decode_ref(
+                  s, _TYPED_ROOTS[root][0], bytes.fromhex(h)))}
+             for note, root, h in _TYPED_BOUNDS]
+    assert {c["expect"].get("tag", "accept") for c in cases} == {"accept", "TooDeep", "TooLarge", "MissingKey"}
+    assert {c["expect"].get("limit") for c in cases} == {None, "64", "16", "4096"}
+    (ts_dir / "typed_bounds.json").write_text(json.dumps({
+        "cases": cases,
+        "roots": {name: ref for name, (_, ref) in _TYPED_ROOTS.items()},
+        "v1": _as_version_1(v2),
+    }))
+
+    harness = ts_dir / "typed_bounds.test.ts"
+    harness.write_text(
+        """
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { decode, decodeRef, encodeRef } from "./codec.ts";
+import { loadSchema } from "./schema.ts";
+
+const schema = loadSchema(JSON.parse(readFileSync("bounds.ir.json", "utf8")));
+const { cases, roots, v1 } = JSON.parse(readFileSync("typed_bounds.json", "utf8"));
+""".lstrip()
+        + _TS_OUTCOME
+        + """
+test("typed decode applies its root's effective bounds, as Python does", () => {
+  for (const c of cases) {
+    const ref = roots[c.root];
+    const data = hexToBytes(c.hex);
+    assert.deepEqual(outcome(() => decodeRef(schema, ref, data)), c.expect, c.note);
+    if (ref.k === "msg") {
+      assert.deepEqual(outcome(() => decode(schema, ref.name, data)), c.expect, c.note);
+    }
+  }
+});
+
+test("a value decoded at its root's bounds re-encodes to its bytes", () => {
+  for (const c of cases.filter((c: any) => c.expect.accept)) {
+    const ref = roots[c.root];
+    assert.equal(bytesToHex(encodeRef(schema, ref, decodeRef(schema, ref, hexToBytes(c.hex)))), c.hex, c.note);
+  }
+});
+
+test("a version 1 IR declares nothing: every root decodes at depth 32 with no length bound", () => {
+  const old = loadSchema(v1);
+  const nested = (arrays: number) => hexToBytes("a2010002" + "81".repeat(arrays - 1) + "80");
+  assert.deepEqual(outcome(() => decode(old, "Plain", nested(31))), { accept: "true" });
+  assert.deepEqual(outcome(() => decode(old, "Plain", nested(32))), { tag: "TooDeep", limit: "32" });
+  const list = { k: "list", elem: { k: "msg", name: "Tree" } } as const;
+  const arrays = hexToBytes("81".repeat(32) + "80");
+  assert.deepEqual(outcome(() => decodeRef(old, list, arrays)), { tag: "TooDeep", limit: "32" });
+  const long = hexToBytes("c0".repeat(5000));
+  assert.deepEqual(outcome(() => decode(old, "Plain", long)), { tag: "UnsupportedMajor", major: "6" });
+});
+"""
+    )
+    _run_node_tests(node, ts_dir, harness)
+
+
+def test_typescript_extension_helpers_read_a_host_at_the_depth_ceiling_if_node(tmp_path):
+    """TautOptions.md G3, TautCheckedDecode.md CD-E4: not knowing the host's root, the three
+    helpers read it at the depth ceiling, 128, with no length bound, as Python's do."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+
+    s = _late_schema()
+    ts_dir = _emit_late(tmp_path)
+    tag = BAND_START + 1
+    cases = []
+    for note, h in [
+        ("a host nested to the ceiling", "a101" + "81" * 126 + "80"),
+        ("a host one beyond", "a101" + "81" * 127 + "80"),
+        ("a host 100,000 deep", "a101" + "81" * 99_999 + "80"),
+        ("a host nested to the ceiling that is not a map", "81" * 127 + "80"),
+        ("a host one beyond that is not a map", "81" * 128 + "80"),
+    ]:
+        host = bytes.fromhex(h)
+        case = {"note": note, "hex": h, "expect": _python_outcome(lambda host=host: ext.ext_clear(host, tag))}
+        if "accept" in case["expect"]:
+            case["set"] = ext.ext_set(s, host, "Late", tag, {"note": None}).hex()
+            case["clear"] = ext.ext_clear(host, tag).hex()
+        cases.append(case)
+    assert [c["expect"] for c in cases] == [
+        {"accept": "true"}, {"tag": "TooDeep", "limit": "128"}, {"tag": "TooDeep", "limit": "128"},
+        {"tag": "WrongType", "expected": "map"}, {"tag": "TooDeep", "limit": "128"}]
+    (ts_dir / "ext_depth.json").write_text(json.dumps({"cases": cases, "tag": tag}))
+
+    harness = ts_dir / "ext_depth.test.ts"
+    harness.write_text(
+        """
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { extClear, extGet, extSet } from "./ext.ts";
+
+const { cases, tag } = JSON.parse(readFileSync("ext_depth.json", "utf8"));
+const lateNull = new Map([[1, null]]); // a Late whose note is null
+""".lstrip()
+        + _TS_OUTCOME
+        + """
+test("each helper reads a host at the depth ceiling, as Python does", () => {
+  for (const c of cases) {
+    const host = hexToBytes(c.hex);
+    for (const call of [() => extGet(host, tag), () => extSet(host, tag, lateNull), () => extClear(host, tag)]) {
+      assert.deepEqual(outcome(call), c.expect, c.note);
+    }
+    if (c.expect.accept) {
+      assert.equal(extGet(host, tag), null, c.note);
+      assert.equal(bytesToHex(extSet(host, tag, lateNull)), c.set, c.note);
+      assert.equal(bytesToHex(extClear(host, tag)), c.clear, c.note);
+    }
+  }
+});
+"""
+    )
+    _run_node_tests(node, ts_dir, harness)
+
+
+# The gate's TypeScript runner (parity.py's bounds protocol, TautCheckedDecode.md CD-C4).
+def _needs_node_for_typescript() -> None:
+    if toolchains.find_node_for_typescript() is None:
+        pytest.skip("node with --experimental-strip-types (node >= 22.6) not available")
+
+
+def test_typescript_parity_runner_speaks_the_bounds_protocol_and_every_row_passes():
+    """`tautc parity -t typescript`: the runner prints its runtime's constants once, passes a raw
+    row's limits, decodes each from_cbor row through the typed entry point and reports the bounds
+    it resolved, and expands segmented bytes itself. Every int, malformed and bounds row passes."""
+    _needs_node_for_typescript()
+    report = parity_typescript.run()
+    assert report.green, "\n".join([report.fault, *(f"{r.name}: {r.detail}" for r in report.failures)])
+    kinds = [r.kind for r in report.results]
+    assert kinds.count("bounds") == len(parity.bounds_rows())
+    assert kinds.count("malformed") == len(parity.malformed_rows())
+
+
+def test_typescript_parity_runner_reports_an_expansion_that_is_not_len_as_untyped(tmp_path, monkeypatch):
+    """The bounds protocol, item 5: a row whose bytes, segments or a hex string, expand to other
+    than its `len` is reported `untyped`, not decoded."""
+    _needs_node_for_typescript()
+    doc = json.loads(parity.BOUNDS_VECTORS.read_text())
+    for row in doc["vectors"]:
+        if row["name"] in ("depth-100000-arrays", "size-at-limit"):
+            row["len"] += 1
+    doctored = tmp_path / parity.BOUNDS_VECTORS.name
+    doctored.write_text(json.dumps(doc))
+    monkeypatch.setattr(parity, "BOUNDS_VECTORS", doctored)
+    report = parity_typescript.run()
+    failed = {r.name: r.detail for r in report.failures}
+    assert set(failed) == {"depth-100000-arrays", "size-at-limit"}, failed
+    assert all(detail.startswith("untyped") for detail in failed.values()), failed
+    assert report.fault == ""
 
 
 # taut_client.ts (TautCheckedDecode.md CD-E3): a response that does not decode fails its call,

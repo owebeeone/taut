@@ -3,7 +3,8 @@
 // plain object keyed by field name (enums as member-name strings, bytes as
 // Uint8Array). The wire is a projection of the tagged subset: messages -> CBOR
 // maps keyed by field tag, transient fields skipped, optionals always emitted
-// (null when absent).
+// (null when absent). Decoding bytes is rooted at one type, whose effective bounds,
+// from the IR through SchemaIndex, bound the whole call (decodeRef).
 
 import {
   CborFloat,
@@ -256,8 +257,10 @@ export function encode(schema: SchemaIndex, message: string, value: Native): Uin
   return cborEncode(toWire(schema, { k: "msg", name: message }, value));
 }
 
+// Bytes -> native value, rooted at `message`: its effective bounds, then the strict
+// schema stage (decodeRef).
 export function decode(schema: SchemaIndex, message: string, data: Uint8Array): Native {
-  return fromWire(schema, { k: "msg", name: message }, cborDecode(data));
+  return decodeRef(schema, { k: "msg", name: message }, data);
 }
 
 // TypeRef-driven (for IR-declared method params / outputs / events).
@@ -265,6 +268,13 @@ export function encodeRef(schema: SchemaIndex, tref: TypeRef, value: Native): Ui
   return cborEncode(toWire(schema, tref, value));
 }
 
+// Bytes -> native value, rooted at any type, such as an RPC slot's list<Tree>. The
+// root's effective max_depth and max_encoded_len, a message's own or else the file's,
+// bound the whole call (TautOptions.md OPT-D4, OPT-L6): the raw stage applies them,
+// and a message nested inside changes neither. A typed decode takes no bounds of its
+// own, so no caller can raise or lower its root's.
 export function decodeRef(schema: SchemaIndex, tref: TypeRef, data: Uint8Array): Native {
-  return fromWire(schema, tref, cborDecode(data));
+  const bounds = schema.rootEffective(tref);
+  const tree = cborDecode(data, { maxDepth: bounds.max_depth, maxEncodedLen: bounds.max_encoded_len });
+  return fromWire(schema, tref, tree);
 }

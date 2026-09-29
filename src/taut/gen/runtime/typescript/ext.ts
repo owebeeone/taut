@@ -6,12 +6,15 @@
 //
 // They fail closed (TautCheckedDecode.md CD-E4): for any host bytes each returns or
 // throws DecodeError, nothing else, and a host that is not a map is WrongType{map}.
-// A tag below the band is the caller's error, a RangeError thrown before the host
-// is read.
+// Not knowing the host's root, they read it at the depth ceiling with no length
+// bound, the only bounds every valid host meets, and leave the host's own bounds to
+// its reader (TautOptions.md G3). A tag below the band is the caller's error, a
+// RangeError thrown before the host is read.
 
 import {
   type CborValue,
   DecodeError,
+  MAX_DEPTH_CEILING,
   type MapKey,
   decode as cborDecode,
   encode as cborEncode,
@@ -26,7 +29,7 @@ function checkTag(tag: number): void {
 }
 
 function decodeHostMap(host: Uint8Array): Map<MapKey, CborValue> {
-  const top = cborDecode(host);
+  const top = cborDecode(host, { maxDepth: MAX_DEPTH_CEILING });
   if (!(top instanceof Map)) {
     throw new DecodeError("WrongType", { expected: "map" });
   }

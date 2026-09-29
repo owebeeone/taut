@@ -9,6 +9,8 @@
 // Python checks the raw values when it loads the IR. A version-1 IR declares
 // nothing, so its effective values are the defaults.
 
+import { DEFAULT_MAX_DEPTH, MAX_DEPTH_CEILING } from "./cbor.ts";
+
 export type TypeRef =
   | { k: "scalar"; scalar: "int" | "str" | "bytes" | "bool" | "float" }
   | { k: "enum"; name: string }
@@ -101,9 +103,8 @@ export interface Schema {
 }
 
 // taut's numbers for the two wire options (OPT-D5, OPT-D6): the defaults, which a
-// version-1 IR resolves to, and the ranges an effective value lies in.
-const DEFAULT_MAX_DEPTH = 32;
-const MAX_DEPTH_CEILING = 128;
+// version-1 IR resolves to, and the ranges an effective value lies in. The depth
+// numbers are the raw decoder's own, so the IR and the decoder cannot disagree.
 const MAX_ENCODED_LEN_CEILING = 2 ** 31 - 1;
 const DEFAULTS: Effective = Object.freeze({ max_depth: DEFAULT_MAX_DEPTH, max_encoded_len: null });
 
