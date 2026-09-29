@@ -12,8 +12,8 @@ import pytest
 from taut import cli, ext
 from taut.corpus.build import IR_PATH
 from taut.corpus import resext_build as rb
-from taut.gen import js
-from taut.ir.dsl import FLOAT, INT, F, List, Map, Msg, schema as mk
+from taut.gen import js, scaffold
+from taut.ir.dsl import FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, schema as mk
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec
@@ -25,6 +25,9 @@ FLOATY = mk(Msg("Floaty",
                 F("x", 1, FLOAT),
                 F("xs", 2, List(FLOAT)),
                 F("by_id", 3, Map(INT, FLOAT))))
+LATE = mk(Msg("Late", F("note", 1, STR, optional=MISSING_OK)),
+          Msg("Opt", F("note", 1, STR, optional=True)))
+PAIRS = mk(Msg("Pairs", F("by_name", 1, Map(STR, INT))))
 PARITY_IR = ROOT / "ir" / "parity_int.taut.py"
 PARITY_INT_VECTORS = ROOT / "corpus" / "parity" / "int.vectors.json"
 PARITY_MALFORMED_VECTORS = ROOT / "corpus" / "parity" / "malformed.vectors.json"
@@ -173,6 +176,114 @@ def test_js_float_runtime_parity():
 
     script = Path(__file__).with_name("js_float_parity.js")
     subprocess.run([node, str(script)], check=True)
+
+
+_DECODE_PRELUDE = r'''
+"use strict";
+const api = require("./api.js");
+const { decode, encode } = require("./cbor.js");
+
+function fromHex(hex) {
+  return Uint8Array.from(hex.match(/../g) || [], (x) => parseInt(x, 16));
+}
+
+function toHex(bytes) {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Decode `hex` as `message` and show the result, or the DecodeError as the parity
+// gate reports it (`Tag;field=value`). Anything else that escapes fails the script.
+function decodeAs(message, hex, show) {
+  try {
+    return show(api[message].fromCbor(decode(fromHex(hex))));
+  } catch (e) {
+    if (e == null || e.name !== "DecodeError") {
+      throw e;
+    }
+    const fields = ["key", "expected"].filter((f) => e[f] !== undefined);
+    return [e.tag, ...fields.map((f) => `${f}=${e[f]}`)].join(";");
+  }
+}
+'''
+
+
+def _run_js(tmp_path, schema, body):
+    """Generate `schema` for js with its runtime, run `body` after the prelude above
+    and return the JSON it prints."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    scaffold.emit(schema, tmp_path, langs=["js"], services=[], runtime=True)
+    script = tmp_path / "js" / "cases.js"
+    script.write_text(_DECODE_PRELUDE + textwrap.dedent(body))
+    result = subprocess.run([node, str(script)], check=True, text=True, capture_output=True)
+    return json.loads(result.stdout)
+
+
+def test_js_missing_ok_reads_an_absent_key_as_null(tmp_path):
+    """optional=MISSING_OK (TautCheckedDecode.md CD-E5, M16-M17): an absent key and a
+    present null both read as null, a wrong type or a non-map is still refused, and
+    encode still writes the key. A plain optional field still needs its key."""
+    got = _run_js(tmp_path, LATE, """
+        const note = (m) => m.note;
+        console.log(JSON.stringify({
+          absent: decodeAs("Late", "a0", note),
+          presentNull: decodeAs("Late", "a101f6", note),
+          present: decodeAs("Late", "a1016178", note),
+          wrongType: decodeAs("Late", "a10101", note),
+          notAMap: decodeAs("Late", "00", note),
+          encodeUnset: toHex(encode(new api.Late().toCbor())),
+          optionalAbsent: decodeAs("Opt", "a0", note),
+        }));
+    """)
+    assert got == {
+        "absent": None,
+        "presentNull": None,
+        "present": "x",
+        "wrongType": "WrongType;expected=text",
+        "notAMap": "WrongType;expected=map",
+        "encodeUnset": "a101f6",
+        "optionalAbsent": "MissingKey;key=1",
+    }
+
+
+def test_js_map_field_checks_an_entry_before_decoding_it(tmp_path):
+    """A map<K,V> field is an array of {1: key, 2: value} entries. Each entry must be a
+    map holding keys 1 and 2, checked before either is decoded, and a repeated key
+    is DuplicateMapKey before its value is read (CD-E5, M13-M14), as in Python."""
+    cases = {
+        "ok": {1: [{1: "a", 2: 1}, {1: "b", 2: 2}]},
+        "notArray": {1: 5},
+        "entryNotMap": {1: [5]},
+        "noKey": {1: [{2: 1}]},
+        "noValue": {1: [{1: 7}]},                               # its key is wrong too
+        "repeated": {1: [{1: "a", 2: 1}, {1: "a", 2: "x"}]},    # its value is wrong too
+        "wrongValue": {1: [{1: "a", 2: "x"}]},
+    }
+    got = _run_js(tmp_path, PAIRS, f"""
+        const cases = {json.dumps({name: cbor.dumps(v).hex() for name, v in cases.items()})};
+        const out = {{}};
+        for (const [name, hex] of Object.entries(cases)) {{
+          out[name] = decodeAs("Pairs", hex, (m) => toHex(encode(m.toCbor())));
+        }}
+        console.log(JSON.stringify(out));
+    """)
+    assert got == {
+        "ok": cbor.dumps(cases["ok"]).hex(),
+        "notArray": "WrongType;expected=array",
+        "entryNotMap": "WrongType;expected=map",
+        "noKey": "MissingKey;key=1",
+        "noValue": "MissingKey;key=2",
+        "repeated": "DuplicateMapKey;key=a",
+        "wrongValue": "WrongType;expected=int",
+    }
+    for name, value in cases.items():
+        if name == "ok":
+            continue
+        with pytest.raises(codec.DecodeError) as err:
+            codec.decode(PAIRS, "Pairs", cbor.dumps(value))
+        payload = [f"{k}={v}" for k, v in err.value.payload.items()]
+        assert ";".join([err.value.tag, *payload]) == got[name], name
 
 
 def _random_cbor_value(rng: random.Random):

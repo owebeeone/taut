@@ -16,12 +16,6 @@
       "reason": "Observed by `tautc parity`: fails M1 bytes-length-over-2^53 and M2 array-count-u64-max (IntOverflow, not Truncated), M8 map-key-2^53 (NonIntegerMapKey, where it must decode), M9 wrong-type-text and M10 wrong-type-array (payload words str and list, not text and array) and M11 optional-absent (decodes to null, not MissingKey{1}). Step P2.ts de-lists it."
     },
     {
-      "target": "js",
-      "phase": "P2",
-      "owner": "codec-parity",
-      "reason": "Observed by `tautc parity`: fails M1 bytes-length-over-2^53 and M2 array-count-u64-max (IntOverflow, not Truncated), M7 major-6-info-28 (UnsupportedInfo{28}, not UnsupportedMajor{6}), M9 wrong-type-text (payload word str, not text), M12 empty-message-not-map (decodes, not WrongType{map}), M13 map-field-duplicate (decodes; the last entry wins) and M14 map-entry-keys-first (WrongType{int}, not MissingKey{2}). Step P2.js de-lists it."
-    },
-    {
       "target": "cpp",
       "phase": "Phase 4",
       "owner": "codec-parity",

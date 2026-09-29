@@ -1,14 +1,15 @@
 """JavaScript code generator — ES classes + a deterministic-CBOR codec, paired
 with the vendored `cbor.js` runtime (CommonJS; emitted by `tautc gen --lang js
 --with-runtime`). Enums are frozen name->wire objects (a field holds the wire
-int); optionals are nullable; forward-compat residual rides along (cbor.js's
+int); optionals are nullable, and an `optional=MISSING_OK` field also reads an
+absent key as null; forward-compat residual rides along (cbor.js's
 encode sorts map keys). Codec integer fields are BigInt so every i64 value is
 exact.
 """
 
 from __future__ import annotations
 
-from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 
 def _enc(t: TypeRef, expr: str) -> str:
@@ -39,9 +40,9 @@ def _dec(t: TypeRef, expr: str) -> str:
         return f"{t.name}.fromCbor({expr})"
     if isinstance(t, ListOf):
         return f"expectArray({expr}).map((e) => {_dec(t.elem, 'e')})"
-    if isinstance(t, MapOf):
-        return (f"new Map(expectArray({expr}).map((e) => "
-                f"[{_dec(t.key, 'cget(e, 1)')}, {_dec(t.value, 'cget(e, 2)')}]))")
+    if isinstance(t, MapOf):  # entries checked for keys 1 and 2 first; a repeated key is refused
+        return (f"mapFromCbor(new Map(), {expr}, (key) => {_dec(t.key, 'key')}, "
+                f"(value) => {_dec(t.value, 'value')})")
     raise TypeError(t)
 
 
@@ -81,13 +82,16 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     out.append("  }")
     # fromCbor
     out.append("  static fromCbor(c) {")
+    if not wire:  # a message with no fields must still be a map (CD-E5)
+        out.append("    expectMap(c);")
     out.append(f"    const v = new {msg.name}();")
     for f in msg.fields:
         if f.transient:
             continue
         fn = f"v.{f.name}"
         if f.optional:
-            out.append(f"    {{ const f = cget(c, {f.tag}); {fn} = isNull(f) ? null : {_dec(f.type, 'f')}; }}")
+            get = "cgetOrNull" if f.optional == MISSING_OK else "cget"
+            out.append(f"    {{ const f = {get}(c, {f.tag}); {fn} = isNull(f) ? null : {_dec(f.type, 'f')}; }}")
         else:
             out.append(f"    {fn} = {_dec(f.type, f'cget(c, {f.tag})')};")
     if forward_compat:
@@ -102,7 +106,7 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
 def emit_types(schema: Schema, forward_compat: bool = False) -> str:
     out = ['"use strict";',
            "// GENERATED native JS types + codec — do not edit. Pairs with cbor.js.",
-           'const { CInt, CFloat, CText, CBytes, CBool, CArr, CMap, CNull, cget, cmapEntries, isNull, expectInt, expectFloat, expectText, expectBytes, expectBool, expectArray, enumFromWire, enumFromCbor } = require("./cbor.js");',
+           'const { CInt, CFloat, CText, CBytes, CBool, CArr, CMap, CNull, cget, cgetOrNull, mapFromCbor, cmapEntries, isNull, expectInt, expectFloat, expectText, expectBytes, expectBool, expectArray, expectMap, enumFromWire, enumFromCbor } = require("./cbor.js");',
            ""]
     names = []
     for e in schema.enums.values():

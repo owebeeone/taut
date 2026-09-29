@@ -118,7 +118,7 @@ function expectFloat(c) {
 }
 
 function expectText(c) {
-  return expectKind(c, TEXT, "str").s;
+  return expectKind(c, TEXT, "text").s;
 }
 
 function expectBytes(c) {
@@ -191,6 +191,34 @@ function compareMapKeys(a, b) {
 function cget(c, key) {
   for (const [k, v] of expectMap(c)) if (mapKeyEquals(k, key)) return v;
   throw new DecodeError("MissingKey", { key });
+}
+
+// An optional=MISSING_OK field: an absent key reads as a present null (CD-E5); the
+// message must still be a map.
+function cgetOrNull(c, key) {
+  for (const [k, v] of expectMap(c)) {
+    if (mapKeyEquals(k, key)) {
+      return v;
+    }
+  }
+  return CNull();
+}
+
+// A map<K,V> field, decoded into `out`, the generated code's fresh native Map: an
+// array of {1: key, 2: value} entries (CD-E5). Each entry is a map holding keys 1
+// and 2, checked before either is decoded, and a repeated key is DuplicateMapKey
+// before its value is decoded.
+function mapFromCbor(out, c, decodeKey, decodeValue) {
+  for (const entry of expectArray(c)) {
+    const rawKey = cget(entry, 1);
+    const rawValue = cget(entry, 2);
+    const key = decodeKey(rawKey);
+    if (out.has(key)) {
+      throw new DecodeError("DuplicateMapKey", { key });
+    }
+    out.set(key, decodeValue(rawValue));
+  }
+  return out;
 }
 
 const cmapEntries = (c) => expectMap(c); // forward-compat residual
@@ -385,10 +413,24 @@ function readArg(data, off, info) {
   return [value, next];
 }
 
+// A byte or text string's length. One beyond the remaining bytes is Truncated,
+// whatever its size (CD-E5), so it is checked before it becomes a Number.
 function readLength(data, off, info) {
   const [n, next] = readArg(data, off, info);
-  if (n > MAX_SAFE_BIGINT) throw decodeIntOverflow(n);
+  if (n > BigInt(data.length - next)) {
+    throw new DecodeError("Truncated");
+  }
   return [Number(n), next];
+}
+
+// An array's or map's item count. Each item takes at least one byte, so a count
+// beyond the remaining bytes is never met: its items are still read in order and
+// the first to fail is reported (CD-E5), at the latest the one after the last
+// byte. Capping the count there keeps it a Number without changing the outcome.
+function readCount(data, off, info) {
+  const [n, next] = readArg(data, off, info);
+  const remaining = data.length - next;
+  return [n > BigInt(remaining) ? remaining + 1 : Number(n), next];
 }
 
 function readFloat32(data, off) {
@@ -409,10 +451,14 @@ function decode(data) {
   return v;
 }
 
+// One item's head, then its body (CD-E5). The major type is checked before the
+// additional info: major 6 is UnsupportedMajor whatever its info, and info 28-31 is
+// UnsupportedInfo from readArg (majors 0-5) or the major-7 arm.
 function dec(data, off0) {
-  if (off0 >= data.length) throw new DecodeError("Truncated");
+  if (off0 >= data.length) {
+    throw new DecodeError("Truncated");
+  }
   const initial = data[off0], major = initial >> 5, info = initial & 0x1f;
-  if (info >= 28) throw new DecodeError("UnsupportedInfo", { info });
   let off = off0 + 1;
   switch (major) {
     case 0: {
@@ -425,12 +471,10 @@ function dec(data, off0) {
     }
     case 2: {
       const [n, o] = readLength(data, off, info);
-      requireBytes(data, o, n);
       return [CBytes(data.slice(o, o + n)), o + n];
     }
     case 3: {
       const [n, o] = readLength(data, off, info);
-      requireBytes(data, o, n);
       try {
         return [CText(new TextDecoder("utf-8", { fatal: true }).decode(data.slice(o, o + n))), o + n];
       } catch (_) {
@@ -438,7 +482,7 @@ function dec(data, off0) {
       }
     }
     case 4: {
-      let [n, o] = readLength(data, off, info);
+      let [n, o] = readCount(data, off, info);
       const a = [];
       for (let i = 0; i < n; i++) {
         const [v, o2] = dec(data, o);
@@ -448,7 +492,7 @@ function dec(data, off0) {
       return [CArr(a), o];
     }
     case 5: {
-      let [n, o] = readLength(data, off, info);
+      let [n, o] = readCount(data, off, info);
       const m = [];
       const seen = new Set();
       for (let i = 0; i < n; i++) {
@@ -493,6 +537,8 @@ module.exports = {
   DecodeError,
   EncodeError,
   cget,
+  cgetOrNull,
+  mapFromCbor,
   cmapEntries,
   isNull,
   expectInt,
