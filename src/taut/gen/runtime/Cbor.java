@@ -48,7 +48,8 @@ public final class Cbor {
 
     public static final class DecodeError extends RuntimeException {
         public final DecodeTag tag;
-        public final Long key;
+        // The key as text: an int in decimal, a str as itself, a bool as true or false.
+        public final String key;
         public final String expected;
         public final String enumName;
         public final String value;
@@ -58,7 +59,7 @@ public final class Cbor {
         private DecodeError(
                 DecodeTag tag,
                 String message,
-                Long key,
+                String key,
                 String expected,
                 String enumName,
                 String value,
@@ -135,22 +136,14 @@ public final class Cbor {
         }
 
         public static DecodeError duplicateMapKey(long key) {
-            return new DecodeError(
-                    DecodeTag.DuplicateMapKey,
-                    "duplicate CBOR map key " + key,
-                    key,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null);
+            return duplicateKey(Long.toString(key));
         }
 
         public static DecodeError missingKey(long key) {
             return new DecodeError(
                     DecodeTag.MissingKey,
                     "missing CBOR map key " + key,
-                    key,
+                    Long.toString(key),
                     null,
                     null,
                     null,
@@ -200,7 +193,7 @@ public final class Cbor {
             return new DecodeError(
                     DecodeTag.NegativeMapKey,
                     "negative CBOR map key " + key,
-                    key,
+                    Long.toString(key),
                     null,
                     null,
                     null,
@@ -208,16 +201,17 @@ public final class Cbor {
                     null);
         }
 
-        // A repeated `map<K,V>` key. An integer key is the payload `key`; the payload has
-        // no field for a text or bool key, so only the message names one.
+        // A repeated `map<K,V>` key: a Long, String or Boolean, whose text String.valueOf
+        // writes as the payload wants it.
         static DecodeError duplicateEntryKey(Object key) {
-            if (key instanceof Long n) {
-                return duplicateMapKey(n);
-            }
+            return duplicateKey(String.valueOf(key));
+        }
+
+        private static DecodeError duplicateKey(String key) {
             return new DecodeError(
                     DecodeTag.DuplicateMapKey,
                     "duplicate map key " + key,
-                    null,
+                    key,
                     null,
                     null,
                     null,

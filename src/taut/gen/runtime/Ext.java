@@ -1,5 +1,8 @@
 // Forward-compatible extension accessors for Java targets.
 // Operates schema-free on the host's top-level CBOR map.
+// Fail-closed (TautCheckedDecode.md CD-E4): for any host bytes each helper returns or
+// throws Cbor.DecodeError, and a host that is not a map is WrongType{map}. A tag below
+// the band is the caller's error, IllegalArgumentException, checked before the host.
 package taut;
 
 import java.util.ArrayList;
@@ -22,7 +25,9 @@ public final class Ext {
         checkTag(tag);
         Cbor root = decodeHostMap(host);
         for (KV kv : root.map) {
-            if (kv.k == tag) return kv.v;
+            if (kv.k == tag) {
+                return kv.v;
+            }
         }
         return null;
     }
@@ -39,10 +44,12 @@ public final class Ext {
         }
     }
 
+    // The host's top-level map. TODO(D1): read the host at the depth ceiling, with no
+    // length bound (TautOptions.md G3), once D1 gives Cbor.decode its depth parameter.
     private static Cbor decodeHostMap(byte[] host) {
         Cbor root = Cbor.decode(host);
         if (root.kind != Cbor.MAP) {
-            throw new IllegalArgumentException("host root is not a CBOR map");
+            throw Cbor.DecodeError.wrongType("map");
         }
         return root;
     }
@@ -50,7 +57,9 @@ public final class Ext {
     private static List<KV> withoutTag(List<KV> entries, long tag) {
         List<KV> out = new ArrayList<>();
         for (KV kv : entries) {
-            if (kv.k != tag) out.add(kv);
+            if (kv.k != tag) {
+                out.add(kv);
+            }
         }
         return out;
     }

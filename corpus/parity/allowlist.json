@@ -2,18 +2,5 @@
   "version": 1,
   "contract": "taut-codec-parity/i64/v0",
   "_note": "An allowlisted target's harness STILL RUNS and REPORTS its observed failures (xfail-that-runs); it just doesn't fail CI. The inverse is enforced too: `tautc parity` FAILS if an allowlisted target passes fully (a green target must be de-listed) or a gated (non-allowlisted) target fails. An entry names a target or a `<target>/fc` variant (the target generated with forward-compat), each governed on its own. Reasons are populated from observed `tautc parity` results.",
-  "targets": [
-    {
-      "target": "java",
-      "phase": "C2",
-      "owner": "codec-parity",
-      "reason": "build failed (exit 1): the Names field `m` meets toCbor's local `List<KV> m` (`Cbor.int_(m)`), and the Names field `java` hides the package in the `java.util.List.of` that encodes a map (long cannot be dereferenced), so no row runs, names-round-trip among them. With both renamed in a scratch run, map-str-key-duplicate and map-bool-key-duplicate report no key, not `a` and `true`"
-    },
-    {
-      "target": "java/fc",
-      "phase": "C2",
-      "owner": "codec-parity",
-      "reason": "build failed (exit 1): as java, the Names fields `m` (toCbor's local) and `java` (the package in java.util.List.of), so no row runs, names-round-trip among them. With both renamed in a scratch run, map-str-key-duplicate and map-bool-key-duplicate report no key, not `a` and `true`"
-    }
-  ]
+  "targets": []
 }
