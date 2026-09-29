@@ -85,9 +85,8 @@ explicit.
   field may be `None` in the native type. On the wire it is still always written, as CBOR `null` when
   `None`, and a decoder refuses a message whose key for the field is missing (`MissingKey`), as for a
   required field. `MISSING_OK` also reads a missing key as `None`, so a new reader accepts messages
-  written before the field existed; the encoder still writes the key. Python and Rust support
-  `MISSING_OK`, and generating any other language refuses a schema that uses it. See §8, *Missing
-  versus null*.
+  written before the field existed; the encoder still writes the key. Every target language
+  supports `MISSING_OK`. See §8, *Missing versus null*.
 - **transient** — present in the *native* type but **never on the wire** (caches,
   indices, handles). The wire is a projection of the tagged, non-transient subset.
 - **merge** — marks a CRDT field; see §7.

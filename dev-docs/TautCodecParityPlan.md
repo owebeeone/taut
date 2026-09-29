@@ -270,3 +270,32 @@ nine by default; Reference.md, this plan and the two notes record it.
 applies them one at a time, runs the gate and the full suite with every toolchain (Java and Kotlin
 from Android Studio), and commits each step. Encode is untouched, so every golden corpus stays
 byte-identical.
+
+**Status, 2026-09-30: done.** All nine are gated on 55 rows (11 int, 44 malformed) with an empty
+allowlist, and taut's suite passes 312 tests.
+- **Commits:**
+  - P1: `2bd1f85`;
+  - P2, one per language: js `8dd833f`, swift `1ccc90a`, typescript `0abc0e0`, rust `d13f5f8`,
+    kotlin `edc5acf`, cpp `24eb42c`, java `db6730f` and go `f892b72`;
+  - P3: `ca48911`.
+- **P3 went beyond the plan.** A row that decodes must re-encode to its expected bytes (D2's law).
+  A `Shapes` message makes every generator generate and round-trip every legal field shape. That
+  found, and the pass fixed:
+  - cpp and go could not generate `list<list<int>>`, an optional list or an optional map, so
+    neither could generate glade's schema; java's nested lambdas reused one name;
+  - typescript and js dropped a leading U+FEFF from text;
+  - typescript, js, java and kotlin sorted str map keys by UTF-16 code unit, not code point;
+    typescript also sorted mixed `number`/`bigint` int keys as strings;
+  - go reported `f7`, `f8` and `e0`-`f3` as `UnsupportedMajor{7}`, not `UnsupportedInfo`; several
+    decoders gave another tag on input with more than one fault; C++ reserved memory from an
+    untrusted count.
+- **Open, for the owner:** TautCheckedDecode.md question 9 (the `DuplicateMapKey` payload for a
+  str or bool key) and question 10 (whether generated code keeps unknown fields on re-encode, as
+  Python and TypeScript do). A non-shortest float still re-encodes shortest everywhere (G2,
+  question 7).
+- **Found, not fixed:**
+  - a field named like a generated local, such as a java field `m`, breaks generated code;
+  - kotlin cannot generate a field-less message with `--forward-compat`;
+  - the extension helpers still fail differently (CD-E4), and `ext.hpp` is not strict;
+  - one-line bodies without braces remain where the pass did not touch;
+  - `docs/examples/tasks/generated/` predates the pass.

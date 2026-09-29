@@ -109,23 +109,29 @@ the Python and Rust runtimes.
 discriminant), with floats boxed so they survive the integer/float split:
 
 ```ts
+export type MapKey = number | bigint;
+
 export type CborValue =
-  | number | CborFloat | string | boolean | null
-  | Uint8Array | CborValue[] | Map<number, CborValue>;
+  | bigint | number | CborFloat | string | boolean | null
+  | Uint8Array | CborValue[] | Map<MapKey, CborValue>;
 
 export function encode(value: CborValue): Uint8Array;
 export function decode(data: Uint8Array): CborValue;
 ```
 
-A bare `number` must be an integer (a non-integer throws "no floats"); reals go
-through `new CborFloat(x)` and decode back as a `CborFloat` (read `.value`).
-`decode` throws on trailing bytes.
+`decode` returns every int as a `bigint`, exact over the whole `i64` range; `encode`
+also takes a `number`, which must be an integer (a non-integer throws "no floats").
+Reals go through `new CborFloat(x)` and decode back as a `CborFloat` (read `.value`).
+A map key is a `number` up to 2^53 − 1 and an exact `bigint` above it, so a map
+re-encodes as it was read. `decode` reports bad input as a `DecodeError`, trailing
+bytes included; until the depth bound lands, input nested thousands deep can still
+overflow the stack.
 
 ## 5. Forward-compatibility (unknown-field preservation)
 
 Default-on — there is no flag to set in TypeScript. On `decode`, any map tags the
 schema doesn't name are captured on the native object under a **`__unknown__`**
-`Map<number, CborValue>`; on `encode`, they're re-emitted **merged with the known
+`Map<MapKey, CborValue>`; on `encode`, they're re-emitted **merged with the known
 fields in one ascending-tag order** (CBOR sorts the keys). So a node that
 *decodes → edits → re-encodes* a newer message never drops fields it doesn't
 understand, and a message with no unknowns is byte-identical either way.

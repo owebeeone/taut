@@ -1,5 +1,18 @@
 # Checked decode: one error and schema-declared bounds in every taut language
 
+**rev8, 2026-09-30:** the parity pass ("just bring all languages to parity";
+[TautCodecParityPlan.md](TautCodecParityPlan.md) §8) built, in all nine codecs, the parts of this
+note that do not wait on the bounds:
+- CD-E5's order of checks and CD-E6's payload words;
+- rows M1-M17, with M1 named `bytes-length-over-2^53`, since its bytes are a byte string;
+- `optional=MISSING_OK` in every generator;
+- a gate that compares payloads (CD-C4), fails a row that never reports, and requires a row that
+  decodes to re-encode to its expected bytes.
+
+`tautc parity` gates all nine with an empty allowlist (taut `2bd1f85` to `ca48911`). The bounds
+(§3, rows B1-B30) and the rest stay proposed. The pass also found questions 9 and 10. Changed: the
+status, the opt-in exception, CD-C1, §4.4's M1 and §8.
+
 **rev7, 2026-09-30:** all nine languages in v0.10.0 ("fix all languages in v0.10.0"; TautOptions.md
 question 2). The codec parity plan's Phase 4, which makes cpp, swift, go, kotlin and java fail-closed,
 joins this release, and so do the bounds and `MISSING_OK` for them. Changed: the title, §0, CD-V2 and
@@ -32,7 +45,8 @@ title, §0, §1, CD-E5, CD-B1-B5, CD-C1, CD-C2, CD-C4, §4.4, the absent-field f
 CD-V2, CD-V3, CD-G1-G4, G1, G3, G4 and questions 1, 2, 4 and 6.
 
 **Status:** DESIGN, proposed 2026-09-28; rev2 records the owner's rulings of the same day (§0) and
-awaits the rest. A document only: no code, corpus, fixture or version has changed. Once ruled, it
+awaits the rest. rev8: the parity pass built CD-E5, CD-E6, rows M1-M17 and `optional=MISSING_OK`
+everywhere (above); the rest is still a document only. Once ruled, it
 becomes decision **D26** in [TautDecisions.md](TautDecisions.md) (D25 is the last) and parity
 contract `taut-codec-parity/i64/v1`.
 
@@ -183,9 +197,10 @@ a message that is not a map (`taut/src/taut/gen/rust.py:287-289`; `cbor_fail_clo
 `codec.py:158`). `validate` requires `optional=True` with the keyword today
 (`taut/src/taut/ir/validate.py:63-64`). The encoder is unchanged and still writes the key, so for
 such a field D2's law deliberately does not hold: a message read without the key re-encodes with it,
-as null. Only Python and Rust implement it today; `scaffold.emit` refuses every other target for a
-schema that uses it (`scaffold.py:624-636`), and TypeScript's IR-driven codec ignores it, reading
-every absent optional key as null. JS and TypeScript implement it in v0.10.0 (question 4, ruled).
+as null. Only Python and Rust implemented it at `bcf98b6`; `scaffold.emit` refused every other
+target for a schema that used it (`scaffold.py:624-636`), and TypeScript's IR-driven codec ignored
+it, reading every absent optional key as null. rev8: all nine implement it, and `scaffold.emit` no
+longer refuses it.
 What the rule and the exception mean for `compat.py:11` is question 4.
 
 **CD-E6 (PROPOSED): payload words.** `WrongType.expected` is one of `int`, `float`, `bytes`,
@@ -287,9 +302,9 @@ bounds.vectors.json      new: 30 depth and length rows (§4.4, B1-B30), each wit
 
 The fixture `taut/ir/parity_int.taut.py` gains three messages for the schema-stage rows:
 `OptBox { note: str optional = 1, tags: list<str> = 2 }`; `Empty`, which has no fields; and, from
-rev3, `Late`, whose one field is `note=F(1, STR, optional=MISSING_OK)` (rev5). Only Python and Rust
-generate such a schema today (`taut/src/taut/gen/scaffold.py:624-636`), so
-`Late` also needs JS and TypeScript, which implement it in v0.10.0 (question 4, ruled). rev2 adds
+rev3, `Late`, whose one field is `note=F(1, STR, optional=MISSING_OK)` (rev5). rev8: all three are
+in the fixture, and every generator generates `Late`; the fixture also gains `Shapes`, which covers
+every legal field shape, with 11 more rows (TautCodecParityPlan.md §8). rev2 adds
 six for the bounds rows: `Tree64 { kids: list<Tree64> = 1 }` declaring `option.max_depth(64)`;
 `Tree128`, the same declaring 128; `Flat2 { v: list<int> = 1 }` declaring 2, its non-recursive
 nesting; `Sized8 { b: bytes = 1 }` declaring `option.max_encoded_len(8)`; and
@@ -368,7 +383,7 @@ the bound its message resolves to, where the row tests one.
 | B28 len-8-declared | from_cbor Sized8 [len 8] | `a101450102030405` | accept | — |
 | B29 len-9-declared | from_cbor Sized8 [len 8] | `a10146010203040506` | `TooLarge{9, 8}` | all accept |
 | B30 len-root-decides | from_cbor HoldsSized8 [none] | `a101a1014a`, `00010203040506070809` | accept | — |
-| M1 text-length-over-2^53 | raw | `5b0020000000000000` | `Truncated` | TS, JS `IntOverflow` |
+| M1 bytes-length-over-2^53 | raw | `5b0020000000000000` | `Truncated` | TS, JS `IntOverflow` |
 | M2 array-count-u64-max | raw | `9bffffffffffffffff` | `Truncated` | TS, JS `IntOverflow` |
 | M3 items-read-in-order | raw | `85c0` | `UnsupportedMajor{6}` | glade `wellformed` says `Truncated` |
 | M4 key-first-duplicate | raw | `a2010001` | `DuplicateMapKey{1}` | Rust `Truncated` |
@@ -653,3 +668,20 @@ fn decode(bytes: &[u8]) -> Result<Inbound, DecodeError> { // in `impl Inbound`
    would also make the duplicate check one comparison per key. (b) Fold it into v0.10.0.
 8. **client-ts.** (a) Its own step after the node step. (b) Inside the node step, which the `bigint`
    change would enlarge.
+9. **A repeated non-int map key (rev8).** A repeated key in a `map<K,V>` field is `DuplicateMapKey`
+   in all nine, but its `key` payload is pinned only for an int key. For a str or bool key the nine
+   report the key itself, 0, the entry's index or nothing, and Python spells a bool `True`, so the
+   rows `map-str-key-duplicate` and `map-bool-key-duplicate` pin only the tag.
+   - (a) The key as text in every language: an int in decimal, a str as itself, a bool as `true` or
+     `false`. Rust's `DuplicateMapKey(i64)` becomes a key type that holds all three (breaking, like
+     v0.10.0's other variant changes), and Swift, Go, C++ and Java widen their key field.
+   - (b) No `key` payload for a non-int key.
+   - (c) Leave it unpinned.
+10. **Unknown fields on re-encode (rev8).** Python's and TypeScript's codecs keep a message's
+   unknown fields and write them back. The seven generated targets keep them only when generated
+   with `--forward-compat`, which is off by default, and otherwise drop them. So `a10100` decoded
+   as `Empty` re-encodes as `a10100` in two languages and as `a0` in seven, and no row covers it.
+   - (a) The gate also generates the seven with forward-compat, and a row pins the round trip.
+     Dropping stays the documented behaviour of generation without the flag.
+   - (b) Make forward-compat the generators' default in v0.10.0.
+   - (c) Declare dropping an exception to the D2 law.

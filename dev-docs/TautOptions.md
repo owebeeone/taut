@@ -5,6 +5,10 @@ on what §0 does not settle. A document only: no code, corpus, fixture or versio
 ruled, it becomes decision **D27** in [TautDecisions.md](TautDecisions.md); D26 is
 [TautCheckedDecode.md](TautCheckedDecode.md), whose rev2 takes both of its bounds from this note.
 
+**rev9, 2026-09-30:** OPT-M2's targets are built. All nine generators implement `MISSING_OK` and
+`scaffold.emit` no longer refuses it, as part of the parity pass (TautCodecParityPlan.md §8, taut
+`ca48911`). The wire options themselves are unbuilt. Changed: §1 row 8 and OPT-M2's targets.
+
 **rev8, 2026-09-30:** question 2 ruled: "fix all languages in v0.10.0". Every generator implements
 every wire option and `MISSING_OK` in v0.10.0, so none refuses a schema for lacking one, and the
 parity gate allowlists no language. Changed: §1 rows 3 and 8, OPT-F2's table, OPT-F3, OPT-M2's
@@ -110,7 +114,7 @@ SCHEMA = schema(
 | 5 | Corpus | Every row carries the bounds it is decoded under. A wire option brings rows at its default, at declared values, at its runtime ceiling if it has one, and rows pinning the root rule. Inheritance is computed only in Python and is unit-tested there. |
 | 6 | Protobuf | The same levels, custom options in parentheses, Editions resolving down the scope. Protobuf leaves depth and size to each reader; taut declares them with the schema. |
 | 7 | Size | `max_encoded_len`: file and message level, no default (a schema that declares none leaves size to its carriers), declared values at most 2^31 − 1. Carriers apply it before they allocate; decode raises `TooLarge` above it. |
-| 8 | Presence | `optional=` takes `False`, `True` or `MISSING_OK` (OWNER); the last also reads an absent key as null. It is a keyword, not an option, and three-valued in the model and the IR too. Nothing named `missing_ok` is supported, and every use moves to `MISSING_OK` (OWNER). rust and python already have the behaviour, and the other seven get it in v0.10.0 (OWNER, question 2). |
+| 8 | Presence | `optional=` takes `False`, `True` or `MISSING_OK` (OWNER); the last also reads an absent key as null. It is a keyword, not an option, and three-valued in the model and the IR too. Nothing named `missing_ok` is supported, and every use moves to `MISSING_OK` (OWNER). rust and python had the behaviour first; the other seven have it since the parity pass (OWNER, question 2; rev9). |
 
 ## 2. What an option is
 
@@ -496,9 +500,10 @@ TypeScript support, which v0.10.0 brings.
   (`taut/src/taut/ir/compat.py:88-91`) and of `missing_ok` (`:94-96`), which grade the same way.
   Adding an optional field is compatible only at `MISSING_OK` (TautCheckedDecode.md question 4, ruled
   (a)).
-- **Targets.** rust and python already have the behaviour, and the other seven get it in v0.10.0
-  (TautCheckedDecode.md question 4 and this note's question 2, both ruled), so `scaffold.emit`'s
-  refusal goes (`taut/src/taut/gen/scaffold.py:624-636`).
+- **Targets.** rust and python had the behaviour first, and the other seven were to get it in
+  v0.10.0 (TautCheckedDecode.md question 4 and this note's question 2, both ruled), so
+  `scaffold.emit`'s refusal goes (`taut/src/taut/gen/scaffold.py:624-636`). rev9: done; all nine
+  have it and the refusal is gone (taut `ca48911`).
 - **At the later migration** (OPT-M1), `optional=` moves as one three-valued wire option, as
   protobuf's `field_presence` did (§8).
 
