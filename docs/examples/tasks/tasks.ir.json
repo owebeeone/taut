@@ -1,5 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
+  "options": {},
+  "effective": {
+    "max_depth": 32,
+    "max_encoded_len": null
+  },
   "shapes": {
     "unary": {
       "name": "unary",
@@ -250,16 +255,27 @@
   "enums": [
     {
       "name": "TaskState",
+      "options": {},
       "members": {
         "open": 0,
         "doing": 1,
         "done": 2
+      },
+      "member_options": {
+        "open": {},
+        "doing": {},
+        "done": {}
       }
     }
   ],
   "messages": [
     {
       "name": "User",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": 3,
@@ -267,6 +283,7 @@
         {
           "name": "id",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -278,6 +295,7 @@
         {
           "name": "name",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -290,6 +308,11 @@
     },
     {
       "name": "Comment",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": 3,
@@ -297,6 +320,7 @@
         {
           "name": "author",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "msg",
             "name": "User"
@@ -308,6 +332,7 @@
         {
           "name": "text",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -320,6 +345,11 @@
     },
     {
       "name": "Task",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [
         6
       ],
@@ -331,6 +361,7 @@
         {
           "name": "id",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -342,6 +373,7 @@
         {
           "name": "title",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -353,6 +385,7 @@
         {
           "name": "state",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "enum",
             "name": "TaskState"
@@ -364,6 +397,7 @@
         {
           "name": "assignee",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "msg",
             "name": "User"
@@ -375,6 +409,7 @@
         {
           "name": "comments",
           "tag": 5,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -389,6 +424,7 @@
         {
           "name": "labels",
           "tag": 7,
+          "options": {},
           "type": {
             "k": "map",
             "key": {
@@ -408,6 +444,11 @@
     },
     {
       "name": "Event",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": 3,
@@ -415,6 +456,7 @@
         {
           "name": "ts",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -426,6 +468,7 @@
         {
           "name": "text",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -440,9 +483,11 @@
   "services": [
     {
       "name": "Tasks",
+      "options": {},
       "methods": [
         {
           "name": "create",
+          "options": {},
           "role": "in",
           "shape": "unary",
           "params": [
@@ -466,6 +511,7 @@
         },
         {
           "name": "comment",
+          "options": {},
           "role": "in",
           "shape": "unary",
           "params": [
@@ -503,6 +549,7 @@
         },
         {
           "name": "set_state",
+          "options": {},
           "role": "ctl",
           "shape": "unary",
           "params": [
@@ -533,6 +580,7 @@
         },
         {
           "name": "tasks.subscribe",
+          "options": {},
           "role": "out",
           "shape": "atom",
           "params": [],
@@ -551,6 +599,7 @@
         },
         {
           "name": "activity.subscribe",
+          "options": {},
           "role": "out",
           "shape": "log",
           "params": [],

@@ -3,6 +3,14 @@
 The IR stops being Python objects and becomes a flat, portable document any
 language can read (the same artifact that would be published as an OCI blob).
 TypeScript/Rust/C++ bindings consume this, not the `.taut.py` source.
+
+Version 2 (TautOptions.md OPT-I1, OPT-I2) adds options. Every level carries its
+declared `options`, `{}` when none: the file at the top level, and each message,
+field and enum. Each service, method and enum value (through its enum's
+`member_options`) carries one too, reserved and always `{}` until its level gets
+its first option. The file and each message also carry `effective`: every wire
+and codegen option of the level, resolved by `options.effective_map`, which is
+what readers outside Python use.
 """
 
 from __future__ import annotations
@@ -11,7 +19,10 @@ import json
 from pathlib import Path
 
 from .model import EnumRef, ListOf, MapOf, MethodDef, MsgRef, Scalar, Schema, TypeRef
+from .options import effective_map
 from .shapes import SHAPES
+
+IR_VERSION = 2
 
 
 def _typeref_json(t: TypeRef) -> dict:
@@ -32,6 +43,7 @@ def _method_json(m: MethodDef) -> dict:
     # The minimal contract (D22): name, role, shape (sole discriminator), in, out.
     return {
         "name": m.name,
+        "options": {},   # reserved (OPT-I2)
         "role": m.role,
         "shape": m.shape,
         "params": [{"name": pn, "type": _typeref_json(pt)} for pn, pt in m.params],
@@ -40,16 +52,26 @@ def _method_json(m: MethodDef) -> dict:
 
 
 def schema_json(schema: Schema) -> dict:
+    # Option maps are copied, so that editing the document leaves the frozen model alone.
     return {
-        "version": 1,
+        "version": IR_VERSION,
+        "options": dict(schema.options),
+        "effective": effective_map(schema),
         "shapes": {name: spec.to_json() for name, spec in SHAPES.items()},
         "enums": [
-            {"name": e.name, "members": e.members}
+            {
+                "name": e.name,
+                "options": dict(e.options),
+                "members": e.members,
+                "member_options": {member: {} for member in e.members},   # reserved (OPT-I2)
+            }
             for e in schema.enums.values()
         ],
         "messages": [
             {
                 "name": m.name,
+                "options": dict(m.options),
+                "effective": effective_map(schema, message=key),
                 "reserved_tags": list(m.reserved_tags),
                 "reserved_names": list(m.reserved_names),
                 "next_id": m.next_id,
@@ -57,6 +79,7 @@ def schema_json(schema: Schema) -> dict:
                     {
                         "name": f.name,
                         "tag": f.tag,
+                        "options": dict(f.options),
                         "type": _typeref_json(f.type),
                         "optional": f.optional,
                         "transient": f.transient,
@@ -65,10 +88,14 @@ def schema_json(schema: Schema) -> dict:
                     for f in m.fields
                 ],
             }
-            for m in schema.messages.values()
+            for key, m in schema.messages.items()
         ],
         "services": [
-            {"name": s.name, "methods": [_method_json(m) for m in s.methods]}
+            {
+                "name": s.name,
+                "options": {},   # reserved (OPT-I2)
+                "methods": [_method_json(m) for m in s.methods],
+            }
             for s in schema.services.values()
         ],
         "extensions": [{"message": e.message, "tag": e.tag} for e in schema.extensions],

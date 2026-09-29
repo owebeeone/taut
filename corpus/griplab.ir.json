@@ -1,5 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
+  "options": {},
+  "effective": {
+    "max_depth": 32,
+    "max_encoded_len": null
+  },
   "shapes": {
     "unary": {
       "name": "unary",
@@ -250,26 +255,45 @@
   "enums": [
     {
       "name": "PresenceStatus",
+      "options": {},
       "members": {
         "configured": 0,
         "offline": 1,
         "starting": 2,
         "online": 3,
         "error": 4
+      },
+      "member_options": {
+        "configured": {},
+        "offline": {},
+        "starting": {},
+        "online": {},
+        "error": {}
       }
     },
     {
       "name": "OpKind",
+      "options": {},
       "members": {
         "insert": 0,
         "delete": 1,
         "replace": 2
+      },
+      "member_options": {
+        "insert": {},
+        "delete": {},
+        "replace": {}
       }
     }
   ],
   "messages": [
     {
       "name": "PeerPresence",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -277,6 +301,7 @@
         {
           "name": "id",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -288,6 +313,7 @@
         {
           "name": "name",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -299,6 +325,7 @@
         {
           "name": "status",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "enum",
             "name": "PresenceStatus"
@@ -310,6 +337,7 @@
         {
           "name": "online",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bool"
@@ -321,6 +349,7 @@
         {
           "name": "location",
           "tag": 5,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -333,6 +362,11 @@
     },
     {
       "name": "ByteOp",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -340,6 +374,7 @@
         {
           "name": "op",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "enum",
             "name": "OpKind"
@@ -351,6 +386,7 @@
         {
           "name": "offset",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -362,6 +398,7 @@
         {
           "name": "length",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -373,6 +410,7 @@
         {
           "name": "data",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -385,6 +423,11 @@
     },
     {
       "name": "FileSnapshot",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -392,6 +435,7 @@
         {
           "name": "resource_id",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -403,6 +447,7 @@
         {
           "name": "resume_seq",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -414,6 +459,7 @@
         {
           "name": "content",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -425,6 +471,7 @@
         {
           "name": "window_start",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -436,6 +483,7 @@
         {
           "name": "window_end",
           "tag": 5,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -447,6 +495,7 @@
         {
           "name": "preview",
           "tag": 6,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -459,6 +508,11 @@
     },
     {
       "name": "FileDelta",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -466,6 +520,7 @@
         {
           "name": "resource_id",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -477,6 +532,7 @@
         {
           "name": "base_seq",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -488,6 +544,7 @@
         {
           "name": "seq",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -499,6 +556,7 @@
         {
           "name": "ops",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -513,6 +571,7 @@
         {
           "name": "result_size",
           "tag": 5,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -525,6 +584,11 @@
     },
     {
       "name": "ChatMessage",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -532,6 +596,7 @@
         {
           "name": "id",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -543,6 +608,7 @@
         {
           "name": "sender_id",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -554,6 +620,7 @@
         {
           "name": "text",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -566,6 +633,11 @@
     },
     {
       "name": "TerminalChunk",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -573,6 +645,7 @@
         {
           "name": "session_id",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -584,6 +657,7 @@
         {
           "name": "data",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -596,6 +670,11 @@
     },
     {
       "name": "TerminalOpened",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -603,6 +682,7 @@
         {
           "name": "session_id",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -614,6 +694,7 @@
         {
           "name": "repo",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -625,6 +706,7 @@
         {
           "name": "cols",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -636,6 +718,7 @@
         {
           "name": "rows",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -648,6 +731,11 @@
     },
     {
       "name": "RepoTarget",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -655,6 +743,7 @@
         {
           "name": "repo",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -666,6 +755,7 @@
         {
           "name": "fail_with",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -678,6 +768,11 @@
     },
     {
       "name": "RepoRun",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -685,6 +780,7 @@
         {
           "name": "repo",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -696,6 +792,7 @@
         {
           "name": "exit_code",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -707,6 +804,7 @@
         {
           "name": "output",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -718,6 +816,7 @@
         {
           "name": "error",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -730,6 +829,11 @@
     },
     {
       "name": "CmdSession",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -737,6 +841,7 @@
         {
           "name": "session_id",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -748,6 +853,7 @@
         {
           "name": "argv",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -762,6 +868,7 @@
         {
           "name": "targets",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -776,6 +883,7 @@
         {
           "name": "started_monotonic",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -788,6 +896,11 @@
     },
     {
       "name": "CrdtOp",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -795,6 +908,7 @@
         {
           "name": "doc",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -806,6 +920,7 @@
         {
           "name": "actor",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -817,6 +932,7 @@
         {
           "name": "seq",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -828,6 +944,7 @@
         {
           "name": "field",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -839,6 +956,7 @@
         {
           "name": "value",
           "tag": 5,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -851,6 +969,11 @@
     },
     {
       "name": "VersionEntry",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -858,6 +981,7 @@
         {
           "name": "actor",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -869,6 +993,7 @@
         {
           "name": "seq",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -881,6 +1006,11 @@
     },
     {
       "name": "CrdtState",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -888,6 +1018,7 @@
         {
           "name": "doc",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -899,6 +1030,7 @@
         {
           "name": "ops",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -913,6 +1045,7 @@
         {
           "name": "version",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -928,6 +1061,11 @@
     },
     {
       "name": "Board",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -935,6 +1073,7 @@
         {
           "name": "title",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -946,6 +1085,7 @@
         {
           "name": "votes",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -960,9 +1100,11 @@
   "services": [
     {
       "name": "GripLab",
+      "options": {},
       "methods": [
         {
           "name": "presence.subscribe",
+          "options": {},
           "role": "out",
           "shape": "atom",
           "params": [],
@@ -981,6 +1123,7 @@
         },
         {
           "name": "presence.get",
+          "options": {},
           "role": "out",
           "shape": "unary",
           "params": [],
@@ -999,6 +1142,7 @@
         },
         {
           "name": "chat.subscribe",
+          "options": {},
           "role": "out",
           "shape": "log",
           "params": [],
@@ -1014,6 +1158,7 @@
         },
         {
           "name": "chat.post",
+          "options": {},
           "role": "in",
           "shape": "unary",
           "params": [
@@ -1044,6 +1189,7 @@
         },
         {
           "name": "file.subscribe",
+          "options": {},
           "role": "out",
           "shape": "swmr",
           "params": [],
@@ -1066,6 +1212,7 @@
         },
         {
           "name": "file.window.update",
+          "options": {},
           "role": "ctl",
           "shape": "unary",
           "params": [
@@ -1096,6 +1243,7 @@
         },
         {
           "name": "term.open",
+          "options": {},
           "role": "hdl",
           "shape": "unary",
           "params": [
@@ -1133,6 +1281,7 @@
         },
         {
           "name": "session.output.subscribe",
+          "options": {},
           "role": "out",
           "shape": "stream",
           "params": [
@@ -1156,6 +1305,7 @@
         },
         {
           "name": "term.input",
+          "options": {},
           "role": "ctl",
           "shape": "unary",
           "params": [
@@ -1186,6 +1336,7 @@
         },
         {
           "name": "term.resize",
+          "options": {},
           "role": "ctl",
           "shape": "unary",
           "params": [
@@ -1223,6 +1374,7 @@
         },
         {
           "name": "term.close",
+          "options": {},
           "role": "td",
           "shape": "unary",
           "params": [
@@ -1246,6 +1398,7 @@
         },
         {
           "name": "cmd.run",
+          "options": {},
           "role": "in",
           "shape": "unary",
           "params": [
@@ -1282,6 +1435,7 @@
         },
         {
           "name": "sessions.query",
+          "options": {},
           "role": "out",
           "shape": "unary",
           "params": [
@@ -1310,9 +1464,11 @@
     },
     {
       "name": "Collab",
+      "options": {},
       "methods": [
         {
           "name": "board.snapshot",
+          "options": {},
           "role": "out",
           "shape": "unary",
           "params": [],
@@ -1328,6 +1484,7 @@
         },
         {
           "name": "board.local_apply",
+          "options": {},
           "role": "in",
           "shape": "unary",
           "params": [
@@ -1365,6 +1522,7 @@
         },
         {
           "name": "board.merge",
+          "options": {},
           "role": "ctl",
           "shape": "unary",
           "params": [
@@ -1388,6 +1546,7 @@
         },
         {
           "name": "board.sync",
+          "options": {},
           "role": "out",
           "shape": "crdt",
           "params": [],

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import itertools
 import json
 import random
@@ -15,9 +16,10 @@ import pytest
 from taut import cli, ext
 from taut.corpus import resext_build as rb
 from taut.gen import scaffold
-from taut.ir.dsl import BOOL, INT, MISSING_OK, STR, F, Map, Msg, schema
+from taut.ir.dsl import BOOL, BYTES, INT, MISSING_OK, STR, F, List, Map, Msg, Ref, option, schema
 from taut.ir.export import export_to
 from taut.ir.load import load_schema
+from taut.ir.options import effective_map
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec
 
@@ -799,5 +801,168 @@ test("a number key above 2^53 - 1 is refused: only a bigint holds it exactly", (
   assert.throws(() => encode(schema, "Keyed", keyed(byId)), { name: "EncodeError", tag: "IntOutOfSubset" });
 });
 """
+    )
+    _run_node_tests(node, ts_dir, harness)
+
+
+# IR version 2 (TautOptions.md OPT-I1, OPT-I2, OPT-F4): loadSchema reads versions 1 and 2, and
+# exposes each root's effective values, the ones Python resolved, through SchemaIndex (OPT-L6).
+def _bounds_schema():
+    """File-level bounds; `Tree` declares its own depth, `Blob` its own length, and `Plain`
+    inherits the file's (OPT-D3)."""
+    return schema(
+        option.max_depth(16), option.max_encoded_len(4096),
+        Msg("Tree", option.max_depth(64), F("children", 1, List(Ref("Tree"))), next_id=2),
+        Msg("Blob", option.max_encoded_len(2**20), F("data", 1, BYTES), next_id=2),
+        Msg("Plain", F("x", 1, INT), next_id=2),
+    )
+
+
+def _as_version_1(ir: dict) -> dict:
+    """`ir` as taut wrote it before version 2: version 1, no options, no effective values."""
+    old = copy.deepcopy(ir)
+    old["version"] = 1
+    levels = [old, *old["enums"], *old["messages"], *old["services"]]
+    levels += [f for m in old["messages"] for f in m["fields"]]
+    levels += [mt for s in old["services"] for mt in s["methods"]]
+    for level in levels:
+        for key in ("options", "effective", "member_options"):
+            level.pop(key, None)
+    return old
+
+
+def _refused_irs(v2: dict) -> list[dict[str, Any]]:
+    """IR documents loadSchema refuses: `v2` with one edit each, and the error each names."""
+    def file(ir: dict) -> dict:
+        return ir["effective"]
+
+    def tree(ir: dict) -> dict:
+        return ir["messages"][0]["effective"]
+
+    depth = "message Tree: effective max_depth must be an integer from 1 to 128"
+    length = "the file: effective max_encoded_len must be null or an integer from 1 to 2147483647"
+    edits = [
+        ("version 3", lambda ir: ir.update(version=3),
+         "unsupported IR version 3: this runtime reads versions 1 and 2"),
+        ("version 0", lambda ir: ir.update(version=0), "unsupported IR version 0"),
+        ("version 2.5", lambda ir: ir.update(version=2.5), "unsupported IR version 2.5"),
+        ('version "2"', lambda ir: ir.update(version="2"), 'unsupported IR version "2"'),
+        ("no version", lambda ir: ir.pop("version"), "unsupported IR version none"),
+        ("no effective for the file", lambda ir: ir.pop("effective"),
+         "the file: a version 2 IR carries effective values"),
+        ("no effective for a message", lambda ir: ir["messages"][0].pop("effective"),
+         "message Tree: a version 2 IR carries effective values"),
+        ("an effective that is no object", lambda ir: ir.update(effective=[16]),
+         "the file: effective must be an object"),
+        ("an unknown option in the file's", lambda ir: file(ir).update(max_frames=8),
+         "the file: effective names max_frames, an option this runtime does not know"),
+        ("an unknown option in a message's", lambda ir: tree(ir).update(max_frames=8),
+         "message Tree: effective names max_frames, an option this runtime does not know"),
+        ("no max_depth", lambda ir: tree(ir).pop("max_depth"), "message Tree: effective lacks max_depth"),
+        ("no max_encoded_len", lambda ir: file(ir).pop("max_encoded_len"),
+         "the file: effective lacks max_encoded_len"),
+        *[(f"max_depth {v!r}", lambda ir, v=v: tree(ir).update(max_depth=v), depth)
+          for v in (0, 129, 1.5, "16", True, None)],
+        *[(f"max_encoded_len {v!r}", lambda ir, v=v: file(ir).update(max_encoded_len=v), length)
+          for v in (0, 2**31, 1.5, "1k", False)],
+    ]
+    cases = []
+    for note, edit, error in edits:
+        ir = copy.deepcopy(v2)
+        edit(ir)
+        cases.append({"note": note, "ir": ir, "error": error})
+    for note, where, error in [
+        ("a version 1 IR with the file's effective values", None, "the file"),
+        ("a version 1 IR with a message's effective values", 0, "message Tree"),
+    ]:
+        v1 = _as_version_1(v2)
+        level = v1 if where is None else v1["messages"][where]
+        level["effective"] = {"max_depth": 32, "max_encoded_len": None}
+        cases.append({"note": note, "ir": v1,
+                      "error": f"{error}: a version 1 IR carries no effective values"})
+    return cases
+
+
+def test_typescript_load_schema_reads_version_2_and_refuses_what_it_cannot_honour_if_node(tmp_path):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+
+    s = _bounds_schema()
+    ts_dir = _emit_ts(s, tmp_path, "bounds.ir.json")
+    v2 = json.loads((ts_dir / "bounds.ir.json").read_text())
+    assert v2["version"] == 2
+    (ts_dir / "cases.json").write_text(json.dumps({
+        "v1": _as_version_1(v2),
+        "file": effective_map(s),
+        "messages": {name: effective_map(s, message=name) for name in s.messages},
+        "refused": _refused_irs(v2),
+    }))
+
+    harness = ts_dir / "ir_version.test.ts"
+    harness.write_text(
+        """
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { decode, encode } from "./codec.ts";
+import { loadSchema } from "./schema.ts";
+
+const v2 = JSON.parse(readFileSync("bounds.ir.json", "utf8"));
+const cases = JSON.parse(readFileSync("cases.json", "utf8"));
+const DEFAULTS = { max_depth: 32, max_encoded_len: null };
+
+test("version 2: each message's effective values are the ones Python resolved", () => {
+  const schema = loadSchema(v2);
+  assert.deepEqual(schema.effective(), { max_depth: 16, max_encoded_len: 4096 });
+  assert.deepEqual(schema.effective(), cases.file);
+  assert.deepEqual(schema.effective("Tree"), { max_depth: 64, max_encoded_len: 4096 });
+  assert.deepEqual(schema.effective("Blob"), { max_depth: 16, max_encoded_len: 1048576 });
+  for (const [name, values] of Object.entries(cases.messages)) {
+    assert.deepEqual(schema.effective(name), values, name);
+    assert.deepEqual(schema.rootEffective({ k: "msg", name }), values, name);
+  }
+  assert.throws(() => schema.effective("Nope"), /unknown message Nope/);
+});
+
+test("a call rooted at a type other than a message takes the file's values", () => {
+  const schema = loadSchema(v2);
+  const tree = { k: "msg", name: "Tree" } as const;
+  assert.deepEqual(schema.rootEffective({ k: "list", elem: tree }), cases.file);
+  assert.deepEqual(schema.rootEffective({ k: "scalar", scalar: "int" }), cases.file);
+});
+
+test("the effective values are read-only", () => {
+  const schema = loadSchema(v2);
+  assert.throws(() => {
+    (schema.effective("Tree") as any).max_depth = 128;
+  }, TypeError);
+  assert.equal(schema.effective("Tree").max_depth, 64);
+});
+
+test("version 2 still drives the codec", () => {
+  const schema = loadSchema(v2);
+  const wire = encode(schema, "Plain", { x: 5n });
+  assert.equal(Buffer.from(wire).toString("hex"), "a10105");
+  assert.deepEqual(decode(schema, "Plain", wire), { x: 5n });
+});
+
+test("version 1 declares nothing, so every root has the defaults", () => {
+  const schema = loadSchema(cases.v1);
+  assert.deepEqual(schema.effective(), DEFAULTS);
+  for (const name of Object.keys(cases.messages)) {
+    assert.deepEqual(schema.effective(name), DEFAULTS, name);
+  }
+});
+
+test("loadSchema refuses a version, or an effective value, that it cannot honour", () => {
+  assert.ok(cases.refused.length >= 20);
+  for (const c of cases.refused) {
+    assert.throws(() => loadSchema(c.ir), new RegExp(c.error), c.note);
+  }
+  assert.throws(() => loadSchema(null), /a taut IR is a JSON object/);
+  assert.throws(() => loadSchema([]), /a taut IR is a JSON object/);
+});
+""".lstrip()
     )
     _run_node_tests(node, ts_dir, harness)

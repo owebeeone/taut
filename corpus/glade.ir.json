@@ -1,5 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
+  "options": {},
+  "effective": {
+    "max_depth": 32,
+    "max_encoded_len": null
+  },
   "shapes": {
     "unary": {
       "name": "unary",
@@ -250,6 +255,7 @@
   "enums": [
     {
       "name": "FrameType",
+      "options": {},
       "members": {
         "hello": 0,
         "welcome": 1,
@@ -266,18 +272,42 @@
         "error": 12,
         "node_hello": 13,
         "node_welcome": 14
+      },
+      "member_options": {
+        "hello": {},
+        "welcome": {},
+        "subscribe": {},
+        "unsubscribe": {},
+        "ops": {},
+        "heads": {},
+        "exchange_req": {},
+        "exchange_res": {},
+        "channel_open": {},
+        "channel_data": {},
+        "channel_close": {},
+        "chunk": {},
+        "error": {},
+        "node_hello": {},
+        "node_welcome": {}
       }
     },
     {
       "name": "Priority",
+      "options": {},
       "members": {
         "control": 0,
         "interactive": 1,
         "bulk": 2
+      },
+      "member_options": {
+        "control": {},
+        "interactive": {},
+        "bulk": {}
       }
     },
     {
       "name": "ErrorCode",
+      "options": {},
       "members": {
         "ok": 0,
         "equivocation": 1,
@@ -286,22 +316,44 @@
         "protocol": 4,
         "retention": 5,
         "internal": 6
+      },
+      "member_options": {
+        "ok": {},
+        "equivocation": {},
+        "unknown_share": {},
+        "unauthorized": {},
+        "protocol": {},
+        "retention": {},
+        "internal": {}
       }
     },
     {
       "name": "Shape",
+      "options": {},
       "members": {
         "value": 0,
         "log": 1,
         "stream": 2,
         "swmr": 3,
         "crdt": 4
+      },
+      "member_options": {
+        "value": {},
+        "log": {},
+        "stream": {},
+        "swmr": {},
+        "crdt": {}
       }
     }
   ],
   "messages": [
     {
       "name": "Head",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -309,6 +361,7 @@
         {
           "name": "origin",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -320,6 +373,7 @@
         {
           "name": "seq",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -331,6 +385,7 @@
         {
           "name": "hash",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -343,6 +398,11 @@
     },
     {
       "name": "StreamHeads",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -350,6 +410,7 @@
         {
           "name": "share",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -361,6 +422,7 @@
         {
           "name": "glade_id",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -372,6 +434,7 @@
         {
           "name": "key",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -383,6 +446,7 @@
         {
           "name": "heads",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -398,6 +462,11 @@
     },
     {
       "name": "Op",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -405,6 +474,7 @@
         {
           "name": "share",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -416,6 +486,7 @@
         {
           "name": "glade_id",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -427,6 +498,7 @@
         {
           "name": "key",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -438,6 +510,7 @@
         {
           "name": "origin",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -449,6 +522,7 @@
         {
           "name": "seq",
           "tag": 5,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -460,6 +534,7 @@
         {
           "name": "prev",
           "tag": 6,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -471,6 +546,7 @@
         {
           "name": "lamport",
           "tag": 7,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -482,6 +558,7 @@
         {
           "name": "refs",
           "tag": 8,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -496,6 +573,7 @@
         {
           "name": "shape",
           "tag": 9,
+          "options": {},
           "type": {
             "k": "enum",
             "name": "Shape"
@@ -507,6 +585,7 @@
         {
           "name": "payload",
           "tag": 10,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -519,6 +598,11 @@
     },
     {
       "name": "Hello",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -526,6 +610,7 @@
         {
           "name": "session",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -537,6 +622,7 @@
         {
           "name": "protocol",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -548,6 +634,7 @@
         {
           "name": "principal",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -559,6 +646,7 @@
         {
           "name": "capability",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -570,6 +658,7 @@
         {
           "name": "heads",
           "tag": 5,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -585,6 +674,11 @@
     },
     {
       "name": "Welcome",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -592,6 +686,7 @@
         {
           "name": "session",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -603,6 +698,7 @@
         {
           "name": "protocol",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -614,6 +710,7 @@
         {
           "name": "heads",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -629,6 +726,11 @@
     },
     {
       "name": "NodeHello",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -636,6 +738,7 @@
         {
           "name": "node_id",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -647,6 +750,7 @@
         {
           "name": "protocol",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -658,6 +762,7 @@
         {
           "name": "sig",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -670,6 +775,11 @@
     },
     {
       "name": "NodeWelcome",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -677,6 +787,7 @@
         {
           "name": "node_id",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -688,6 +799,7 @@
         {
           "name": "protocol",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -699,6 +811,7 @@
         {
           "name": "sig",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -711,6 +824,11 @@
     },
     {
       "name": "Subscribe",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -718,6 +836,7 @@
         {
           "name": "share",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -729,6 +848,7 @@
         {
           "name": "glade_id",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -740,6 +860,7 @@
         {
           "name": "key",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -751,6 +872,7 @@
         {
           "name": "from",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -766,6 +888,11 @@
     },
     {
       "name": "Unsubscribe",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -773,6 +900,7 @@
         {
           "name": "share",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -784,6 +912,7 @@
         {
           "name": "glade_id",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -795,6 +924,7 @@
         {
           "name": "key",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -807,6 +937,11 @@
     },
     {
       "name": "Ops",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -814,6 +949,7 @@
         {
           "name": "ops",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -828,6 +964,7 @@
         {
           "name": "pri",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "enum",
             "name": "Priority"
@@ -840,6 +977,11 @@
     },
     {
       "name": "Heads",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -847,6 +989,7 @@
         {
           "name": "streams",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "list",
             "elem": {
@@ -862,6 +1005,11 @@
     },
     {
       "name": "ExchangeReq",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -869,6 +1017,7 @@
         {
           "name": "share",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -880,6 +1029,7 @@
         {
           "name": "glade_id",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -891,6 +1041,7 @@
         {
           "name": "corr",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -902,6 +1053,7 @@
         {
           "name": "payload",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -914,6 +1066,11 @@
     },
     {
       "name": "ExchangeRes",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -921,6 +1078,7 @@
         {
           "name": "corr",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -932,6 +1090,7 @@
         {
           "name": "ok",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bool"
@@ -943,6 +1102,7 @@
         {
           "name": "payload",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -954,6 +1114,7 @@
         {
           "name": "error",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -966,6 +1127,11 @@
     },
     {
       "name": "ChannelOpen",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -973,6 +1139,7 @@
         {
           "name": "share",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -984,6 +1151,7 @@
         {
           "name": "glade_id",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -995,6 +1163,7 @@
         {
           "name": "channel",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -1006,6 +1175,7 @@
         {
           "name": "key",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -1018,6 +1188,11 @@
     },
     {
       "name": "ChannelData",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -1025,6 +1200,7 @@
         {
           "name": "channel",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -1036,6 +1212,7 @@
         {
           "name": "data",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -1048,6 +1225,11 @@
     },
     {
       "name": "ChannelClose",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -1055,6 +1237,7 @@
         {
           "name": "channel",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -1066,6 +1249,7 @@
         {
           "name": "reason",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -1078,6 +1262,11 @@
     },
     {
       "name": "Chunk",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -1085,6 +1274,7 @@
         {
           "name": "corr",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -1096,6 +1286,7 @@
         {
           "name": "index",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -1107,6 +1298,7 @@
         {
           "name": "total",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "int"
@@ -1118,6 +1310,7 @@
         {
           "name": "data",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "bytes"
@@ -1130,6 +1323,11 @@
     },
     {
       "name": "Error",
+      "options": {},
+      "effective": {
+        "max_depth": 32,
+        "max_encoded_len": null
+      },
       "reserved_tags": [],
       "reserved_names": [],
       "next_id": null,
@@ -1137,6 +1335,7 @@
         {
           "name": "code",
           "tag": 1,
+          "options": {},
           "type": {
             "k": "enum",
             "name": "ErrorCode"
@@ -1148,6 +1347,7 @@
         {
           "name": "message",
           "tag": 2,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -1159,6 +1359,7 @@
         {
           "name": "share",
           "tag": 3,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -1170,6 +1371,7 @@
         {
           "name": "glade_id",
           "tag": 4,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
@@ -1181,6 +1383,7 @@
         {
           "name": "corr",
           "tag": 5,
+          "options": {},
           "type": {
             "k": "scalar",
             "scalar": "str"
