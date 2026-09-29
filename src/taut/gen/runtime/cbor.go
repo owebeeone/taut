@@ -50,7 +50,9 @@ const (
 	DecodeErrUnsupportedInfo  = "UnsupportedInfo"
 	DecodeErrUnsupportedMajor = "UnsupportedMajor"
 	DecodeErrNonIntegerMapKey = "NonIntegerMapKey"
+	DecodeErrNegativeMapKey   = "NegativeMapKey"
 	DecodeErrIntOverflow      = "IntOverflow"
+	DecodeErrNonCanonicalInt  = "NonCanonicalInt"
 	DecodeErrDuplicateMapKey  = "DuplicateMapKey"
 	DecodeErrMissingKey       = "MissingKey"
 	DecodeErrWrongType        = "WrongType"
@@ -79,13 +81,13 @@ func (e *DecodeError) Error() string {
 		return fmt.Sprintf("%s(%d)", e.Tag, e.Info)
 	case DecodeErrUnsupportedMajor:
 		return fmt.Sprintf("%s(%d)", e.Tag, e.Major)
-	case DecodeErrDuplicateMapKey, DecodeErrMissingKey:
+	case DecodeErrNegativeMapKey, DecodeErrDuplicateMapKey, DecodeErrMissingKey:
 		return fmt.Sprintf("%s(%d)", e.Tag, e.Key)
 	case DecodeErrWrongType:
 		return fmt.Sprintf("%s(%s)", e.Tag, e.Expected)
 	case DecodeErrUnknownEnum:
 		return fmt.Sprintf("%s(%s=%s)", e.Tag, e.Enum, e.Value)
-	case DecodeErrIntOverflow:
+	case DecodeErrIntOverflow, DecodeErrNonCanonicalInt:
 		return fmt.Sprintf("%s(%s)", e.Tag, e.Value)
 	default:
 		return e.Tag
@@ -157,7 +159,7 @@ func (c Cbor) TryInt() (int64, error) {
 
 func (c Cbor) TryText() (string, error) {
 	if c.Kind != KText {
-		return "", &DecodeError{Tag: DecodeErrWrongType, Expected: "str"}
+		return "", &DecodeError{Tag: DecodeErrWrongType, Expected: "text"}
 	}
 	return c.S, nil
 }
@@ -382,41 +384,39 @@ func TryDecode(data []byte) (Cbor, error) {
 	return v, nil
 }
 
+// readArg reads the argument of a major 0-5 head: an int, or a length or count.
+// Additional info 28-31 is UnsupportedInfo and missing argument bytes are
+// Truncated. Strict canonical (D2): a 1-, 2-, 4- or 8-byte argument that fits a
+// shorter form is NonCanonicalInt, carrying the raw argument, because the
+// canonical encoder never writes one.
 func readArg(data []byte, off int, info byte) (uint64, int, error) {
+	var width int
+	var shorter uint64 // the largest argument the next shorter form carries
 	switch {
 	case info < 24:
 		return uint64(info), off, nil
 	case info == 24:
-		if off > len(data)-1 {
-			return 0, off, &DecodeError{Tag: DecodeErrTruncated}
-		}
-		return uint64(data[off]), off + 1, nil
+		width, shorter = 1, 23
 	case info == 25:
-		if off > len(data)-2 {
-			return 0, off, &DecodeError{Tag: DecodeErrTruncated}
-		}
-		return uint64(data[off])<<8 | uint64(data[off+1]), off + 2, nil
+		width, shorter = 2, 0xff
 	case info == 26:
-		if off > len(data)-4 {
-			return 0, off, &DecodeError{Tag: DecodeErrTruncated}
-		}
-		var v uint64
-		for j := 0; j < 4; j++ {
-			v = v<<8 | uint64(data[off+j])
-		}
-		return v, off + 4, nil
+		width, shorter = 4, 0xffff
 	case info == 27:
-		if off > len(data)-8 {
-			return 0, off, &DecodeError{Tag: DecodeErrTruncated}
-		}
-		var v uint64
-		for j := 0; j < 8; j++ {
-			v = v<<8 | uint64(data[off+j])
-		}
-		return v, off + 8, nil
+		width, shorter = 8, 0xffffffff
 	default:
 		return 0, off, &DecodeError{Tag: DecodeErrUnsupportedInfo, Info: info}
 	}
+	if off > len(data)-width {
+		return 0, off, &DecodeError{Tag: DecodeErrTruncated}
+	}
+	var v uint64
+	for j := 0; j < width; j++ {
+		v = v<<8 | uint64(data[off+j])
+	}
+	if v <= shorter {
+		return 0, off, &DecodeError{Tag: DecodeErrNonCanonicalInt, Value: strconv.FormatUint(v, 10)}
+	}
+	return v, off + width, nil
 }
 
 func negOverflowValue(n uint64) string {
@@ -426,6 +426,10 @@ func negOverflowValue(n uint64) string {
 	return "-" + strconv.FormatUint(n+1, 10)
 }
 
+// dec reads one item left to right and reports the first check that fails
+// (TautCheckedDecode.md CD-E5): the head (no byte, major type 6 whatever its info,
+// unsupported info, missing argument bytes, a non-canonical argument), then the
+// body, whose items are read in order, a map entry's key checked before its value.
 func dec(data []byte, off int) (Cbor, int, error) {
 	if off >= len(data) {
 		return Cbor{}, off, &DecodeError{Tag: DecodeErrTruncated}
@@ -434,9 +438,6 @@ func dec(data []byte, off int) (Cbor, int, error) {
 	major := initial >> 5
 	info := initial & 0x1f
 	off++
-	if info >= 28 {
-		return Cbor{}, off, &DecodeError{Tag: DecodeErrUnsupportedInfo, Info: info}
-	}
 	switch major {
 	case 0:
 		n, o, err := readArg(data, off, info)
@@ -509,6 +510,9 @@ func dec(data []byte, off int) (Cbor, int, error) {
 			if kc.Kind != KInt {
 				return Cbor{}, o2, &DecodeError{Tag: DecodeErrNonIntegerMapKey}
 			}
+			if kc.I < 0 {
+				return Cbor{}, o2, &DecodeError{Tag: DecodeErrNegativeMapKey, Key: kc.I}
+			}
 			if seen[kc.I] {
 				return Cbor{}, o2, &DecodeError{Tag: DecodeErrDuplicateMapKey, Key: kc.I}
 			}
@@ -553,6 +557,9 @@ func dec(data []byte, off int) (Cbor, int, error) {
 				bits = bits<<8 | uint64(data[off+j])
 			}
 			return CFloat(math.Float64frombits(bits)), off + 8, nil
+		default:
+			// Neither false, true, null nor a float (which keep the width they came in).
+			return Cbor{}, off, &DecodeError{Tag: DecodeErrUnsupportedInfo, Info: info}
 		}
 	}
 	return Cbor{}, off, &DecodeError{Tag: DecodeErrUnsupportedMajor, Major: major}

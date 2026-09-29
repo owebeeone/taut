@@ -9,7 +9,7 @@ Field/enum names are PascalCased (Go requires capitalized identifiers to export)
 
 from __future__ import annotations
 
-from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 
 def _pascal(name: str) -> str:
@@ -61,6 +61,14 @@ def _try_dec(t: TypeRef, expr: str) -> str:
     if isinstance(t, MsgRef):
         return f"Try{t.name}FromCbor({expr})"
     raise TypeError(t)
+
+
+def _duplicate_key_error(key: TypeRef) -> str:
+    """The error for a repeated `map<K,V>` entry key `k`. `DecodeError.Key` is an int64,
+    so it carries an int key; a str or bool key is refused with the same tag and no key."""
+    if isinstance(key, Scalar) and key.kind == "int":
+        return "&DecodeError{Tag: DecodeErrDuplicateMapKey, Key: k}"
+    return "&DecodeError{Tag: DecodeErrDuplicateMapKey}"
 
 
 def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
@@ -140,18 +148,32 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     out.append("\treturn CMap(m)")
     out.append("}")
     out.append("")
-    # FromCbor
+    # FromCbor. The schema stage (TautCheckedDecode.md CD-E5): the message must be a map,
+    # even one with no fields; then each field in IR order.
     out.append(f"func Try{msg.name}FromCbor(c Cbor) ({msg.name}, error) {{")
     out.append(f"\tvar v {msg.name}")
+    out.append("\tif _, err := c.TryMap(); err != nil { return v, err }")
     for f in msg.fields:
         if f.transient:
             continue  # native-only; left as the Go zero value
         fn = f"v.{_pascal(f.name)}"
-        if f.optional:
+        if f.optional == MISSING_OK:
+            # An absent key reads as null, like a present null; a wrong type still fails.
             out.append("\t{")
             out.append(f"\t\tfv, ok, err := c.Lookup({f.tag})")
             out.append("\t\tif err != nil { return v, err }")
             out.append("\t\tif ok && !fv.IsNull() {")
+            out.append(f"\t\t\tx, err := {_try_dec(f.type, 'fv')}")
+            out.append("\t\t\tif err != nil { return v, err }")
+            out.append(f"\t\t\t{fn} = &x")
+            out.append("\t\t}")
+            out.append("\t}")
+        elif f.optional:
+            # The key is required (the encoder always writes it); its value may be null.
+            out.append("\t{")
+            out.append(f"\t\tfv, err := c.Require({f.tag})")
+            out.append("\t\tif err != nil { return v, err }")
+            out.append("\t\tif !fv.IsNull() {")
             out.append(f"\t\t\tx, err := {_try_dec(f.type, 'fv')}")
             out.append("\t\t\tif err != nil { return v, err }")
             out.append(f"\t\t\t{fn} = &x")
@@ -170,6 +192,8 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
             out.append("\t\t}")
             out.append("\t}")
         elif isinstance(f.type, MapOf):
+            # An array of entry maps; each entry has keys 1 and 2 before either is
+            # decoded, and a repeated key is refused (the last one never wins).
             kt, vt = _go_ty(f.type.key), _go_ty(f.type.value)
             out.append("\t{")
             out.append(f"\t\tfv, err := c.Require({f.tag})")
@@ -177,18 +201,14 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
             out.append("\t\tarr, err := fv.TryArray()")
             out.append("\t\tif err != nil { return v, err }")
             out.append(f"\t\t{fn} = map[{kt}]{vt}{{}}")
-            if isinstance(f.type.key, Scalar) and f.type.key.kind == "int":
-                out.append(f"\t\tseen := map[{kt}]bool{{}}")
             out.append("\t\tfor _, e := range arr {")
             out.append("\t\t\tkc, err := e.Require(1)")
             out.append("\t\t\tif err != nil { return v, err }")
-            out.append(f"\t\t\tk, err := {_try_dec(f.type.key, 'kc')}")
-            out.append("\t\t\tif err != nil { return v, err }")
-            if isinstance(f.type.key, Scalar) and f.type.key.kind == "int":
-                out.append("\t\t\tif seen[k] { return v, &DecodeError{Tag: DecodeErrDuplicateMapKey, Key: k} }")
-                out.append("\t\t\tseen[k] = true")
             out.append("\t\t\tvc, err := e.Require(2)")
             out.append("\t\t\tif err != nil { return v, err }")
+            out.append(f"\t\t\tk, err := {_try_dec(f.type.key, 'kc')}")
+            out.append("\t\t\tif err != nil { return v, err }")
+            out.append(f"\t\t\tif _, dup := {fn}[k]; dup {{ return v, {_duplicate_key_error(f.type.key)} }}")
             out.append(f"\t\t\tval, err := {_try_dec(f.type.value, 'vc')}")
             out.append("\t\t\tif err != nil { return v, err }")
             out.append(f"\t\t\t{fn}[k] = val")
