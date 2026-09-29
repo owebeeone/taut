@@ -1,0 +1,394 @@
+{
+  "version": 1,
+  "contract": "taut-codec-parity/i64/v1",
+  "schema_path": "ir/parity_int.taut.py",
+  "default_max_depth": 32,
+  "max_depth_ceiling": 128,
+  "vectors": [
+    {
+      "name": "depth-32-arrays",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "81", "count": 31},
+        "80"
+      ],
+      "len": 32,
+      "bounds": {"max_depth": 32},
+      "expect": {"accept": true},
+      "why": "B1: 32 nested arrays, the innermost empty, decode under the default depth bound, 32 (CD-B1)",
+      "lead": true
+    },
+    {
+      "name": "depth-33-arrays",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "81", "count": 32},
+        "80"
+      ],
+      "len": 33,
+      "bounds": {"max_depth": 32},
+      "expect": {"tag": "TooDeep", "limit": 32},
+      "why": "B2: a 33rd nested array is one beyond the default bound: TooDeep, though it is empty",
+      "lead": true
+    },
+    {
+      "name": "depth-32-maps",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "a100", "count": 31},
+        "a0"
+      ],
+      "len": 63,
+      "bounds": {"max_depth": 32},
+      "expect": {"accept": true},
+      "why": "B3: 32 nested maps, each holding the next under key 0, decode: a map counts as an array does",
+      "lead": true
+    },
+    {
+      "name": "depth-33-maps",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "a100", "count": 32},
+        "a0"
+      ],
+      "len": 65,
+      "bounds": {"max_depth": 32},
+      "expect": {"tag": "TooDeep", "limit": 32},
+      "why": "B4: a 33rd nested map is TooDeep",
+      "lead": true
+    },
+    {
+      "name": "depth-32-scalar-leaf",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "81", "count": 32},
+        "00"
+      ],
+      "len": 33,
+      "bounds": {"max_depth": 32},
+      "expect": {"accept": true},
+      "why": "B5: an int inside the 32nd array adds no depth: ints, strings, bools, null and floats never count",
+      "lead": true
+    },
+    {
+      "name": "depth-33-items-missing",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "81", "count": 33}
+      ],
+      "len": 33,
+      "bounds": {"max_depth": 32},
+      "expect": {"tag": "TooDeep", "limit": 32},
+      "why": "B6: the 33rd array's head is complete and its item missing: depth is checked once a head is read, before its first item, so TooDeep and not Truncated (CD-B2)",
+      "lead": true
+    },
+    {
+      "name": "depth-33-torn-head",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "81", "count": 32},
+        "9b00"
+      ],
+      "len": 34,
+      "bounds": {"max_depth": 32},
+      "expect": {"tag": "Truncated"},
+      "why": "B7: the 33rd array's head claims an 8-byte count and holds one byte: a torn head is Truncated, before depth is checked (CD-B2)",
+      "lead": true
+    },
+    {
+      "name": "depth-33-mixed",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "81a100", "count": 16},
+        "80"
+      ],
+      "len": 49,
+      "bounds": {"max_depth": 32},
+      "expect": {"tag": "TooDeep", "limit": 32},
+      "why": "B8: arrays and maps alternating, 33 deep: both count toward the one bound",
+      "lead": true
+    },
+    {
+      "name": "depth-100000-arrays",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "81", "count": 99999},
+        "80"
+      ],
+      "len": 100000,
+      "bounds": {"max_depth": 32},
+      "expect": {"tag": "TooDeep", "limit": 32},
+      "why": "B9: 100,000 nested arrays are refused at the 33rd, with no stack overflow, RecursionError or RangeError on the way (CD-E4)",
+      "lead": true
+    },
+    {
+      "name": "depth-100000-maps",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "a100", "count": 99999},
+        "a0"
+      ],
+      "len": 199999,
+      "bounds": {"max_depth": 32},
+      "expect": {"tag": "TooDeep", "limit": 32},
+      "why": "B10: 100,000 nested maps, as B9",
+      "lead": true
+    },
+    {
+      "name": "depth-33-unknown-field",
+      "stage": "from_cbor",
+      "schema": "IntBox",
+      "bytes": [
+        "a30100028009",
+        {"repeat": "81", "count": 31},
+        "80"
+      ],
+      "len": 38,
+      "bounds": {"max_depth": 32},
+      "expect": {"tag": "TooDeep", "limit": 32},
+      "why": "B11: an IntBox whose unknown field 9 holds 32 nested arrays, 33 deep with the message's map: depth counts unknown fields, and the raw stage refuses them before the schema stage runs (CD-B2)",
+      "lead": true
+    },
+    {
+      "name": "depth-32-unknown-field",
+      "stage": "from_cbor",
+      "schema": "IntBox",
+      "bytes": [
+        "a30100028009",
+        {"repeat": "81", "count": 30},
+        "80"
+      ],
+      "len": 37,
+      "bounds": {"max_depth": 32},
+      "expect": {"accept": true},
+      "expect_dropping": {"accept": true, "reencode": "a201000280"},
+      "why": "B12: the same with 31 arrays, 32 deep, decodes: a codec that keeps unknown fields writes field 9 back, one that drops them writes the IntBox alone",
+      "lead": true
+    },
+    {
+      "name": "size-at-limit",
+      "stage": "raw_decode",
+      "bytes": "83010203",
+      "len": 4,
+      "limits": {"max_encoded_len": 4},
+      "bounds": {"max_depth": 32, "max_encoded_len": 4},
+      "expect": {"accept": true},
+      "why": "B13: four bytes under a raw call's max_encoded_len of 4 decode: input exactly at the bound is accepted (CD-B5)",
+      "lead": true
+    },
+    {
+      "name": "size-over-limit",
+      "stage": "raw_decode",
+      "bytes": "83010203",
+      "len": 4,
+      "limits": {"max_encoded_len": 3},
+      "bounds": {"max_depth": 32, "max_encoded_len": 3},
+      "expect": {"tag": "TooLarge", "len": 4, "limit": 3},
+      "why": "B14: the same four bytes under a bound of 3 are TooLarge, naming the input's length and the bound (CD-B4)",
+      "lead": true
+    },
+    {
+      "name": "size-before-parse",
+      "stage": "raw_decode",
+      "bytes": "c0c0c0c0",
+      "len": 4,
+      "limits": {"max_encoded_len": 3},
+      "bounds": {"max_depth": 32, "max_encoded_len": 3},
+      "expect": {"tag": "TooLarge", "len": 4, "limit": 3},
+      "why": "B15: the length is checked before a byte is read: four CBOR tags, UnsupportedMajor once read, are TooLarge under a bound of 3 (CD-E5 step 1)",
+      "lead": true
+    },
+    {
+      "name": "size-empty",
+      "stage": "raw_decode",
+      "bytes": "",
+      "len": 0,
+      "limits": {"max_encoded_len": 0},
+      "bounds": {"max_depth": 32, "max_encoded_len": 0},
+      "expect": {"tag": "Truncated"},
+      "why": "B16: empty input is within a bound of 0, so it is read, and is Truncated (CD-B5)",
+      "lead": true
+    },
+    {
+      "name": "depth-64-declared",
+      "stage": "from_cbor",
+      "schema": "Tree64",
+      "bytes": [
+        {"repeat": "a10181", "count": 31},
+        "a10180"
+      ],
+      "len": 96,
+      "bounds": {"max_depth": 64},
+      "expect": {"accept": true},
+      "why": "B17: a Tree64 64 deep decodes: a typed decode applies its root's declared max_depth, 64 (CD-B3)",
+      "lead": true
+    },
+    {
+      "name": "depth-65-declared",
+      "stage": "from_cbor",
+      "schema": "Tree64",
+      "bytes": [
+        {"repeat": "a10181", "count": 32},
+        "a10180"
+      ],
+      "len": 99,
+      "bounds": {"max_depth": 64},
+      "expect": {"tag": "TooDeep", "limit": 64},
+      "why": "B18: a Tree64 65 deep is TooDeep{64}",
+      "lead": true
+    },
+    {
+      "name": "raw-ignores-declared",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "a10181", "count": 31},
+        "a10180"
+      ],
+      "len": 96,
+      "bounds": {"max_depth": 32},
+      "expect": {"tag": "TooDeep", "limit": 32},
+      "why": "B19: B17's bytes through the raw decode, which knows no schema, meet the default bound (CD-B3)",
+      "lead": true
+    },
+    {
+      "name": "depth-root-decides",
+      "stage": "from_cbor",
+      "schema": "Holds64",
+      "bytes": [
+        "a101",
+        {"repeat": "a10181", "count": 15},
+        "a10180"
+      ],
+      "len": 50,
+      "bounds": {"max_depth": 32},
+      "expect": {"tag": "TooDeep", "limit": 32},
+      "why": "B20: a Tree64 inside a Holds64, 33 deep: the root, Holds64, declares nothing, so 32 bounds the whole call though Tree64 declares 64 (OPT-D4)",
+      "lead": true
+    },
+    {
+      "name": "depth-2-declared",
+      "stage": "from_cbor",
+      "schema": "Flat2",
+      "bytes": "a1018100",
+      "len": 4,
+      "bounds": {"max_depth": 2},
+      "expect": {"accept": true},
+      "why": "B21: a Flat2 at its declared bound, 2, its own non-recursive nesting, decodes",
+      "lead": true
+    },
+    {
+      "name": "depth-3-declared",
+      "stage": "from_cbor",
+      "schema": "Flat2",
+      "bytes": "a1018180",
+      "len": 4,
+      "bounds": {"max_depth": 2},
+      "expect": {"tag": "TooDeep", "limit": 2},
+      "why": "B22: an array inside Flat2's list is 3 deep: TooDeep{2} from the raw stage, before the schema stage would find a WrongType (CD-E5)",
+      "lead": true
+    },
+    {
+      "name": "depth-128-ceiling",
+      "stage": "from_cbor",
+      "schema": "Tree128",
+      "bytes": [
+        {"repeat": "a10181", "count": 63},
+        "a10180"
+      ],
+      "len": 192,
+      "bounds": {"max_depth": 128},
+      "expect": {"accept": true},
+      "why": "B23: a Tree128 128 deep, at the ceiling, decodes (CD-B5)",
+      "lead": true
+    },
+    {
+      "name": "depth-129-ceiling",
+      "stage": "from_cbor",
+      "schema": "Tree128",
+      "bytes": [
+        {"repeat": "a10181", "count": 64},
+        "a10180"
+      ],
+      "len": 195,
+      "bounds": {"max_depth": 128},
+      "expect": {"tag": "TooDeep", "limit": 128},
+      "why": "B24: a Tree128 129 deep is TooDeep{128}",
+      "lead": true
+    },
+    {
+      "name": "raw-depth-128",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "81", "count": 127},
+        "80"
+      ],
+      "len": 128,
+      "limits": {"max_depth": 128},
+      "bounds": {"max_depth": 128},
+      "expect": {"accept": true},
+      "why": "B25: a raw call passing max_depth 128 decodes 128 nested arrays",
+      "lead": true
+    },
+    {
+      "name": "raw-depth-129",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "81", "count": 128},
+        "80"
+      ],
+      "len": 129,
+      "limits": {"max_depth": 128},
+      "bounds": {"max_depth": 128},
+      "expect": {"tag": "TooDeep", "limit": 128},
+      "why": "B26: the same call refuses 129",
+      "lead": true
+    },
+    {
+      "name": "raw-depth-capped",
+      "stage": "raw_decode",
+      "bytes": [
+        {"repeat": "81", "count": 128},
+        "80"
+      ],
+      "len": 129,
+      "limits": {"max_depth": 1000},
+      "bounds": {"max_depth": 128},
+      "expect": {"tag": "TooDeep", "limit": 128},
+      "why": "B27: a raw call passing max_depth 1000 applies the ceiling, and TooDeep names the bound applied, 128 (CD-B3, question 1)",
+      "lead": true
+    },
+    {
+      "name": "len-8-declared",
+      "stage": "from_cbor",
+      "schema": "Sized8",
+      "bytes": "a101450102030405",
+      "len": 8,
+      "bounds": {"max_depth": 32, "max_encoded_len": 8},
+      "expect": {"accept": true},
+      "why": "B28: a Sized8 of exactly 8 bytes decodes under its declared max_encoded_len, 8",
+      "lead": true
+    },
+    {
+      "name": "len-9-declared",
+      "stage": "from_cbor",
+      "schema": "Sized8",
+      "bytes": "a10146010203040506",
+      "len": 9,
+      "bounds": {"max_depth": 32, "max_encoded_len": 8},
+      "expect": {"tag": "TooLarge", "len": 9, "limit": 8},
+      "why": "B29: a Sized8 of 9 bytes is TooLarge, before a byte is read (CD-B4)",
+      "lead": true
+    },
+    {
+      "name": "len-root-decides",
+      "stage": "from_cbor",
+      "schema": "HoldsSized8",
+      "bytes": ["a101a1014a", "00010203040506070809"],
+      "len": 15,
+      "bounds": {"max_depth": 32},
+      "expect": {"accept": true},
+      "why": "B30: a Sized8 longer than 8 bytes inside a HoldsSized8 decodes: the root declares no length bound, and Sized8's does not apply inside it (OPT-D4)",
+      "lead": true
+    }
+  ]
+}

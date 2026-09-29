@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "contract": "taut-codec-parity/i64/v0",
+  "contract": "taut-codec-parity/i64/v1",
   "schema_path": "ir/parity_int.taut.py",
   "vectors": [
     {

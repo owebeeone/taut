@@ -1,10 +1,11 @@
 """Checked decode's bounds through Python's API, the reference the other eight mirror (D26:
 TautCheckedDecode.md §3, CD-E4, CD-E5; D27: TautOptions.md OPT-D4, OPT-L6, G1, G3).
 
-`ROWS` are §4.4's B1-B30, each with the bounds it is decoded under (CD-C2): raw rows through
-`cbor.loads` with the limits their call passes, typed rows through `codec.decode` on CD-C1's six
-fixture messages, built here beside the parity fixture's `IntBox`. Step C2 turns them into
-`bounds.vectors.json`; the raw decoder's own contract is in test_cbor.py.
+`ROWS` are §4.4's B1-B30 as `bounds.vectors.json` holds them, written by
+`corpus/parity/gen_vectors.py` (CD-C2), each with the bounds it is decoded under: raw rows
+through `cbor.loads` with the limits their call passes, typed rows through `codec.decode` on
+CD-C1's six messages in the parity fixture, `FIXTURE`. The gate replays the same rows in every
+language; the raw decoder's own contract is in test_cbor.py.
 """
 
 from __future__ import annotations
@@ -17,23 +18,16 @@ from pathlib import Path
 import pytest
 
 from taut import ext
+from taut.corpus import parity
 from taut.ir import options
-from taut.ir.dsl import BYTES, INT, STR, Enum, F, List, Map, Msg, Ref, extension, option, schema
+from taut.ir.dsl import INT, STR, Enum, F, List, Msg, Ref, extension, option, schema
 from taut.ir.model import EnumRef, ListOf, MsgRef, Scalar
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec, jsoncodec
 
-# IntBox as `ir/parity_int.taut.py` declares it, and CD-C1's six. The file declares no bound, so
+# `ir/parity_int.taut.py`, which holds IntBox and CD-C1's six. The file declares no bound, so
 # IntBox, Holds64 and HoldsSized8 resolve to the defaults: depth 32 and no length bound.
-FIXTURE = schema(
-    Msg("IntBox", F("n", 1, INT), F("by_id", 2, Map(INT, INT)), next_id=3),
-    Msg("Tree64", F("kids", 1, List(Ref("Tree64"))), option.max_depth(64), next_id=2),
-    Msg("Tree128", F("kids", 1, List(Ref("Tree128"))), option.max_depth(128), next_id=2),
-    Msg("Flat2", F("v", 1, List(INT)), option.max_depth(2), next_id=2),
-    Msg("Sized8", F("b", 1, BYTES), option.max_encoded_len(8), next_id=2),
-    Msg("Holds64", F("t", 1, Ref("Tree64")), next_id=2),
-    Msg("HoldsSized8", F("s", 1, Ref("Sized8")), next_id=2),
-)
+FIXTURE = parity.parity_schema()
 
 RAW = "raw_decode"
 ACCEPT = {"accept": True}
@@ -48,54 +42,17 @@ def too_large(length: int, limit: int) -> dict:
     return {"tag": "TooLarge", "len": length, "limit": limit}
 
 
-# (row, name, stage: RAW or the message a typed row decodes, bytes as hex, the raw call's limits,
-#  the bounds applied as (max_depth, max_encoded_len), expect)
-ROWS = [
-    ("B1", "depth-32-arrays", RAW, "81" * 31 + "80", {}, (32, None), ACCEPT),
-    ("B2", "depth-33-arrays", RAW, "81" * 32 + "80", {}, (32, None), too_deep(32)),
-    ("B3", "depth-32-maps", RAW, "a100" * 31 + "a0", {}, (32, None), ACCEPT),
-    ("B4", "depth-33-maps", RAW, "a100" * 32 + "a0", {}, (32, None), too_deep(32)),
-    ("B5", "depth-32-scalar-leaf", RAW, "81" * 32 + "00", {}, (32, None), ACCEPT),
-    ("B6", "depth-33-items-missing", RAW, "81" * 33, {}, (32, None), too_deep(32)),
-    ("B7", "depth-33-torn-head", RAW, "81" * 32 + "9b00", {}, (32, None), TRUNCATED),
-    ("B8", "depth-33-mixed", RAW, "81a100" * 16 + "80", {}, (32, None), too_deep(32)),
-    ("B9", "depth-100000-arrays", RAW, "81" * 99999 + "80", {}, (32, None), too_deep(32)),
-    ("B10", "depth-100000-maps", RAW, "a100" * 99999 + "a0", {}, (32, None), too_deep(32)),
-    ("B11", "depth-33-unknown-field", "IntBox", "a30100028009" + "81" * 31 + "80", {},
-     (32, None), too_deep(32)),
-    ("B12", "depth-32-unknown-field", "IntBox", "a30100028009" + "81" * 30 + "80", {},
-     (32, None), ACCEPT),
-    ("B13", "size-at-limit", RAW, "83010203", {"max_encoded_len": 4}, (32, 4), ACCEPT),
-    ("B14", "size-over-limit", RAW, "83010203", {"max_encoded_len": 3}, (32, 3), too_large(4, 3)),
-    ("B15", "size-before-parse", RAW, "c0c0c0c0", {"max_encoded_len": 3}, (32, 3),
-     too_large(4, 3)),
-    ("B16", "size-empty", RAW, "", {"max_encoded_len": 0}, (32, 0), TRUNCATED),
-    ("B17", "depth-64-declared", "Tree64", "a10181" * 31 + "a10180", {}, (64, None), ACCEPT),
-    ("B18", "depth-65-declared", "Tree64", "a10181" * 32 + "a10180", {}, (64, None),
-     too_deep(64)),
-    ("B19", "raw-ignores-declared", RAW, "a10181" * 31 + "a10180", {}, (32, None), too_deep(32)),
-    ("B20", "depth-root-decides", "Holds64", "a101" + "a10181" * 15 + "a10180", {}, (32, None),
-     too_deep(32)),
-    ("B21", "depth-2-declared", "Flat2", "a1018100", {}, (2, None), ACCEPT),
-    ("B22", "depth-3-declared", "Flat2", "a1018180", {}, (2, None), too_deep(2)),
-    ("B23", "depth-128-ceiling", "Tree128", "a10181" * 63 + "a10180", {}, (128, None), ACCEPT),
-    ("B24", "depth-129-ceiling", "Tree128", "a10181" * 64 + "a10180", {}, (128, None),
-     too_deep(128)),
-    ("B25", "raw-depth-128", RAW, "81" * 127 + "80", {"max_depth": 128}, (128, None), ACCEPT),
-    ("B26", "raw-depth-129", RAW, "81" * 128 + "80", {"max_depth": 128}, (128, None),
-     too_deep(128)),
-    ("B27", "raw-depth-capped", RAW, "81" * 128 + "80", {"max_depth": 1000}, (128, None),
-     too_deep(128)),
-    ("B28", "len-8-declared", "Sized8", "a101450102030405", {}, (32, 8), ACCEPT),
-    ("B29", "len-9-declared", "Sized8", "a10146010203040506", {}, (32, 8), too_large(9, 8)),
-    ("B30", "len-root-decides", "HoldsSized8", "a101a1014a" + "00010203040506070809", {},
-     (32, None), ACCEPT),
-]
-TYPED = [row for row in ROWS if row[2] != RAW]
+ROWS = parity.bounds_rows()
+TYPED = [row for row in ROWS if row["stage"] != RAW]
 
 
-def _ids(rows: list[tuple]) -> list[str]:
-    return [f"{row[0]}-{row[1]}" for row in rows]
+def _ids(rows: list[dict]) -> list[str]:
+    return [f"{row['why'].partition(':')[0]}-{row['name']}" for row in rows]
+
+
+def _applied(row: dict) -> tuple[int, int | None]:
+    """A row's bounds as `(max_depth, max_encoded_len)`, None for no length bound."""
+    return row["bounds"]["max_depth"], row["bounds"].get("max_encoded_len")
 
 
 def _outcome(call) -> dict:
@@ -108,37 +65,45 @@ def _outcome(call) -> dict:
     return ACCEPT
 
 
+def test_the_fixture_declares_cd_c1s_six():
+    assert FIXTURE.options == {}
+    assert {name: FIXTURE.messages[name].options for name in (
+        "Tree64", "Tree128", "Flat2", "Sized8", "Holds64", "HoldsSized8")} == {
+        "Tree64": {"max_depth": 64}, "Tree128": {"max_depth": 128}, "Flat2": {"max_depth": 2},
+        "Sized8": {"max_encoded_len": 8}, "Holds64": {}, "HoldsSized8": {}}
+
+
 def test_rows_are_b1_to_b30():
-    assert [row[0] for row in ROWS] == [f"B{i}" for i in range(1, 31)]
-    assert len({row[1] for row in ROWS}) == len(ROWS)
+    assert [row["why"].partition(":")[0] for row in ROWS] == [f"B{i}" for i in range(1, 31)]
+    assert len({row["name"] for row in ROWS}) == len(ROWS)
+    assert all(row["lead"] is True for row in ROWS)
 
 
 @pytest.mark.parametrize("row", ROWS, ids=_ids(ROWS))
 def test_b_row(row):
-    _, _, stage, hexed, limits, applied, expect = row
-    data = bytes.fromhex(hexed)
-    if stage == RAW:
+    data, limits, expect = parity.row_bytes(row), row.get("limits", {}), row["expect"]
+    if row["stage"] == RAW:
         # A raw row's bounds are what its call passes, the depth capped at 128, else the defaults.
         depth = min(limits.get("max_depth", cbor.DEFAULT_MAX_DEPTH), cbor.MAX_DEPTH_CEILING)
-        assert (depth, limits.get("max_encoded_len")) == applied
+        assert (depth, limits.get("max_encoded_len")) == _applied(row)
         decoded = []
         assert _outcome(lambda: decoded.append(cbor.loads(data, **limits))) == expect
         if decoded:
             assert cbor.dumps(decoded[0]) == data                   # and re-encodes to its bytes
     else:
         # A typed row's are what the resolver gives its message (CD-C4), and no call passes any.
-        assert codec.bounds(FIXTURE, MsgRef(stage)) == applied
+        message = row["schema"]
+        assert not limits and codec.bounds(FIXTURE, MsgRef(message)) == _applied(row)
         decoded = []
-        assert _outcome(lambda: decoded.append(codec.decode(FIXTURE, stage, data))) == expect
+        assert _outcome(lambda: decoded.append(codec.decode(FIXTURE, message, data))) == expect
         if decoded:
-            assert codec.encode(FIXTURE, stage, decoded[0]) == data
+            assert codec.encode(FIXTURE, message, decoded[0]) == data
 
 
 @pytest.mark.parametrize("row", TYPED, ids=_ids(TYPED))
 def test_the_json_profile_applies_the_same_bounds(row):
-    _, _, message, hexed, _, _, expect = row
-    data = bytes.fromhex(hexed)
-    assert _outcome(lambda: jsoncodec.cbor_to_json(FIXTURE, message, data)) == expect
+    data = parity.row_bytes(row)
+    assert _outcome(lambda: jsoncodec.cbor_to_json(FIXTURE, row["schema"], data)) == row["expect"]
 
 
 def test_raw_decoder_constants_equal_the_options():

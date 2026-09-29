@@ -1,6 +1,6 @@
 """Deterministically (re)generate the taut codec-parity vector files.
 
-    python gen_vectors.py            # rewrites int.vectors.json + malformed.vectors.json
+    python gen_vectors.py            # rewrites int, malformed and bounds.vectors.json
 
 The round-trip integer bytes are produced by taut's OWN reference wire codec
 (`taut.wire.codec`), so the committed `.json` is at once **reviewable** (a human
@@ -38,6 +38,13 @@ A from_cbor row may add `expect_dropping`, the expectation for a codec that drop
 message's unknown fields: the seven generated targets built without forward-compat.
 Python, TypeScript and every `<target>/fc` variant keep them and are judged by `expect`
 (TautCheckedDecode.md §8 question 10).
+
+`bounds.vectors.json` holds TautCheckedDecode.md §4.4's rows B1-B30 (CD-C1, CD-C2), written
+by hand like the raw malformed rows and all leading. Its header records contract v1's two
+depth numbers. A row's `bytes` may be a list of segments, each a hex string or
+`{"repeat": "<hex>", "count": N}`, so a 100,000-deep row stays one line, and `len` gives the
+expanded length. A raw row's `limits` are what its call passes; every row's `bounds` are
+what it is decoded under, checked here against Python's resolution.
 """
 
 from __future__ import annotations
@@ -50,13 +57,19 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent  # taut/
 sys.path.insert(0, str(ROOT / "src"))
 
+from taut.ir import options  # noqa: E402
 from taut.ir.load import load_schema  # noqa: E402
-from taut.ir.model import Scalar  # noqa: E402
+from taut.ir.model import MsgRef, Scalar  # noqa: E402
 from taut.wire import cbor, codec  # noqa: E402
 
-CONTRACT = "taut-codec-parity/i64/v0"
+CONTRACT = "taut-codec-parity/i64/v1"
 SCHEMA_PATH = "ir/parity_int.taut.py"
 SCHEMA = load_schema(ROOT / SCHEMA_PATH)
+# Contract v1's depth numbers: bounds.vectors.json's header records them, and every runtime's
+# constants, `taut.ir.options`' and the raw decoder's included, must equal them (CD-B3, CD-C4).
+BOUNDS_HEADER = {"default_max_depth": 32, "max_depth_ceiling": 128}
+assert (options.DEFAULT_MAX_DEPTH, options.MAX_DEPTH_CEILING) == tuple(BOUNDS_HEADER.values())
+assert (cbor.DEFAULT_MAX_DEPTH, cbor.MAX_DEPTH_CEILING) == tuple(BOUNDS_HEADER.values())
 
 INT_MIN = -(1 << 63)
 INT_MAX = (1 << 63) - 1
@@ -465,6 +478,160 @@ MALFORMED_VECTORS = [
 ]
 
 
+# --- bounds vectors: TautCheckedDecode.md §4.4 B1-B30 ---------------------------------
+RAW = "raw_decode"
+ACCEPT = {"accept": True}
+TRUNCATED = {"tag": "Truncated"}
+
+
+def _too_deep(limit: int) -> dict:
+    return {"tag": "TooDeep", "limit": limit}
+
+
+def _too_large(length: int, limit: int) -> dict:
+    return {"tag": "TooLarge", "len": length, "limit": limit}
+
+
+def _rep(hexed: str, count: int) -> dict:
+    """A segment: `hexed` repeated `count` times."""
+    return {"repeat": hexed, "count": count}
+
+
+def _expanded(segments: str | list) -> bytes:
+    if isinstance(segments, str):
+        return bytes.fromhex(segments)
+    return b"".join(bytes.fromhex(s) if isinstance(s, str) else bytes.fromhex(s["repeat"]) * s["count"]
+                    for s in segments)
+
+
+def _b(name: str, root: str, segments: str | list, bounds: tuple[int, int | None], expect: dict,
+       why: str, *, limits: dict | None = None, expect_dropping: dict | None = None) -> dict:
+    """A bounds row. `root` is RAW or the message a typed row decodes; `bounds` is
+    (max_depth, max_encoded_len or None), what the row is decoded under: a raw row's `limits`,
+    the depth capped at the ceiling, else the defaults; a typed row's message's effective
+    values, which must be what Python resolves (`codec.bounds`)."""
+    limits = limits or {}
+    if root == RAW:
+        resolved = (min(limits.get("max_depth", BOUNDS_HEADER["default_max_depth"]),
+                        BOUNDS_HEADER["max_depth_ceiling"]), limits.get("max_encoded_len"))
+    else:
+        resolved = codec.bounds(SCHEMA, MsgRef(root))
+    assert resolved == bounds, (name, resolved, bounds)
+    row: dict = {"name": name, "stage": RAW if root == RAW else "from_cbor"}
+    if root != RAW:
+        row["schema"] = root
+    row["bytes"] = segments
+    row["len"] = len(_expanded(segments))
+    if limits:
+        row["limits"] = limits
+    depth, length = bounds
+    row["bounds"] = {"max_depth": depth} if length is None else {"max_depth": depth, "max_encoded_len": length}
+    row["expect"] = expect
+    if expect_dropping is not None:
+        row["expect_dropping"] = expect_dropping
+    row["why"] = why
+    row["lead"] = True
+    return row
+
+
+# B12's IntBox, n 0 and by_id empty, without its unknown field 9.
+INTBOX_ZERO_HEX = _encoded("IntBox", {"n": 0, "by_id": {}})
+assert INTBOX_ZERO_HEX == "a201000280"
+
+BOUNDS_VECTORS = [
+    _b("depth-32-arrays", RAW, [_rep("81", 31), "80"], (32, None), ACCEPT,
+       "B1: 32 nested arrays, the innermost empty, decode under the default depth bound, 32 "
+       "(CD-B1)"),
+    _b("depth-33-arrays", RAW, [_rep("81", 32), "80"], (32, None), _too_deep(32),
+       "B2: a 33rd nested array is one beyond the default bound: TooDeep, though it is empty"),
+    _b("depth-32-maps", RAW, [_rep("a100", 31), "a0"], (32, None), ACCEPT,
+       "B3: 32 nested maps, each holding the next under key 0, decode: a map counts as an "
+       "array does"),
+    _b("depth-33-maps", RAW, [_rep("a100", 32), "a0"], (32, None), _too_deep(32),
+       "B4: a 33rd nested map is TooDeep"),
+    _b("depth-32-scalar-leaf", RAW, [_rep("81", 32), "00"], (32, None), ACCEPT,
+       "B5: an int inside the 32nd array adds no depth: ints, strings, bools, null and floats "
+       "never count"),
+    _b("depth-33-items-missing", RAW, [_rep("81", 33)], (32, None), _too_deep(32),
+       "B6: the 33rd array's head is complete and its item missing: depth is checked once a "
+       "head is read, before its first item, so TooDeep and not Truncated (CD-B2)"),
+    _b("depth-33-torn-head", RAW, [_rep("81", 32), "9b00"], (32, None), TRUNCATED,
+       "B7: the 33rd array's head claims an 8-byte count and holds one byte: a torn head is "
+       "Truncated, before depth is checked (CD-B2)"),
+    _b("depth-33-mixed", RAW, [_rep("81a100", 16), "80"], (32, None), _too_deep(32),
+       "B8: arrays and maps alternating, 33 deep: both count toward the one bound"),
+    _b("depth-100000-arrays", RAW, [_rep("81", 99999), "80"], (32, None), _too_deep(32),
+       "B9: 100,000 nested arrays are refused at the 33rd, with no stack overflow, "
+       "RecursionError or RangeError on the way (CD-E4)"),
+    _b("depth-100000-maps", RAW, [_rep("a100", 99999), "a0"], (32, None), _too_deep(32),
+       "B10: 100,000 nested maps, as B9"),
+    _b("depth-33-unknown-field", "IntBox", ["a30100028009", _rep("81", 31), "80"], (32, None),
+       _too_deep(32),
+       "B11: an IntBox whose unknown field 9 holds 32 nested arrays, 33 deep with the message's "
+       "map: depth counts unknown fields, and the raw stage refuses them before the schema stage "
+       "runs (CD-B2)"),
+    _b("depth-32-unknown-field", "IntBox", ["a30100028009", _rep("81", 30), "80"], (32, None),
+       ACCEPT, expect_dropping={"accept": True, "reencode": INTBOX_ZERO_HEX},
+       why="B12: the same with 31 arrays, 32 deep, decodes: a codec that keeps unknown fields "
+           "writes field 9 back, one that drops them writes the IntBox alone"),
+    _b("size-at-limit", RAW, "83010203", (32, 4), ACCEPT,
+       "B13: four bytes under a raw call's max_encoded_len of 4 decode: input exactly at the "
+       "bound is accepted (CD-B5)",
+       limits={"max_encoded_len": 4}),
+    _b("size-over-limit", RAW, "83010203", (32, 3), _too_large(4, 3),
+       "B14: the same four bytes under a bound of 3 are TooLarge, naming the input's length "
+       "and the bound (CD-B4)",
+       limits={"max_encoded_len": 3}),
+    _b("size-before-parse", RAW, "c0c0c0c0", (32, 3), _too_large(4, 3),
+       "B15: the length is checked before a byte is read: four CBOR tags, UnsupportedMajor "
+       "once read, are TooLarge under a bound of 3 (CD-E5 step 1)",
+       limits={"max_encoded_len": 3}),
+    _b("size-empty", RAW, "", (32, 0), TRUNCATED,
+       "B16: empty input is within a bound of 0, so it is read, and is Truncated (CD-B5)",
+       limits={"max_encoded_len": 0}),
+    _b("depth-64-declared", "Tree64", [_rep("a10181", 31), "a10180"], (64, None), ACCEPT,
+       "B17: a Tree64 64 deep decodes: a typed decode applies its root's declared max_depth, "
+       "64 (CD-B3)"),
+    _b("depth-65-declared", "Tree64", [_rep("a10181", 32), "a10180"], (64, None), _too_deep(64),
+       "B18: a Tree64 65 deep is TooDeep{64}"),
+    _b("raw-ignores-declared", RAW, [_rep("a10181", 31), "a10180"], (32, None), _too_deep(32),
+       "B19: B17's bytes through the raw decode, which knows no schema, meet the default bound "
+       "(CD-B3)"),
+    _b("depth-root-decides", "Holds64", ["a101", _rep("a10181", 15), "a10180"], (32, None),
+       _too_deep(32),
+       "B20: a Tree64 inside a Holds64, 33 deep: the root, Holds64, declares nothing, so 32 "
+       "bounds the whole call though Tree64 declares 64 (OPT-D4)"),
+    _b("depth-2-declared", "Flat2", "a1018100", (2, None), ACCEPT,
+       "B21: a Flat2 at its declared bound, 2, its own non-recursive nesting, decodes"),
+    _b("depth-3-declared", "Flat2", "a1018180", (2, None), _too_deep(2),
+       "B22: an array inside Flat2's list is 3 deep: TooDeep{2} from the raw stage, before "
+       "the schema stage would find a WrongType (CD-E5)"),
+    _b("depth-128-ceiling", "Tree128", [_rep("a10181", 63), "a10180"], (128, None), ACCEPT,
+       "B23: a Tree128 128 deep, at the ceiling, decodes (CD-B5)"),
+    _b("depth-129-ceiling", "Tree128", [_rep("a10181", 64), "a10180"], (128, None),
+       _too_deep(128),
+       "B24: a Tree128 129 deep is TooDeep{128}"),
+    _b("raw-depth-128", RAW, [_rep("81", 127), "80"], (128, None), ACCEPT,
+       "B25: a raw call passing max_depth 128 decodes 128 nested arrays",
+       limits={"max_depth": 128}),
+    _b("raw-depth-129", RAW, [_rep("81", 128), "80"], (128, None), _too_deep(128),
+       "B26: the same call refuses 129",
+       limits={"max_depth": 128}),
+    _b("raw-depth-capped", RAW, [_rep("81", 128), "80"], (128, None), _too_deep(128),
+       "B27: a raw call passing max_depth 1000 applies the ceiling, and TooDeep names the bound "
+       "applied, 128 (CD-B3, question 1)",
+       limits={"max_depth": 1000}),
+    _b("len-8-declared", "Sized8", "a101450102030405", (32, 8), ACCEPT,
+       "B28: a Sized8 of exactly 8 bytes decodes under its declared max_encoded_len, 8"),
+    _b("len-9-declared", "Sized8", "a10146010203040506", (32, 8), _too_large(9, 8),
+       "B29: a Sized8 of 9 bytes is TooLarge, before a byte is read (CD-B4)"),
+    _b("len-root-decides", "HoldsSized8", ["a101a1014a", "00010203040506070809"], (32, None),
+       ACCEPT,
+       "B30: a Sized8 longer than 8 bytes inside a HoldsSized8 decodes: the root declares no "
+       "length bound, and Sized8's does not apply inside it (OPT-D4)"),
+]
+
+
 def _scalar(v) -> str:
     if v == [] and isinstance(v, list):
         return "[]"
@@ -501,26 +668,30 @@ def _fmt(obj, indent: int) -> str:
     return _scalar(obj)
 
 
-def render(vectors: list[dict]) -> str:
-    """The exact committed file text for a vector list (stable + regenerable)."""
+def render(vectors: list[dict], header: dict | None = None) -> str:
+    """The exact committed file text for a vector list (stable + regenerable), with
+    `header`'s fields after the schema path (bounds.vectors.json's two numbers)."""
     doc = {
         "version": 1,
         "contract": CONTRACT,
         "schema_path": SCHEMA_PATH,
+        **(header or {}),
         "vectors": vectors,
     }
     return _fmt(doc, 0) + "\n"
 
 
-def _write(path: Path, vectors: list[dict]) -> None:
-    path.write_text(render(vectors))
+def _write(path: Path, vectors: list[dict], header: dict | None = None) -> None:
+    path.write_text(render(vectors, header))
     print(path)
 
 
 def main() -> None:
     _write(HERE / "int.vectors.json", INT_VECTORS)
     _write(HERE / "malformed.vectors.json", MALFORMED_VECTORS)
-    print(f"# {len(INT_VECTORS)} int vectors, {len(MALFORMED_VECTORS)} malformed vectors", file=sys.stderr)
+    _write(HERE / "bounds.vectors.json", BOUNDS_VECTORS, BOUNDS_HEADER)
+    print(f"# {len(INT_VECTORS)} int vectors, {len(MALFORMED_VECTORS)} malformed vectors, "
+          f"{len(BOUNDS_VECTORS)} bounds vectors", file=sys.stderr)
 
 
 if __name__ == "__main__":

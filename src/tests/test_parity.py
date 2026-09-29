@@ -1,14 +1,17 @@
-"""The governed parity gate (TautCodecParityPlan.md §8 P1; TautCheckedDecode.md CD-C4, §5.4).
+"""The governed parity gate (TautCodecParityPlan.md §8 P1; TautCheckedDecode.md CD-C1-C4, §5.4).
 
 Which targets and variants are gated and which allowlisted is data, in
 corpus/parity/allowlist.json; no test here pins a status. The tests check that the
-artifacts validate, that the comparator and the report parser enforce the runner protocol
+artifacts validate (bounds.vectors.json's segments, `len`, `limits`, `bounds` and header
+among them), that the comparator and the report parser enforce the runner protocol
 (an accept row and its re-encoding, the expectation for a codec that drops unknown fields,
 payloads compared as strings, a row never reported, a runner exiting non-zero, a build that
-fails), that a target's runner is found by module and runs each of its variants, and,
+fails, the `#constants` line and a from_cbor row's resolved bounds), that Python's harness
+speaks it, that a target's runner is found by module and runs each of its variants, and,
 end-to-end with whatever toolchains are present, that the gate's governance is clean.
 """
 
+import copy
 import dataclasses
 import importlib
 import importlib.util
@@ -27,36 +30,57 @@ from taut.corpus import parity, toolchains
 from taut.gen import kotlin as kotlin_gen
 from taut.gen import scaffold
 from taut.gen import swift as swift_gen
+from taut.ir import options
 from taut.ir.dsl import STR, F, Msg, schema as mk
-from taut.ir.model import MISSING_OK, EnumRef, ListOf, MapOf, Scalar
-from taut.wire import codec
+from taut.ir.model import MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar
+from taut.wire import cbor, codec
 
 INT_ROWS = 11
 MALFORMED_ROWS = 47
+BOUNDS_ROWS = 30
+ALL_ROWS = INT_ROWS + MALFORMED_ROWS + BOUNDS_ROWS
 GENERATED = ("rust", "js", "cpp", "swift", "go", "kotlin", "java")
+CONSTANTS_LINE = f"{parity.CONSTANTS}\tdefault_max_depth=32;max_depth_ceiling=128"
 
 
 def _row(name):
-    return next(r for r in parity.malformed_rows() if r["name"] == name)
+    return next(r for r in parity.decode_rows() if r["name"] == name)
 
 
 def _passing_lines(target="js"):
-    """The report `target`'s runner prints when every row behaves as the corpus expects of it."""
-    lines = [f"{row['name']}\t{parity.PASS}\t" for row in parity.int_rows()]
-    for row in parity.malformed_rows():
+    """The report `target`'s runner prints when every row behaves as the corpus expects of it,
+    in C3's protocol: its constants, and each from_cbor row's resolved bounds."""
+    schema = parity.parity_schema()
+    lines = [CONSTANTS_LINE, *(f"{row['name']}\t{parity.PASS}\t" for row in parity.int_rows())]
+    for row in parity.decode_rows():
         expect = parity.row_expect(target, row)
         if expect.get("accept"):
-            lines.append(f"{row['name']}\t{parity.OK}\t{parity.expected_reencoding(row, expect)}")
+            line = f"{row['name']}\t{parity.OK}\t{parity.expected_reencoding(row, expect)}"
         else:
-            lines.append(f"{row['name']}\t{parity.ERR}\t{parity.format_error(expect['tag'], expect)}")
+            line = f"{row['name']}\t{parity.ERR}\t{parity.format_error(expect['tag'], expect)}"
+        if row["stage"] == "from_cbor":
+            line += "\t" + parity.format_bounds(parity.decoded_under(schema, row))
+        lines.append(line)
     return lines
+
+
+def _replace(lines, name, line=None):
+    """`lines` with the line reporting row `name` replaced by `line`, or left out for None."""
+    out = []
+    for old in lines:
+        if old.split("\t")[0] != name:
+            out.append(old)
+        elif line is not None:
+            out.append(line)
+    return out
 
 
 # --- artifacts ------------------------------------------------------------------
 
-def test_int_and_malformed_artifacts_validate():
+def test_the_three_artifacts_validate():
     assert parity.validate_int_vectors() == INT_ROWS
     assert parity.validate_malformed_vectors() == MALFORMED_ROWS
+    assert parity.validate_bounds_vectors() == BOUNDS_ROWS
 
 
 def test_malformed_rows_expect_a_known_tag_or_accept(tmp_path):
@@ -109,14 +133,195 @@ def test_expect_dropping_is_a_from_cbor_rows_second_expectation(tmp_path):
             parity.validate_malformed_vectors(path)
 
 
-def test_malformed_rows_name_the_fixture_messages():
+def test_decode_rows_name_the_fixture_messages():
     schema = parity.parity_schema()
-    for row in parity.malformed_rows():
+    for row in parity.decode_rows():
         if row["stage"] == "from_cbor":
             assert row["schema"] in schema.messages, row["name"]
         if row["stage"] == "from_wire":
             assert row["schema"] in schema.enums, row["name"]
-    assert {"OptBox", "Empty", "Late", "Shapes", "Names"} <= set(schema.messages)
+    assert {"OptBox", "Empty", "Late", "Shapes", "Names", "Tree64", "Tree128", "Flat2", "Sized8",
+            "Holds64", "HoldsSized8"} <= set(schema.messages)
+    assert {row["schema"] for row in parity.bounds_rows() if row["stage"] == "from_cbor"} == {
+        "IntBox", "Tree64", "Tree128", "Flat2", "Sized8", "Holds64", "HoldsSized8"}
+
+
+# --- bounds.vectors.json (CD-C1, CD-C2) ------------------------------------------------
+
+def _bounds_doc():
+    return json.loads(parity.BOUNDS_VECTORS.read_text())
+
+
+def _refused(tmp_path, doc, match):
+    path = tmp_path / "bounds.vectors.json"
+    path.write_text(json.dumps(doc))
+    with pytest.raises(parity.ParityValidationError, match=match):
+        parity.validate_bounds_vectors(path)
+
+
+def _bounds_index(doc, name):
+    return next(i for i, row in enumerate(doc["vectors"]) if row["name"] == name)
+
+
+def test_bounds_rows_are_b1_to_b30_each_leading_with_a_why_and_its_bounds():
+    rows = parity.bounds_rows()
+    assert [row["why"].partition(":")[0] for row in rows] == [f"B{i}" for i in range(1, 31)]
+    assert all(row["lead"] is True and "len" in row and "bounds" in row for row in rows)
+    assert {row["stage"] for row in rows} == {"raw_decode", "from_cbor"}
+    names = {row["name"] for row in rows}
+    assert not names & {row["name"] for row in [*parity.int_rows(), *parity.malformed_rows()]}
+    assert {"depth-100000-arrays", "depth-100000-maps"} <= names
+
+
+def test_the_bounds_header_records_tauts_two_depth_numbers(tmp_path):
+    doc = _bounds_doc()
+    assert (doc["default_max_depth"], doc["max_depth_ceiling"]) == (
+        options.DEFAULT_MAX_DEPTH, options.MAX_DEPTH_CEILING) == (
+        cbor.DEFAULT_MAX_DEPTH, cbor.MAX_DEPTH_CEILING) == (32, 128)
+    assert parity.expected_constants() == "default_max_depth=32;max_depth_ceiling=128"
+    for name, bad in (("default_max_depth", 33), ("max_depth_ceiling", 127), ("default_max_depth", 32.0),
+                      ("max_depth_ceiling", None)):
+        _refused(tmp_path, {**doc, name: bad}, "but taut's default_max_depth is 32 and its max_depth_ceiling 128")
+    _refused(tmp_path, {**doc, "schema_path": "ir/razel.taut.py"}, "is not the fixture int.vectors.json names")
+
+
+def test_a_row_may_give_its_bytes_as_segments_whose_expansion_is_len(tmp_path):
+    b9 = _row("depth-100000-arrays")
+    assert b9["bytes"] == [{"repeat": "81", "count": 99999}, "80"] and b9["len"] == 100000
+    assert parity.segments(b9) == [("81", 99999), ("80", 1)]
+    assert parity.row_bytes(b9) == b"\x81" * 99999 + b"\x80"
+    b30 = _row("len-root-decides")
+    assert parity.segments(b30) == [("a101a1014a", 1), ("00010203040506070809", 1)]
+    assert parity.segments(_row("size-at-limit")) == [("83010203", 1)]
+    assert parity.row_bytes(_row("size-empty")) == b""
+    with pytest.raises(parity.ParityValidationError, match="expand to 100000 bytes, len is 99999"):
+        parity.row_bytes({**b9, "len": 99999})
+    doc = _bounds_doc()
+    at = _bounds_index(doc, "depth-100000-arrays")
+    segment = "a segment is a hex string or"
+    for bad, match in (([], "a hex string or a non-empty list of segments"), ({"repeat": "81"}, "a hex string or a"),
+                       ("zz", "invalid hex"), (["8"], "invalid hex"),
+                       ([{"repeat": "81", "count": 0}], segment), ([{"repeat": "81", "count": True}], segment),
+                       ([{"repeat": "", "count": 2}], segment), ([{"repeat": "81"}], segment),
+                       ([{"repeat": "81", "count": 2, "x": 1}], segment), ([7], segment)):
+        broken = copy.deepcopy(doc)
+        broken["vectors"][at]["bytes"] = bad
+        _refused(tmp_path, broken, match)
+    for bad in (99999, "100000", None):
+        broken = copy.deepcopy(doc)
+        broken["vectors"][at]["len"] = bad
+        _refused(tmp_path, broken, "bytes expand to 100000 bytes, len is")
+    broken = copy.deepcopy(doc)
+    del broken["vectors"][at]["len"]
+    _refused(tmp_path, broken, "missing len")
+
+
+def test_a_raw_rows_limits_are_what_its_call_passes(tmp_path):
+    assert _row("raw-depth-capped")["limits"] == {"max_depth": 1000}
+    assert _row("size-empty")["limits"] == {"max_encoded_len": 0}
+    assert "limits" not in _row("depth-32-arrays")
+    doc = _bounds_doc()
+    raw, typed = _bounds_index(doc, "size-over-limit"), _bounds_index(doc, "len-9-declared")
+    for bad, match in (({}, "or no limits"), ({"depth": 3}, "or no limits"), ([3], "or no limits"),
+                       ({"max_depth": 0}, "max_depth: an int of at least 1"),
+                       ({"max_depth": True}, "max_depth: an int of at least 1"),
+                       ({"max_encoded_len": -1}, "max_encoded_len: an int of at least 0")):
+        broken = copy.deepcopy(doc)
+        broken["vectors"][raw]["limits"] = bad
+        _refused(tmp_path, broken, match)
+    broken = copy.deepcopy(doc)
+    broken["vectors"][typed]["limits"] = {"max_encoded_len": 9}
+    _refused(tmp_path, broken, "only a raw_decode row has limits")
+
+
+def test_a_rows_bounds_are_what_it_is_decoded_under(tmp_path):
+    schema = parity.parity_schema()
+    # A raw row: its limits, the depth capped at 128, else the defaults.
+    assert _row("depth-32-arrays")["bounds"] == {"max_depth": 32}
+    assert _row("size-over-limit")["bounds"] == {"max_depth": 32, "max_encoded_len": 3}
+    assert _row("raw-depth-capped")["bounds"] == {"max_depth": 128}
+    # A from_cbor row: its message's effective values, as Python resolves them.
+    for name, bounds in (("depth-64-declared", {"max_depth": 64}), ("depth-root-decides", {"max_depth": 32}),
+                         ("depth-2-declared", {"max_depth": 2}), ("depth-128-ceiling", {"max_depth": 128}),
+                         ("len-8-declared", {"max_depth": 32, "max_encoded_len": 8}),
+                         ("len-root-decides", {"max_depth": 32})):
+        row = _row(name)
+        assert row["bounds"] == bounds == parity.decoded_under(schema, row), name
+        assert codec.bounds(schema, MsgRef(row["schema"])) == (bounds["max_depth"], bounds.get("max_encoded_len"))
+    doc = _bounds_doc()
+    for name, bad in (("depth-32-arrays", {"max_depth": 33}), ("raw-depth-capped", {"max_depth": 1000}),
+                      ("size-over-limit", {"max_depth": 32}), ("depth-64-declared", {"max_depth": 32}),
+                      ("len-8-declared", {"max_depth": 32}), ("len-root-decides", {"max_depth": 32, "max_encoded_len": 8})):
+        broken = copy.deepcopy(doc)
+        broken["vectors"][_bounds_index(doc, name)]["bounds"] = bad
+        _refused(tmp_path, broken, "but it is decoded under")
+    for bad in ({}, {"max_encoded_len": 8}, {"max_depth": "32"}, {"max_depth": 32, "max_encoded_len": None},
+                {"max_depth": 32, "depth": 1}, [32]):
+        broken = copy.deepcopy(doc)
+        broken["vectors"][0]["bounds"] = bad
+        _refused(tmp_path, broken, "bounds: max_depth, and max_encoded_len where a length bound applies")
+    broken = copy.deepcopy(doc)
+    del broken["vectors"][0]["bounds"]
+    _refused(tmp_path, broken, "missing bounds")
+
+
+def test_a_bounds_row_is_raw_or_typed_and_named_apart_from_every_other_row(tmp_path):
+    doc = _bounds_doc()
+    broken = copy.deepcopy(doc)
+    broken["vectors"][0].update(stage="from_wire", schema="Mode")
+    _refused(tmp_path, broken, "bad stage")
+    broken = copy.deepcopy(doc)
+    broken["vectors"][0]["name"] = parity.malformed_rows()[0]["name"]
+    _refused(tmp_path, broken, "also name int or malformed rows")
+    broken = copy.deepcopy(doc)
+    broken["vectors"][1]["name"] = broken["vectors"][0]["name"]
+    _refused(tmp_path, broken, "duplicate row name")
+    broken = copy.deepcopy(doc)
+    broken["vectors"][0]["expect"] = {"tag": "TooDeep", "limit": 32, "depth": 33}
+    _refused(tmp_path, broken, "unknown payload field")
+
+
+def test_a_malformed_row_may_use_the_same_fields(tmp_path):
+    """One row format for both files: a malformed row's segments, `len`, `limits` and
+    `bounds` are checked as a bounds row's are, and none is required."""
+    data = json.loads(parity.MALFORMED_VECTORS.read_text())
+    path = tmp_path / "malformed.vectors.json"
+    row = data["vectors"][0]                                   # truncated-u64-argument, 1b0000
+    row.update(bytes=["1b", {"repeat": "00", "count": 2}], len=3, limits={"max_depth": 1},
+               bounds={"max_depth": 1})
+    path.write_text(json.dumps(data))
+    assert parity.validate_malformed_vectors(path) == MALFORMED_ROWS
+    for key, bad, match in (("len", 2, "expand to 3 bytes, len is 2"), ("bounds", {"max_depth": 32}, "decoded under"),
+                            ("limits", {"max_depth": 0}, "max_depth: an int of at least 1")):
+        broken = copy.deepcopy(data)
+        broken["vectors"][0][key] = bad
+        path.write_text(json.dumps(broken))
+        with pytest.raises(parity.ParityValidationError, match=match):
+            parity.validate_malformed_vectors(path)
+    broken = copy.deepcopy(data)
+    wire = next(r for r in broken["vectors"] if r["stage"] == "from_wire")
+    wire["bounds"] = {"max_depth": 32}
+    path.write_text(json.dumps(broken))
+    with pytest.raises(parity.ParityValidationError, match="a from_wire row has no bounds"):
+        parity.validate_malformed_vectors(path)
+
+
+def test_every_artifact_names_contract_v1(tmp_path):
+    assert parity.CONTRACT == "taut-codec-parity/i64/v1"
+    for path in (parity.INT_VECTORS, parity.MALFORMED_VECTORS, parity.BOUNDS_VECTORS, parity.ALLOWLIST):
+        assert json.loads(path.read_text())["contract"] == parity.CONTRACT, path.name
+    checks = ((parity.INT_VECTORS, parity.validate_int_vectors),
+              (parity.MALFORMED_VECTORS, parity.validate_malformed_vectors),
+              (parity.BOUNDS_VECTORS, parity.validate_bounds_vectors),
+              (parity.ALLOWLIST, parity.target_statuses))
+    for source, check in checks:
+        data = json.loads(source.read_text())
+        for bad in ("taut-codec-parity/i64/v0", None):
+            data["contract"] = bad
+            path = tmp_path / source.name
+            path.write_text(json.dumps(data))
+            with pytest.raises(parity.ParityValidationError, match="expected 'taut-codec-parity/i64/v1'"):
+                check(path)
 
 
 def _shape(t):
@@ -192,6 +397,7 @@ def test_committed_vectors_match_generator():
     spec.loader.exec_module(gen)
     assert gen.render(gen.INT_VECTORS) == parity.INT_VECTORS.read_text()
     assert gen.render(gen.MALFORMED_VECTORS) == parity.MALFORMED_VECTORS.read_text()
+    assert gen.render(gen.BOUNDS_VECTORS, gen.BOUNDS_HEADER) == parity.BOUNDS_VECTORS.read_text()
 
 
 # --- allowlist governance ---------------------------------------------------------
@@ -208,7 +414,7 @@ def test_every_allowlisted_target_has_phase_owner_and_reason():
 
 def _allowlist(tmp_path, *entries):
     path = tmp_path / "allowlist.json"
-    path.write_text(json.dumps({"version": 1, "targets": list(entries)}))
+    path.write_text(json.dumps({"version": 1, "contract": parity.CONTRACT, "targets": list(entries)}))
     return path
 
 
@@ -403,10 +609,12 @@ def test_a_repeated_map_key_is_reported_as_text():
 def test_a_complete_passing_report_is_green():
     report = parity.parse_report("js", "\n".join(_passing_lines()) + "\n")
     assert report.green
-    assert len(report.results) == INT_ROWS + MALFORMED_ROWS
+    assert len(report.results) == ALL_ROWS
+    assert [r.kind for r in report.results].count("bounds") == BOUNDS_ROWS
     # a keeper's report is a dropper's failure on the unknown-field rows, and the reverse
     kept = parity.parse_report("js", "\n".join(_passing_lines("js/fc")))
-    assert sorted(r.name for r in kept.failures) == ["unknown-field-beside-known", "unknown-field-round-trip"]
+    assert sorted(r.name for r in kept.failures) == [
+        "depth-32-unknown-field", "unknown-field-beside-known", "unknown-field-round-trip"]
     assert parity.parse_report("js/fc", "\n".join(_passing_lines("js/fc"))).green
 
 
@@ -434,6 +642,93 @@ def test_a_row_reported_twice_or_unknown_or_with_a_bad_outcome_fails():
     name = parity.int_rows()[0]["name"]
     report = parity.parse_report("js", "\n".join([f"{name}\tok\t", *lines[1:]]))
     assert [(r.name, r.status) for r in report.failures] == [(name, parity.FAIL)]
+
+
+# --- C3's protocol: the constants line, a from_cbor row's resolved bounds, the two tags ---
+
+def test_a_runner_prints_its_constants_once_as_the_bounds_header_says():
+    lines = _passing_lines()
+    assert lines[0] == CONSTANTS_LINE and parity.parse_report("js", "\n".join(lines)).green
+    missing = parity.parse_report("js", "\n".join(lines[1:]))
+    assert missing.failures == [] and not missing.green
+    assert missing.fault.splitlines()[0] == parity.NO_CONSTANTS
+    assert parity._verdict(missing) == "RED no #constants line"
+    assert parity.governance({"js": missing}, set()) and parity.governance({"js": missing}, {"js"}) == []
+    twice = parity.parse_report("js", "\n".join([*lines, CONSTANTS_LINE]))
+    assert twice.fault == "#constants printed 2 times, expected once"
+    for other in ("default_max_depth=64;max_depth_ceiling=128", "default_max_depth=32;max_depth_ceiling=100",
+                  "max_depth_ceiling=128;default_max_depth=32", "default_max_depth=32", ""):
+        report = parity.parse_report("js", "\n".join([f"{parity.CONSTANTS}\t{other}", *lines[1:]]))
+        assert report.fault == f"#constants {other}, expected default_max_depth=32;max_depth_ceiling=128"
+    exited = parity.parse_report("js", "\n".join(lines[1:]), returncode=3)
+    assert exited.fault.splitlines()[0] == "runner exited 3" and parity.NO_CONSTANTS in exited.fault.splitlines()
+    assert parity.red("js", "build failed (exit 1)").fault == "build failed (exit 1)"
+
+
+def test_a_bounds_rows_fourth_column_must_be_the_bounds_it_is_decoded_under():
+    lines = _passing_lines()
+    name = "depth-65-declared"                                   # Tree64, declaring max_depth 64
+    assert f"{name}\t{parity.ERR}\tTooDeep;limit=64\tmax_depth=64;max_encoded_len=" in lines
+    assert "len-9-declared\terr\tTooLarge;len=9;limit=8\tmax_depth=32;max_encoded_len=8" in lines
+    for line, why in (
+            (f"{name}\terr\tTooDeep;limit=64", "no resolved bounds reported, expected max_depth=64;max_encoded_len="),
+            (f"{name}\terr\tTooDeep;limit=64\tmax_depth=32;max_encoded_len=",
+             "resolved max_depth=32;max_encoded_len=, expected max_depth=64;max_encoded_len="),
+            (f"{name}\terr\tTooDeep;limit=64\tmax_depth=64;max_encoded_len=8",
+             "resolved max_depth=64;max_encoded_len=8, expected max_depth=64;max_encoded_len="),
+            (f"{name}\terr\tTooDeep;limit=64\tmax_depth=64",
+             "resolved bounds 'max_depth=64', not max_depth=<n>;max_encoded_len=<n or empty>"),
+            # a wrong resolution is reported as such, whatever the outcome (OPT-P1)
+            (f"{name}\terr\tTooDeep;limit=32\tmax_depth=32;max_encoded_len=",
+             "resolved max_depth=32;max_encoded_len=, expected max_depth=64;max_encoded_len=")):
+        report = parity.parse_report("js", "\n".join(_replace(lines, name, line)))
+        assert [(r.name, r.detail) for r in report.failures] == [(name, why)]
+
+
+def test_a_malformed_from_cbor_rows_fourth_column_is_checked_for_its_form_only():
+    lines = _passing_lines()
+    name = "missing-required-field"                              # IntBox: MissingKey{2}
+    for line in (f"{name}\terr\tMissingKey;key=2", f"{name}\terr\tMissingKey;key=2\tmax_depth=7;max_encoded_len=9"):
+        assert parity.parse_report("js", "\n".join(_replace(lines, name, line))).green
+    bad = parity.parse_report("js", "\n".join(_replace(lines, name, f"{name}\terr\tMissingKey;key=2\tdepth=32")))
+    assert [(r.name, r.detail) for r in bad.failures] == [
+        (name, "resolved bounds 'depth=32', not max_depth=<n>;max_encoded_len=<n or empty>")]
+
+
+def test_only_a_from_cbor_row_has_a_fourth_column():
+    lines = _passing_lines()
+    for name, line in (("size-over-limit", "size-over-limit\terr\tTooLarge;len=4;limit=3\tmax_depth=32;max_encoded_len=3"),
+                       ("unknown-enum", "unknown-enum\terr\tUnknownEnum;enum=Mode;value=99\tmax_depth=32;max_encoded_len="),
+                       ("zero", "zero\tpass\t\tmax_depth=32;max_encoded_len=")):
+        report = parity.parse_report("js", "\n".join(_replace(lines, name, line)))
+        assert [r.name for r in report.failures] == [name]
+        assert "has no fourth column" in report.failures[0].detail
+
+
+def test_too_deep_and_too_large_are_judged_on_tag_and_payload():
+    assert {"TooDeep", "TooLarge"} <= parity.DECODE_TAGS
+    assert parity.PAYLOAD_FIELDS[-2:] == ("len", "limit")
+    assert parity.format_error("TooLarge", {"limit": 3, "len": 4}) == "TooLarge;len=4;limit=3"
+    large, deep = _row("size-over-limit"), _row("depth-33-arrays")
+    assert parity.judge("js", large, parity.ERR, "TooLarge;len=4;limit=3") == (parity.PASS, "")
+    assert parity.judge("js", large, parity.ERR, "TooLarge;limit=3;len=4") == (parity.PASS, "")
+    for detail in ("TooLarge;len=4;limit=4", "TooLarge;limit=3", "Truncated", "TooDeep;limit=3"):
+        assert parity.judge("js", large, parity.ERR, detail)[0] == parity.FAIL, detail
+    assert parity.judge("js", deep, parity.ERR, "TooDeep;limit=32") == (parity.PASS, "")
+    assert parity.judge("js", deep, parity.ERR, "TooDeep;limit=128")[0] == parity.FAIL
+    assert parity.judge("js", deep, parity.OK, "81" * 32 + "80")[0] == parity.FAIL
+    assert parity.judge("js", deep, parity.UNTYPED, "RangeError: Maximum call stack size exceeded")[0] == parity.FAIL
+    b1 = _row("depth-32-arrays")                                # an accept row given as segments
+    assert parity.expected_reencoding(b1) == "81" * 31 + "80"
+    assert parity.judge("js", b1, parity.OK, "81" * 31 + "80") == (parity.PASS, "")
+    assert parity.judge("js", b1, parity.OK, str(b1["bytes"]))[0] == parity.FAIL
+
+
+def test_a_json_reading_runner_gets_all_three_files(tmp_path):
+    parity.write_json_rows(tmp_path)
+    for path in (parity.INT_VECTORS, parity.MALFORMED_VECTORS, parity.BOUNDS_VECTORS):
+        assert (tmp_path / path.name).read_text() == path.read_text()
+    assert {"Tree64", "HoldsSized8"} <= set(json.loads((tmp_path / "dispatch.json").read_text())["messages"])
 
 
 def test_a_build_failure_is_red_not_a_skip(tmp_path):
@@ -487,7 +782,8 @@ def test_run_runner_judges_the_report_and_the_exit_status(tmp_path):
 def test_python_harness_reports_every_row_and_its_governance_is_clean():
     report = parity.run_python()
     assert report.available
-    assert len(report.results) == INT_ROWS + MALFORMED_ROWS
+    assert len(report.results) == ALL_ROWS
+    assert report.green, [report.fault, *(f"{r.name}: {r.detail}" for r in report.failures)]
     assert parity.governance({"python": report}, parity.allowlisted_targets()) == []
 
 
@@ -495,13 +791,69 @@ def test_python_harness_uses_the_gate_comparator(monkeypatch):
     judged = []
     real = parity.judge
 
-    def spy(target, row, outcome, detail):
-        judged.append((target, row["name"]))
-        return real(target, row, outcome, detail)
+    def spy(target, row, outcome, detail, **resolved):
+        judged.append((target, row["name"], resolved))
+        return real(target, row, outcome, detail, **resolved)
 
     monkeypatch.setattr(parity, "judge", spy)
-    parity.run_python()
-    assert judged == [("python", row["name"]) for row in parity.malformed_rows()]
+    assert parity.run_python().green
+    schema = parity.parity_schema()
+    assert judged == [
+        ("python", row["name"],
+         {"resolved": parity.format_bounds(parity.decoded_under(schema, row)) if row["stage"] == "from_cbor"
+          else None})
+        for row in parity.decode_rows()]
+
+
+def test_python_speaks_the_protocol_through_the_parser():
+    """Python's report is the lines a runner prints: its runtime's constants once, then each
+    row, a from_cbor row's with a fourth column, the bounds its typed entry point resolved."""
+    lines = parity.python_report()
+    assert lines[0] == CONSTANTS_LINE
+    assert (cbor.DEFAULT_MAX_DEPTH, cbor.MAX_DEPTH_CEILING) == (32, 128)
+    by_name = {line.split("\t")[0]: line.split("\t") for line in lines[1:]}
+    assert len(by_name) == len(lines) - 1 == ALL_ROWS
+    assert by_name["size-over-limit"] == ["size-over-limit", parity.ERR, "TooLarge;len=4;limit=3"]
+    assert by_name["depth-65-declared"] == ["depth-65-declared", parity.ERR, "TooDeep;limit=64",
+                                             "max_depth=64;max_encoded_len="]
+    assert by_name["len-8-declared"] == ["len-8-declared", parity.OK, "a101450102030405",
+                                          "max_depth=32;max_encoded_len=8"]
+    assert by_name["missing-required-field"][3] == "max_depth=32;max_encoded_len="   # both files
+    assert len(by_name["unknown-enum"]) == len(by_name["zero"]) == 3                # no fourth column
+    assert parity.run_python().green
+
+
+def test_python_decodes_every_from_cbor_row_through_the_typed_entry_point(monkeypatch):
+    """Item 3: from bytes, through `codec.decode`, which applies the message's bounds; a raw
+    decode at the defaults and then `decode_struct` would accept B18 and refuse B17."""
+    typed, real = [], codec.decode
+
+    def spy(schema, message, data):
+        typed.append(message)
+        return real(schema, message, data)
+
+    monkeypatch.setattr(codec, "decode", spy)
+    monkeypatch.setattr(codec, "decode_struct", lambda *a, **k: pytest.fail("decode_struct used"))
+    parity.python_report()
+    round_trips = [row["message"] for row in parity.int_rows() if row["kind"] == "round_trip"]
+    assert typed == [*round_trips, *(row["schema"] for row in parity.decode_rows() if row["stage"] == "from_cbor")]
+    schema = parity.parity_schema()
+    deep = parity.row_bytes(_row("depth-64-declared"))
+    assert codec.decode(schema, "Tree64", deep)                                     # 64 deep: B17
+    with pytest.raises(cbor.DecodeError) as raw:
+        cbor.loads(deep)                                                            # the raw default
+    assert (raw.value.tag, raw.value.limit) == ("TooDeep", 32)
+
+
+def test_a_raw_row_passes_its_limits_to_pythons_raw_decode():
+    schema = parity.parity_schema()
+    assert parity._observe_python(schema, _row("raw-depth-capped")) == (parity.ERR, "TooDeep;limit=128")
+    assert parity._observe_python(schema, _row("size-at-limit")) == (parity.OK, "83010203")
+    no_limits = {k: v for k, v in _row("size-over-limit").items() if k not in ("limits", "bounds")}
+    assert parity._observe_python(schema, no_limits) == (parity.OK, "83010203")       # the defaults
+    mis_expanded = {**_row("depth-33-arrays"), "len": 34}                           # item 5
+    outcome, detail = parity._observe_python(schema, mis_expanded)
+    assert outcome == parity.UNTYPED and "expand to 33 bytes, len is 34" in detail
 
 
 # --- the registry and the default run ---------------------------------------------------
@@ -542,18 +894,20 @@ def test_every_runner_takes_forward_compat_off_by_default():
 def test_the_cpp_runner_describes_an_error_while_its_input_lives(monkeypatch):
     """A C++ DuplicateMapKey's text key is a view of the row's input, so the runner describes
     the error before that input goes; it reported `key=\\x00` when it described it later.
-    Built without Names, whose field `b` C++ does not compile yet."""
+    Built without Names and Sized8, whose fields `b` C++ does not compile yet, and HoldsSized8,
+    which holds a Sized8."""
     from taut.corpus import parity_cpp
 
     if toolchains.find_cxx() is None:
         pytest.skip("no C++ compiler")
     fixture = parity.parity_schema()
-    without_names = dataclasses.replace(
-        fixture, messages={name: m for name, m in fixture.messages.items() if name != "Names"})
+    without_names = dataclasses.replace(fixture, messages={
+        name: m for name, m in fixture.messages.items() if name not in ("Names", "Sized8", "HoldsSized8")})
     row = _row("map-str-key-duplicate")
     monkeypatch.setattr(parity, "parity_schema", lambda: without_names)
     monkeypatch.setattr(parity, "int_rows", lambda: [])
     monkeypatch.setattr(parity, "malformed_rows", lambda: [row])
+    monkeypatch.setattr(parity, "bounds_rows", lambda: [])
     report = parity_cpp.run()
     assert [(r.name, r.status, r.detail) for r in report.results] == [(row["name"], parity.PASS, "")], report.fault
 
@@ -642,7 +996,7 @@ def test_a_runner_that_raises_is_red_and_the_others_still_run(monkeypatch):
     assert outcome.reports["go"].available and not outcome.reports["go"].green
     assert outcome.reports["go"].fault == "runner raised\nRuntimeError: runner bug"
     assert "  ! RuntimeError: runner bug" in outcome.lines
-    assert f"  - no row reported ({INT_ROWS + MALFORMED_ROWS} rows)" in outcome.lines
+    assert f"  - no row reported ({ALL_ROWS} rows)" in outcome.lines
 
 
 def test_the_cli_takes_a_target_or_an_fc_variant(monkeypatch, capsys):
@@ -664,6 +1018,7 @@ def test_parity_cli_python_only_reports_clean(capsys):
     out = capsys.readouterr().out
     assert f"int vectors: {INT_ROWS}" in out
     assert f"malformed vectors: {MALFORMED_ROWS}" in out
+    assert f"bounds vectors: {BOUNDS_ROWS}" in out
     assert "governance: clean" in out
 
 
@@ -672,7 +1027,9 @@ def test_full_gate_governance_clean():
     toolchain skips with its reason (not a violation), so this holds whichever
     toolchains are present; a target that ran is green exactly when it is not
     allowlisted, and an allowlisted target's reason names every row it fails or, when
-    its code did not generate or build, that fault."""
+    its code did not generate or build, that fault. A runner that does not speak C3's
+    protocol yet (D1) prints no #constants line and reports no bounds row: its reason
+    starts with that fault and names every other row it fails."""
     outcome = parity.run_gate(run_compiled=True)
     assert outcome.violations == [], "\n".join(outcome.violations)
     assert set(outcome.reports) == set(parity._RUNNERS)
@@ -681,12 +1038,14 @@ def test_full_gate_governance_clean():
     for target, report in outcome.reports.items():
         if not report.available or target not in reasons:
             continue
-        if report.fault:
-            label = report.fault.splitlines()[0]
-            assert label.startswith(("generation failed", "build failed")), (target, report.fault)
+        label = report.fault.splitlines()[0] if report.fault else ""
+        if label:
+            assert label.startswith(("generation failed", "build failed", parity.NO_CONSTANTS)), (target, report.fault)
             assert reasons[target].startswith(label), (target, label)
+        if label.startswith(("generation failed", "build failed")):
             continue
-        unnamed = [r.name for r in report.failures if r.name not in reasons[target]]
+        unnamed = [r.name for r in report.failures
+                   if r.name not in reasons[target] and not (label and r.kind == "bounds")]
         assert unnamed == [], (target, unnamed)
 
 

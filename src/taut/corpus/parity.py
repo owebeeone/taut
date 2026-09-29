@@ -1,9 +1,9 @@
 """Shared codec-parity gate — the leading cross-language conformance corpus.
 
-Phase 0 of `dev-docs/TautCodecParityPlan.md`, hardened by its §8 P1. Two
-language-neutral vector files (`corpus/parity/{int,malformed}.vectors.json`,
-produced by `gen_vectors.py`) are replayed through **every codec that has a
-runner**. A target is **gated** (must pass) unless it appears in `allowlist.json`,
+Phase 0 of `dev-docs/TautCodecParityPlan.md`, hardened by its §8 P1. Three
+language-neutral vector files (`corpus/parity/{int,malformed,bounds}.vectors.json`,
+produced by `gen_vectors.py`, contract `taut-codec-parity/i64/v1`) are replayed through
+**every codec that has a runner**. A target is **gated** (must pass) unless it appears in `allowlist.json`,
 in which case it is **allowlisted**: its runner still RUNS and REPORTS observed
 failures (xfail-that-runs), it just doesn't fail CI. Governance is the inverse
 check too — CI fails if an *allowlisted* target passes fully (a green target must
@@ -52,6 +52,30 @@ it names matches when compared as a string (`PAYLOAD_EXEMPT` lists the fields a
 runtime does not carry). A row never reported fails, and a runner that exits
 non-zero fails its target (`parse_report`).
 
+Bounds (TautCheckedDecode.md CD-C1-C4; TautOptions.md OPT-P1). `bounds.vectors.json`
+(`bounds_rows`) holds rows B1-B30, judged as malformed rows are; its header records
+`default_max_depth` and `max_depth_ceiling`. A row's `bytes` may be a list of segments,
+each a hex string or `{"repeat": "<hex>", "count": N}`, with `len` the expanded length
+(`segments`, `row_bytes`). A raw row's `limits` are what its call passes, `max_depth`
+and/or `max_encoded_len`; every bounds row's `bounds` are what it is decoded under,
+`max_depth` always and `max_encoded_len` where a length bound applies. Five additions to
+the protocol, which step D1 brings to every runner but Python's:
+  1. Once per run, print `#constants<TAB>default_max_depth=<n>;max_depth_ceiling=<n>`
+     from the runtime's own constants, which the gate compares with the bounds header;
+     a missing, repeated or different line is a target fault (`NO_CONSTANTS`).
+  2. A raw_decode row with `limits` calls the raw decode with them.
+  3. Every from_cbor row, malformed or bounds, decodes from bytes through its message's
+     typed entry point, which applies its effective bounds (CD-B3), not a raw decode
+     then from_cbor.
+  4. A from_cbor row's line adds a fourth column, the bounds that entry point resolved:
+     `max_depth=<n>;max_encoded_len=<n, or empty for none>`. Where the row has `bounds`
+     the gate requires and compares it, elsewhere checks its form; no other row has one.
+  5. A runner expands segmented bytes itself (a 100,000-deep row is 200 KB of hex,
+     beyond a Java string literal) and reports an expansion whose length is not `len`
+     as `untyped`.
+Python's in-process harness prints the same lines, and the gate parses them
+(`run_python`).
+
 This corpus **SUPPLEMENTS** `tautc corpus` / the message golden corpora; it never
 replaces them. Entry point: `tautc parity`.
 
@@ -65,6 +89,7 @@ import functools
 import importlib
 import importlib.util
 import json
+import re
 import subprocess
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -72,13 +97,18 @@ from pathlib import Path
 from typing import Any
 
 from ..ir.load import load_schema
+from ..ir.model import MsgRef
+from ..ir.options import DEFAULT_MAX_DEPTH, MAX_DEPTH_CEILING
 from ..wire import cbor, codec
 
 ROOT = Path(__file__).resolve().parents[3]
 PARITY_DIR = ROOT / "corpus" / "parity"
 INT_VECTORS = PARITY_DIR / "int.vectors.json"
 MALFORMED_VECTORS = PARITY_DIR / "malformed.vectors.json"
+BOUNDS_VECTORS = PARITY_DIR / "bounds.vectors.json"
 ALLOWLIST = PARITY_DIR / "allowlist.json"
+# The contract every vector file and the allowlist name (TautCheckedDecode.md CD-V1).
+CONTRACT = "taut-codec-parity/i64/v1"
 
 INT_MIN = -(1 << 63)
 INT_MAX = (1 << 63) - 1
@@ -105,10 +135,22 @@ DECODE_TAGS = {
     "UnknownEnum",
     "NonCanonicalInt",
     "NegativeMapKey",
+    "TooDeep",
+    "TooLarge",
 }
 ENCODE_TAGS = {"IntOutOfSubset"}
 # The payload fields a malformed row may name and a runner reports, in report order.
-PAYLOAD_FIELDS = ("info", "major", "key", "expected", "enum", "value")
+PAYLOAD_FIELDS = ("info", "major", "key", "expected", "enum", "value", "len", "limit")
+# The two bounds, in the order a raw row's `limits`, a row's `bounds` and a bounds column name them.
+BOUND_FIELDS = ("max_depth", "max_encoded_len")
+# The first column of the line a runner prints once per run with its runtime's constants, and
+# the fault that labels a runner that printed none (the bounds protocol, item 1).
+CONSTANTS = "#constants"
+NO_CONSTANTS = "no #constants line"
+# A bounds column's form (item 4); `max_encoded_len` is empty where no length bound applies.
+_BOUNDS_COLUMN = re.compile(r"max_depth=[0-9]+;max_encoded_len=[0-9]*")
+# The row kinds judged by the comparator: malformed.vectors.json's and bounds.vectors.json's.
+DECODE_KINDS = ("malformed", "bounds")
 # Per target, the (tag, field) payloads its runtime does not carry; the gate does
 # not compare them (CD-C4).
 PAYLOAD_EXEMPT: dict[str, frozenset[tuple[str, str]]] = {
@@ -202,6 +244,18 @@ def _hex(value: Any, where: str) -> str:
     return value
 
 
+def _is_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _check_file(data: Mapping[str, Any], path: Path) -> None:
+    """Every parity file, the allowlist included: version 1 of this gate's contract."""
+    if data.get("version") != 1:
+        raise ParityValidationError(f"{path}: unsupported version {data.get('version')!r}")
+    if data.get("contract") != CONTRACT:
+        raise ParityValidationError(f"{path}: contract {data.get('contract')!r}, expected {CONTRACT!r}")
+
+
 def _native_intbox(value: dict[str, Any], where: str) -> dict[str, Any]:
     by_id = value.get("by_id")
     if not isinstance(by_id, list):
@@ -255,10 +309,123 @@ def _check_expect(row: Mapping[str, Any], where: str) -> None:
         raise ParityValidationError(f"{where}: expect_dropping equals expect; leave it out")
 
 
+def _check_bytes(row: Mapping[str, Any], where: str) -> int:
+    """A row's `bytes`, a hex string or a non-empty list of segments, each a hex string or
+    `{"repeat": "<hex>", "count": N}` with N > 0 (CD-C2); returns the expanded length."""
+    raw = row.get("bytes")
+    if isinstance(raw, str):
+        return len(bytes.fromhex(_hex(raw, f"{where}.bytes")))
+    if not isinstance(raw, list) or not raw:
+        raise ParityValidationError(f"{where}.bytes: a hex string or a non-empty list of segments")
+    length = 0
+    for index, seg in enumerate(raw):
+        at = f"{where}.bytes[{index}]"
+        if isinstance(seg, str):
+            length += len(bytes.fromhex(_hex(seg, at)))
+        elif (isinstance(seg, dict) and set(seg) == {"repeat", "count"} and _is_int(seg["count"])
+              and seg["count"] > 0 and _hex(seg["repeat"], f"{at}.repeat")):
+            length += len(bytes.fromhex(seg["repeat"])) * seg["count"]
+        else:
+            raise ParityValidationError(
+                f'{at}: a segment is a hex string or {{"repeat": "<hex>", "count": N}}, N > 0')
+    return length
+
+
+def _check_limits(row: Mapping[str, Any], where: str) -> None:
+    """A raw row's `limits`, what its call passes: `max_depth`, at least 1, and/or
+    `max_encoded_len`, at least 0 (a call argument out of range is misuse, not input:
+    TautOptions.md OPT-P3). A typed decode takes none (CD-B3)."""
+    if "limits" not in row:
+        return
+    if row.get("stage") != "raw_decode":
+        raise ParityValidationError(f"{where}: only a raw_decode row has limits; a typed decode takes none")
+    limits = row["limits"]
+    if not isinstance(limits, dict) or not limits or set(limits) - set(BOUND_FIELDS):
+        raise ParityValidationError(f"{where}.limits: max_depth and/or max_encoded_len, or no limits")
+    floors = {"max_depth": 1, "max_encoded_len": 0}
+    for name, value in limits.items():
+        if not _is_int(value) or value < floors[name]:
+            raise ParityValidationError(f"{where}.limits.{name}: an int of at least {floors[name]}, "
+                                        f"got {value!r}")
+
+
+def decoded_under(schema: Any, row: Mapping[str, Any]) -> dict[str, int]:
+    """The bounds a raw_decode or from_cbor row is decoded under (TautOptions.md OPT-P1): a
+    raw row's `limits`, the depth capped at the ceiling, else the defaults; a from_cbor row's
+    message's effective values, as Python resolves them (`codec.bounds`). `max_encoded_len`
+    only where a length bound applies."""
+    if row["stage"] == "raw_decode":
+        limits = row.get("limits", {})
+        depth = min(limits.get("max_depth", DEFAULT_MAX_DEPTH), MAX_DEPTH_CEILING)
+        length = limits.get("max_encoded_len")
+    else:
+        depth, length = codec.bounds(schema, MsgRef(row["schema"]))
+    return {"max_depth": depth} if length is None else {"max_depth": depth, "max_encoded_len": length}
+
+
+def _check_bounds(row: Mapping[str, Any], schema: Any, where: str) -> None:
+    """A row's `bounds` are `max_depth` and, where a length bound applies, `max_encoded_len`,
+    and equal what it is decoded under (`decoded_under`)."""
+    bounds = row["bounds"]
+    if row.get("stage") == "from_wire":
+        raise ParityValidationError(f"{where}: a from_wire row has no bounds")
+    if (not isinstance(bounds, dict) or "max_depth" not in bounds or set(bounds) - set(BOUND_FIELDS)
+            or not all(_is_int(value) for value in bounds.values())):
+        raise ParityValidationError(f"{where}.bounds: max_depth, and max_encoded_len where a length "
+                                    "bound applies")
+    want = decoded_under(schema, row)
+    if bounds != want:
+        raise ParityValidationError(f"{where}: bounds {bounds}, but it is decoded under {want}")
+
+
+def _check_decode_row(row: Mapping[str, Any], schema: Any, where: str, *, bounds_file: bool) -> None:
+    """One malformed or bounds row (CD-C2). A bounds row is raw_decode or from_cbor and has
+    `len` and `bounds`; any row may have them, and segmented `bytes` and `limits`, which are
+    then checked the same way."""
+    stage = row.get("stage")
+    stages = ("raw_decode", "from_cbor") if bounds_file else ("raw_decode", "from_cbor", "from_wire")
+    if stage not in stages:
+        raise ParityValidationError(f"{where}: bad stage {stage!r}")
+    length = _check_bytes(row, where)
+    if "len" in row and not (_is_int(row["len"]) and row["len"] == length):
+        raise ParityValidationError(f"{where}: bytes expand to {length} bytes, len is {row['len']!r}")
+    if bounds_file and "len" not in row:
+        raise ParityValidationError(f"{where}: missing len, the expanded length")
+    _check_limits(row, where)
+    _check_expect(row, where)
+    entrypoint = row.get("schema")
+    if stage == "from_cbor" and entrypoint not in schema.messages:
+        raise ParityValidationError(f"{where}: unknown message {entrypoint!r}")
+    if stage == "from_wire" and entrypoint not in schema.enums:
+        raise ParityValidationError(f"{where}: unknown enum {entrypoint!r}")
+    if stage == "from_wire" and "accept" in row["expect"]:
+        raise ParityValidationError(f"{where}: a from_wire row is an enum and never accepts")
+    if "bounds" in row:
+        _check_bounds(row, schema, where)
+    elif bounds_file:
+        raise ParityValidationError(f"{where}: missing bounds, what it is decoded under")
+    if not row.get("why"):
+        raise ParityValidationError(f"{where}: missing why")
+
+
+def _validate_decode_rows(path: Path, data: Mapping[str, Any], *, bounds_file: bool) -> int:
+    _check_file(data, path)
+    schema = load_schema(ROOT / data["schema_path"])
+    count = 0
+    names: set[str] = set()
+    for row in data.get("vectors", []):
+        name = row.get("name", "<unnamed>")
+        if name in names:
+            raise ParityValidationError(f"{path}:{name}: duplicate row name")
+        names.add(name)
+        _check_decode_row(row, schema, f"{path}:{name}", bounds_file=bounds_file)
+        count += 1
+    return count
+
+
 def validate_int_vectors(path: Path = INT_VECTORS) -> int:
     data = _load_json(path)
-    if data.get("version") != 1:
-        raise ParityValidationError(f"{path}: unsupported version {data.get('version')!r}")
+    _check_file(data, path)
     schema = load_schema(ROOT / data["schema_path"])
     count = 0
     names: set[str] = set()
@@ -291,32 +458,28 @@ def validate_int_vectors(path: Path = INT_VECTORS) -> int:
 
 
 def validate_malformed_vectors(path: Path = MALFORMED_VECTORS) -> int:
+    return _validate_decode_rows(path, _load_json(path), bounds_file=False)
+
+
+def validate_bounds_vectors(path: Path = BOUNDS_VECTORS) -> int:
+    """`bounds.vectors.json` (CD-C1, CD-C2): the parity fixture, a header recording taut's two
+    depth numbers (`taut.ir.options`', which every runtime's constants must equal), and rows
+    B1-B30, each with `len` and `bounds`, named apart from the other files' rows."""
     data = _load_json(path)
-    if data.get("version") != 1:
-        raise ParityValidationError(f"{path}: unsupported version {data.get('version')!r}")
-    schema = load_schema(ROOT / data["schema_path"])
-    count = 0
-    names: set[str] = set()
-    for row in data.get("vectors", []):
-        name = row.get("name", "<unnamed>")
-        if name in names:
-            raise ParityValidationError(f"{path}:{name}: duplicate row name")
-        names.add(name)
-        stage = row.get("stage")
-        if stage not in {"raw_decode", "from_cbor", "from_wire"}:
-            raise ParityValidationError(f"{path}:{name}: bad stage {stage!r}")
-        _hex(row.get("bytes"), f"{path}:{name}.bytes")
-        _check_expect(row, f"{path}:{name}")
-        entrypoint = row.get("schema")
-        if stage == "from_cbor" and entrypoint not in schema.messages:
-            raise ParityValidationError(f"{path}:{name}: unknown message {entrypoint!r}")
-        if stage == "from_wire" and entrypoint not in schema.enums:
-            raise ParityValidationError(f"{path}:{name}: unknown enum {entrypoint!r}")
-        if stage == "from_wire" and "accept" in row["expect"]:
-            raise ParityValidationError(f"{path}:{name}: a from_wire row is an enum and never accepts")
-        if not row.get("why"):
-            raise ParityValidationError(f"{path}:{name}: missing why")
-        count += 1
+    _check_file(data, path)
+    if data.get("schema_path") != _load_json(INT_VECTORS).get("schema_path"):
+        raise ParityValidationError(f"{path}: schema_path {data.get('schema_path')!r} is not the "
+                                    "fixture int.vectors.json names")
+    header = {name: data.get(name) for name in ("default_max_depth", "max_depth_ceiling")}
+    if (header != {"default_max_depth": DEFAULT_MAX_DEPTH, "max_depth_ceiling": MAX_DEPTH_CEILING}
+            or not all(_is_int(value) for value in header.values())):
+        raise ParityValidationError(f"{path}: header {header}, but taut's default_max_depth is "
+                                    f"{DEFAULT_MAX_DEPTH} and its max_depth_ceiling {MAX_DEPTH_CEILING}")
+    count = _validate_decode_rows(path, data, bounds_file=True)
+    elsewhere = {row.get("name") for row in [*int_rows(), *malformed_rows()]}
+    shared = sorted(elsewhere & {row.get("name") for row in data.get("vectors", [])})
+    if shared:
+        raise ParityValidationError(f"{path}: row name(s) {shared} also name int or malformed rows")
     return count
 
 
@@ -324,8 +487,7 @@ def target_statuses(path: Path = ALLOWLIST) -> list[ParityStatus]:
     """Each variant's status, in `variants()` order: allowlisted when the allowlist names it,
     else gated. An entry names a target or a `<target>/fc` variant, each on its own."""
     data = _load_json(path)
-    if data.get("version") != 1:
-        raise ParityValidationError(f"{path}: unsupported version {data.get('version')!r}")
+    _check_file(data, path)
     entries: dict[str, dict[str, Any]] = {}
     for row in data.get("targets", []):
         target = row.get("target")
@@ -363,7 +525,7 @@ NO_REPORT = "no report"
 @dataclass(frozen=True)
 class VectorResult:
     name: str
-    kind: str          # "round_trip" | "encode_fail" | "malformed"
+    kind: str          # "round_trip" | "encode_fail" | "malformed" | "bounds"
     expected_tag: str  # the expected tag; "accept" for an accept row; "" for round_trip
     status: str        # PASS | FAIL | TYPE_SATISFIED
     detail: str
@@ -409,6 +571,52 @@ def malformed_rows() -> list[dict]:
     return _load_json(MALFORMED_VECTORS)["vectors"]
 
 
+def bounds_rows() -> list[dict]:
+    return _load_json(BOUNDS_VECTORS)["vectors"]
+
+
+def decode_rows() -> list[dict]:
+    """The rows the comparator judges: malformed rows, then bounds rows."""
+    return [*malformed_rows(), *bounds_rows()]
+
+
+def segments(row: Mapping[str, Any]) -> list[tuple[str, int]]:
+    """A row's `bytes` as `(hex, count)` pairs, in order, for a runner to embed and expand
+    (the bounds protocol, item 5): a hex string is one pair, and so is each segment of a
+    list, a hex string or `{"repeat": "<hex>", "count": N}`."""
+    raw = row["bytes"]
+    if isinstance(raw, str):
+        return [(raw, 1)]
+    return [(seg, 1) if isinstance(seg, str) else (seg["repeat"], seg["count"]) for seg in raw]
+
+
+def row_bytes(row: Mapping[str, Any]) -> bytes:
+    """A row's input: its segments expanded, and checked against its `len` where it has one."""
+    data = b"".join(bytes.fromhex(hexed) * count for hexed, count in segments(row))
+    if "len" in row and len(data) != row["len"]:
+        raise ParityValidationError(f"{row.get('name')}: bytes expand to {len(data)} bytes, "
+                                    f"len is {row['len']}")
+    return data
+
+
+def format_constants(default_max_depth: int, max_depth_ceiling: int) -> str:
+    """The second column of a runner's `#constants` line (the bounds protocol, item 1)."""
+    return f"default_max_depth={default_max_depth};max_depth_ceiling={max_depth_ceiling}"
+
+
+def expected_constants() -> str:
+    """What a runner's `#constants` line must say: the bounds header's two numbers."""
+    data = _load_json(BOUNDS_VECTORS)
+    return format_constants(data["default_max_depth"], data["max_depth_ceiling"])
+
+
+def format_bounds(bounds: Mapping[str, Any]) -> str:
+    """A bounds column (the bounds protocol, item 4), from a row's `bounds` or a resolution:
+    `max_depth=<n>;max_encoded_len=<n>`, the length empty where none applies."""
+    length = bounds.get("max_encoded_len")
+    return f"max_depth={bounds['max_depth']};max_encoded_len={'' if length is None else length}"
+
+
 @dataclass(frozen=True)
 class Dispatch:
     """The fixture's typed entry points: a `from_cbor` row names a message and a
@@ -424,10 +632,10 @@ def fixture_dispatch(schema: Any | None = None) -> Dispatch:
 
 
 def write_json_rows(dest: Path, schema: Any | None = None) -> None:
-    """For a runner that reads JSON: the two vector files and `dispatch.json`."""
+    """For a runner that reads JSON: the three vector files and `dispatch.json`."""
     dispatch = fixture_dispatch(schema)
-    (dest / "int.vectors.json").write_text(INT_VECTORS.read_text())
-    (dest / "malformed.vectors.json").write_text(MALFORMED_VECTORS.read_text())
+    for path in (INT_VECTORS, MALFORMED_VECTORS, BOUNDS_VECTORS):
+        (dest / path.name).write_text(path.read_text())
     (dest / "dispatch.json").write_text(
         json.dumps({"messages": list(dispatch.messages), "enums": list(dispatch.enums)}))
 
@@ -448,15 +656,43 @@ def parse_error(detail: str) -> tuple[str, dict[str, str]]:
 
 def expected_reencoding(row: Mapping[str, Any], expect: Mapping[str, Any] | None = None) -> str:
     """An accept expectation's re-encoding, as hex: its `reencode`, else the row's own
-    bytes. `expect` is the row's `expect` unless given (`row_expect`)."""
+    bytes, expanded. `expect` is the row's `expect` unless given (`row_expect`)."""
     expect = row["expect"] if expect is None else expect
-    return expect.get("reencode", row["bytes"])
+    if "reencode" in expect:
+        return expect["reencode"]
+    return row["bytes"] if isinstance(row["bytes"], str) else row_bytes(row).hex()
 
 
-def judge(target: str, row: Mapping[str, Any], outcome: str, detail: str) -> tuple[str, str]:
-    """The comparator: (PASS or FAIL, why) for one malformed row's observation by
+def _judge_resolved(row: Mapping[str, Any], resolved: str | None) -> tuple[str, str] | None:
+    """A decode row's fourth column, the bounds its typed entry point resolved (the bounds
+    protocol, item 4): a FAIL, or None when it is as the row requires. Only a from_cbor row
+    has one; its form is checked; a row with `bounds` must report them."""
+    if row["stage"] != "from_cbor":
+        if resolved is None:
+            return None
+        return FAIL, f"a {row['stage']} row has no fourth column, got {resolved!r}"
+    if resolved is not None and not _BOUNDS_COLUMN.fullmatch(resolved):
+        return FAIL, f"resolved bounds {resolved!r}, not max_depth=<n>;max_encoded_len=<n or empty>"
+    if "bounds" not in row:
+        return None
+    want = format_bounds(row["bounds"])
+    if resolved is None:
+        return FAIL, f"no resolved bounds reported, expected {want}"
+    if resolved != want:
+        return FAIL, f"resolved {resolved}, expected {want}"
+    return None
+
+
+def judge(target: str, row: Mapping[str, Any], outcome: str, detail: str, *,
+          resolved: str | None = None) -> tuple[str, str]:
+    """The comparator: (PASS or FAIL, why) for one malformed or bounds row's observation by
     `target`, a target or variant, judged by `row_expect(target, row)`. An accept
-    expectation's `ok` must carry its re-encoding (D2's law)."""
+    expectation's `ok` must carry its re-encoding (D2's law). `resolved` is a from_cbor
+    row's fourth column, None when absent: bounds resolved otherwise than the row's fail
+    the row whatever its outcome, so a wrong resolution shows as such (OPT-P1)."""
+    wrong = _judge_resolved(row, resolved)
+    if wrong is not None:
+        return wrong
     expect = row_expect(target, row)
     want = "accept" if expect.get("accept") else format_error(expect["tag"], expect)
     if outcome == OK:
@@ -484,9 +720,10 @@ def judge(target: str, row: Mapping[str, Any], outcome: str, detail: str) -> tup
 
 
 def _row_index() -> dict[str, tuple[str, dict]]:
-    """name -> (kind, row), int rows then malformed rows, in corpus order."""
+    """name -> (kind, row), int rows, malformed rows, then bounds rows, in corpus order."""
     index: dict[str, tuple[str, dict]] = {}
-    for kind, row in [*((r["kind"], r) for r in int_rows()), *(("malformed", r) for r in malformed_rows())]:
+    for kind, row in [*((r["kind"], r) for r in int_rows()), *(("malformed", r) for r in malformed_rows()),
+                      *(("bounds", r) for r in bounds_rows())]:
         if row["name"] in index:
             raise ParityValidationError(f"row name {row['name']!r} appears twice in the corpus")
         index[row["name"]] = (kind, row)
@@ -495,9 +732,22 @@ def _row_index() -> dict[str, tuple[str, dict]]:
 
 def _result(target: str, kind: str, row: Mapping[str, Any], status: str, detail: str) -> VectorResult:
     """One row's result for `target`, naming the expectation it was judged by."""
-    expect = row_expect(target, row) if kind == "malformed" else row.get("expect", {})
+    expect = row_expect(target, row) if kind in DECODE_KINDS else row.get("expect", {})
     expected = "accept" if expect.get("accept") else expect.get("tag", "")
     return VectorResult(row["name"], kind, expected, status, detail, bool(row.get("lead")))
+
+
+def _constants_fault(reported: list[str]) -> str:
+    """The fault, if any, in the `#constants` lines a runner printed (the bounds protocol,
+    item 1): exactly one, saying the bounds header's numbers."""
+    want = expected_constants()
+    if not reported:
+        return f"{NO_CONSTANTS}\nexpected {CONSTANTS}<TAB>{want}, once, from the runtime's own constants"
+    if len(reported) > 1:
+        return f"{CONSTANTS} printed {len(reported)} times, expected once"
+    if reported[0] != want:
+        return f"{CONSTANTS} {reported[0]}, expected {want}"
+    return ""
 
 
 def _excerpt(text: str, limit: int = 800) -> str:
@@ -510,23 +760,32 @@ def _excerpt(text: str, limit: int = 800) -> str:
 
 def parse_report(target: str, stdout: str, *, returncode: int = 0, stderr: str = "") -> TargetReport:
     """Judge a runner's report. Every row is reported exactly once, or it fails;
-    a runner that exits non-zero, or reports rows the corpus lacks, fails its target."""
+    a runner that exits non-zero, reports rows the corpus lacks, or does not print its
+    `#constants` line once and as the bounds header says, fails its target."""
     rows = _row_index()
     judged: dict[str, VectorResult] = {}
     stray: list[str] = []
+    constants: list[str] = []
     for line in stdout.splitlines():
         if "\t" not in line:
             continue
         name, _, rest = line.partition("\t")
-        outcome, _, detail = rest.partition("\t")
+        if name == CONSTANTS:
+            constants.append(rest)
+            continue
+        outcome, _, rest = rest.partition("\t")
+        detail, fourth, resolved = rest.partition("\t")
         if name not in rows:
             stray.append(name)
             continue
         kind, row = rows[name]
         if name in judged:
             judged[name] = _result(target, kind, row, FAIL, "reported more than once")
-        elif kind == "malformed":
-            judged[name] = _result(target, kind, row, *judge(target, row, outcome, detail))
+        elif kind in DECODE_KINDS:
+            judged[name] = _result(target, kind, row, *judge(target, row, outcome, detail,
+                                                             resolved=resolved if fourth else None))
+        elif fourth:
+            judged[name] = _result(target, kind, row, FAIL, f"an int row has no fourth column, got {resolved!r}")
         elif outcome in (PASS, FAIL, TYPE_SATISFIED):
             judged[name] = _result(target, kind, row, outcome, detail)
         else:
@@ -539,6 +798,9 @@ def parse_report(target: str, stdout: str, *, returncode: int = 0, stderr: str =
         faults.append(f"runner exited {returncode}{_excerpt(stderr)}")
     if stray:
         faults.append(f"runner reported rows the corpus lacks: {sorted(set(stray))}")
+    constants_fault = _constants_fault(constants)
+    if constants_fault:
+        faults.append(constants_fault)
     report.fault = "\n".join(faults)
     return report
 
@@ -607,14 +869,16 @@ def run_runner(target: str, argv: Sequence[str], *, cwd: Path, env: Mapping[str,
 # --- Python harness (in-process, no subprocess) -----------------------------------
 
 def _observe_python(schema: Any, row: Mapping[str, Any]) -> tuple[str, str]:
-    """One malformed row through wire.cbor/wire.codec: (outcome, detail) as a runner
-    reports it, `ok` with the hex of the re-encoding (empty for a `from_wire` row)."""
+    """One malformed or bounds row through wire.cbor/wire.codec: (outcome, detail) as a
+    runner reports it, `ok` with the hex of the re-encoding (empty for a `from_wire` row).
+    A raw row's call passes its `limits`; a from_cbor row decodes through the typed entry
+    point from bytes, `codec.decode`, which applies the message's bounds."""
     from ..ir.model import EnumRef
 
-    data = bytes.fromhex(row["bytes"])
     try:
+        data = row_bytes(row)
         if row["stage"] == "raw_decode":
-            again = cbor.dumps(cbor.loads(data))
+            again = cbor.dumps(cbor.loads(data, **row.get("limits", {})))
         elif row["stage"] == "from_cbor":
             again = codec.encode(schema, row["schema"], codec.decode(schema, row["schema"], data))
         else:  # from_wire: an enum, never an accept row
@@ -627,40 +891,57 @@ def _observe_python(schema: Any, row: Mapping[str, Any]) -> tuple[str, str]:
     return OK, again.hex()
 
 
-def run_python() -> TargetReport:
+def _check_int_python(schema: Any, row: Mapping[str, Any]) -> tuple[str, str]:
+    """An int row's (status, detail): a round trip through `codec`, or an encode that fails."""
+    value = {"n": int(row["value"]["n"]),
+             "by_id": {int(k): int(v) for k, v in row["value"]["by_id"]}}
+    if row["kind"] == "round_trip":
+        try:
+            wire = codec.encode(schema, row["message"], value)
+            if wire.hex() != row["cbor"]:
+                return FAIL, f"encode {wire.hex()} != {row['cbor']}"
+            if codec.decode(schema, row["message"], wire) != value:
+                return FAIL, "decode mismatch"
+            return PASS, ""
+        except Exception as exc:  # noqa: BLE001 — fail-closed check
+            return FAIL, f"raised {type(exc).__name__}: {exc}"
+    tag = row["expect"]["tag"]  # encode_fail
+    try:
+        codec.encode(schema, row["message"], value)
+    except codec.EncodeError as exc:
+        return (PASS, "") if exc.tag == tag else (FAIL, f"tag {exc.tag} != {tag}")
+    except Exception as exc:  # noqa: BLE001
+        return FAIL, f"raised {type(exc).__name__}"
+    return FAIL, "encoded, expected IntOutOfSubset"
+
+
+def _line(*columns: str) -> str:
+    """A report line, as a runner prints one: tabs and line breaks inside a column are spaces."""
+    return "\t".join(re.sub(r"[\t\r\n]+", " ", column) for column in columns)
+
+
+def python_report() -> list[str]:
+    """The Python codec's report, line by line, as a runner prints it: its constants, each
+    int row checked here, and each decode row observed (`_observe_python`), a from_cbor
+    row's with the bounds `codec.decode` resolves its message to."""
     schema = parity_schema()
-    report = TargetReport("python", available=True)
-
+    lines = [_line(CONSTANTS, format_constants(cbor.DEFAULT_MAX_DEPTH, cbor.MAX_DEPTH_CEILING))]
     for row in int_rows():
-        value = {"n": int(row["value"]["n"]),
-                 "by_id": {int(k): int(v) for k, v in row["value"]["by_id"]}}
-        if row["kind"] == "round_trip":
-            try:
-                wire = codec.encode(schema, row["message"], value)
-                if wire.hex() != row["cbor"]:
-                    status, detail = FAIL, f"encode {wire.hex()} != {row['cbor']}"
-                elif codec.decode(schema, row["message"], wire) != value:
-                    status, detail = FAIL, "decode mismatch"
-                else:
-                    status, detail = PASS, ""
-            except Exception as exc:  # noqa: BLE001 — fail-closed check
-                status, detail = FAIL, f"raised {type(exc).__name__}: {exc}"
-        else:  # encode_fail
-            tag = row["expect"]["tag"]
-            try:
-                codec.encode(schema, row["message"], value)
-                status, detail = FAIL, "encoded, expected IntOutOfSubset"
-            except codec.EncodeError as exc:
-                status, detail = (PASS, "") if exc.tag == tag else (FAIL, f"tag {exc.tag} != {tag}")
-            except Exception as exc:  # noqa: BLE001
-                status, detail = FAIL, f"raised {type(exc).__name__}"
-        report.results.append(_result("python", row["kind"], row, status, detail))
+        lines.append(_line(row["name"], *_check_int_python(schema, row)))
+    for row in decode_rows():
+        outcome, detail = _observe_python(schema, row)
+        if row["stage"] == "from_cbor":
+            depth, length = codec.bounds(schema, MsgRef(row["schema"]))
+            lines.append(_line(row["name"], outcome, detail,
+                               format_bounds({"max_depth": depth, "max_encoded_len": length})))
+        else:
+            lines.append(_line(row["name"], outcome, detail))
+    return lines
 
-    for row in malformed_rows():
-        outcome, observed = _observe_python(schema, row)
-        report.results.append(_result("python", "malformed", row, *judge("python", row, outcome, observed)))
 
-    return report
+def run_python() -> TargetReport:
+    """The python gate: its report parsed and judged as any runner's is."""
+    return parse_report("python", "\n".join(python_report()))
 
 
 # --- the registry -------------------------------------------------------------------
@@ -758,9 +1039,9 @@ def governed_variants(run: Callable[..., TargetReport],
 
 
 def _summary(reports: dict[str, TargetReport], statuses: list[ParityStatus],
-             int_count: int, mal_count: int) -> list[str]:
+             int_count: int, mal_count: int, bounds_count: int) -> list[str]:
     lines = [
-        f"int vectors: {int_count}    malformed vectors: {mal_count}",
+        f"int vectors: {int_count}    malformed vectors: {mal_count}    bounds vectors: {bounds_count}",
         "",
         f"{'target':<11} {'status':<12} {'pass':>4} {'fail':>4} {'skip/type':>9}  observed",
     ]
@@ -827,12 +1108,13 @@ def run_gate(*, target: str | None = None, run_compiled: bool = True) -> GateOut
         wanted = ("python",)
     int_count = validate_int_vectors()
     mal_count = validate_malformed_vectors()
+    bounds_count = validate_bounds_vectors()
     statuses = target_statuses()
     allow = {s.target for s in statuses if s.status == "allowlisted"}
     reports = run_targets(wanted)
 
     violations = governance(reports, allow)
-    lines = _summary(reports, statuses, int_count, mal_count)
+    lines = _summary(reports, statuses, int_count, mal_count, bounds_count)
     if violations:
         lines.append("")
         lines.append("GOVERNANCE VIOLATIONS (gate fails):")
@@ -849,8 +1131,10 @@ def validate_all(*, target: str | None = None) -> list[str]:
     selected = _selected(target) if target is not None else variants()
     int_count = validate_int_vectors()
     malformed_count = validate_malformed_vectors()
+    bounds_count = validate_bounds_vectors()
     statuses = [s for s in target_statuses() if s.target in selected]
-    lines = [f"int vectors: {int_count}", f"malformed vectors: {malformed_count}"]
+    lines = [f"int vectors: {int_count}", f"malformed vectors: {malformed_count}",
+             f"bounds vectors: {bounds_count}"]
     for status in statuses:
         lines.append(f"{status.target}: {status.status} - {status.reason}")
     return lines

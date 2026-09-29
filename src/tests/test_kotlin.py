@@ -995,7 +995,9 @@ def _nodes(node, parent=None, key=None):
 def _mutate_tree(data, rng):
     """`data` with one node of its tree replaced, or a key dropped from or added to a map, or an
     item repeated in or swapped within an array: canonical CBOR a schema may refuse."""
-    tree = cbor.loads(data)
+    # The fixture's recursive messages (Tree64, Tree128) may nest past the raw default, so the
+    # tree is read at the ceiling; each row is still judged under its root's own bounds.
+    tree = cbor.loads(data, max_depth=cbor.MAX_DEPTH_CEILING)
     parent, key, node = rng.choice(list(_nodes(tree)))
     move = rng.randrange(5)
     if move == 1 and isinstance(node, dict) and node:
@@ -1078,6 +1080,11 @@ def _with_repeated_key(fixture, message, tag, key, rng):
     return cbor.dumps(tree)
 
 
+# The bounds fixture (TautCheckedDecode.md CD-C1): recursive or bounded messages whose rows are
+# bounds.vectors.json's, where depth and length are judged; kept out of the random rows until D1.
+BOUNDS_MESSAGES = frozenset({"Tree64", "Tree128", "Flat2", "Sized8", "Holds64", "HoldsSized8"})
+
+
 @functools.cache
 def _beyond_rows(per_message=36, randoms=60, seed=BEYOND_SEED):
     """Malformed rows beyond the shared corpus, for the gate's own runner and judge: question 9's
@@ -1099,6 +1106,8 @@ def _beyond_rows(per_message=36, randoms=60, seed=BEYOND_SEED):
     for i, data in enumerate([bytes.fromhex(h) for h in RAW_EDGES] + randoms_):
         rows.append(_beyond_row(fixture, f"beyond-raw-{i}", "raw_decode", "", data))
     for message in fixture.messages:
+        if message in BOUNDS_MESSAGES:
+            continue  # the bounds fixture is bounds.vectors.json's; D1.kotlin brings it here
         for i in range(per_message):
             data = codec.encode(fixture, message, _native(fixture, MsgRef(message), rng))
             if i % 3:
@@ -1121,14 +1130,14 @@ def test_the_rows_beyond_the_corpus_state_what_python_the_reference_does():
     # a mix: every fixture message accepted and refused at the schema stage, rows that a codec
     # dropping unknown fields re-encodes otherwise, and each decode tag
     typed = [row for row in rows if row["stage"] == "from_cbor"]
-    assert {row["schema"] for row in typed if row["expect"].get("accept")} == set(fixture.messages)
+    assert {row["schema"] for row in typed if row["expect"].get("accept")} == set(fixture.messages) - BOUNDS_MESSAGES
     assert any("expect_dropping" in row for row in typed)
     tags = {row["expect"].get("tag") for row in rows}
     assert {"Truncated", "TrailingBytes", "InvalidUtf8", "UnsupportedInfo", "UnsupportedMajor",
             "NonIntegerMapKey", "NegativeMapKey", "DuplicateMapKey", "NonCanonicalInt", "IntOverflow",
             "WrongType", "MissingKey", "UnknownEnum"} <= tags
     refused = {row["schema"] for row in typed if row["expect"].get("tag") in ("WrongType", "MissingKey")}
-    assert refused == set(fixture.messages)
+    assert refused == set(fixture.messages) - BOUNDS_MESSAGES
 
 
 def test_kotlin_matches_python_beyond_the_corpus(monkeypatch):
@@ -1138,6 +1147,10 @@ def test_kotlin_matches_python_beyond_the_corpus(monkeypatch):
     own Kotlin runner and judge, as kotlin and as kotlin/fc. A runner reports anything else
     escaping as `untyped`, which fails its row. The JVM's own stdout here is ASCII, as on a
     host whose locale is: the runner still reports a str key such as `naïve` as itself."""
+    allowlisted = parity.allowlisted_targets()
+    if {"kotlin", "kotlin/fc"} & allowlisted:
+        pytest.skip("kotlin is allowlisted until D1.kotlin (corpus/parity/allowlist.json): its runner "
+                    "prints no #constants line yet")
     rows = list(_beyond_rows())
     monkeypatch.setattr(parity, "malformed_rows", lambda: rows)
     options = os.environ.get("JAVA_TOOL_OPTIONS", "")

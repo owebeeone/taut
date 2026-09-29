@@ -1,6 +1,97 @@
 {
   "version": 1,
-  "contract": "taut-codec-parity/i64/v0",
+  "contract": "taut-codec-parity/i64/v1",
   "_note": "An allowlisted target's harness STILL RUNS and REPORTS its observed failures (xfail-that-runs); it just doesn't fail CI. The inverse is enforced too: `tautc parity` FAILS if an allowlisted target passes fully (a green target must be de-listed) or a gated (non-allowlisted) target fails. An entry names a target or a `<target>/fc` variant (the target generated with forward-compat), each governed on its own. Reasons are populated from observed `tautc parity` results.",
-  "targets": []
+  "targets": [
+    {
+      "target": "rust",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.rust builds rust's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "rust/fc",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.rust builds rust's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "typescript",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.typescript builds typescript's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "js",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.js builds js's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "js/fc",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.js builds js's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "cpp",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.cpp builds cpp's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "cpp/fc",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.cpp builds cpp's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "swift",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.swift builds swift's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "swift/fc",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.swift builds swift's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "go",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.go builds go's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "go/fc",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.go builds go's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "kotlin",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.kotlin builds kotlin's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "kotlin/fc",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.kotlin builds kotlin's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
+    },
+    {
+      "target": "java",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "build failed (exit 1): the runner reads DecodeError's len and limit, which step D1 adds with TooDeep and TooLarge. Step D1.java builds java's bounds and de-lists it."
+    },
+    {
+      "target": "java/fc",
+      "phase": "D1",
+      "owner": "codec-parity",
+      "reason": "build failed (exit 1): the runner reads DecodeError's len and limit, which step D1 adds with TooDeep and TooLarge. Step D1.java builds java's bounds and de-lists it."
+    }
+  ]
 }

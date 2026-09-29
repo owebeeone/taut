@@ -38,6 +38,15 @@ A scalar, a list and a map field are among them, with an optional and a MISSING_
 None is a keyword in any of the nine languages (keywords are a separate concern), so
 JS's `value` is left out as a Kotlin modifier keyword; `self`, `$0` and C++'s reserved
 `__` names cannot be fields.
+
+The last six serve the bounds rows B17-B30 (TautCheckedDecode.md CD-C1, §4.4): `Tree64`
+and `Tree128`, trees declaring `max_depth` 64 and 128, the ceiling; `Flat2`, declaring
+`max_depth` 2, its own non-recursive nesting; `Sized8`, declaring `max_encoded_len` 8; and
+`Holds64` and `HoldsSized8`, which declare nothing and embed a `Tree64` and a `Sized8`, so
+that a decode rooted at them applies their own bounds (TautOptions.md OPT-D4). The file
+declares no bound, so these two and every other message resolve to the defaults: depth 32
+and no length bound. tautc's lint warns, by design, that `Tree64`'s and `Sized8`'s bounds
+cannot take effect inside the messages that embed them; a warning fails nothing.
 """
 
 import sys
@@ -47,7 +56,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from taut.ir.dsl import (
-    BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, schema,
+    BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, option, schema,
 )
 
 SCHEMA = schema(
@@ -121,4 +130,10 @@ SCHEMA = schema(
         F("java", 29, INT),
         F("decodeDictionary", 30, INT),
         next_id=31),
+    Msg("Tree64", F("kids", 1, List(Ref("Tree64"))), option.max_depth(64), next_id=2),
+    Msg("Tree128", F("kids", 1, List(Ref("Tree128"))), option.max_depth(128), next_id=2),
+    Msg("Flat2", F("v", 1, List(INT)), option.max_depth(2), next_id=2),
+    Msg("Sized8", F("b", 1, BYTES), option.max_encoded_len(8), next_id=2),
+    Msg("Holds64", F("t", 1, Ref("Tree64")), next_id=2),
+    Msg("HoldsSized8", F("s", 1, Ref("Sized8")), next_id=2),
 )
