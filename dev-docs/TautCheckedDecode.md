@@ -1,4 +1,9 @@
-# Checked decode: one error and schema-declared bounds in Rust, TypeScript and Python
+# Checked decode: one error and schema-declared bounds in every taut language
+
+**rev7, 2026-09-30:** all nine languages in v0.10.0 ("fix all languages in v0.10.0"; TautOptions.md
+question 2). The codec parity plan's Phase 4, which makes cpp, swift, go, kotlin and java fail-closed,
+joins this release, and so do the bounds and `MISSING_OK` for them. Changed: the title, §0, CD-V2 and
+G1.
 
 **rev6, 2026-09-28:** nothing named `missing_ok` is supported ("no missing_ok support - transition
 all use to optional=MISSING_OK"; [TautOptions.md](TautOptions.md) question 9, ruled). The design text
@@ -68,6 +73,9 @@ turning it off breaking (TautOptions.md OPT-D7, OPT-K1).
 optional=MISSING_OK"): `optional=` takes `False`, `True` or `MISSING_OK`, replacing rev4's field
 option (TautOptions.md OPT-M2). Question 4's ruling stands in those terms: adding an optional field
 is compatible only at `MISSING_OK`.
+
+**OWNER, 2026-09-30 (rev7):** "all the generators need to support the same set of features" and
+"fix all languages in v0.10.0". Every language this note covers now includes the five Wave-2 targets.
 
 The property this note makes precise: **for any input bytes, every decode entry point returns either
 a value or a `DecodeError`. It never panics, aborts, runs out of stack or throws anything else, and
@@ -481,8 +489,14 @@ change; their runtimes change (`cbor.ts`, `codec.ts`, `ext.ts`, and `schema.ts` 
 optional field as `MissingKey`, as Python's strict decode already does, and, as question 4 rules,
 reads `"optional": "missing_ok"` from the IR (TautOptions.md OPT-M2).
 The exported IR becomes version 2, which readers accept beside version 1 (TautOptions.md OPT-I1).
-Encode is untouched, so every golden corpus (`glade.golden.json`, `log.v0.json` and the rest) stays
-byte-identical.
+**cpp, swift, go, kotlin and java (rev7):** the codec parity plan's Phase 4 in full. Each gets
+fail-closed decode with typed errors carrying §2b's tags, the out-of-`i64` range check, D2 strictness
+and `fail_closed=True` as `emit()`'s default. Each also gets both bounds, `MISSING_OK` and a runtime
+harness in `tautc parity`, so the allowlist ends empty. C++ keeps its constexpr encode goldens and
+adds a runtime binary for the malformed rows (`TautCodecParityPlan.md:162-170`). All five build and
+test locally: Apple clang, Swift and Go are on PATH, and Java and Kotlin use Android Studio's JDK 21
+and kotlinc 2.2.20. Encode is untouched, so every golden corpus (`glade.golden.json`, `log.v0.json`
+and the rest) stays byte-identical.
 
 **CD-V3 (PROPOSED): how the clients adopt it.** A consumer pinned below v0.10.0 is unaffected until
 it regenerates, as with D1. The shape packages move as one 0.10 release train, which the release
@@ -579,9 +593,8 @@ fn decode(bytes: &[u8]) -> Result<Inbound, DecodeError> { // in `impl Inbound`
 
 **Named gaps** (not solved here):
 
-- **G1 Wave 2.** cpp, swift, go, kotlin and java stay allowlisted and recurse without a bound until
-  Phase 4 replays the rows (`TautCodecParityPlan.md:162-170`); they refuse a schema that declares
-  either bound (TautOptions.md OPT-F2, OPT-F3).
+- **G1 Wave 2.** Closed (rev7): the owner put Phase 4 (`TautCodecParityPlan.md:162-170`) into v0.10.0,
+  so cpp, swift, go, kotlin and java replay the rows and leave the allowlist (CD-V2).
 - **G2 The D2 law is not fully enforced.** Every decoder accepts raw map keys out of order,
   `map<K,V>` entries out of order (D24 requires them sorted) and floats wider than needed, so a
   successful decode does not yet guarantee a byte-identical re-encode (`TautCodecParityPlan.md:57`).

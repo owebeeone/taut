@@ -160,6 +160,9 @@ language-neutral but a target is **gated only once its real replay harness lands
 - **3.3 —** Green TS+js in harness + matrix.
 
 ### Phase 4 — Wave 2: cpp / swift / go / kotlin / java *(now thin — no carrier work)*
+**2026-09-30:** this phase joins taut v0.10.0 (owner: "fix all languages in v0.10.0";
+TautOptions.md question 2), with the depth and size bounds and `optional=MISSING_OK` added per target
+(TautCheckedDecode.md CD-V2).
 The `i64` decision **deletes the carrier ADR** — every Wave-2 target already has a native `i64`. Remaining per target:
 fail-closed decode (typed error carrying §2b tags; bounds-checked reads, no panic), the **out-of-`i64` range
 rejection** on encode+decode, §2c/D2 strictness, `fail_closed=True` default in `emit()`, and the CI harness.

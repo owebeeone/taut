@@ -5,6 +5,11 @@ on what §0 does not settle. A document only: no code, corpus, fixture or versio
 ruled, it becomes decision **D27** in [TautDecisions.md](TautDecisions.md); D26 is
 [TautCheckedDecode.md](TautCheckedDecode.md), whose rev2 takes both of its bounds from this note.
 
+**rev8, 2026-09-30:** question 2 ruled: "fix all languages in v0.10.0". Every generator implements
+every wire option and `MISSING_OK` in v0.10.0, so none refuses a schema for lacking one, and the
+parity gate allowlists no language. Changed: §1 rows 3 and 8, OPT-F2's table, OPT-F3, OPT-M2's
+targets, G6 and question 2.
+
 **rev7, 2026-09-29:** every use in gwz-dev has moved (gwz-transport `f8ebef7`, gwz-core `0b7fdf19`,
 gwz-dev `60fb142`, whose taut is at `9d46310`). gwz-core's fixture holds thirteen `FieldDef`s, not
 the twelve rev5 counted. Changed: OPT-M2's list.
@@ -100,12 +105,12 @@ SCHEMA = schema(
 |---|---|---|
 | 1 | Where | One new module, `taut/src/taut/ir/options.py`: the definitions, the `option` namespace, the resolver and the bound checks. `dsl.py` takes option values as positionals at every level; `model.py` stores what was declared; `validate.py` checks names, levels, values and bounds; `load.py` and `export.py` read and write IR version 2. |
 | 2 | IR | Version 2. Every level carries its raw `options` (`{}` when none); the file and each message also carry `effective`, every wire and codegen option resolved, defaults included. The loader recomputes `effective` and refuses a mismatch, so only Python ever resolves. |
-| 3 | Fail closed | An unknown name is refused at import, load and validation, whatever its class. A generator refuses a schema that declares a wire option it does not implement. In v0.10.0 rust, js, python and typescript implement both bounds; cpp, go, java, kotlin and swift refuse a schema that declares either, and mark what they still emit as unbounded. |
+| 3 | Fail closed | An unknown name is refused at import, load and validation, whatever its class. A generator refuses a schema that declares a wire option it does not implement. In v0.10.0 all nine generators implement both bounds, cpp, go, java, kotlin and swift included (OWNER, question 2). |
 | 4 | Compatibility | Changing a wire option's effective value at any root is breaking, both ways; moving a declaration without changing an effective value is no change. Codegen changes are wire-compatible; metadata changes change nothing. |
 | 5 | Corpus | Every row carries the bounds it is decoded under. A wire option brings rows at its default, at declared values, at its runtime ceiling if it has one, and rows pinning the root rule. Inheritance is computed only in Python and is unit-tested there. |
 | 6 | Protobuf | The same levels, custom options in parentheses, Editions resolving down the scope. Protobuf leaves depth and size to each reader; taut declares them with the schema. |
 | 7 | Size | `max_encoded_len`: file and message level, no default (a schema that declares none leaves size to its carriers), declared values at most 2^31 − 1. Carriers apply it before they allocate; decode raises `TooLarge` above it. |
-| 8 | Presence | `optional=` takes `False`, `True` or `MISSING_OK` (OWNER); the last also reads an absent key as null. It is a keyword, not an option, and three-valued in the model and the IR too. Nothing named `missing_ok` is supported, and every use moves to `MISSING_OK` (OWNER). rust and python already have the behaviour, js and typescript get it in v0.10.0, and Wave 2 refuses it. |
+| 8 | Presence | `optional=` takes `False`, `True` or `MISSING_OK` (OWNER); the last also reads an absent key as null. It is a keyword, not an option, and three-valued in the model and the IR too. Nothing named `missing_ok` is supported, and every use moves to `MISSING_OK` (OWNER). rust and python already have the behaviour, and the other seven get it in v0.10.0 (OWNER, question 2). |
 
 ## 2. What an option is
 
@@ -343,9 +348,10 @@ It never emits code that ignores a declared value.
 | js | generated `fromCbor` over the vendored `cbor.js` | implements both, as rust | generates |
 | python | types only (`scaffold.py:80-99`); `taut.wire.codec` decodes from the `Schema` | implements both in the runtime, through `effective()` | generates |
 | typescript | types only (`scaffold.py:163-177`); `codec.ts` decodes from the IR JSON | implements both in the runtime, from `effective` | generates |
-| cpp, go, java, kotlin, swift | generated; neither fail-closed nor bounded (`TautCodecParityPlan.md:78`) | implements neither | **refuses** |
+| cpp, go, java, kotlin, swift | generated; neither fail-closed nor bounded today (`TautCodecParityPlan.md:78`) | implements both, once fail-closed: the codec parity plan's Phase 4 joins v0.10.0 (question 2, ruled) | generates |
 
-**OPT-F3 (PROPOSED): what Wave 2 emits for a schema that declares nothing.** Every schema has an
+**OPT-F3 (superseded, rev8: Wave 2 is fail-closed and bounded in v0.10.0, question 2): what Wave 2
+emits for a schema that declares nothing.** Every schema has an
 effective `max_depth`, if only the default, and the five Wave-2 targets enforce no bound: they
 recurse without one, panic on malformed input, and are allowlisted until Phase 4
 (`taut/corpus/parity/allowlist.json`; TautCheckedDecode.md G1). Refusing every schema would stop all
@@ -490,9 +496,9 @@ TypeScript support, which v0.10.0 brings.
   (`taut/src/taut/ir/compat.py:88-91`) and of `missing_ok` (`:94-96`), which grade the same way.
   Adding an optional field is compatible only at `MISSING_OK` (TautCheckedDecode.md question 4, ruled
   (a)).
-- **Targets.** rust and python already have the behaviour, and js and typescript get it in v0.10.0
-  (question 4, ruled). `scaffold.emit` keeps refusing the other five for a schema that uses it, with
-  js and typescript taken off its list (`taut/src/taut/gen/scaffold.py:624-636`).
+- **Targets.** rust and python already have the behaviour, and the other seven get it in v0.10.0
+  (TautCheckedDecode.md question 4 and this note's question 2, both ruled), so `scaffold.emit`'s
+  refusal goes (`taut/src/taut/gen/scaffold.py:624-636`).
 - **At the later migration** (OPT-M1), `optional=` moves as one three-valued wire option, as
   protobuf's `field_presence` did (§8).
 
@@ -516,7 +522,7 @@ TypeScript support, which v0.10.0 brings.
   option that needs them.
 - **G5 Other unknown keys.** The loader still ignores unknown IR keys outside `options`
   (`load.py:58-88`); only options are made strict here.
-- **G6 Wave 2** enforces neither bound until Phase 4 (OPT-F3).
+- **G6 Wave 2.** Closed (rev8): Phase 4 joins v0.10.0, so all five enforce both bounds (question 2).
 
 **Questions.** Each lists its alternatives; (a) is recommended.
 
@@ -524,10 +530,11 @@ TypeScript support, which v0.10.0 brings.
    level, checked by the loader. (b) Raw only: the TypeScript runtime and every provider reimplement
    inheritance and defaults, a new parity surface. (c) Effective only: the IR no longer records where
    a value was declared, and cannot round-trip to the DSL.
-2. **Wave 2 in v0.10.0.** (a) Refuse a schema that declares either bound; emit the rest with a header
-   saying their decode is unbounded. (b) Refuse every schema until Phase 4, the strictest reading of
-   "never ignore the option". (c) Add both checks to the five runtimes now, as a panic or throw until
-   they are fail-closed.
+2. **Wave 2 in v0.10.0.** RULED (OWNER, 2026-09-30, rev8): "fix all languages in v0.10.0" ("all the
+   generators need to support the same set of features"). cpp, swift, go, kotlin and java become
+   fail-closed and implement both bounds and `MISSING_OK`, and the parity gate replays every row in all
+   nine. The alternatives were to refuse only schemas that declare a bound, to refuse every schema
+   until Phase 4, or to add the checks as panics or throws.
 3. **Unknown options.** (a) Refused, whatever the class. (b) Let unknown metadata options through,
    which needs each option's class in the IR, so that a reader can tell one it has never seen.
 4. **Levels in version 2.** (a) `options` at all seven levels now, so the later three need no new
