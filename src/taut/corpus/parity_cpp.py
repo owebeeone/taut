@@ -1,7 +1,7 @@
 """C++ runner for the parity gate (see `parity_rust.py` for the shape).
 
-C++ keeps its constexpr corpus for the encode goldens (`gen/cpp.py`); constexpr
-cannot host a fallible decode, so the gate replays the rows through a small
+C++ keeps its constexpr corpus for the golden vectors (`gen/cpp.py`); a static_assert
+cannot report a row's outcome, so the gate replays the rows through a small
 runtime binary instead: the generated `api.hpp` over the vendored `taut/cbor.hpp`,
 built with the compiler and flags `src/tests/test_cpp.py` uses. A build failure is
 RED; a runner that dies before reporting every row fails its target.

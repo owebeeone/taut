@@ -4,18 +4,6 @@
   "_note": "An allowlisted target's harness STILL RUNS and REPORTS its observed failures (xfail-that-runs); it just doesn't fail CI. The inverse is enforced too: `tautc parity` FAILS if an allowlisted target passes fully (a green target must be de-listed) or a gated (non-allowlisted) target fails. An entry names a target or a `<target>/fc` variant (the target generated with forward-compat), each governed on its own. Reasons are populated from observed `tautc parity` results.",
   "targets": [
     {
-      "target": "cpp",
-      "phase": "C2",
-      "owner": "codec-parity",
-      "reason": "build failed (exit 1): the Names field `b` meets to_cbor's parameter `Buf& b` (`b.integer(b)`: no conversion from Buf to long long), so no row runs, names-round-trip among them. With that field renamed in a scratch run, map-bool-key-duplicate reports key=1, not `true`"
-    },
-    {
-      "target": "cpp/fc",
-      "phase": "C2",
-      "owner": "codec-parity",
-      "reason": "build failed (exit 1): as cpp (the Names field `b`), and the Names field `encode_value` hides the runtime's encode_value, which the forward-compat to_cbor calls unqualified (called object type 'long long' is not a function), so no row runs, names-round-trip among them. With both renamed in a scratch run, map-bool-key-duplicate reports key=1, not `true`"
-    },
-    {
       "target": "java",
       "phase": "C2",
       "owner": "codec-parity",

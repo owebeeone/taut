@@ -2,13 +2,28 @@
 
 Two generated headers (trial/cpp/generated/):
   - types.hpp  : one `enum class` per IR enum, one `struct` per message with a
-                 `constexpr to_cbor(Buf&)`. These are the M3 native C++ types
+                 `constexpr to_cbor(Buf&)` and the fail-closed `try_from_cbor`, which
+                 returns a DecodeResult. These are the M3 native C++ types
                  (idiomatic struct/enum, transient fields present-but-off-the-wire).
   - corpus.hpp : per vector, a `consteval` that constructs the *typed value* and
-                 encodes it, plus `static_assert(eq_hex(value.to_cbor(), golden))`.
+                 encodes it, plus `static_assert(eq_hex(value.to_cbor(), golden))`,
+                 and a `consteval` that decodes the golden bytes back through
+                 `try_decode` and `try_from_cbor` and re-encodes them.
 
 So the static_assert oracle runs through the native types, at compile time, with
 zero runtime cost — the C++ form of the conformance corpus (build prompt §5a).
+
+Names. A message's code compiles whatever its fields are called (TautV010Plan.md §0; the
+parity fixture's `Names`), because no name the generator chooses can meet a field:
+  - every parameter and local it declares in a struct starts with `__`, which C++
+    reserves for the implementation, so no field is named like one;
+  - every name it takes from outside the struct (the runtime's types and helpers, the
+    schema's enums and messages, the struct itself, their `try_` functions) is qualified
+    from the global namespace, `::taut::`, so no member can hide it. `std::` needs no
+    such care: the name before a `::` is looked up as a namespace or a type, never as a
+    data member.
+A field still cannot take a member function's name (`to_cbor`, `try_from_cbor`), and the
+`wire_` prefix is taut's (`ir/validate.py`).
 
 `emit(schema, references)` is given the reference values by the caller (importing
 corpus.build here would be a cycle).
@@ -54,14 +69,36 @@ def _is_container(t: TypeRef) -> bool:
     return isinstance(t, (ListOf, MapOf))
 
 
+# Every name a struct takes from outside it, qualified (the module docstring).
+_NS = "::taut::"
+# The parameters and the value `try_from_cbor` builds: `__` names, like every generated local.
+_BUF = "__b"  # to_cbor's Buf
+_SRC = "__c"  # try_from_cbor's Cbor
+_OUT = "__v"  # the value try_from_cbor builds
+
+
 def _loop_var(stem: str, depth: int) -> str:
-    """A container loop's variable: the bare stem at a field's own level, numbered below it,
-    so a nested loop never shadows the loop that encloses it."""
-    return stem if depth == 0 else f"{stem}{depth}"
+    """A container loop's variable: `__` and the stem at a field's own level, numbered below
+    it, so a nested loop never shadows the loop that encloses it."""
+    return f"__{stem}" if depth == 0 else f"__{stem}{depth}"
 
 
-def _msg_constexpr_ok(msg) -> bool:
-    return not any(_uses_map(f.type) for f in msg.fields)
+def _holds_map(schema: Schema, t: TypeRef, seen: frozenset[str] = frozenset()) -> bool:
+    """Whether a value of type `t` holds a std::map, directly or in a message it holds."""
+    if isinstance(t, MapOf):
+        return True
+    if isinstance(t, ListOf):
+        return _holds_map(schema, t.elem, seen)
+    if isinstance(t, MsgRef) and t.name not in seen:
+        return any(_holds_map(schema, f.type, seen | {t.name}) for f in schema.messages[t.name].fields)
+    return False
+
+
+def _literal(schema: Schema, msg) -> bool:
+    """Whether `msg`'s struct is a literal type, so its functions can be constexpr. libc++'s
+    std::map is not one, so neither is a message that holds a map, directly or in a message:
+    a constexpr function that returns one does not compile."""
+    return not _holds_map(schema, MsgRef(msg.name))
 
 
 def _lit(data: bytes) -> str:
@@ -81,8 +118,9 @@ def _lit(data: bytes) -> str:
 
 # --- native type declarations -------------------------------------------------
 
-def _base_type(t: TypeRef, ns: str = "") -> str:
-    """The native type of `t`; `ns` (`taut::`) qualifies an enum or message outside namespace taut."""
+def _base_type(t: TypeRef, ns: str = _NS) -> str:
+    """The native type of `t`; `ns` qualifies an enum or message: `::taut::` inside a struct
+    (the module docstring), `taut::` in the corpus."""
     if isinstance(t, Scalar):
         return {"int": "long long", "float": "double", "str": "std::string_view", "bytes": "std::string_view", "bool": "bool"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
@@ -101,17 +139,12 @@ def _field_type(f) -> str:
 
 def _encode_scalar(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
-        return {
-            "int": f"b.integer({expr});",
-            "float": f"b.float_({expr});",
-            "bool": f"b.boolean({expr});",
-            "str": f"b.text({expr});",
-            "bytes": f"b.bytes({expr});",
-        }[t.kind]
+        method = {"int": "integer", "float": "float_", "bool": "boolean", "str": "text", "bytes": "bytes"}[t.kind]
+        return f"{_BUF}.{method}({expr});"
     if isinstance(t, EnumRef):
-        return f"b.integer(static_cast<long long>({expr}));"
+        return f"{_BUF}.integer(static_cast<long long>({expr}));"
     if isinstance(t, MsgRef):
-        return f"{expr}.to_cbor(b);"
+        return f"{expr}.to_cbor({_BUF});"
     raise TypeError(t)
 
 
@@ -122,57 +155,23 @@ def _encode_stmts(t: TypeRef, expr: str, depth: int = 0) -> list[str]:
     if isinstance(t, ListOf):
         x = _loop_var("x", depth)
         item = " ".join(_encode_stmts(t.elem, x, depth + 1))
-        return [f"b.array({expr}.size());", f"for (const auto& {x} : {expr}) {{ {item} }}"]
+        return [f"{_BUF}.array({expr}.size());", f"for (const auto& {x} : {expr}) {{ {item} }}"]
     if isinstance(t, MapOf):
         k, v = _loop_var("k", depth), _loop_var("v", depth)
         key = " ".join(_encode_stmts(t.key, k, depth + 1))
         value = " ".join(_encode_stmts(t.value, v, depth + 1))
-        return [f"b.array({expr}.size());",
-                f"for (const auto& [{k}, {v}] : {expr}) {{ b.map(2); b.uint(1); {key} b.uint(2); {value} }}"]
+        return [f"{_BUF}.array({expr}.size());",
+                f"for (const auto& [{k}, {v}] : {expr}) {{ {_BUF}.map(2); {_BUF}.uint(1); {key} "
+                f"{_BUF}.uint(2); {value} }}"]
     return [_encode_scalar(t, expr)]
 
 
-def _decode_expr(t: TypeRef, acc: str) -> str:
-    if isinstance(t, Scalar):
-        return {"int": f"{acc}.as_int()", "float": f"{acc}.as_float()", "bool": f"{acc}.as_bool()",
-                "str": f"{acc}.as_text()", "bytes": f"{acc}.as_bytes()"}[t.kind]
-    if isinstance(t, EnumRef):
-        return f"static_cast<{t.name}>({acc}.as_int())"
-    if isinstance(t, MsgRef):
-        return f"taut::{t.name}::from_cbor({acc})"
-    raise TypeError(t)
-
-
-def _decode_stmts(t: TypeRef, acc: str, target: str, depth: int = 0) -> list[str]:
-    """The unchecked (constexpr) decode of `acc`, a Cbor, into `target`, an empty lvalue of type
-    `t`, at any nesting. Like `from_cbor`, it trusts its input."""
-    if isinstance(t, ListOf):
-        x = _loop_var("x", depth)
-        if _is_container(t.elem):
-            item = [f"{target}.emplace_back();", *_decode_stmts(t.elem, x, f"{target}.back()", depth + 1)]
-        else:
-            item = [f"{target}.push_back({_decode_expr(t.elem, x)});"]
-        return [f"for (const auto& {x} : {acc}.as_array()) {{ {' '.join(item)} }}"]
-    if isinstance(t, MapOf):  # a map's key and value are never a list or map (`ir/validate.py`)
-        e = _loop_var("e", depth)
-        key, value = _decode_expr(t.key, f"{e}.get(1)"), _decode_expr(t.value, f"{e}.get(2)")
-        return [f"for (const auto& {e} : {acc}.as_array()) {{ {target}[{key}] = {value}; }}"]
-    return [f"{target} = {_decode_expr(t, acc)};"]
-
-
-def _decode_present_stmts(t: TypeRef, acc: str, target: str) -> list[str]:
-    """An optional field's present value: a container is engaged empty, then filled."""
-    if _is_container(t):
-        return [f"{target}.emplace();", *_decode_stmts(t, acc, f"(*{target})")]
-    return _decode_stmts(t, acc, target)
-
-
 def _duplicate_key_error(key_type: TypeRef, key: str) -> str:
-    """A `map<K,V>` field's repeated entry key. K is int, str or bool (`ir/validate.py`);
-    a str key is carried as text, a bool key as 0 or 1."""
-    if isinstance(key_type, Scalar) and key_type.kind == "str":
-        return f"DecodeError::duplicate_map_text_key({key})"
-    return f"DecodeError::duplicate_map_key({key})"
+    """A `map<K,V>` field's repeated entry key, as text (TautCheckedDecode.md §8 question 9):
+    K is int, str or bool (`ir/validate.py`), and a bool is `true` or `false`."""
+    kind = key_type.kind if isinstance(key_type, Scalar) else "int"
+    factory = {"str": "duplicate_map_text_key", "bool": "duplicate_map_bool_key"}.get(kind, "duplicate_map_key")
+    return f"{_NS}DecodeError::{factory}({key})"
 
 
 def _try_scalar_method(t: Scalar) -> str:
@@ -180,9 +179,13 @@ def _try_scalar_method(t: Scalar) -> str:
             "str": "try_text", "bytes": "try_bytes"}[t.kind]
 
 
+def _result_type(msg_name: str) -> str:
+    return f"{_NS}DecodeResult<{_NS}{msg_name}>"
+
+
 def _return_if_failed(result: str, ret: str) -> str:
     """Return a failed DecodeResult's error from the `try_from_cbor` of message `ret`."""
-    return f"if (!{result}) {{ return DecodeResult<{ret}>::fail({result}.error); }}"
+    return f"if (!{result}) {{ return {_result_type(ret)}::fail({result}.error); }}"
 
 
 def _try_decode_value(t: TypeRef, acc: str, target: str, ret: str, tmp: str, depth: int = 0) -> list[str]:
@@ -202,14 +205,14 @@ def _try_decode_value(t: TypeRef, acc: str, target: str, ret: str, tmp: str, dep
         return [
             f"    auto {wire} = ({acc}).try_int();",
             f"    {_return_if_failed(wire, ret)}",
-            f"    auto {enum} = {_try_enum_fn(t.name)}({wire}.value);",
+            f"    auto {enum} = {_NS}{_try_enum_fn(t.name)}({wire}.value);",
             f"    {_return_if_failed(enum, ret)}",
             f"    {target} = {enum}.value;",
         ]
     if isinstance(t, MsgRef):
         nested = f"{tmp}_msg"
         return [
-            f"    auto {nested} = {t.name}::try_from_cbor({acc});",
+            f"    auto {nested} = {_NS}{t.name}::try_from_cbor({acc});",
             f"    {_return_if_failed(nested, ret)}",
             f"    {target} = {nested}.value;",
         ]
@@ -255,7 +258,7 @@ def _try_decode_value(t: TypeRef, acc: str, target: str, ret: str, tmp: str, dep
         # A repeated entry key is refused after the key decodes, before its value (CD-E5).
         lines.extend([
             f"      if ({target}.count({key}) != 0) {{",
-            f"        return DecodeResult<{ret}>::fail({_duplicate_key_error(t.key, key)});",
+            f"        return {_result_type(ret)}::fail({_duplicate_key_error(t.key, key)});",
             "      }",
         ])
         value_lines = _try_decode_value(t.value, f"*{val_cbor}.value", val, ret, f"{tmp}_v", depth + 1)
@@ -270,97 +273,79 @@ def _try_decode_value(t: TypeRef, acc: str, target: str, ret: str, tmp: str, dep
 
 def _field_encode_lines(f) -> list[str]:
     if f.optional:
-        # parenthesize the deref: `(*x).to_cbor(b)`, not `*x.to_cbor(b)` (precedence)
+        # parenthesize the deref: `(*x).to_cbor(__b)`, not `*x.to_cbor(__b)` (precedence)
         present = " ".join(_encode_stmts(f.type, f"(*{f.name})"))
-        return [f"    if ({f.name}.has_value()) {{ {present} }} else {{ b.null_(); }}"]
+        return [f"    if ({f.name}.has_value()) {{ {present} }} else {{ {_BUF}.null_(); }}"]
     return [f"    {stmt}" for stmt in _encode_stmts(f.type, f.name)]
 
 
-def _emit_from_cbor(msg, forward_compat: bool = False) -> list[str]:
-    qual = "constexpr " if _msg_constexpr_ok(msg) else ""
-    lines = [f"  static {qual}{msg.name} from_cbor(const Cbor& c) {{", f"    {msg.name} v{{}};"]
-    for f in msg.fields:
-        if f.transient:
-            continue  # native-only; left default
-        if f.optional == MISSING_OK:  # an absent key reads as null, like a present null
-            present = " ".join(_decode_present_stmts(f.type, "(*f)", f"v.{f.name}"))
-            lines.append(f"    {{ const Cbor* f = c.try_get_opt({f.tag}).value; "
-                         f"if (f != nullptr && !f->is_null()) {{ {present} }} }}")
-        elif f.optional:
-            present = " ".join(_decode_present_stmts(f.type, "f", f"v.{f.name}"))
-            lines.append(f"    {{ const auto& f = c.get({f.tag}); if (!f.is_null()) {{ {present} }} }}")
-        else:
-            lines.append("    " + " ".join(_decode_stmts(f.type, f"c.get({f.tag})", f"v.{f.name}")))
-    if forward_compat:
-        known = " && ".join(f"kv.first != {f.tag}" for f in msg.wire_fields()) or "true"
-        lines.append(f"    for (const auto& kv : c.map) {{ if ({known}) {{ v.wire_residual.push_back(kv); }} }}")
-    lines.append("    return v;")
-    lines.append("  }")
-    return lines
-
-
-def _emit_try_from_cbor(msg, forward_compat: bool = False) -> list[str]:
+def _emit_try_from_cbor(msg, forward_compat: bool = False, literal: bool = False) -> list[str]:
+    """The fail-closed decode, the only one (TautCheckedDecode.md question 5): the value, or
+    the first DecodeError in IR order. Constexpr when the struct is a literal type."""
+    qual = "constexpr " if literal else ""
+    result = _result_type(msg.name)
     lines = [
-        f"  static DecodeResult<{msg.name}> try_from_cbor(const Cbor& c) {{",
-        f"    {msg.name} v{{}};",
-        "    auto __map = c.try_map();  // a message is a map, even one with no fields",
-        f"    if (!__map) {{ return DecodeResult<{msg.name}>::fail(__map.error); }}",
+        f"  static {qual}{result} try_from_cbor(const {_NS}Cbor& {_SRC}) {{",
+        f"    {_NS}{msg.name} {_OUT}{{}};",
+        f"    auto __map = {_SRC}.try_map();  // a message is a map, even one with no fields",
+        f"    if (!__map) {{ return {result}::fail(__map.error); }}",
     ]
     for f in msg.fields:
         if f.transient:
             continue
         field = f"__field_{f.tag}"
         if not f.optional:
-            lines.append(f"    auto {field} = c.try_get({f.tag});")
+            lines.append(f"    auto {field} = {_SRC}.try_get({f.tag});")
             lines.append(f"    {_return_if_failed(field, msg.name)}")
-            lines.extend(_try_decode_value(f.type, f"*{field}.value", f"v.{f.name}", msg.name, f"__decoded_{f.tag}"))
+            lines.extend(_try_decode_value(f.type, f"*{field}.value", f"{_OUT}.{f.name}", msg.name,
+                                           f"__decoded_{f.tag}"))
             continue
         if f.optional == MISSING_OK:  # an absent key reads as null, like a present null
-            lines.append(f"    auto {field} = c.try_get_opt({f.tag});")
+            lines.append(f"    auto {field} = {_SRC}.try_get_opt({f.tag});")
             lines.append(f"    {_return_if_failed(field, msg.name)}")
             lines.append(f"    if ({field}.value == nullptr || {field}.value->is_null()) {{")
         else:
-            lines.append(f"    auto {field} = c.try_get({f.tag});")
+            lines.append(f"    auto {field} = {_SRC}.try_get({f.tag});")
             lines.append(f"    {_return_if_failed(field, msg.name)}")
             lines.append(f"    if ({field}.value->is_null()) {{")
-        lines.append(f"      v.{f.name} = std::nullopt;")
+        lines.append(f"      {_OUT}.{f.name} = std::nullopt;")
         lines.append("    } else {")
         tmp = f"__value_{f.tag}"
         lines.append(f"      {_base_type(f.type)} {tmp}{{}};")
         nested = _try_decode_value(f.type, f"*{field}.value", tmp, msg.name, f"__decoded_{f.tag}")
         lines.extend("  " + line for line in nested)
-        lines.append(f"      v.{f.name} = {tmp};")
+        lines.append(f"      {_OUT}.{f.name} = {tmp};")
         lines.append("    }")
     if forward_compat:
-        known = " && ".join(f"kv.first != {f.tag}" for f in msg.wire_fields()) or "true"
-        lines.append(f"    for (const auto& kv : *__map.value) {{ if ({known}) {{ v.wire_residual.push_back(kv); }} }}")
-    lines.append(f"    return DecodeResult<{msg.name}>::success(v);")
+        kv = _loop_var("kv", 0)
+        known = " && ".join(f"{kv}.first != {f.tag}" for f in msg.wire_fields()) or "true"
+        lines.append(f"    for (const auto& {kv} : *__map.value) {{ if ({known}) {{ "
+                     f"{_OUT}.wire_residual.push_back({kv}); }} }}")
+    lines.append(f"    return {result}::success({_OUT});")
     lines.append("  }")
     return lines
 
 
-def _emit_to_cbor(msg, forward_compat: bool = False) -> list[str]:
+def _emit_to_cbor(msg, forward_compat: bool = False, literal: bool = False) -> list[str]:
     wire = sorted(msg.wire_fields(), key=lambda f: f.tag)
-    qual = "constexpr " if _msg_constexpr_ok(msg) else ""
-    lines = [f"  {qual}void to_cbor(Buf& b) const {{"]
+    qual = "constexpr " if literal else ""
+    lines = [f"  {qual}void to_cbor({_NS}Buf& {_BUF}) const {{"]
     if forward_compat:
         # merge residual (ascending) with known fields (ascending) -> canonical order
-        lines.append(f"    b.map({len(wire)} + wire_residual.size());")
+        lines.append(f"    {_BUF}.map({len(wire)} + wire_residual.size());")
         lines.append("    std::size_t __ri = 0;")
-        flush = ("    while (__ri < wire_residual.size() && wire_residual[__ri].first < {tag}) "
-                 "{{ b.uint(static_cast<unsigned long long>(wire_residual[__ri].first)); "
-                 "encode_value(b, wire_residual[__ri].second); ++__ri; }}")
+        emit_residual = (f"{{ {_BUF}.uint(static_cast<unsigned long long>(wire_residual[__ri].first)); "
+                         f"{_NS}encode_value({_BUF}, wire_residual[__ri].second); ++__ri; }}")
         for f in wire:
-            lines.append(flush.format(tag=f.tag))
-            lines.append(f"    b.uint({f.tag});")
+            lines.append(f"    while (__ri < wire_residual.size() && wire_residual[__ri].first < {f.tag}) "
+                         f"{emit_residual}")
+            lines.append(f"    {_BUF}.uint({f.tag});")
             lines += _field_encode_lines(f)
-        lines.append("    while (__ri < wire_residual.size()) "
-                     "{ b.uint(static_cast<unsigned long long>(wire_residual[__ri].first)); "
-                     "encode_value(b, wire_residual[__ri].second); ++__ri; }")
+        lines.append(f"    while (__ri < wire_residual.size()) {emit_residual}")
     else:
-        lines.append(f"    b.map({len(wire)});")
+        lines.append(f"    {_BUF}.map({len(wire)});")
         for f in wire:
-            lines.append(f"    b.uint({f.tag});")
+            lines.append(f"    {_BUF}.uint({f.tag});")
             lines += _field_encode_lines(f)
     lines.append("  }")
     return lines
@@ -400,10 +385,10 @@ def _emit_types(schema: Schema, forward_compat: bool = False) -> str:
         for f in m.fields:
             lines.append(f"  {_field_type(f)} {f.name};")
         if forward_compat:
-            lines.append("  std::vector<std::pair<long long, Cbor>> wire_residual;")
-        lines.extend(_emit_to_cbor(m, forward_compat))
-        lines.extend(_emit_from_cbor(m, forward_compat))
-        lines.extend(_emit_try_from_cbor(m, forward_compat))
+            lines.append(f"  std::vector<std::pair<long long, {_NS}Cbor>> wire_residual;")
+        literal = _literal(schema, m)
+        lines.extend(_emit_to_cbor(m, forward_compat, literal))
+        lines.extend(_emit_try_from_cbor(m, forward_compat, literal))
         lines.append("};")
         lines.append("")
     lines.append("} // namespace taut")
@@ -474,11 +459,16 @@ def _emit_corpus(schema: Schema, references: dict[str, tuple[str, dict]]) -> str
         lines.append("  taut::Buf b; v.to_cbor(b); return b;")
         lines.append("}")
         lines.append(f'static_assert(taut::eq_hex(encode_{fn}(), "{encoded.hex()}"), "{name} encode");')
-        # round-trip: parse golden -> from_cbor -> to_cbor, prove == golden
+        # round-trip: golden -> try_decode -> try_from_cbor -> to_cbor, prove == golden; a
+        # refused golden leaves the Buf empty, so the static_assert names it
         lines.append(f"consteval taut::Buf roundtrip_{fn}() {{")
-        lines.append(f"  std::string_view src = {_lit(encoded)};")
-        lines.append(f"  auto v = taut::{message}::from_cbor(taut::parse(src));")
-        lines.append("  taut::Buf b; v.to_cbor(b); return b;")
+        lines.append(f"  auto c = taut::try_decode({_lit(encoded)});")
+        lines.append(f"  auto v = taut::{message}::try_from_cbor(c.value);")
+        lines.append("  taut::Buf b;")
+        lines.append("  if (c && v) {")
+        lines.append("    v.value.to_cbor(b);")
+        lines.append("  }")
+        lines.append("  return b;")
         lines.append("}")
         lines.append(f'static_assert(taut::eq(roundtrip_{fn}(), {_lit(encoded)}), "{name} roundtrip");')
         lines.append("")

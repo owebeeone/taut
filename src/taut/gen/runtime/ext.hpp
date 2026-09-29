@@ -1,9 +1,16 @@
 // Runtime residual-extension helpers for C++.
 //
-// These operate on host CBOR bytes without knowing the host schema. Returned
-// Cbor values hold string_view slices into the caller's host byte buffer; keep
-// that buffer alive until the returned value has been consumed, or immediately
-// decode the result into an owning/typed value.
+// These operate on host CBOR bytes without knowing the host schema. They fail closed
+// (TautCheckedDecode.md CD-E4): for any host bytes each returns its result or a
+// DecodeError through DecodeResult, nothing else. The strict runtime decode reads the
+// host, so it reserves nothing from a count the bytes declare, and a host that is not
+// a map is WrongType{map}. Two things are the caller's errors, std::invalid_argument:
+// a tag below the extension band, checked before the host is read, and a value that
+// holds a negative map key, which the frozen subset cannot encode.
+//
+// Returned Cbor values hold string_view slices into the caller's host byte buffer; keep
+// that buffer alive until the returned value has been consumed, or immediately decode
+// the result into an owning/typed value (`ExtMsg::try_from_cbor`).
 #pragma once
 
 #include "taut/cbor.hpp"
@@ -11,10 +18,10 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace taut {
@@ -123,200 +130,62 @@ inline void encode_value(std::vector<unsigned char>& out, const Cbor& c) {
 
 namespace detail {
 
-inline void ext_require(bool ok, const char* message) {
-    if (!ok) throw std::invalid_argument(message);
+// The host's top-level map, read by the strict runtime: its DecodeError, or
+// WrongType{map} for a host that is not a map.
+// TODO(D1): read the host at the depth ceiling with no length bound (TautOptions.md G3),
+// as Python's ext.py does, once D1 gives try_decode its depth parameter.
+inline DecodeResult<Cbor> ext_host(std::string_view host) {
+    auto top = try_decode(host);
+    if (top && top.value.k != Cbor::K::Map) {
+        return DecodeResult<Cbor>::fail(DecodeError::wrong_type("map"));
+    }
+    return top;
 }
 
-inline unsigned char ext_byte_at(std::string_view d, std::size_t off) {
-    ext_require(off < d.size(), "truncated CBOR input");
-    return static_cast<unsigned char>(d[off]);
-}
-
-inline unsigned long long ext_read_arg(std::string_view d, std::size_t& off, unsigned info) {
-    if (info < 24) return info;
-    if (info == 24) {
-        ext_require(off + 1 <= d.size(), "truncated CBOR argument");
-        return ext_byte_at(d, off++);
+// The host re-encoded without the entry at `tag`, and with `value` there when given.
+inline std::vector<unsigned char> ext_rewrite(Cbor host, long long tag, const Cbor* value) {
+    std::erase_if(host.map, [tag](const auto& kv) { return kv.first == tag; });
+    if (value != nullptr) {
+        host.map.push_back({tag, *value});
     }
-    if (info == 25) {
-        ext_require(off + 2 <= d.size(), "truncated CBOR argument");
-        unsigned long long v = (static_cast<unsigned long long>(ext_byte_at(d, off)) << 8)
-            | ext_byte_at(d, off + 1);
-        off += 2;
-        return v;
-    }
-    if (info == 26) {
-        ext_require(off + 4 <= d.size(), "truncated CBOR argument");
-        unsigned long long v = 0;
-        for (int j = 0; j < 4; ++j) v = (v << 8) | ext_byte_at(d, off + j);
-        off += 4;
-        return v;
-    }
-    if (info == 27) {
-        ext_require(off + 8 <= d.size(), "truncated CBOR argument");
-        unsigned long long v = 0;
-        for (int j = 0; j < 8; ++j) v = (v << 8) | ext_byte_at(d, off + j);
-        off += 8;
-        return v;
-    }
-    throw std::invalid_argument("unsupported additional-info in frozen CBOR subset");
-}
-
-inline std::size_t ext_size_arg(unsigned long long v) {
-    ext_require(v <= static_cast<unsigned long long>(std::numeric_limits<std::size_t>::max()),
-        "CBOR length is too large");
-    return static_cast<std::size_t>(v);
-}
-
-inline long long ext_int_arg(unsigned long long v) {
-    ext_require(v <= static_cast<unsigned long long>(std::numeric_limits<long long>::max()),
-        "CBOR integer is too large");
-    return static_cast<long long>(v);
-}
-
-inline Cbor ext_decode_at(std::string_view d, std::size_t& off, bool key_position) {
-    const unsigned init = ext_byte_at(d, off++);
-    const unsigned major = init >> 5;
-    const unsigned info = init & 0x1f;
-    Cbor c;
-
-    if (major == 0) {
-        c.k = Cbor::K::Int;
-        c.i = ext_int_arg(ext_read_arg(d, off, info));
-        return c;
-    }
-    if (major == 1) {
-        ext_require(!key_position, "frozen subset allows only non-negative integer map keys");
-        const unsigned long long n = ext_read_arg(d, off, info);
-        ext_require(n < static_cast<unsigned long long>(std::numeric_limits<long long>::max()),
-            "CBOR negative integer is too large");
-        c.k = Cbor::K::Int;
-        c.i = -1 - static_cast<long long>(n);
-        return c;
-    }
-    if (major == 2 || major == 3) {
-        ext_require(!key_position, "frozen subset allows only non-negative integer map keys");
-        const std::size_t n = ext_size_arg(ext_read_arg(d, off, info));
-        ext_require(off + n <= d.size(), "truncated CBOR string");
-        c.k = major == 2 ? Cbor::K::Bytes : Cbor::K::Text;
-        c.s = d.substr(off, n);
-        off += n;
-        return c;
-    }
-    if (major == 4) {
-        ext_require(!key_position, "frozen subset allows only non-negative integer map keys");
-        const std::size_t n = ext_size_arg(ext_read_arg(d, off, info));
-        c.k = Cbor::K::Arr;
-        c.arr.reserve(n);
-        for (std::size_t j = 0; j < n; ++j) c.arr.push_back(ext_decode_at(d, off, false));
-        return c;
-    }
-    if (major == 5) {
-        ext_require(!key_position, "frozen subset allows only non-negative integer map keys");
-        const std::size_t n = ext_size_arg(ext_read_arg(d, off, info));
-        c.k = Cbor::K::Map;
-        c.map.reserve(n);
-        for (std::size_t j = 0; j < n; ++j) {
-            Cbor key = ext_decode_at(d, off, true);
-            Cbor val = ext_decode_at(d, off, false);
-            c.map.push_back({key.i, val});
-        }
-        return c;
-    }
-    if (major == 7) {
-        ext_require(!key_position, "frozen subset allows only non-negative integer map keys");
-        if (info == 20 || info == 21) {
-            c.k = Cbor::K::Bool;
-            c.i = info == 21 ? 1 : 0;
-            return c;
-        }
-        if (info == 22) {
-            c.k = Cbor::K::Null;
-            return c;
-        }
-        if (info == 25) {
-            ext_require(off + 2 <= d.size(), "truncated half-float");
-            c.k = Cbor::K::Float;
-            c.f = half_to_double(static_cast<std::uint16_t>((ext_byte_at(d, off) << 8) | ext_byte_at(d, off + 1)));
-            off += 2;
-            return c;
-        }
-        if (info == 26) {
-            ext_require(off + 4 <= d.size(), "truncated single-float");
-            std::uint32_t bits = 0;
-            for (int j = 0; j < 4; ++j) bits = (bits << 8) | ext_byte_at(d, off + j);
-            c.k = Cbor::K::Float;
-            c.f = static_cast<double>(f32_from_bits(bits));
-            off += 4;
-            return c;
-        }
-        if (info == 27) {
-            ext_require(off + 8 <= d.size(), "truncated double-float");
-            std::uint64_t bits = 0;
-            for (int j = 0; j < 8; ++j) bits = (bits << 8) | ext_byte_at(d, off + j);
-            c.k = Cbor::K::Float;
-            c.f = f64_from_bits(bits);
-            off += 8;
-            return c;
-        }
-        throw std::invalid_argument("unsupported simple value in frozen CBOR subset");
-    }
-
-    throw std::invalid_argument("unsupported major type in frozen CBOR subset");
+    std::vector<unsigned char> out;
+    encode_value(out, host);
+    return out;
 }
 
 } // namespace detail
 
-inline Cbor checked_parse_map(std::string_view data) {
-    std::size_t off = 0;
-    Cbor value = detail::ext_decode_at(data, off, false);
-    if (off != data.size()) {
-        throw std::invalid_argument("trailing bytes after top-level CBOR item");
+inline DecodeResult<std::vector<unsigned char>> ext_set(std::string_view host, long long tag, const Cbor& value) {
+    ext_check_tag(tag);
+    auto top = detail::ext_host(host);
+    if (!top) {
+        return DecodeResult<std::vector<unsigned char>>::fail(top.error);
     }
-    if (value.k != Cbor::K::Map) {
-        throw std::invalid_argument("extension host must be a top-level CBOR map");
-    }
-    return value;
+    return DecodeResult<std::vector<unsigned char>>::success(detail::ext_rewrite(std::move(top.value), tag, &value));
 }
 
-inline std::vector<unsigned char> ext_set(std::string_view host, long long tag, const Cbor& value) {
+// The extension at `tag`, or nullopt when the host has none.
+inline DecodeResult<std::optional<Cbor>> ext_get(std::string_view host, long long tag) {
     ext_check_tag(tag);
-    Cbor root = checked_parse_map(host);
-    std::vector<std::pair<long long, Cbor>> entries;
-    entries.reserve(root.map.size() + 1);
-    for (const auto& kv : root.map) {
-        if (kv.first != tag) entries.push_back(kv);
+    auto top = detail::ext_host(host);
+    if (!top) {
+        return DecodeResult<std::optional<Cbor>>::fail(top.error);
     }
-    entries.push_back({tag, value});
-    root.map = std::move(entries);
-
-    std::vector<unsigned char> out;
-    encode_value(out, root);
-    return out;
+    for (const auto& kv : top.value.map) {
+        if (kv.first == tag) {
+            return DecodeResult<std::optional<Cbor>>::success(kv.second);
+        }
+    }
+    return DecodeResult<std::optional<Cbor>>::success(std::nullopt);
 }
 
-inline std::optional<Cbor> ext_get(std::string_view host, long long tag) {
+inline DecodeResult<std::vector<unsigned char>> ext_clear(std::string_view host, long long tag) {
     ext_check_tag(tag);
-    Cbor root = checked_parse_map(host);
-    for (const auto& kv : root.map) {
-        if (kv.first == tag) return kv.second;
+    auto top = detail::ext_host(host);
+    if (!top) {
+        return DecodeResult<std::vector<unsigned char>>::fail(top.error);
     }
-    return std::nullopt;
-}
-
-inline std::vector<unsigned char> ext_clear(std::string_view host, long long tag) {
-    ext_check_tag(tag);
-    Cbor root = checked_parse_map(host);
-    std::vector<std::pair<long long, Cbor>> entries;
-    entries.reserve(root.map.size());
-    for (const auto& kv : root.map) {
-        if (kv.first != tag) entries.push_back(kv);
-    }
-    root.map = std::move(entries);
-
-    std::vector<unsigned char> out;
-    encode_value(out, root);
-    return out;
+    return DecodeResult<std::vector<unsigned char>>::success(detail::ext_rewrite(std::move(top.value), tag, nullptr));
 }
 
 } // namespace taut

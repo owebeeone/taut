@@ -90,8 +90,8 @@ def test_extensions_require_forward_compat_for_cpp(tmp_path):
 
 def test_cpp_forward_compat_emits_residual():
     hpp = scaffold.cpp_api(S, forward_compat=True)
-    assert "std::vector<std::pair<long long, Cbor>> wire_residual;" in hpp
-    assert "encode_value(b" in hpp                       # residual re-emitted
+    assert "std::vector<std::pair<long long, ::taut::Cbor>> wire_residual;" in hpp
+    assert "::taut::encode_value(__b" in hpp             # residual re-emitted
     assert "wire_residual" not in scaffold.cpp_api(S)    # off by default
 
 

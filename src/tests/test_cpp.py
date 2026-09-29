@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from taut import cli, ext
-from taut.corpus import parity, parity_cpp
+from taut.corpus import build, parity, parity_cpp
 from taut.corpus import resext_build as resext
 from taut.gen import cpp as cpp_gen
 from taut.gen import scaffold
@@ -19,6 +19,8 @@ from taut.ir.dsl import BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List,
 from taut.ir.validate import validate
 from taut.wire import cbor, codec
 
+
+RUNTIME = Path(cpp_gen.__file__).resolve().parent / "runtime"
 
 S_SCALAR_LIST = mk(Msg("M",
                        F("x", 1, FLOAT),
@@ -120,9 +122,9 @@ def test_cpp_codegen_threads_float_scalar_and_list():
     hpp = cpp_gen._emit_types(S_SCALAR_LIST)
     assert "double x;" in hpp
     assert "std::vector<double> xs;" in hpp
-    assert "b.float_(x);" in hpp
-    assert "for (const auto& x : xs) { b.float_(x); }" in hpp
-    assert ".as_float()" in hpp
+    assert "__b.float_(x);" in hpp
+    assert "for (const auto& __x : xs) { __b.float_(__x); }" in hpp
+    assert ".try_float()" in hpp
     assert cpp_gen._render(S_SCALAR_LIST, FLOAT, -0.0) == "taut::f64_from_bits(0x8000000000000000ULL)"
 
 
@@ -131,9 +133,9 @@ def test_cpp_codegen_threads_float_map_string_shape_only():
     # scalar/list float generated code is the compiled C++20 coverage below.
     hpp = cpp_gen._emit_types(S_MAP_SHAPE)
     assert "std::map<long long, double> by_id;" in hpp
-    assert "for (const auto& [k, v] : by_id)" in hpp
-    assert "b.float_(v);" in hpp
-    assert "v.by_id[e.get(1).as_int()] = e.get(2).as_float();" in hpp
+    assert "for (const auto& [__k, __v] : by_id)" in hpp
+    assert "__b.float_(__v);" in hpp
+    assert "auto __decoded_3_v = (*__decoded_3_val_cbor.value).try_float();" in hpp
 
 
 def test_cpp_codegen_emits_fallible_decode_path_for_i64_and_enums():
@@ -142,7 +144,7 @@ def test_cpp_codegen_emits_fallible_decode_path_for_i64_and_enums():
     hpp = cpp_gen._emit_types(schema)
     assert "inline constexpr DecodeResult<Mode> try_Mode_from_wire(long long v)" in hpp
     assert 'DecodeError::unknown_enum("Mode", v)' in hpp
-    assert "static DecodeResult<IntBox> try_from_cbor(const Cbor& c)" in hpp
+    assert "static ::taut::DecodeResult<::taut::IntBox> try_from_cbor(const ::taut::Cbor& __c)" in hpp
     assert "auto __decoded_1 = (*__field_1.value).try_int();" in hpp
     assert "auto __decoded_2_arr = (*__field_2.value).try_array();" in hpp
     assert "auto __decoded_2_k = (*__decoded_2_key_cbor.value).try_int();" in hpp
@@ -204,9 +206,9 @@ BEYOND_THE_CORPUS = [
     ("enum-field-unknown", "from_cbor", "EnumBox", "a1011863", "UnknownEnum;enum=Mode;value=99"),
     ("list-item-wrong-type", "from_cbor", "OptBox", "a201f6028101", "WrongType;expected=text"),
     ("message-not-a-map", "from_cbor", "OptBox", "80", "WrongType;expected=map"),
-    # No `empty-message-ignores-unknown-fields` row (Empty, a10100): whether a typed codec
-    # generated without forward-compat keeps an unknown field when it re-encodes is an open
-    # question for the owner. Python keeps it (a10100); C++, like Rust and Go, drops it (a0).
+    # No `empty-message-ignores-unknown-fields` row (Empty, a10100): Python keeps an unknown
+    # field (a10100) and C++ without forward-compat drops it (a0), so the corpus's
+    # `unknown-field-*` rows pin it with `expect_dropping` (question 10).
     ("enum-wire-negative", "from_wire", "Mode", "20", "UnknownEnum;enum=Mode;value=-1"),
     ("enum-wire-not-an-int", "from_wire", "Mode", "f6", "WrongType;expected=int"),
 ]
@@ -309,14 +311,101 @@ std::string outcome_of(std::string_view hex) {
     return "ok";
 }
 
+// The checked decode, then the value's own encode.
+template <class M>
+std::string checked(std::string_view hex) {
+    auto r = decode<M>(hex);
+    if (!r) {
+        return "err " + describe(r.error);
+    }
+    taut::Buf b;
+    r.value.to_cbor(b);
+    return "ok " + hexof(b);
+}
+
 }  // namespace
 """
 
 
-def _observe(tmp_path: Path, s, main: str) -> dict[str, str]:
-    scaffold.emit(s, tmp_path, langs=["cpp"], services=[], runtime=True)
+def _observe(tmp_path: Path, s, main: str, *, forward_compat: bool = False) -> dict[str, str]:
+    scaffold.emit(s, tmp_path, langs=["cpp"], services=[], runtime=True, forward_compat=forward_compat)
     run = _compile_and_run_cpp(tmp_path, _OBSERVE + main, "observe")
     return dict(line.split("\t", 1) for line in run.stdout.splitlines())
+
+
+# Fields named like every name a message's C++ code uses: the runtime's types and helper, the
+# schema's enum and messages (the struct itself among them, and a field named like its own
+# message), the enum's `try_` function, the two namespaces, and the parameters and locals the
+# generator once declared. None may clash with the generated code (`gen/cpp.py`, Names).
+_FORMER_LOCALS = ("b", "c", "v", "x", "k", "e", "f", "kv")
+S_HYGIENE = mk(Enum("Mode", ok=0, alt=1),
+               Msg("Inner", F("Inner", 1, INT)),
+               Msg("Holder",
+                   F("Mode", 1, Ref("Mode")),
+                   F("Inner", 2, Ref("Inner")),
+                   F("Holder", 3, INT),
+                   F("Cbor", 4, List(Ref("Inner"))),
+                   F("Buf", 5, Map(STR, Ref("Mode"))),
+                   F("DecodeResult", 6, Ref("Inner"), optional=True),
+                   F("DecodeError", 7, Map(BOOL, INT)),
+                   F("encode_value", 8, INT),
+                   F("try_Mode_from_wire", 9, INT),
+                   F("std", 10, List(List(INT))),
+                   F("taut", 11, STR, optional=MISSING_OK),
+                   *(F(name, tag, INT) for tag, name in enumerate(_FORMER_LOCALS, start=12))))
+
+HYGIENE_VALUE = {"Mode": "alt", "Inner": {"Inner": 7}, "Holder": 3,
+                 "Cbor": [{"Inner": 1}, {"Inner": -2}], "Buf": {"b": "ok", "a": "alt"},
+                 "DecodeResult": {"Inner": 9}, "DecodeError": {True: 1, False: 0},
+                 "encode_value": 8, "try_Mode_from_wire": 9, "std": [[1, 2], []], "taut": "t",
+                 **{name: tag for tag, name in enumerate(_FORMER_LOCALS, start=12)}}
+
+
+def test_cpp_compiles_fields_named_like_anything_its_code_uses(tmp_path):
+    """Generated code names its own parameters and locals with `__` and qualifies every other
+    name `::taut::`, so a field named like any of them compiles, plain and forward-compat, and
+    round-trips. (Keywords, and the member functions' own names, stay out of reach.)"""
+    assert validate(S_HYGIENE) == []
+    golden = codec.encode(S_HYGIENE, "Holder", HYGIENE_VALUE).hex()
+    unknown = cbor.dumps({**cbor.loads(bytes.fromhex(golden)), 99: [1, "u"]}).hex()
+    main = f"""
+int main() {{
+    auto built = {cpp_gen._render_struct(S_HYGIENE, "Holder", HYGIENE_VALUE)};
+    taut::Buf out;
+    built.to_cbor(out);
+    std::cout << "built\\t" << hexof(out) << "\\n";
+    std::cout << "checked\\t" << checked<taut::Holder>("{golden}") << "\\n";
+    std::cout << "unknown-field\\t" << checked<taut::Holder>("{unknown}") << "\\n";
+    return 0;
+}}
+"""
+    for forward_compat in (False, True):
+        observed = _observe(tmp_path / ("fc" if forward_compat else "plain"), S_HYGIENE, main,
+                            forward_compat=forward_compat)
+        kept = unknown if forward_compat else golden  # generated without forward-compat, it drops it
+        assert observed == {"built": golden, "checked": f"ok {golden}", "unknown-field": f"ok {kept}"}
+
+
+S_LITERAL = mk(Msg("Keyed", F("m", 1, Map(INT, INT))),
+               Msg("Outer", F("inner", 1, Ref("Keyed"))),  # no map of its own
+               Msg("Plain", F("n", 1, INT)))
+
+
+def test_cpp_is_constexpr_only_where_the_struct_is_a_literal_type(tmp_path):
+    """libc++'s std::map is not a literal type, so neither is a message that holds one, even
+    through another message, and a constexpr function returning it does not compile."""
+    hpp = cpp_gen._emit_types(S_LITERAL)
+    assert "static constexpr ::taut::DecodeResult<::taut::Plain> try_from_cbor(" in hpp
+    assert "static ::taut::DecodeResult<::taut::Keyed> try_from_cbor(" in hpp
+    assert "static ::taut::DecodeResult<::taut::Outer> try_from_cbor(" in hpp
+    golden = codec.encode(S_LITERAL, "Outer", {"inner": {"m": {2: 3}}}).hex()
+    observed = _observe(tmp_path, S_LITERAL, f"""
+int main() {{
+    std::cout << "outer\\t" << checked<taut::Outer>("{golden}") << "\\n";
+    return 0;
+}}
+""")
+    assert observed == {"outer": f"ok {golden}"}
 
 
 S_MISSING_OK = mk(Msg("Late", F("note", 1, STR, optional=MISSING_OK)),
@@ -334,9 +423,12 @@ std::string note_of(std::string_view hex) {
     return r.value.note.has_value() ? "text " + std::string(*r.value.note) : "null";
 }
 
-// The unchecked constexpr path reads an absent MISSING_OK key as null too.
-static_assert(!taut::Late::from_cbor(taut::parse(std::string_view("\xa0", 1))).note.has_value());
-static_assert(*taut::Late::from_cbor(taut::parse(std::string_view("\xa1\x01\x61x", 4))).note == "x");
+// The checked decode runs at compile time too, and reads an absent MISSING_OK key as null.
+constexpr auto late_absent = taut::Late::try_from_cbor(taut::try_decode(std::string_view("\xa0", 1)).value);
+static_assert(late_absent.ok && !late_absent.value.note.has_value());
+constexpr auto late_text = taut::Late::try_from_cbor(taut::try_decode(std::string_view("\xa1\x01\x61x", 4)).value);
+static_assert(late_text.ok && *late_text.value.note == "x");
+static_assert(!taut::Late::try_from_cbor(taut::try_decode(std::string_view("\xa1\x01\x01", 3)).value).ok);
 
 int main() {
     std::cout << "late-absent\t" << note_of<taut::Late>("a0") << "\n";
@@ -375,15 +467,18 @@ int main() {
     std::cout << "int\t" << outcome_of<taut::ByInt>("a10182a201050201a201050202") << "\n";
     std::cout << "text\t" << outcome_of<taut::ByText>("a10182a201616b0201a201616b0202") << "\n";
     std::cout << "bool\t" << outcome_of<taut::ByBool>("a10182a201f50201a201f50202") << "\n";
+    std::cout << "bool-false\t" << outcome_of<taut::ByBool>("a10182a201f40201a201f40202") << "\n";
     std::cout << "before-its-value\t" << outcome_of<taut::ByText>("a10182a201616b0201a201616b02f6") << "\n";
     std::cout << "distinct\t" << outcome_of<taut::ByText>("a10182a201616a0201a201616b0202") << "\n";
     return 0;
 }
 """)
+    # The key as text (question 9): an int in decimal, a str as itself, a bool as true or false.
     assert observed == {
         "int": "err DuplicateMapKey;key=5",
         "text": "err DuplicateMapKey;key=k",
-        "bool": "err DuplicateMapKey;key=1",
+        "bool": "err DuplicateMapKey;key=true",
+        "bool-false": "err DuplicateMapKey;key=false",
         "before-its-value": "err DuplicateMapKey;key=k",
         "distinct": "ok",
     }
@@ -447,9 +542,8 @@ def _reference_outcome(s, message: str, data: bytes) -> str:
     """What the reference (`wire/codec.py`) makes of `data`, as the C++ below reports it."""
     try:
         again = codec.encode(s, message, codec.decode(s, message, data))
-    except cbor.DecodeError as exc:  # a bool map key is carried as 0 or 1
-        return f"err {exc.tag}" + "".join(
-            f";{name}={int(v) if isinstance(v, bool) else v}" for name, v in exc.payload.items())
+    except cbor.DecodeError as exc:
+        return f"err {exc.tag}" + "".join(f";{name}={v}" for name, v in exc.payload.items())
     return f"ok {again.hex()}"
 
 
@@ -471,54 +565,29 @@ def nested_shapes(tmp_path_factory):
         prints.append(f'    std::cout << "{name} built\\t" << built_{_ident(name)}() << "\\n";')
         expected[f"{name} built"] = golden
         expected[f"{name} checked"] = f"ok {golden}"
-        expected[f"{name} unchecked"] = golden
-        for path in ("checked", "unchecked"):
-            prints.append(f'    std::cout << "{name} {path}\\t" << {path}<taut::{message}>("{golden}") << "\\n";')
+        prints.append(f'    std::cout << "{name} checked\\t" << checked<taut::{message}>("{golden}") << "\\n";')
     for name, message, fields in NESTED_INPUTS:
         hexed = _nested_wire(fields).hex()
-        outcome = _reference_outcome(S_NESTED, message, bytes.fromhex(hexed))
-        expected[f"{name} checked"] = outcome
+        expected[f"{name} checked"] = _reference_outcome(S_NESTED, message, bytes.fromhex(hexed))
         prints.append(f'    std::cout << "{name} checked\\t" << checked<taut::{message}>("{hexed}") << "\\n";')
-        if outcome.startswith("ok "):
-            expected[f"{name} unchecked"] = outcome.removeprefix("ok ")
-            prints.append(f'    std::cout << "{name} unchecked\\t" << unchecked<taut::{message}>("{hexed}") << "\\n";')
 
     observed = _observe(tmp_path, S_NESTED, r"""
 #include "corpus.hpp"
 
 static_assert(taut::corpus::VECTOR_COUNT == 3);
 
-template <class M>
-std::string checked(std::string_view hex) {
-    auto r = decode<M>(hex);
-    if (!r) {
-        return "err " + describe(r.error);
-    }
-    taut::Buf b;
-    r.value.to_cbor(b);
-    return "ok " + hexof(b);
-}
-
-template <class M>
-std::string unchecked(std::string_view hex) {
-    taut::Buf b;
-    M::from_cbor(taut::parse(bytes_of(hex))).to_cbor(b);
-    return hexof(b);
-}
-
 """ + "\n\n".join(built) + "\n\nint main() {\n" + "\n".join(prints) + "\n    return 0;\n}\n")
     return observed, expected
 
 
-# A repeated bool map key: question 9 rules its payload the key as text, `true`; C++ reports 1.
+# A repeated bool map key: question 9 rules its payload the key as text, `true`.
 BOOL_KEY_CASE = "shelf-repeated-bool-key checked"
 
 
 def test_cpp_generates_every_legal_shape_at_any_nesting(nested_shapes):
-    """Each value is built natively and encodes to the reference's bytes, which decode back,
-    checked and unchecked; each input decodes, checked, as the reference does. Deep has no map,
-    so the constexpr corpus oracle proves its values at compile time too. Question 9's bool
-    key is the strict xfail below."""
+    """Each value is built natively and encodes to the reference's bytes, which decode back;
+    each input decodes as the reference does. Deep has no map, so the constexpr corpus oracle
+    proves its values at compile time too, through the checked decode."""
     assert validate(S_NESTED) == []
     assert "#include <map>" in cpp_gen._emit_types(mk(Msg("M", F("pages", 1, List(Map(STR, INT))))))
     observed, expected = nested_shapes
@@ -526,14 +595,9 @@ def test_cpp_generates_every_legal_shape_at_any_nesting(nested_shapes):
     assert {outcome.split(";")[0] for outcome in expected.values() if outcome.startswith("err ")} == {
         "err WrongType", "err MissingKey", "err DuplicateMapKey"}
     assert expected[BOOL_KEY_CASE] == "err DuplicateMapKey;key=true"
-    assert set(observed) == set(expected)
-    assert {name: seen for name, seen in observed.items() if name != BOOL_KEY_CASE} == \
-        {name: want for name, want in expected.items() if name != BOOL_KEY_CASE}
+    assert observed == expected
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="question 9 (TautCheckedDecode.md §8): a repeated bool map key is `true`; "
-                          "C++ reports it as 1")
 def test_cpp_reports_a_repeated_bool_map_key_as_text(nested_shapes):
     observed, expected = nested_shapes
     assert observed[BOOL_KEY_CASE] == expected[BOOL_KEY_CASE]
@@ -577,6 +641,49 @@ def test_cpp_generated_scalar_list_float_static_asserts_cxx20(tmp_path):
     """)
 
 
+def test_cpp_constexpr_corpus_proves_the_golden_corpus(tmp_path):
+    """The constexpr oracle over the golden corpus, as `corpus/build.py` writes it: at compile
+    time each vector's native value encodes to its golden bytes, and those bytes decode back
+    through the fail-closed decode and re-encode to themselves."""
+    compiler = _cpp_compiler()
+    schema = load_schema(build.IR_PATH)
+    refs = build.reference_values()
+    golden = json.loads(build.GOLDEN_PATH.read_text())
+    corpus = cpp_gen._emit_corpus(schema, refs)
+    assert sorted(re.findall(r'eq_hex\(encode_\w+\(\), "([0-9a-f]+)"\)', corpus)) == \
+        sorted(golden[name]["cbor"] for name in refs)
+    (tmp_path / "taut").mkdir()
+    (tmp_path / "taut" / "cbor.hpp").write_text((RUNTIME / "cbor.hpp").read_text())
+    (tmp_path / "types.hpp").write_text(cpp_gen._emit_types(schema))
+    (tmp_path / "corpus.hpp").write_text(corpus)
+    source = tmp_path / "golden_corpus.cpp"
+    source.write_text('#include "corpus.hpp"\n\n'
+                      f"int main() {{ return taut::corpus::VECTOR_COUNT == {len(refs)} ? 0 : 1; }}\n")
+    exe = tmp_path / "golden_corpus"
+    result = subprocess.run([compiler, "-std=c++20", "-I", str(tmp_path), str(source), "-o", str(exe)],
+                            text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert subprocess.run([str(exe)]).returncode == 0
+
+
+def test_cpp_has_no_decode_entry_point_that_is_not_fail_closed():
+    """Question 5 (ruled): every public decode entry point returns a value or a DecodeError
+    through DecodeResult. The unchecked `parse` (it read past the end of its input and threw
+    std::out_of_range), its helpers, the lenient accessors, the generated `from_cbor` and
+    ext.hpp's throwing host decoder, which reserved memory from untrusted counts, are gone."""
+    runtime = (RUNTIME / "cbor.hpp").read_text()
+    extensions = (RUNTIME / "ext.hpp").read_text()
+    unchecked = (r"\b(parse|decode_at|read_arg|byte_at|get|as_int|as_bool|as_float|as_text|as_bytes"
+                 r"|as_array|checked_parse_map|ext_decode_at|ext_read_arg|ext_require)\(")
+    assert re.findall(unchecked, runtime + extensions) == []
+    assert "reserve(" not in extensions
+    schema = parity.parity_schema()
+    for forward_compat in (False, True):
+        hpp = cpp_gen._emit_types(schema, forward_compat)
+        assert re.findall(r"\bfrom_cbor\(", hpp) == []
+        assert hpp.count("try_from_cbor(const ::taut::Cbor& __c)") == len(schema.messages)
+
+
 def test_cpp_runtime_float_vectors_static_assert(tmp_path):
     compiler = _cpp_compiler()
 
@@ -604,17 +711,20 @@ def test_cpp_runtime_float_vectors_static_assert(tmp_path):
         parts.append(f'static_assert(taut::eq_hex(encode_{name}(), "{cbor}"), "{name} encode");')
         parts.append("")
         parts.append(f"consteval taut::Buf reemit_{name}() {{")
-        parts.append(f"    auto c = taut::parse({lit});")
+        parts.append(f"    auto c = taut::try_decode({lit});")
         parts.append("    taut::Buf b;")
-        parts.append("    taut::encode_value(b, c);")
+        parts.append("    if (c) {")
+        parts.append("        taut::encode_value(b, c.value);")
+        parts.append("    }")
         parts.append("    return b;")
         parts.append("}")
         parts.append(f"static_assert(taut::eq(reemit_{name}(), {lit}), \"{name} reemit\");")
         if not row["note"].startswith("nan"):
             parts.append("")
             parts.append(f"consteval bool decode_bits_{name}() {{")
-            parts.append(f"    auto c = taut::parse({lit});")
-            parts.append(f"    return c.k == taut::Cbor::K::Float && taut::f64_bits(c.as_float()) == 0x{bits}ULL;")
+            parts.append(f"    auto c = taut::try_decode({lit});")
+            parts.append("    auto f = c.value.try_float();")
+            parts.append(f"    return c && f && taut::f64_bits(f.value) == 0x{bits}ULL;")
             parts.append("}")
             parts.append(f'static_assert(decode_bits_{name}(), "{name} decode bits");')
         parts.append("")
@@ -637,6 +747,76 @@ def test_cpp_runtime_float_vectors_static_assert(tmp_path):
         stderr:
         {result.stderr}
     """)
+
+
+# Host bytes the extension helpers refuse, each with the tag the three are called with. The
+# reference (`taut/ext.py`) decides each outcome: a tag below the band is the caller's error,
+# raised before the host is read, and any fault in the host is a DecodeError.
+_EXT_TAG = BAND_START + 1
+EXT_NEGATIVES = [
+    # note, host hex, tag
+    ("below-band-before-host-decode", "ff", 7),
+    ("scalar-host", "01", _EXT_TAG),
+    ("array-host", "80", _EXT_TAG),
+    ("empty-host", "", _EXT_TAG),
+    ("truncated-host", "a101", _EXT_TAG),
+    ("trailing-host", "a000", _EXT_TAG),
+    ("text-map-key", "a1616b01", _EXT_TAG),
+    # The strict runtime reads the host: the lax decoder took each of these four.
+    ("negative-map-key", "a12001", _EXT_TAG),
+    ("duplicate-map-key", "a201000101", _EXT_TAG),
+    ("non-canonical-int", "a1011800", _EXT_TAG),
+    ("invalid-utf8", "a10161ff", _EXT_TAG),
+    ("unsupported-major", "c0a0", _EXT_TAG),
+    ("unsupported-simple", "a101f7", _EXT_TAG),
+    ("unsupported-additional-info", "a1011f", _EXT_TAG),
+    # Counts no input could hold: nothing is reserved from them, and the first missing item is
+    # Truncated (the lax decoder reserved them, and std::length_error escaped).
+    ("map-count-u64-max", "bbffffffffffffffff", _EXT_TAG),
+    ("array-count-u64-max", "a1019bffffffffffffffff", _EXT_TAG),
+]
+EXT_NEGATIVE_DECISION = {"backend": "b", "hops": 1}
+
+
+def _ext_reference(s, op: str, host: bytes, tag: int) -> str:
+    """What the reference makes of one call, as the C++ harness reports it."""
+    try:
+        if op == "set":
+            ext.ext_set(s, host, "Decision", tag, EXT_NEGATIVE_DECISION)
+        elif op == "get":
+            ext.ext_get(s, host, "Decision", tag)
+        else:
+            ext.ext_clear(host, tag)
+    except cbor.DecodeError as exc:
+        return parity.format_error(exc.tag, exc.payload)
+    except ValueError:  # after DecodeError, which is a ValueError too
+        return "caller-error"
+    return "ok"
+
+
+def test_cpp_ext_negatives_are_the_references():
+    """The table's outcomes, pinned: each host fault is the same DecodeError from all three."""
+    s = _resext_schema()
+    outcomes = {note: {_ext_reference(s, op, bytes.fromhex(host), tag) for op in ("set", "get", "clear")}
+                for note, host, tag in EXT_NEGATIVES}
+    assert outcomes == {
+        "below-band-before-host-decode": {"caller-error"},
+        "scalar-host": {"WrongType;expected=map"},
+        "array-host": {"WrongType;expected=map"},
+        "empty-host": {"Truncated"},
+        "truncated-host": {"Truncated"},
+        "trailing-host": {"TrailingBytes"},
+        "text-map-key": {"NonIntegerMapKey"},
+        "negative-map-key": {"NegativeMapKey;key=-1"},
+        "duplicate-map-key": {"DuplicateMapKey;key=1"},
+        "non-canonical-int": {"NonCanonicalInt;value=0"},
+        "invalid-utf8": {"InvalidUtf8"},
+        "unsupported-major": {"UnsupportedMajor;major=6"},
+        "unsupported-simple": {"UnsupportedInfo;info=23"},
+        "unsupported-additional-info": {"UnsupportedInfo;info=31"},
+        "map-count-u64-max": {"Truncated"},
+        "array-count-u64-max": {"Truncated"},
+    }
 
 
 def test_cpp_resext_runtime_corpus_negatives_and_fuzz(tmp_path):
@@ -726,21 +906,31 @@ def test_cpp_resext_runtime_corpus_negatives_and_fuzz(tmp_path):
         for row in fuzz_ext
     )
 
+    negative_value = codec.encode(s, "Decision", EXT_NEGATIVE_DECISION).hex()
+    negatives_init = ",\n".join(
+        "{" + ", ".join([_cpp_string_literal(note), _cpp_string_literal(host), str(tag),
+                         *(_cpp_string_literal(_ext_reference(s, op, bytes.fromhex(host), tag))
+                           for op in ("set", "get", "clear"))]) + "}"
+        for note, host, tag in EXT_NEGATIVES
+    )
+
     source = textwrap.dedent(f"""\
         #include "api.hpp"
         #include "taut/ext.hpp"
 
         #include <exception>
-        #include <functional>
         #include <iostream>
+        #include <optional>
         #include <stdexcept>
         #include <string>
         #include <string_view>
+        #include <utility>
         #include <vector>
 
         struct ResidualRow {{ const char* note; const char* wire; }};
         struct ExtRow {{ const char* op; const char* note; const char* host; long long tag; const char* value; const char* expect; }};
         struct ExtFuzzRow {{ const char* note; const char* host; long long tag; const char* value; const char* set_expect; const char* clear_expect; }};
+        struct ExtNegative {{ const char* note; const char* host; long long tag; const char* set; const char* get; const char* clear; }};
 
         static const ResidualRow residual_rows[] = {{
         {residual_init}
@@ -754,15 +944,27 @@ def test_cpp_resext_runtime_corpus_negatives_and_fuzz(tmp_path):
         {fuzz_ext_init}
         }};
 
+        static const ExtNegative ext_negatives[] = {{
+        {negatives_init}
+        }};
+
         int hex_nibble(char c) {{
-            if (c >= '0' && c <= '9') return c - '0';
-            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            if (c >= '0' && c <= '9') {{
+                return c - '0';
+            }}
+            if (c >= 'a' && c <= 'f') {{
+                return c - 'a' + 10;
+            }}
+            if (c >= 'A' && c <= 'F') {{
+                return c - 'A' + 10;
+            }}
             throw std::invalid_argument("bad hex");
         }}
 
         std::string from_hex(std::string_view hex) {{
-            if ((hex.size() % 2) != 0) throw std::invalid_argument("odd hex");
+            if ((hex.size() % 2) != 0) {{
+                throw std::invalid_argument("odd hex");
+            }}
             std::string out;
             out.reserve(hex.size() / 2);
             for (std::size_t i = 0; i < hex.size(); i += 2) {{
@@ -798,9 +1000,48 @@ def test_cpp_resext_runtime_corpus_negatives_and_fuzz(tmp_path):
             return to_hex(std::string_view(reinterpret_cast<const char*>(b.d), b.n));
         }}
 
+        // A DecodeError as the reference's `Tag;field=value` (parity.format_error).
+        std::string describe(const taut::DecodeError& e) {{
+            using T = taut::DecodeErrorTag;
+            switch (e.tag) {{
+                case T::Truncated:
+                    return "Truncated";
+                case T::TrailingBytes:
+                    return "TrailingBytes";
+                case T::InvalidUtf8:
+                    return "InvalidUtf8";
+                case T::UnsupportedInfo:
+                    return "UnsupportedInfo;info=" + std::to_string(e.info);
+                case T::UnsupportedMajor:
+                    return "UnsupportedMajor;major=" + std::to_string(e.major);
+                case T::NonIntegerMapKey:
+                    return "NonIntegerMapKey";
+                case T::NegativeMapKey:
+                    return "NegativeMapKey;key=" + std::to_string(e.key);
+                case T::DuplicateMapKey:
+                    return "DuplicateMapKey;key=" + (e.key_is_text ? std::string(e.key_text) : std::to_string(e.key));
+                case T::NonCanonicalInt:
+                    return "NonCanonicalInt;value=" + std::to_string(e.unsigned_value);
+                case T::WrongType:
+                    return std::string("WrongType;expected=") + e.expected;
+                default:
+                    return "tag#" + std::to_string(static_cast<int>(e.tag));
+            }}
+        }}
+
+        // A decode that must succeed: its value, else std::runtime_error naming the error.
+        template <class T>
+        T must(taut::DecodeResult<T> r, std::string_view what) {{
+            if (!r) {{
+                throw std::runtime_error(std::string(what) + ": " + describe(r.error));
+            }}
+            return std::move(r.value);
+        }}
+
         std::string typed_decision_wire(std::string_view value_hex) {{
             std::string value_bytes = from_hex(value_hex);
-            taut::Decision d = taut::Decision::from_cbor(taut::checked_parse_map(view(value_bytes)));
+            taut::Decision d = must(taut::Decision::try_from_cbor(must(taut::try_decode(view(value_bytes)), "value")),
+                                    "Decision");
             taut::Buf b;
             d.to_cbor(b);
             return buf_string(b);
@@ -813,28 +1054,17 @@ def test_cpp_resext_runtime_corpus_negatives_and_fuzz(tmp_path):
             std::cerr << "mismatch " << note << "\\n  got    " << got << "\\n  expect " << expect << "\\n";
         }}
 
-        void expect_invalid(std::string_view note, const std::function<void()>& fn, std::string_view contains = "") {{
-            try {{
-                fn();
-                fail(note, "no throw", "std::invalid_argument");
-            }} catch (const std::invalid_argument& e) {{
-                if (!contains.empty() && std::string_view(e.what()).find(contains) == std::string_view::npos) {{
-                    fail(note, e.what(), contains);
-                }}
-            }} catch (const std::exception& e) {{
-                fail(note, e.what(), "std::invalid_argument");
-            }}
-        }}
-
         void run_residuals() {{
             for (const auto& row : residual_rows) {{
                 try {{
                     std::string wire = from_hex(row.wire);
-                    taut::Host host = taut::Host::from_cbor(taut::checked_parse_map(view(wire)));
+                    taut::Host host = must(taut::Host::try_from_cbor(must(taut::try_decode(view(wire)), row.note)), row.note);
                     taut::Buf b;
                     host.to_cbor(b);
                     std::string got = buf_hex(b);
-                    if (got != row.wire) fail(row.note, got, row.wire);
+                    if (got != row.wire) {{
+                        fail(row.note, got, row.wire);
+                    }}
                 }} catch (const std::exception& e) {{
                     fail(row.note, e.what(), "no exception");
                 }}
@@ -848,27 +1078,33 @@ def test_cpp_resext_runtime_corpus_negatives_and_fuzz(tmp_path):
                     std::string op(row.op);
                     if (op == "set") {{
                         std::string typed_wire = typed_decision_wire(row.value);
-                        taut::Cbor value = taut::checked_parse_map(view(typed_wire));
-                        std::string got = to_hex(taut::ext_set(view(host), row.tag, value));
-                        if (got != row.expect) fail(row.note, got, row.expect);
+                        taut::Cbor value = must(taut::try_decode(view(typed_wire)), row.note);
+                        std::string got = to_hex(must(taut::ext_set(view(host), row.tag, value), row.note));
+                        if (got != row.expect) {{
+                            fail(row.note, got, row.expect);
+                        }}
                     }} else if (op == "get") {{
-                        auto got = taut::ext_get(view(host), row.tag);
+                        std::optional<taut::Cbor> got = must(taut::ext_get(view(host), row.tag), row.note);
                         if (std::string_view(row.expect) == "null") {{
-                            if (got.has_value()) fail(row.note, "present", "null");
+                            if (got.has_value()) {{
+                                fail(row.note, "present", "null");
+                            }}
+                        }} else if (!got.has_value()) {{
+                            fail(row.note, "null", row.expect);
                         }} else {{
-                            if (!got.has_value()) {{
-                                fail(row.note, "null", row.expect);
-                            }} else {{
-                                taut::Decision d = taut::Decision::from_cbor(*got);
-                                taut::Buf b;
-                                d.to_cbor(b);
-                                std::string got_hex = buf_hex(b);
-                                if (got_hex != row.expect) fail(row.note, got_hex, row.expect);
+                            taut::Decision d = must(taut::Decision::try_from_cbor(*got), row.note);
+                            taut::Buf b;
+                            d.to_cbor(b);
+                            std::string got_hex = buf_hex(b);
+                            if (got_hex != row.expect) {{
+                                fail(row.note, got_hex, row.expect);
                             }}
                         }}
                     }} else if (op == "clear") {{
-                        std::string got = to_hex(taut::ext_clear(view(host), row.tag));
-                        if (got != row.expect) fail(row.note, got, row.expect);
+                        std::string got = to_hex(must(taut::ext_clear(view(host), row.tag), row.note));
+                        if (got != row.expect) {{
+                            fail(row.note, got, row.expect);
+                        }}
                     }} else {{
                         fail(row.note, op, "known op");
                     }}
@@ -883,58 +1119,77 @@ def test_cpp_resext_runtime_corpus_negatives_and_fuzz(tmp_path):
                 try {{
                     std::string host = from_hex(row.host);
                     std::string typed_wire = typed_decision_wire(row.value);
-                    taut::Cbor value = taut::checked_parse_map(view(typed_wire));
-                    std::string set_got = to_hex(taut::ext_set(view(host), row.tag, value));
-                    if (set_got != row.set_expect) fail(row.note, set_got, row.set_expect);
+                    taut::Cbor value = must(taut::try_decode(view(typed_wire)), row.note);
+                    std::string set_got = to_hex(must(taut::ext_set(view(host), row.tag, value), row.note));
+                    if (set_got != row.set_expect) {{
+                        fail(row.note, set_got, row.set_expect);
+                    }}
 
                     std::string strapped = from_hex(row.set_expect);
-                    auto got = taut::ext_get(view(strapped), row.tag);
+                    std::optional<taut::Cbor> got = must(taut::ext_get(view(strapped), row.tag), row.note);
                     if (!got.has_value()) {{
                         fail(row.note, "null", row.value);
                     }} else {{
-                        taut::Decision d = taut::Decision::from_cbor(*got);
+                        taut::Decision d = must(taut::Decision::try_from_cbor(*got), row.note);
                         taut::Buf b;
                         d.to_cbor(b);
                         std::string got_hex = buf_hex(b);
-                        if (got_hex != row.value) fail(row.note, got_hex, row.value);
+                        if (got_hex != row.value) {{
+                            fail(row.note, got_hex, row.value);
+                        }}
                     }}
 
-                    std::string clear_got = to_hex(taut::ext_clear(view(strapped), row.tag));
-                    if (clear_got != row.clear_expect) fail(row.note, clear_got, row.clear_expect);
+                    std::string clear_got = to_hex(must(taut::ext_clear(view(strapped), row.tag), row.note));
+                    if (clear_got != row.clear_expect) {{
+                        fail(row.note, clear_got, row.clear_expect);
+                    }}
                 }} catch (const std::exception& e) {{
                     fail(row.note, e.what(), "no exception");
                 }}
             }}
         }}
 
+        // One call's outcome as the reference reports it: `ok`, the DecodeError, or
+        // `caller-error` for std::invalid_argument. Anything else escapes to the caller.
+        template <class Call>
+        std::string outcome_of(Call call) {{
+            try {{
+                auto r = call();
+                if (!r) {{
+                    return describe(r.error);
+                }}
+                return "ok";
+            }} catch (const std::invalid_argument&) {{
+                return "caller-error";
+            }}
+        }}
+
         void run_negatives() {{
-            expect_invalid("below-band-before-host-decode", [] {{
-                (void)taut::ext_get(std::string_view("\\xff", 1), 7);
-            }}, "below");
-            expect_invalid("scalar-host", [] {{
-                std::string host = from_hex("01");
-                (void)taut::ext_get(view(host), {tag});
-            }});
-            expect_invalid("trailing-host", [] {{
-                std::string host = from_hex("a000");
-                (void)taut::ext_get(view(host), {tag});
-            }});
-            expect_invalid("invalid-map-key", [] {{
-                std::string host = from_hex("a1616b01");
-                (void)taut::ext_get(view(host), {tag});
-            }});
-            expect_invalid("unsupported-major", [] {{
-                std::string host = from_hex("c0a0");
-                (void)taut::ext_get(view(host), {tag});
-            }});
-            expect_invalid("unsupported-simple", [] {{
-                std::string host = from_hex("a101f7");
-                (void)taut::ext_get(view(host), {tag});
-            }});
-            expect_invalid("unsupported-additional-info", [] {{
-                std::string host = from_hex("a1011f");
-                (void)taut::ext_get(view(host), {tag});
-            }});
+            std::string typed_wire = typed_decision_wire("{negative_value}");
+            taut::Cbor value = must(taut::try_decode(view(typed_wire)), "negative value");
+            for (const auto& row : ext_negatives) {{
+                std::string host = from_hex(row.host);
+                const std::pair<const char*, std::string_view> calls[] = {{
+                    {{"set", row.set}}, {{"get", row.get}}, {{"clear", row.clear}}}};
+                for (const auto& [op, expect] : calls) {{
+                    std::string note = std::string(row.note) + " " + op;
+                    try {{
+                        std::string got;
+                        if (std::string_view(op) == "set") {{
+                            got = outcome_of([&] {{ return taut::ext_set(view(host), row.tag, value); }});
+                        }} else if (std::string_view(op) == "get") {{
+                            got = outcome_of([&] {{ return taut::ext_get(view(host), row.tag); }});
+                        }} else {{
+                            got = outcome_of([&] {{ return taut::ext_clear(view(host), row.tag); }});
+                        }}
+                        if (got != expect) {{
+                            fail(note, got, expect);
+                        }}
+                    }} catch (const std::exception& e) {{
+                        fail(note, std::string("escaped: ") + e.what(), expect);
+                    }}
+                }}
+            }}
         }}
 
         int main() {{
