@@ -19,7 +19,7 @@ import pytest
 from taut import ext as py_ext
 from taut.gen import scaffold
 from taut.gen import rust
-from taut.ir.dsl import FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, schema
+from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, schema
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor as py_cbor
@@ -823,6 +823,134 @@ def test_rust_empty_message_requires_map_in_both_codecs(tmp_path, fail_closed):
         }}
     """))
     bin_path = tmp_path / ("empty_closed_bin" if fail_closed else "empty_default_bin")
+    subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
+    subprocess.run([str(bin_path)], check=True)
+
+
+_MAP_FIELDS_TEST = r"""
+extern crate alloc;
+#[path = "@CBOR@"]
+mod cbor;
+#[path = "@API@"]
+mod api;
+
+use api::Maps;
+use cbor::{encode, try_decode, Cbor, DecodeError};
+use std::collections::BTreeMap;
+
+fn text(s: &str) -> Cbor {
+    Cbor::Text(s.to_string())
+}
+
+fn entry(key: Cbor, value: Cbor) -> Cbor {
+    Cbor::Map(vec![(1, key), (2, value)])
+}
+
+fn entries(items: Vec<Cbor>) -> Cbor {
+    Cbor::Array(items)
+}
+
+/// A valid `Maps` whose field `tag` is replaced by `value`.
+fn decode_with(tag: i64, value: Cbor) -> Result<Maps, DecodeError> {
+    let mut fields = vec![
+        (1, entries(vec![entry(Cbor::Int(1), text("a"))])),
+        (2, entries(vec![entry(text("a"), Cbor::Int(1))])),
+        (3, entries(vec![entry(Cbor::Bool(true), Cbor::Int(1))])),
+        (4, Cbor::Null),
+        (5, entries(vec![entries(vec![entry(Cbor::Int(1), Cbor::Int(1))])])),
+    ];
+    for field in fields.iter_mut() {
+        if field.0 == tag {
+            field.1 = value.clone();
+        }
+    }
+    Maps::from_cbor(&Cbor::Map(fields))
+}
+
+#[test]
+fn every_map_shape_round_trips() {
+    let maps = Maps {
+        by_int: BTreeMap::from([(1, "a".to_string()), (2, "b".to_string())]),
+        by_text: BTreeMap::from([("a".to_string(), 1), ("b".to_string(), 2)]),
+        by_flag: BTreeMap::from([(false, 0), (true, 1)]),
+        maybe: Some(BTreeMap::from([(3, 4)])),
+        many: vec![BTreeMap::from([(5, 6)]), BTreeMap::new()],
+    };
+    let bytes = encode(&maps.to_cbor());
+    let back = Maps::from_cbor(&try_decode(&bytes).unwrap()).unwrap();
+    assert_eq!(back, maps);
+    assert_eq!(encode(&back.to_cbor()), bytes);
+    assert_eq!(decode_with(4, Cbor::Null).unwrap().maybe, None);
+}
+
+#[test]
+fn an_entry_needs_keys_1_and_2_before_either_is_decoded() {
+    let key_only = Cbor::Map(vec![(1, text("x"))]);
+    assert_eq!(decode_with(1, entries(vec![key_only])), Err(DecodeError::MissingKey(2)));
+    let value_only = Cbor::Map(vec![(2, text("a"))]);
+    assert_eq!(decode_with(1, entries(vec![value_only])), Err(DecodeError::MissingKey(1)));
+    assert_eq!(decode_with(1, entries(vec![Cbor::Int(5)])), Err(DecodeError::WrongType { expected: "map" }));
+    // Entries are read in order: the first entry's bad key fails before the
+    // second entry's missing key 2 is seen.
+    let second = Cbor::Map(vec![(1, Cbor::Int(5))]);
+    assert_eq!(
+        decode_with(1, entries(vec![entry(text("bad"), text("a")), second])),
+        Err(DecodeError::WrongType { expected: "int" })
+    );
+}
+
+#[test]
+fn a_repeated_key_is_refused_before_its_value_is_decoded() {
+    let repeated = entries(vec![entry(Cbor::Int(5), text("a")), entry(Cbor::Int(5), text("b"))]);
+    assert_eq!(decode_with(1, repeated), Err(DecodeError::DuplicateMapKey(5)));
+    // The repeated entry's value has the wrong type; it is never decoded.
+    let bad_value = entries(vec![entry(Cbor::Int(5), text("a")), entry(Cbor::Int(5), Cbor::Int(7))]);
+    assert_eq!(decode_with(1, bad_value), Err(DecodeError::DuplicateMapKey(5)));
+    let optional = entries(vec![entry(Cbor::Int(3), Cbor::Int(1)), entry(Cbor::Int(3), Cbor::Int(2))]);
+    assert_eq!(decode_with(4, optional), Err(DecodeError::DuplicateMapKey(3)));
+    let inner = entries(vec![entry(Cbor::Int(4), Cbor::Int(1)), entry(Cbor::Int(4), Cbor::Int(2))]);
+    assert_eq!(decode_with(5, entries(vec![entries(vec![]), inner])), Err(DecodeError::DuplicateMapKey(4)));
+}
+
+#[test]
+fn a_repeated_bool_or_text_key_is_refused_with_an_i64_payload() {
+    // A bool key is carried as 0 or 1.
+    let flags = entries(vec![entry(Cbor::Bool(false), Cbor::Int(1)), entry(Cbor::Bool(false), Cbor::Int(2))]);
+    assert_eq!(decode_with(3, flags), Err(DecodeError::DuplicateMapKey(0)));
+    // An i64 cannot carry a text key, so the payload is the repeated entry's index.
+    let texts = entries(vec![
+        entry(text("a"), Cbor::Int(1)),
+        entry(text("b"), Cbor::Int(2)),
+        entry(text("a"), Cbor::Int(3)),
+    ]);
+    assert_eq!(decode_with(2, texts), Err(DecodeError::DuplicateMapKey(2)));
+}
+"""
+
+
+def test_rust_fail_closed_map_fields_check_each_entry_in_order(tmp_path):
+    """CD-E5 for `map<K,V>` fields (M13, M14) beyond the fixture's `map<int,int>`:
+    each entry, in order, must be a map holding keys 1 and 2 before either is
+    decoded, and a repeated key is refused before its value is decoded. Covers
+    int, str and bool keys, an optional map and a list of maps."""
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        pytest.skip("rustc not available")
+
+    s = schema(Msg("Maps",
+                   F("by_int", 1, Map(INT, STR)),
+                   F("by_text", 2, Map(STR, INT)),
+                   F("by_flag", 3, Map(BOOL, INT)),
+                   F("maybe", 4, Map(INT, INT), optional=True),
+                   F("many", 5, List(Map(INT, INT)))))
+    generated = tmp_path / "generated"
+    scaffold.emit(s, generated, langs=["rust"], services=[], runtime=True, fail_closed=True)
+    rust_dir = generated / "rust"
+    test_rs = tmp_path / "map_fields.rs"
+    test_rs.write_text(_MAP_FIELDS_TEST
+                       .replace("@CBOR@", (rust_dir / "cbor.rs").as_posix())
+                       .replace("@API@", (rust_dir / "api.rs").as_posix()))
+    bin_path = tmp_path / "map_fields"
     subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
     subprocess.run([str(bin_path)], check=True)
 

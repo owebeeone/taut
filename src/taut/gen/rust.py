@@ -123,7 +123,8 @@ def _decode_try(t: TypeRef, expr: str) -> str:
 
     Scalars use the `try_*` accessors (each `-> Result<_, DecodeError>`); enums
     use the fallible `from_wire`; nested messages recurse through the fallible
-    `from_cbor`. Collections build a `Result<Vec<_>>` and `?` it out."""
+    `from_cbor`. A list builds a `Result<Vec<_>>` and `?`s it out; a map is
+    `_decode_try_map`."""
     if isinstance(t, Scalar):
         return {
             "int": f"{expr}.try_int()?",
@@ -140,10 +141,33 @@ def _decode_try(t: TypeRef, expr: str) -> str:
         return (f"{expr}.try_array()?.iter().map(|x| {_decode_try_elem(t.elem, 'x')})"
                 f".collect::<Result<Vec<_>, DecodeError>>()?")
     if isinstance(t, MapOf):
-        return (f"{expr}.try_array()?.iter().map(|e| "
-                f"Ok(({_decode_try(t.key, 'e.try_get(1)?')}, {_decode_try(t.value, 'e.try_get(2)?')})))"
-                f".collect::<Result<_, DecodeError>>()?")
+        return _decode_try_map(t, expr)
     raise TypeError(t)
+
+
+# `DuplicateMapKey` carries an `i64`, so a repeated `map<K,V>` key is reported as
+# itself for an int key, as 0 or 1 for a bool key and, since no `i64` can carry a
+# str key, as the index of the repeated entry (`i` in `_decode_try_map`).
+_DUPLICATE_KEY_PAYLOAD = {"int": "k", "bool": "i64::from(k)", "str": "i as i64"}
+
+
+def _decode_try_map(t: MapOf, expr: str) -> str:
+    """A `map<K,V>` block expression: an array of `{1: key, 2: value}` entry maps
+    (D24), read entry by entry in order (CD-E5). Each entry must be a map holding
+    key 1 and then key 2 before either is decoded; then its key is decoded, a
+    repeated key is `DuplicateMapKey` (`_DUPLICATE_KEY_PAYLOAD`), and only then
+    its value is decoded. The block `return`s its error, from `from_cbor` or from
+    a list element's closure."""
+    key = t.key
+    if not isinstance(key, Scalar) or key.kind not in _DUPLICATE_KEY_PAYLOAD:
+        raise TypeError(t)   # validate allows only int, str and bool keys
+    entries = f"{expr}.try_array()?"
+    loop = f"for (i, e) in {entries}.iter().enumerate()" if key.kind == "str" else f"for e in {entries}"
+    return ("{ let mut m = std::collections::BTreeMap::new(); "
+            f"{loop} {{ let ek = e.try_get(1)?; let ev = e.try_get(2)?; "
+            f"let k = {_decode_try(key, 'ek')}; "
+            f"if m.contains_key(&k) {{ return Err(DecodeError::DuplicateMapKey({_DUPLICATE_KEY_PAYLOAD[key.kind]})); }} "
+            f"m.insert(k, {_decode_try(t.value, 'ev')}); }} m }}")
 
 
 def _decode_try_elem(t: TypeRef, expr: str) -> str:

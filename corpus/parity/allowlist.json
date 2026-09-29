@@ -4,12 +4,6 @@
   "_note": "An allowlisted target's harness STILL RUNS and REPORTS its observed failures (xfail-that-runs); it just doesn't fail CI. The inverse is enforced too: `tautc parity` FAILS if an allowlisted target passes fully (a green target must be de-listed) or a gated (non-allowlisted) target fails. Reasons are populated from observed `tautc parity` results.",
   "targets": [
     {
-      "target": "rust",
-      "phase": "P2",
-      "owner": "codec-parity",
-      "reason": "Observed by `tautc parity`: fails M4 key-first-duplicate, M5 key-first-text and M6 key-first-negative (Truncated: a map entry's value is read before its key is checked), M13 map-field-duplicate (decodes; the last entry wins) and M14 map-entry-keys-first (WrongType{int}, not MissingKey{2}). Step P2.rs de-lists it."
-    },
-    {
       "target": "cpp",
       "phase": "Phase 4",
       "owner": "codec-parity",

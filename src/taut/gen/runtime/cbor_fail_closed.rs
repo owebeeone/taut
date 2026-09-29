@@ -51,7 +51,10 @@ pub enum DecodeError {
     UnsupportedMajor(u8),
     /// A map key that was not a (frozen-subset) integer.
     NonIntegerMapKey,
-    /// The same integer key appeared twice in one CBOR map.
+    /// The same integer key appeared twice in one CBOR map, or the same key in
+    /// two entries of a generated `map<K,V>` field: an int key as itself, a
+    /// bool key as 0 or 1, and a str key, which an `i64` cannot carry, as the
+    /// index of the repeated entry.
     DuplicateMapKey(i64),
     /// A CBOR integer on the wire outside the frozen `i64` subset — a major-0
     /// value above `i64::MAX`, a major-1 value below `i64::MIN`, or a map key
@@ -598,8 +601,10 @@ fn dec(data: &[u8], off: usize) -> Result<(Cbor, usize), DecodeError> {
             let (n, mut o) = read_arg(data, off, info)?;
             let mut m = Vec::new();
             for _ in 0..n {
+                // An entry's key is read and checked before its value is read
+                // (CD-E5), so a bad key is reported even when the value is
+                // missing or malformed.
                 let (k, o2) = dec(data, o)?;
-                let (v, o3) = dec(data, o2)?;
                 let ki = match k {
                     // Map keys are i64 (CBOR field tags). An out-of-i64 key was
                     // already rejected as IntOverflow when `dec` read it above,
@@ -611,6 +616,7 @@ fn dec(data: &[u8], off: usize) -> Result<(Cbor, usize), DecodeError> {
                 if m.iter().any(|(existing, _)| *existing == ki) {
                     return Err(DecodeError::DuplicateMapKey(ki));
                 }
+                let (v, o3) = dec(data, o2)?;
                 m.push((ki, v));
                 o = o3;
             }
