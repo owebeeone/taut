@@ -16,7 +16,9 @@ from pathlib import Path
 
 import pytest
 
+from taut import cli
 from taut import ext as py_ext
+from taut.corpus import glade_build, parity, parity_rust, toolchains
 from taut.gen import scaffold
 from taut.gen import rust
 from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, schema
@@ -28,6 +30,8 @@ from taut.wire import codec
 ROOT = Path(__file__).resolve().parents[2]
 RESEXT_SCHEMA = load_schema(ROOT / "ir" / "resext.taut.py")
 PARITY_SCHEMA = load_schema(ROOT / "ir" / "parity_int.taut.py")
+# The one Rust runtime, which `tautc gen --with-runtime` vendors as `cbor.rs`.
+CBOR_RS = ROOT / "src" / "taut" / "gen" / "runtime" / "cbor_fail_closed.rs"
 
 
 def test_rust_generator_emits_float_scalar_codec():
@@ -43,9 +47,13 @@ def test_rust_generator_emits_float_scalar_codec():
     assert "Some(v) => Cbor::Float(*v)" in out
     assert "Cbor::Array(self.xs.iter().map(|x| Cbor::Float(*x)).collect())" in out
     assert "(2, Cbor::Float(*v))" in out
-    assert "x: c.get(1).float()" in out
-    assert "maybe: { let v = c.get(2); if v.is_null() { None } else { Some(v.float()) } }" in out
-    assert '"M" => crate::cbor::encode(&M::from_cbor(&c).to_cbor()),' in out
+    # The corpus emitter decodes as the package codegen does: fail-closed.
+    assert "use crate::cbor::{Cbor, DecodeError};" in out
+    assert "x: c.try_get(1)?.try_float()?," in out
+    assert "maybe: { let v = c.try_get(2)?; if v.is_null() { None } else { Some(v.try_float()?) } }," in out
+    assert "pub fn roundtrip(message: &str, bytes: &[u8]) -> Result<Vec<u8>, DecodeError> {" in out
+    assert "let c = crate::cbor::try_decode(bytes)?;" in out
+    assert '"M" => M::from_cbor(&c).map(|v| crate::cbor::encode(&v.to_cbor())),' in out
     assert '.expect("decode: M")' not in out
 
 
@@ -59,13 +67,14 @@ def test_rust_runtime_matches_float_vectors(tmp_path):
         f'        ("{row["note"]}", 0x{row["f64"]}u64, "{row["cbor"]}")'
         for row in vectors
     )
-    cbor_path = (ROOT / "src" / "taut" / "gen" / "runtime" / "cbor.rs").as_posix()
+    cbor_path = CBOR_RS.as_posix()
     test_rs = tmp_path / "float_vectors.rs"
     test_rs.write_text(textwrap.dedent(f"""
+        extern crate alloc;
         #[path = "{cbor_path}"]
         mod cbor;
 
-        use cbor::{{decode, encode, Cbor}};
+        use cbor::{{encode, try_decode, Cbor}};
 
         static VECTORS: &[(&str, u64, &str)] = &[
 {rows}
@@ -92,10 +101,10 @@ def test_rust_runtime_matches_float_vectors(tmp_path):
                 let value = f64::from_bits(*bits);
                 assert_eq!(hexof(&encode(&Cbor::Float(value))), *cbor_hex, "encode {{note}}");
 
-                let decoded = decode(&unhex(cbor_hex));
+                let decoded = try_decode(&unhex(cbor_hex)).unwrap();
                 assert_eq!(hexof(&encode(&decoded)), *cbor_hex, "re-encode {{note}}");
                 if !note.starts_with("nan") {{
-                    assert_eq!(decoded.float().to_bits(), *bits, "decode bits {{note}}");
+                    assert_eq!(decoded.try_float().unwrap().to_bits(), *bits, "decode bits {{note}}");
                 }}
             }}
         }}
@@ -103,13 +112,14 @@ def test_rust_runtime_matches_float_vectors(tmp_path):
         #[test]
         fn float_decode_accepts_all_widths() {{
             for hx in ["f93c00", "fa3f800000", "fb3ff0000000000000"] {{
-                assert_eq!(decode(&unhex(hx)).float().to_bits(), 1.0f64.to_bits(), "{{hx}}");
+                let decoded = try_decode(&unhex(hx)).unwrap();
+                assert_eq!(decoded.try_float().unwrap().to_bits(), 1.0f64.to_bits(), "{{hx}}");
             }}
         }}
     """))
 
     bin_path = tmp_path / "float_vectors"
-    subprocess.run([rustc, "--test", str(test_rs), "-o", str(bin_path)], check=True)
+    subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
     subprocess.run([str(bin_path)], check=True)
 
 
@@ -229,11 +239,6 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
         services=[],
         runtime=True,
         forward_compat=True,
-        # legacy (infallible) codec: this test's Rust program calls
-        # `Decision::from_cbor(&c) -> Self` / `Host::from_cbor(&d).to_cbor()`
-        # directly. The residual/ext behaviour is orthogonal to the D1 flip;
-        # pin it to the legacy codec so the program keeps compiling.
-        fail_closed=False,
     )
     rust_dir = generated / "rust"
     assert (rust_dir / "api.rs").exists()
@@ -249,6 +254,7 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
     ext_path = (rust_dir / "ext.rs").as_posix()
     test_rs = tmp_path / "resext_vectors.rs"
     test_rs.write_text(textwrap.dedent(f"""
+        extern crate alloc;
         #[path = "{cbor_path}"]
         mod cbor;
         #[path = "{api_path}"]
@@ -257,7 +263,7 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
         mod ext;
 
         use api::{{Decision, Host}};
-        use cbor::{{decode, encode, Cbor}};
+        use cbor::{{encode, try_decode, Cbor, DecodeError, MapKey}};
 
         static RESIDUAL: &[(&str, &str)] = &[
 {residual_rows}
@@ -308,15 +314,15 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
         }}
 
         fn decision_from_wire(hex: &str) -> Decision {{
-            let c = decode(&unhex(hex));
-            Decision::from_cbor(&c)
+            let c = try_decode(&unhex(hex)).unwrap();
+            Decision::from_cbor(&c).unwrap()
         }}
 
         #[test]
         fn residual_vectors_roundtrip_byte_exactly() {{
             for (note, wire) in RESIDUAL {{
-                let decoded = decode(&unhex(wire));
-                let host = Host::from_cbor(&decoded);
+                let decoded = try_decode(&unhex(wire)).unwrap();
+                let host = Host::from_cbor(&decoded).unwrap();
                 assert_eq!(hexof(&encode(&host.to_cbor())), *wire, "residual {{note}}");
             }}
         }}
@@ -328,15 +334,15 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
                 match row.op {{
                     "set" => {{
                         let decision = decision_from_wire(row.value);
-                        let got = ext::ext_set(&host, row.tag, decision.to_cbor());
+                        let got = ext::ext_set(&host, row.tag, decision.to_cbor()).unwrap();
                         assert_eq!(hexof(&got), row.expect, "ext set {{}}", row.note);
                     }}
                     "get" => {{
-                        let got = ext::ext_get(&host, row.tag);
+                        let got = ext::ext_get(&host, row.tag).unwrap();
                         if row.expect == "null" {{
                             assert!(got.is_none(), "ext get absent {{}}", row.note);
                         }} else {{
-                            let decision = Decision::from_cbor(&got.as_ref().unwrap());
+                            let decision = Decision::from_cbor(got.as_ref().unwrap()).unwrap();
                             assert_eq!(
                                 hexof(&encode(&decision.to_cbor())),
                                 row.expect,
@@ -346,7 +352,7 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
                         }}
                     }}
                     "clear" => {{
-                        let got = ext::ext_clear(&host, row.tag);
+                        let got = ext::ext_clear(&host, row.tag).unwrap();
                         assert_eq!(hexof(&got), row.expect, "ext clear {{}}", row.note);
                     }}
                     _ => panic!("unknown op {{}}", row.op),
@@ -354,17 +360,48 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
             }}
         }}
 
+        // A tag below the band is the caller's error, not the input's: each helper
+        // panics before it reads the host, whose bytes here (none) would be Truncated.
         #[test]
         #[should_panic(expected = "below the extension band")]
-        fn ext_rejects_below_band_before_decoding_host() {{
-            ext::ext_set(&[], (1 << 20) - 1, Cbor::Null);
+        fn ext_set_rejects_below_band_before_decoding_host() {{
+            let _ = ext::ext_set(&[], (1 << 20) - 1, Cbor::Null);
         }}
 
         #[test]
-        #[should_panic(expected = "top-level CBOR map")]
-        fn ext_rejects_non_map_hosts() {{
+        #[should_panic(expected = "below the extension band")]
+        fn ext_get_rejects_below_band_before_decoding_host() {{
+            let _ = ext::ext_get(&[], (1 << 20) - 1);
+        }}
+
+        #[test]
+        #[should_panic(expected = "below the extension band")]
+        fn ext_clear_rejects_below_band_before_decoding_host() {{
+            let _ = ext::ext_clear(&[], (1 << 20) - 1);
+        }}
+
+        #[test]
+        fn ext_helpers_refuse_a_host_that_is_not_a_map() {{
             let decision = Decision {{ backend: "b7".to_string(), hops: 1, wire_residual: vec![] }};
-            ext::ext_set(&encode(&Cbor::Int(1)), 1 << 20, decision.to_cbor());
+            let host = encode(&Cbor::Int(1));
+            let not_map = DecodeError::WrongType {{ expected: "map" }};
+            assert_eq!(ext::ext_set(&host, 1 << 20, decision.to_cbor()), Err(not_map.clone()));
+            assert_eq!(ext::ext_get(&host, 1 << 20), Err(not_map.clone()));
+            assert_eq!(ext::ext_clear(&host, 1 << 20), Err(not_map));
+        }}
+
+        #[test]
+        fn ext_helpers_report_a_malformed_host_as_its_decode_error() {{
+            let tag = 1 << 20;
+            assert_eq!(ext::ext_get(&[0xa1, 0x01], tag), Err(DecodeError::Truncated));
+            assert_eq!(ext::ext_clear(&[0xa0, 0x00], tag), Err(DecodeError::TrailingBytes));
+            assert_eq!(
+                ext::ext_set(&[0xa2, 0x01, 0x00, 0x01, 0x00], tag, Cbor::Null),
+                Err(DecodeError::DuplicateMapKey(MapKey::Int(1)))
+            );
+            assert_eq!(ext::ext_get(&[0xa1, 0x61, 0x78, 0x00], tag), Err(DecodeError::NonIntegerMapKey));
+            // The band's first tag is the helpers' to use.
+            assert_eq!(ext::ext_get(&[0xa0], tag), Ok(None));
         }}
 
         #[test]
@@ -373,8 +410,8 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
             for row in FUZZ {{
                 let host = unhex(row.host);
 
-                let decoded = decode(&host);
-                let typed = Host::from_cbor(&decoded);
+                let decoded = try_decode(&host).unwrap();
+                let typed = Host::from_cbor(&decoded).unwrap();
                 let roundtrip = hexof(&encode(&typed.to_cbor()));
                 if roundtrip != row.roundtrip {{
                     eprintln!(
@@ -385,7 +422,7 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
                 }}
 
                 let decision = decision_from_wire(row.value);
-                let set = ext::ext_set(&host, row.tag, decision.to_cbor());
+                let set = ext::ext_set(&host, row.tag, decision.to_cbor()).expect(row.note);
                 let set_hex = hexof(&set);
                 if set_hex != row.expect_set {{
                     eprintln!(
@@ -395,9 +432,9 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
                     mismatches += 1;
                 }}
 
-                match ext::ext_get(&set, row.tag) {{
+                match ext::ext_get(&set, row.tag).expect(row.note) {{
                     Some(c) => {{
-                        let got = Decision::from_cbor(&c);
+                        let got = Decision::from_cbor(&c).expect(row.note);
                         let get_hex = hexof(&encode(&got.to_cbor()));
                         if get_hex != row.expect_get {{
                             eprintln!(
@@ -413,7 +450,7 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
                     }}
                 }}
 
-                let clear_hex = hexof(&ext::ext_clear(&set, row.tag));
+                let clear_hex = hexof(&ext::ext_clear(&set, row.tag).expect(row.note));
                 if clear_hex != row.expect_clear {{
                     eprintln!(
                         "ext_clear mismatch seed={{}} note={{}} input={{}} got={{}} expect={{}}",
@@ -427,17 +464,15 @@ def test_rust_resext_residual_ext_and_fuzz_vectors(tmp_path):
     """))
 
     bin_path = tmp_path / "resext_vectors"
-    subprocess.run([rustc, "--test", str(test_rs), "-o", str(bin_path)], check=True)
+    subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
     subprocess.run([str(bin_path)], check=True)
 
 
 # =============================================================================
-# Fail-closed (opt-in) Rust codec — the untrusted-boundary hardening.
-#
-# Non-negotiable: the default (no-flag) output is byte-for-byte today's, so a
-# consumer that regenerates WITHOUT the flag is unaffected. These tests pin the
-# opt-in shape and prove the default is unchanged, mirroring the forward-compat
-# gates in test_forward_compat.py.
+# The fail-closed Rust codec — the untrusted-boundary hardening, and since
+# v0.10.0 the only Rust codec: the legacy (fail-open) codec, its `--legacy-codec`
+# opt-out and its runtime template are gone (TautCheckedDecode.md question 5).
+# These tests pin its shape and its behaviour on every decode path.
 # =============================================================================
 
 # A schema exercising every scalar + an enum + optional + collections, so the
@@ -513,7 +548,7 @@ def _rust_parity_malformed_rows() -> str:
 
 
 def test_rust_fail_closed_emits_fallible_from_cbor_and_i64_ints():
-    rs = scaffold.rust_api(_FC, fail_closed=True)
+    rs = scaffold.rust_api(_FC)
     # from_cbor is fallible and never panics on input
     assert "pub fn from_cbor(c: &Cbor) -> Result<Self, DecodeError>" in rs
     assert "use crate::cbor::{Cbor, DecodeError};" in rs
@@ -533,70 +568,71 @@ def test_rust_fail_closed_emits_fallible_from_cbor_and_i64_ints():
 def test_rust_missing_ok_only_relaxes_selected_optional_slot():
     s = schema(Msg("M", F("old", 1, STR, optional=True),
                    F("new", 2, STR, optional=MISSING_OK)))
-    rs = scaffold.rust_api(s, fail_closed=True)
+    rs = scaffold.rust_api(s)
     assert "old: { let v = c.try_get(1)?; if v.is_null() { None } else { Some(v.try_text()?) } }," in rs
     assert "new: { let v = c.try_get_opt(2)?; match v { None => None, Some(v) => if v.is_null() { None } else { Some(v.try_text()?) } } }," in rs
 
 
 def test_rust_fail_closed_enum_from_wire_is_fallible():
-    rs = scaffold.rust_api(_FC, fail_closed=True)
+    rs = scaffold.rust_api(_FC)
     assert "pub fn from_wire(v: i64) -> Result<Self, DecodeError>" in rs
     assert 'return Err(DecodeError::UnknownEnum { enum_name: "Color", value: v })' in rs
     # wire() returns the i64 carrier so `Cbor::Int(x.wire())` type-checks
     assert "pub fn wire(self) -> i64" in rs
 
 
-def test_legacy_codec_opt_out_is_byte_identical():
-    # D1: fail-closed is the default now; the `--legacy-codec` opt-out
-    # (fail_closed=False) restores today's pre-v0.8.0 codec body byte-for-byte:
-    # infallible from_cbor, i64 ints, panicking from_wire, no DecodeError import.
-    legacy = scaffold.rust_api(_FC, fail_closed=False)
-    assert "pub fn from_cbor(c: &Cbor) -> Self {" in legacy
-    assert "Result<Self, DecodeError>" not in legacy
-    assert "DecodeError" not in legacy
-    assert "pub n: i64," in legacy
-    assert "i128" not in legacy
-    assert "pub fn from_wire(v: i64) -> Self {" in legacy
-    assert 'panic!("bad Color wire value' in legacy
-    # and the fail-closed codec genuinely differs
-    assert scaffold.rust_api(_FC, fail_closed=True) != legacy
+def test_a_repeated_map_field_key_is_reported_as_the_key_itself():
+    """Question 9: each key kind of a `map<K,V>` field reports its repeated key itself,
+    converted into the runtime's `MapKey`, never an entry's index or a stand-in number."""
+    s = schema(Msg("M", F("by_int", 1, Map(INT, INT)), F("by_text", 2, Map(STR, INT)),
+                   F("by_flag", 3, Map(BOOL, INT))))
+    rs = scaffold.rust_api(s)
+    assert rs.count("return Err(DecodeError::DuplicateMapKey(k.into()));") == 3
+    assert "enumerate()" not in rs and "i as i64" not in rs and "i64::from(k)" not in rs
 
 
-def test_emit_default_is_fail_closed(tmp_path):
-    # D1 (ratified): `tautc gen` / scaffold.emit default to the fail-closed codec.
+def test_the_legacy_codec_is_gone(tmp_path):
+    """Question 5: the fail-closed codec is the only Rust codec. Neither `emit` nor
+    `rust_api` takes `fail_closed`, no legacy runtime template is left, and the vendored
+    `cbor.rs` is the fail-closed runtime, with no panicking `decode` or accessor."""
+    with pytest.raises(TypeError, match="fail_closed"):
+        scaffold.emit(_FC, tmp_path / "legacy", langs=["rust"], services=[], fail_closed=False)
+    with pytest.raises(TypeError, match="fail_closed"):
+        scaffold.emit(_FC, tmp_path / "legacy", langs=["rust"], services=[], fail_closed=True)
+    with pytest.raises(TypeError, match="fail_closed"):
+        scaffold.rust_api(_FC, fail_closed=True)
+    assert not (tmp_path / "legacy").exists()
+    assert not scaffold._runtime_exists("cbor.rs")
+
     generated = tmp_path / "gen"
-    scaffold.emit(_FC, generated, langs=["rust"], services=[], runtime=True)  # no fail_closed kwarg
+    scaffold.emit(_FC, generated, langs=["rust"], services=[], runtime=True)
     api = (generated / "rust" / "api.rs").read_text()
     assert "pub fn from_cbor(c: &Cbor) -> Result<Self, DecodeError>" in api
-    assert "use crate::cbor::{Cbor, DecodeError};" in api
-    assert "DEPRECATED (--legacy-codec)" not in api               # no banner on the default path
-    # the vendored runtime is the hardened one (typed try_decode), under the same name
-    assert "pub fn try_decode" in (generated / "rust" / "cbor.rs").read_text()
+    assert "DEPRECATED" not in api and "panic!" not in api
+    runtime = (generated / "rust" / "cbor.rs").read_text()
+    assert runtime == CBOR_RS.read_text()
+    assert "pub fn try_decode" in runtime
+    assert "panic!" not in runtime
+    for gone in ("decode", "get", "get_opt", "int", "float", "text", "bytes", "boolean", "array"):
+        assert f"pub fn {gone}(" not in runtime, gone
 
 
-def test_legacy_codec_emit_stamps_deprecation_banner(tmp_path):
-    # The opt-out path stamps a one-line deprecation banner into the generated
-    # header while keeping the legacy (fail-open) codec body + panicking runtime.
-    generated = tmp_path / "gen"
-    scaffold.emit(_FC, generated, langs=["rust"], services=[], runtime=True, fail_closed=False)
-    api = (generated / "rust" / "api.rs").read_text()
-    assert api.startswith("// DEPRECATED (--legacy-codec):")
-    assert "removed at v0.10.0" in api
-    assert "pub fn from_cbor(c: &Cbor) -> Self {" in api          # legacy body preserved
-    assert "pub fn try_decode" not in (generated / "rust" / "cbor.rs").read_text()
+def test_tautc_gen_refuses_legacy_codec_and_takes_fail_closed_as_a_no_op(tmp_path, capsys):
+    ir = (ROOT / "ir" / "parity_int.taut.py").as_posix()
+    base = ["gen", ir, "-l", "rust", "--api-only", "--with-runtime"]
+    with pytest.raises(SystemExit) as refused:
+        cli.main([*base, "-o", str(tmp_path / "legacy"), "--legacy-codec"])
+    assert refused.value.code == 2
+    assert "--legacy-codec" in capsys.readouterr().err
+    assert not (tmp_path / "legacy").exists()
 
-
-def test_fail_closed_is_a_noop_for_non_rust_targets(tmp_path):
-    # D1: fail-closed is the default and a NO-OP for non-rust targets — combining it
-    # with e.g. python no longer raises (it raised pre-flip); only rust is hardened,
-    # and the python output is identical whether fail_closed is True or False.
-    a = tmp_path / "a"
-    b = tmp_path / "b"
-    written = scaffold.emit(_FC, a, langs=["rust", "python"], services=[], fail_closed=True)
-    assert {"api.rs", "api.py"} <= {p.name for p in written}
-    assert "Result<Self, DecodeError>" in (a / "rust" / "api.rs").read_text()
-    scaffold.emit(_FC, b, langs=["python"], services=[], fail_closed=False)
-    assert (a / "python" / "api.py").read_text() == (b / "python" / "api.py").read_text()
+    assert cli.main([*base, "-o", str(tmp_path / "plain")]) == 0
+    assert "--fail-closed" not in capsys.readouterr().err
+    assert cli.main([*base, "-o", str(tmp_path / "flag"), "--fail-closed"]) == 0
+    assert "--fail-closed is a no-op" in capsys.readouterr().err
+    for name in ("api.rs", "cbor.rs", "ext.rs"):
+        plain = (tmp_path / "plain" / "rust" / name).read_text()
+        assert (tmp_path / "flag" / "rust" / name).read_text() == plain, name
 
 
 def test_rust_fail_closed_runtime_decode_is_fail_closed(tmp_path):
@@ -609,7 +645,7 @@ def test_rust_fail_closed_runtime_decode_is_fail_closed(tmp_path):
         pytest.skip("rustc not available")
 
     generated = tmp_path / "generated"
-    scaffold.emit(_FC, generated, langs=["rust"], services=[], runtime=True, fail_closed=True)
+    scaffold.emit(_FC, generated, langs=["rust"], services=[], runtime=True)
     rust_dir = generated / "rust"
     api_path = (rust_dir / "api.rs").as_posix()
     cbor_path = (rust_dir / "cbor.rs").as_posix()
@@ -716,19 +752,175 @@ def test_rust_fail_closed_runtime_decode_is_fail_closed(tmp_path):
     subprocess.run([str(bin_path)], check=True)
 
 
-@pytest.mark.parametrize("fail_closed", [False, True])
-def test_rust_missing_ok_runtime_behavior_for_both_codecs(tmp_path, fail_closed):
+# Each DecodeError variant, as Rust builds it, and the canonical tag it reports.
+_TAGGED_ERRORS = {
+    "Truncated": "DecodeError::Truncated",
+    "TrailingBytes": "DecodeError::TrailingBytes",
+    "InvalidUtf8": "DecodeError::InvalidUtf8",
+    "UnsupportedInfo": "DecodeError::UnsupportedInfo(28)",
+    "UnsupportedMajor": "DecodeError::UnsupportedMajor(6)",
+    "NonIntegerMapKey": "DecodeError::NonIntegerMapKey",
+    "DuplicateMapKey": 'DecodeError::DuplicateMapKey(MapKey::Text("a".to_string()))',
+    "IntOverflow": "DecodeError::IntOverflow",
+    "NonCanonicalInt": "DecodeError::NonCanonicalInt(5)",
+    "NegativeMapKey": "DecodeError::NegativeMapKey(-1)",
+    "MissingKey": "DecodeError::MissingKey(2)",
+    "WrongType": 'DecodeError::WrongType { expected: "map" }',
+    "UnknownEnum": 'DecodeError::UnknownEnum { enum_name: "Mode", value: 99 }',
+}
+
+_RUNTIME_ERRORS_TEST = r"""
+extern crate alloc;
+#[path = "@CBOR@"]
+mod cbor;
+
+use cbor::{encode, try_decode, Cbor, DecodeError, MapKey};
+
+#[test]
+fn every_variant_reports_its_canonical_tag() {
+    let cases: Vec<(DecodeError, &str)> = vec![
+@TAGGED@
+    ];
+    for (e, tag) in &cases {
+        assert_eq!(e.tag(), *tag);
+        // The tag is the variant's name.
+        assert!(format!("{e:?}").starts_with(tag), "{e:?}");
+    }
+}
+
+#[test]
+fn a_map_key_prints_as_the_parity_text() {
+    assert_eq!(MapKey::Int(5).to_string(), "5");
+    assert_eq!(MapKey::Int(-1).to_string(), "-1");
+    assert_eq!(MapKey::Int(i64::MIN).to_string(), "-9223372036854775808");
+    assert_eq!(MapKey::Text("a".to_string()).to_string(), "a");
+    assert_eq!(MapKey::Text(String::new()).to_string(), "");
+    assert_eq!(MapKey::Text("a;key=b".to_string()).to_string(), "a;key=b");
+    assert_eq!(MapKey::Bool(true).to_string(), "true");
+    assert_eq!(MapKey::Bool(false).to_string(), "false");
+    assert_eq!(MapKey::from(7i64), MapKey::Int(7));
+    assert_eq!(MapKey::from(true), MapKey::Bool(true));
+    assert_eq!(MapKey::from("k".to_string()), MapKey::Text("k".to_string()));
+    let e = DecodeError::DuplicateMapKey(MapKey::Text("a".to_string()));
+    assert_eq!(e.to_string(), "duplicate map key a");
+    assert_eq!(DecodeError::DuplicateMapKey(MapKey::Bool(true)).to_string(), "duplicate map key true");
+}
+
+#[test]
+fn a_raw_map_reports_its_repeated_int_key() {
+    assert_eq!(try_decode(&[0xa2, 0x01, 0x00, 0x01, 0x01]), Err(DecodeError::DuplicateMapKey(MapKey::Int(1))));
+    // A map of 20,000 distinct keys decodes; with its first key repeated after the
+    // last, it is refused with that key.
+    let n: u16 = 20_000;
+    let entries: Vec<(i64, Cbor)> = (0..i64::from(n)).map(|k| (k, Cbor::Null)).collect();
+    let mut bytes = encode(&Cbor::Map(entries));
+    assert_eq!(bytes[0], 0xb9); // a map whose count takes two bytes
+    assert_eq!(try_decode(&bytes).map(|c| c.map_entries().len()), Ok(usize::from(n)));
+    bytes[1..3].copy_from_slice(&(n + 1).to_be_bytes());
+    bytes.extend_from_slice(&[0x00, 0xf6]);
+    assert_eq!(try_decode(&bytes), Err(DecodeError::DuplicateMapKey(MapKey::Int(0))));
+}
+
+#[test]
+fn a_length_beyond_the_input_is_truncated_whatever_its_size() {
+    let cases: [&[u8]; 5] = [
+        &[0x5b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],       // bytes, 2^64 - 1
+        &[0x7b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],       // text, 2^64 - 1
+        &[0x5b, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00],       // bytes, 2^32
+        &[0x7b, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x61], // text, 2^32 + 1
+        &[0x7a, 0xff, 0xff, 0xff, 0xff],                               // text, 2^32 - 1
+    ];
+    for bytes in cases {
+        assert_eq!(try_decode(bytes), Err(DecodeError::Truncated), "{bytes:02x?}");
+    }
+}
+"""
+
+
+def test_rust_runtime_errors_carry_their_tag_and_key_as_text(tmp_path):
+    """CD-E2 and question 9 at the runtime: `DecodeError::tag()` names each variant as the
+    gate does, `DuplicateMapKey` carries the key as a `MapKey` whose text is the parity
+    contract's, a raw map's repeated key is found in a set, and a length beyond the input
+    is `Truncated` whatever its size."""
+    assert set(_TAGGED_ERRORS) <= parity.DECODE_TAGS
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        pytest.skip("rustc not available")
+    tagged = "\n".join(f"        ({rust_value}, {json.dumps(tag)})," for tag, rust_value in _TAGGED_ERRORS.items())
+    test_rs = tmp_path / "runtime_errors.rs"
+    test_rs.write_text(_RUNTIME_ERRORS_TEST.replace("@CBOR@", CBOR_RS.as_posix()).replace("@TAGGED@", tagged))
+    bin_path = tmp_path / "runtime_errors"
+    subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
+    subprocess.run([str(bin_path)], check=True)
+
+
+_WASM32_LENGTHS = r"""
+extern crate alloc;
+#[path = "@CBOR@"]
+mod cbor;
+
+#[no_mangle]
+pub extern "C" fn usize_bits() -> u32 {
+    usize::BITS
+}
+
+/// One bit per case that does not decode to `Truncated`.
+#[no_mangle]
+pub extern "C" fn not_truncated() -> u32 {
+    let cases: [&[u8]; 4] = [
+        &[0x5b, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00],       // bytes, 2^32: `as usize` made it 0
+        &[0x7b, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x61], // text, 2^32 + 1: `as usize` made it 1
+        &[0x5b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],       // bytes, 2^64 - 1
+        &[0x7a, 0xff, 0xff, 0xff, 0xff],                               // text, 2^32 - 1, which fits
+    ];
+    let mut bits = 0u32;
+    for (i, bytes) in cases.iter().enumerate() {
+        if cbor::try_decode(bytes) != Err(cbor::DecodeError::Truncated) {
+            bits |= 1 << i;
+        }
+    }
+    bits
+}
+"""
+
+_WASM32_RUN = """
+const fs = require("fs");
+WebAssembly.instantiate(fs.readFileSync(process.argv[1]), {}).then(({ instance }) => {
+  console.log(instance.exports.usize_bits(), instance.exports.not_truncated());
+});
+"""
+
+
+def test_rust_runtime_keeps_long_lengths_whole_on_a_32_bit_target(tmp_path):
+    """§5.2: `n as usize` cut a length of 2^32 or more to its low 32 bits on a 32-bit target,
+    so a wasm32 build accepted input that a 64-bit build calls `Truncated`. The runtime is
+    built for wasm32 and run under node; either missing skips."""
+    rustc = shutil.which("rustc")
+    node = toolchains.find_node()
+    if rustc is None or node is None:
+        pytest.skip("rustc or node not available")
+    probe = tmp_path / "lengths.rs"
+    probe.write_text(_WASM32_LENGTHS.replace("@CBOR@", CBOR_RS.as_posix()))
+    wasm = tmp_path / "lengths.wasm"
+    built = subprocess.run([rustc, "--edition", "2021", "--target", "wasm32-unknown-unknown",
+                            "--crate-type", "cdylib", "-O", str(probe), "-o", str(wasm)],
+                           capture_output=True, text=True)
+    if built.returncode != 0 and "may not be installed" in built.stderr:
+        pytest.skip("the wasm32-unknown-unknown target is not installed")
+    assert built.returncode == 0, built.stderr
+    ran = subprocess.run([node, "-e", _WASM32_RUN, str(wasm)], capture_output=True, text=True, check=True)
+    assert ran.stdout.split() == ["32", "0"]
+
+
+def test_rust_missing_ok_runtime_behavior(tmp_path):
     """Compile generated code and exercise absent/null/malformed slots.
 
-    The legacy optional slot remains a required nullable map entry.  Only the
-    opted-in slot accepts absence; a present wrong type remains an error in both
-    codec modes.
+    A plain optional slot remains a required nullable map entry. Only the opted-in
+    slot accepts absence; a present wrong type remains an error.
     """
     rustc = shutil.which("rustc")
     if rustc is None:
         pytest.skip("rustc not available")
-
-    from taut.ir.dsl import F, Msg, schema
 
     s = schema(
         Msg(
@@ -738,32 +930,19 @@ def test_rust_missing_ok_runtime_behavior_for_both_codecs(tmp_path, fail_closed)
             F("missing_optional", 3, STR, optional=MISSING_OK),
         )
     )
-    generated = tmp_path / ("generated_closed" if fail_closed else "generated_default")
-    scaffold.emit(s, generated, langs=["rust"], services=[], runtime=True,
-                  fail_closed=fail_closed)
+    generated = tmp_path / "generated"
+    scaffold.emit(s, generated, langs=["rust"], services=[], runtime=True)
     rust_dir = generated / "rust"
     api_path = (rust_dir / "api.rs").as_posix()
     cbor_path = (rust_dir / "cbor.rs").as_posix()
-    if fail_closed:
-        decode_missing_strict = "assert_eq!(M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into()))]),), Err(DecodeError::MissingKey(2)));"
-        decode_missing_required = "assert_eq!(M::from_cbor(&map(&[(2, Cbor::Null), (3, Cbor::Null)])), Err(DecodeError::MissingKey(1)));"
-        decode_malformed = "assert_eq!(M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into())), (2, Cbor::Null), (3, Cbor::Int(9))])), Err(DecodeError::WrongType { expected: \"text\" }));"
-        decode_valid = "let v = M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into())), (2, Cbor::Null)])).expect(\"valid\"); assert_eq!(v.missing_optional, None);"
-        imports = "use cbor::{Cbor, DecodeError};"
-    else:
-        decode_missing_strict = "assert!(std::panic::catch_unwind(|| M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into()))]))).is_err());"
-        decode_missing_required = "assert!(std::panic::catch_unwind(|| M::from_cbor(&map(&[(2, Cbor::Null), (3, Cbor::Null)]))).is_err());"
-        decode_malformed = "assert!(std::panic::catch_unwind(|| M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into())), (2, Cbor::Null), (3, Cbor::Int(9))]))).is_err());"
-        decode_valid = "let v = M::from_cbor(&map(&[(1, Cbor::Text(\"ok\".into())), (2, Cbor::Null)]) ); assert_eq!(v.missing_optional, None);"
-        imports = "use cbor::Cbor;"
-    test_rs = tmp_path / ("missing_ok_closed.rs" if fail_closed else "missing_ok_default.rs")
+    test_rs = tmp_path / "missing_ok.rs"
     test_rs.write_text(textwrap.dedent(f"""
         extern crate alloc;
         #[path = "{cbor_path}"]
         mod cbor;
         #[path = "{api_path}"]
         mod api;
-        {imports}
+        use cbor::{{Cbor, DecodeError}};
         use api::M;
 
         fn map(entries: &[(i64, Cbor)]) -> Cbor {{
@@ -772,57 +951,50 @@ def test_rust_missing_ok_runtime_behavior_for_both_codecs(tmp_path, fail_closed)
 
         #[test]
         fn field_presence_and_malformed_values_are_scoped() {{
-            {decode_valid}
-            {decode_missing_strict}
-            {decode_missing_required}
-            {decode_malformed}
+            let v = M::from_cbor(&map(&[(1, Cbor::Text("ok".into())), (2, Cbor::Null)])).expect("valid");
+            assert_eq!(v.missing_optional, None);
+            assert_eq!(M::from_cbor(&map(&[(1, Cbor::Text("ok".into()))])), Err(DecodeError::MissingKey(2)));
+            assert_eq!(M::from_cbor(&map(&[(2, Cbor::Null), (3, Cbor::Null)])), Err(DecodeError::MissingKey(1)));
+            assert_eq!(
+                M::from_cbor(&map(&[(1, Cbor::Text("ok".into())), (2, Cbor::Null), (3, Cbor::Int(9))])),
+                Err(DecodeError::WrongType {{ expected: "text" }})
+            );
             let nulled = M::from_cbor(&map(&[(1, Cbor::Text("ok".into())), (2, Cbor::Null), (3, Cbor::Null)]));
-            {"assert!(nulled.is_ok());" if fail_closed else "let _ = nulled;"}
+            assert!(nulled.is_ok());
         }}
     """))
-    bin_path = tmp_path / ("missing_ok_closed" if fail_closed else "missing_ok_default")
+    bin_path = tmp_path / "missing_ok"
     subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
     subprocess.run([str(bin_path)], check=True)
 
 
-@pytest.mark.parametrize("fail_closed", [False, True])
-def test_rust_empty_message_requires_map_in_both_codecs(tmp_path, fail_closed):
+def test_rust_empty_message_requires_map(tmp_path):
     rustc = shutil.which("rustc")
     if rustc is None:
         pytest.skip("rustc not available")
-    from taut.ir.dsl import Msg, schema
 
-    generated = tmp_path / ("empty_closed" if fail_closed else "empty_default")
-    scaffold.emit(schema(Msg("Empty")), generated, langs=["rust"], services=[],
-                  runtime=True, fail_closed=fail_closed)
+    generated = tmp_path / "empty"
+    scaffold.emit(schema(Msg("Empty")), generated, langs=["rust"], services=[], runtime=True)
     rust_dir = generated / "rust"
     api_path = (rust_dir / "api.rs").as_posix()
     cbor_path = (rust_dir / "cbor.rs").as_posix()
-    if fail_closed:
-        body = "assert_eq!(Empty::from_cbor(&Cbor::Bool(true)), Err(DecodeError::WrongType { expected: \"map\" }));"
-        imports = "use cbor::{Cbor, DecodeError};"
-        valid = "assert!(Empty::from_cbor(&Cbor::Map(vec![])).is_ok());"
-    else:
-        body = "assert!(std::panic::catch_unwind(|| Empty::from_cbor(&Cbor::Bool(true))).is_err());"
-        imports = "use cbor::Cbor;"
-        valid = "let _ = Empty::from_cbor(&Cbor::Map(vec![]));"
-    test_rs = tmp_path / ("empty_closed.rs" if fail_closed else "empty_default.rs")
+    test_rs = tmp_path / "empty.rs"
     test_rs.write_text(textwrap.dedent(f"""
         extern crate alloc;
         #[path = "{cbor_path}"]
         mod cbor;
         #[path = "{api_path}"]
         mod api;
-        {imports}
+        use cbor::{{Cbor, DecodeError}};
         use api::Empty;
 
         #[test]
         fn empty_message_checks_container_shape() {{
-            {valid}
-            {body}
+            assert!(Empty::from_cbor(&Cbor::Map(vec![])).is_ok());
+            assert_eq!(Empty::from_cbor(&Cbor::Bool(true)), Err(DecodeError::WrongType {{ expected: "map" }}));
         }}
     """))
-    bin_path = tmp_path / ("empty_closed_bin" if fail_closed else "empty_default_bin")
+    bin_path = tmp_path / "empty_bin"
     subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
     subprocess.run([str(bin_path)], check=True)
 
@@ -835,7 +1007,7 @@ mod cbor;
 mod api;
 
 use api::Maps;
-use cbor::{encode, try_decode, Cbor, DecodeError};
+use cbor::{encode, try_decode, Cbor, DecodeError, MapKey};
 use std::collections::BTreeMap;
 
 fn text(s: &str) -> Cbor {
@@ -902,28 +1074,37 @@ fn an_entry_needs_keys_1_and_2_before_either_is_decoded() {
 #[test]
 fn a_repeated_key_is_refused_before_its_value_is_decoded() {
     let repeated = entries(vec![entry(Cbor::Int(5), text("a")), entry(Cbor::Int(5), text("b"))]);
-    assert_eq!(decode_with(1, repeated), Err(DecodeError::DuplicateMapKey(5)));
+    assert_eq!(decode_with(1, repeated), Err(DecodeError::DuplicateMapKey(MapKey::Int(5))));
     // The repeated entry's value has the wrong type; it is never decoded.
     let bad_value = entries(vec![entry(Cbor::Int(5), text("a")), entry(Cbor::Int(5), Cbor::Int(7))]);
-    assert_eq!(decode_with(1, bad_value), Err(DecodeError::DuplicateMapKey(5)));
+    assert_eq!(decode_with(1, bad_value), Err(DecodeError::DuplicateMapKey(MapKey::Int(5))));
     let optional = entries(vec![entry(Cbor::Int(3), Cbor::Int(1)), entry(Cbor::Int(3), Cbor::Int(2))]);
-    assert_eq!(decode_with(4, optional), Err(DecodeError::DuplicateMapKey(3)));
+    assert_eq!(decode_with(4, optional), Err(DecodeError::DuplicateMapKey(MapKey::Int(3))));
     let inner = entries(vec![entry(Cbor::Int(4), Cbor::Int(1)), entry(Cbor::Int(4), Cbor::Int(2))]);
-    assert_eq!(decode_with(5, entries(vec![entries(vec![]), inner])), Err(DecodeError::DuplicateMapKey(4)));
+    assert_eq!(
+        decode_with(5, entries(vec![entries(vec![]), inner])),
+        Err(DecodeError::DuplicateMapKey(MapKey::Int(4)))
+    );
 }
 
 #[test]
-fn a_repeated_bool_or_text_key_is_refused_with_an_i64_payload() {
-    // A bool key is carried as 0 or 1.
+fn a_repeated_bool_or_text_key_is_reported_as_the_key() {
+    // Question 9: the key itself, whose text is `false` or the str; never 0 or an index.
     let flags = entries(vec![entry(Cbor::Bool(false), Cbor::Int(1)), entry(Cbor::Bool(false), Cbor::Int(2))]);
-    assert_eq!(decode_with(3, flags), Err(DecodeError::DuplicateMapKey(0)));
-    // An i64 cannot carry a text key, so the payload is the repeated entry's index.
+    let got = decode_with(3, flags);
+    assert_eq!(got, Err(DecodeError::DuplicateMapKey(MapKey::Bool(false))));
+    assert_eq!(got.unwrap_err().to_string(), "duplicate map key false");
     let texts = entries(vec![
         entry(text("a"), Cbor::Int(1)),
         entry(text("b"), Cbor::Int(2)),
         entry(text("a"), Cbor::Int(3)),
     ]);
-    assert_eq!(decode_with(2, texts), Err(DecodeError::DuplicateMapKey(2)));
+    let got = decode_with(2, texts);
+    assert_eq!(got, Err(DecodeError::DuplicateMapKey(MapKey::Text("a".to_string()))));
+    assert_eq!(got.unwrap_err().to_string(), "duplicate map key a");
+    // An empty str is a key like any other.
+    let empties = entries(vec![entry(text(""), Cbor::Int(1)), entry(text(""), Cbor::Int(2))]);
+    assert_eq!(decode_with(2, empties), Err(DecodeError::DuplicateMapKey(MapKey::Text(String::new()))));
 }
 """
 
@@ -944,7 +1125,7 @@ def test_rust_fail_closed_map_fields_check_each_entry_in_order(tmp_path):
                    F("maybe", 4, Map(INT, INT), optional=True),
                    F("many", 5, List(Map(INT, INT)))))
     generated = tmp_path / "generated"
-    scaffold.emit(s, generated, langs=["rust"], services=[], runtime=True, fail_closed=True)
+    scaffold.emit(s, generated, langs=["rust"], services=[], runtime=True)
     rust_dir = generated / "rust"
     test_rs = tmp_path / "map_fields.rs"
     test_rs.write_text(_MAP_FIELDS_TEST
@@ -961,7 +1142,7 @@ def test_rust_fail_closed_replays_shared_i64_parity_corpus(tmp_path):
         pytest.skip("rustc not available")
 
     generated = tmp_path / "generated"
-    scaffold.emit(PARITY_SCHEMA, generated, langs=["rust"], services=[], runtime=True, fail_closed=True)
+    scaffold.emit(PARITY_SCHEMA, generated, langs=["rust"], services=[], runtime=True)
     rust_dir = generated / "rust"
     api_path = (rust_dir / "api.rs").as_posix()
     cbor_path = (rust_dir / "cbor.rs").as_posix()
@@ -977,7 +1158,7 @@ def test_rust_fail_closed_replays_shared_i64_parity_corpus(tmp_path):
         mod api;
 
         use api::{{IntBox, Mode}};
-        use cbor::{{encode, try_decode, DecodeError}};
+        use cbor::{{encode, try_decode, DecodeError, MapKey}};
 
         struct IntRow {{
             name: &'static str,
@@ -1064,7 +1245,7 @@ def test_rust_fail_closed_replays_shared_i64_parity_corpus(tmp_path):
                 "NonIntegerMapKey" => assert_eq!(got, DecodeError::NonIntegerMapKey, "{{}}", row.name),
                 "DuplicateMapKey" => assert_eq!(
                     got,
-                    DecodeError::DuplicateMapKey(parse_i64(row.key.unwrap())),
+                    DecodeError::DuplicateMapKey(MapKey::Int(parse_i64(row.key.unwrap()))),
                     "{{}}",
                     row.name
                 ),
@@ -1172,3 +1353,129 @@ def test_rust_fail_closed_replays_shared_i64_parity_corpus(tmp_path):
     bin_path = tmp_path / "parity_vectors"
     subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
     subprocess.run([str(bin_path)], check=True)
+
+
+# =============================================================================
+# The corpus emitter and glade_build: the fail-closed codec too (question 5).
+# =============================================================================
+
+_CORPUS_EMITTER_TEST = r"""
+extern crate alloc;
+#[path = "@CBOR@"]
+mod cbor;
+#[path = "@GENERATED@"]
+mod generated;
+
+use cbor::DecodeError;
+use generated::{roundtrip, VECTORS};
+
+fn unhex(s: &str) -> Vec<u8> {
+    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+}
+
+fn hexof(b: &[u8]) -> String {
+    b.iter().map(|x| format!("{x:02x}")).collect()
+}
+
+#[test]
+fn every_golden_vector_round_trips_through_its_typed_message() {
+    assert!(!VECTORS.is_empty(), "no vectors generated");
+    for (name, message, hex) in VECTORS {
+        let again = roundtrip(message, &unhex(hex)).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+        assert_eq!(&hexof(&again), hex, "{name}");
+    }
+}
+
+#[test]
+fn malformed_input_is_a_decode_error_never_a_panic() {
+    for (name, message, hex) in VECTORS {
+        let bytes = unhex(hex);
+        for cut in 0..bytes.len() {
+            assert_eq!(roundtrip(message, &bytes[..cut]), Err(DecodeError::Truncated), "{name} cut at {cut}");
+        }
+        let mut trailing = bytes.clone();
+        trailing.push(0x00);
+        assert_eq!(roundtrip(message, &trailing), Err(DecodeError::TrailingBytes), "{name}");
+        assert_eq!(roundtrip(message, &[0x00]), Err(DecodeError::WrongType { expected: "map" }), "{name}");
+    }
+}
+
+#[test]
+#[should_panic(expected = "unknown message")]
+fn an_unknown_message_name_is_the_callers_error() {
+    let _ = roundtrip("NoSuchMessage", &[0xa0]);
+}
+"""
+
+
+def _run_corpus_emitter(rustc: str, tmp_path: Path, cbor_rs: Path, generated_rs: Path) -> None:
+    test_rs = tmp_path / "corpus_emitter.rs"
+    test_rs.write_text(_CORPUS_EMITTER_TEST
+                       .replace("@CBOR@", cbor_rs.as_posix())
+                       .replace("@GENERATED@", generated_rs.as_posix()))
+    bin_path = tmp_path / "corpus_emitter"
+    subprocess.run([rustc, "--edition", "2021", "--test", str(test_rs), "-o", str(bin_path)], check=True)
+    subprocess.run([str(bin_path)], check=True)
+
+
+def test_rust_corpus_emitter_is_fail_closed(tmp_path):
+    """The corpus emitter (`rust._emit`, behind `rust.emit` and glade's `generated.rs`)
+    generates the fail-closed codec: `roundtrip` returns a `Result`, every golden vector
+    round-trips byte for byte, and malformed input is a `DecodeError`, never a panic."""
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        pytest.skip("rustc not available")
+    griplab = load_schema(ROOT / "ir" / "griplab.taut.py")
+    golden = json.loads((ROOT / "corpus" / "griplab.golden.json").read_text())
+    generated = tmp_path / "generated.rs"
+    generated.write_text(rust._emit(griplab, golden))
+    _run_corpus_emitter(rustc, tmp_path, CBOR_RS, generated)
+
+
+def test_glade_build_writes_the_fail_closed_codec_and_runtime(tmp_path, monkeypatch):
+    """`glade_build` regenerates glade's wire-rs sources from the fail-closed path: its
+    `cbor.rs` is the fail-closed runtime and its `generated.rs` the corpus emitter's
+    fail-closed codec. Written into a scratch crate, since `glade_build.main()` writes into
+    glade itself."""
+    crate = tmp_path / "glade" / "wire-rs"
+    monkeypatch.setattr(glade_build, "GLADE_RS_DIR", crate / "src")
+    glade_schema = load_schema(glade_build.IR_PATH)
+    corpus = json.loads(glade_build.GOLDEN_PATH.read_text())
+    glade_build.emit_rust(glade_schema, corpus)
+    assert not crate.exists()   # no crate scaffolded: nothing to regenerate
+
+    crate.mkdir(parents=True)
+    glade_build.emit_rust(glade_schema, corpus)
+    src = crate / "src"
+    assert sorted(p.name for p in src.iterdir()) == ["cbor.rs", "generated.rs"]
+    assert (src / "cbor.rs").read_text() == CBOR_RS.read_text()
+    generated = (src / "generated.rs").read_text()
+    assert generated == rust._emit(glade_schema, corpus)
+    assert "use crate::cbor::{Cbor, DecodeError};" in generated
+    assert "pub fn from_wire(v: i64) -> Result<Self, DecodeError>" in generated
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        pytest.skip("rustc not available")
+    _run_corpus_emitter(rustc, tmp_path, src / "cbor.rs", src / "generated.rs")
+
+
+# =============================================================================
+# The gate.
+# =============================================================================
+
+def test_rust_passes_the_parity_gate():
+    """Every row of the shared corpus through the gate's Rust runner (`tautc parity -t rust`),
+    as rust and rust/fc, each held to the gate's governance: GREEN, or RED and allowlisted.
+    The runner reports each error's tag from the runtime's `DecodeError::tag()` (CD-E2)."""
+    assert "e.tag()" in parity_rust._MAIN
+    reports, violations = parity.governed_variants(parity_rust.run)
+    for report in reports:
+        if not report.available:
+            pytest.skip(report.skip_reason)
+    assert violations == [], "\n".join(violations)
+    # Only an encode-fail row may be satisfied by the type system; every other row ran.
+    for report in reports:
+        if not report.fault:
+            satisfied = {r.name for r in report.results if r.status == parity.TYPE_SATISFIED}
+            assert satisfied == {r["name"] for r in parity.int_rows() if r["kind"] == "encode_fail"}, \
+                report.target

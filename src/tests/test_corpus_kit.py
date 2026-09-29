@@ -58,6 +58,9 @@ def test_rust_harness_is_self_contained_and_covers_messages():
     # unwrapping the fallible decode (golden vectors must decode)
     for m in RAZEL.messages:
         assert f'"{m}" => crate::{m}::from_cbor(c).expect("corpus decode: {m}").to_cbor(),' in rs
+    # the raw decode is the runtime's fallible one: the panicking `decode` is gone
+    assert "crate::try_decode(&unhex(golden))" in rs
+    assert "crate::decode(" not in rs
 
 
 def test_golden_json_is_stable():
@@ -81,7 +84,7 @@ def test_generated_rust_corpus_compiles_and_passes_if_rustc(tmp_path):
     assert cli.main(["corpus", ir, "-o", str(corpus_dir), "-l", "rust"]) == 0
 
     # The crate shape vectors.rs documents: generated types plus
-    # `Cbor`/`encode`/`decode` re-exported at the crate root.
+    # `Cbor`/`encode`/`try_decode` re-exported at the crate root.
     lib_rs = tmp_path / "lib.rs"
     lib_rs.write_text(textwrap.dedent(f"""
         // The vendored runtime imports through `alloc::` paths; a std embedder
@@ -93,7 +96,7 @@ def test_generated_rust_corpus_compiles_and_passes_if_rustc(tmp_path):
         #[path = "{(gen_dir / 'rust' / 'api.rs').as_posix()}"]
         mod api;
         pub use api::*;
-        pub use cbor::{{Cbor, decode, encode}};
+        pub use cbor::{{Cbor, encode, try_decode}};
         #[path = "{(corpus_dir / 'rust' / 'vectors.rs').as_posix()}"]
         mod vectors;
     """))

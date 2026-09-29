@@ -28,7 +28,8 @@ _REPO = _TAUT.parent                       # glial-dev (glade/ is a sibling of t
 IR_PATH = _TAUT / "ir" / "glade.taut.py"
 GOLDEN_PATH = _TAUT / "corpus" / "glade.golden.json"
 IR_JSON_PATH = _TAUT / "corpus" / "glade.ir.json"
-RUNTIME_CBOR_RS = _TAUT / "src" / "taut" / "gen" / "runtime" / "cbor.rs"
+# The fail-closed runtime, Rust's only one; glade's crate gets it as `cbor.rs`.
+RUNTIME_CBOR_RS = _TAUT / "src" / "taut" / "gen" / "runtime" / "cbor_fail_closed.rs"
 GLADE_RS_DIR = _REPO / "glade" / "wire-rs" / "src"   # the rust glade-wire codec crate
 
 
@@ -114,8 +115,9 @@ def glade_values(schema: Schema) -> dict[str, tuple[str, dict]]:
 def emit_rust(schema: Schema, corpus: dict[str, dict]) -> None:
     """Emit the rust glade-wire codec crate sources (P0.S4): generated types +
     `roundtrip` dispatcher + VECTORS (via the shared rust generator), plus the
-    CBOR runtime. The crate's Cargo.toml + lib.rs (parity tests) are tracked by
-    hand; these two files are regenerated artifacts, like trial/rs."""
+    CBOR runtime, both fail-closed: decode returns `DecodeError`, never panics. The
+    crate's Cargo.toml + lib.rs (parity tests) are tracked by hand; these two files
+    are regenerated artifacts, like trial/rs."""
     if not GLADE_RS_DIR.parent.exists():
         return  # crate not scaffolded yet; nothing to regenerate
     GLADE_RS_DIR.mkdir(parents=True, exist_ok=True)

@@ -52,7 +52,7 @@ fn main() {
 def test_invalid_external_mapping_refuses(imports):
     _, consumer = objects()
     with pytest.raises(ValueError):
-        rust_api(consumer, fail_closed=True, external_types=imports)
+        rust_api(consumer, external_types=imports)
 
 
 def test_external_mapping_is_explicitly_rust_only(tmp_path):

@@ -100,24 +100,27 @@ fn decode_row(row: &Mal) -> Result<Vec<u8>, DecodeError> {
     }
 }
 
-/// An `err` detail: the tag, then `;field=value` for each payload field it carries.
-/// Exhaustive on purpose: a new variant fails the build until it is reported here.
+/// An `err` detail: the runtime's canonical tag (`DecodeError::tag`), then
+/// `;field=value` for each payload field it carries; a `DuplicateMapKey` key is its
+/// text (`MapKey`'s `Display`). Exhaustive on purpose: a new variant fails the build
+/// until its payload is reported here.
 fn describe(e: &DecodeError) -> String {
-    match e {
-        DecodeError::Truncated => "Truncated".to_string(),
-        DecodeError::TrailingBytes => "TrailingBytes".to_string(),
-        DecodeError::InvalidUtf8 => "InvalidUtf8".to_string(),
-        DecodeError::UnsupportedInfo(info) => format!("UnsupportedInfo;info={info}"),
-        DecodeError::UnsupportedMajor(major) => format!("UnsupportedMajor;major={major}"),
-        DecodeError::NonIntegerMapKey => "NonIntegerMapKey".to_string(),
-        DecodeError::DuplicateMapKey(key) => format!("DuplicateMapKey;key={key}"),
-        DecodeError::IntOverflow => "IntOverflow".to_string(),
-        DecodeError::NonCanonicalInt(value) => format!("NonCanonicalInt;value={value}"),
-        DecodeError::NegativeMapKey(key) => format!("NegativeMapKey;key={key}"),
-        DecodeError::MissingKey(key) => format!("MissingKey;key={key}"),
-        DecodeError::WrongType { expected } => format!("WrongType;expected={expected}"),
-        DecodeError::UnknownEnum { enum_name, value } => format!("UnknownEnum;enum={enum_name};value={value}"),
-    }
+    let payload = match e {
+        DecodeError::Truncated
+        | DecodeError::TrailingBytes
+        | DecodeError::InvalidUtf8
+        | DecodeError::NonIntegerMapKey
+        | DecodeError::IntOverflow => String::new(),
+        DecodeError::UnsupportedInfo(info) => format!(";info={info}"),
+        DecodeError::UnsupportedMajor(major) => format!(";major={major}"),
+        DecodeError::DuplicateMapKey(key) => format!(";key={key}"),
+        DecodeError::NonCanonicalInt(value) => format!(";value={value}"),
+        DecodeError::NegativeMapKey(key) => format!(";key={key}"),
+        DecodeError::MissingKey(key) => format!(";key={key}"),
+        DecodeError::WrongType { expected } => format!(";expected={expected}"),
+        DecodeError::UnknownEnum { enum_name, value } => format!(";enum={enum_name};value={value}"),
+    };
+    format!("{}{payload}", e.tag())
 }
 
 fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
@@ -223,7 +226,7 @@ def run(forward_compat: bool = False) -> parity.TargetReport:
         return parity.skipped(name, "rustc not found")
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        failed = parity.generate(name, work, runtime=True, fail_closed=True)
+        failed = parity.generate(name, work, runtime=True)
         if failed is not None:
             return failed
         runner = work / "parity_runner.rs"

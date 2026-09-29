@@ -4,18 +4,6 @@
   "_note": "An allowlisted target's harness STILL RUNS and REPORTS its observed failures (xfail-that-runs); it just doesn't fail CI. The inverse is enforced too: `tautc parity` FAILS if an allowlisted target passes fully (a green target must be de-listed) or a gated (non-allowlisted) target fails. An entry names a target or a `<target>/fc` variant (the target generated with forward-compat), each governed on its own. Reasons are populated from observed `tautc parity` results.",
   "targets": [
     {
-      "target": "rust",
-      "phase": "C2",
-      "owner": "codec-parity",
-      "reason": "map-str-key-duplicate, map-bool-key-duplicate: DuplicateMapKey(i64) cannot carry question 9's key as text, so the str key \"a\" is reported as its entry's index (key=1) and the bool key true as key=1, not `a` and `true`"
-    },
-    {
-      "target": "rust/fc",
-      "phase": "C2",
-      "owner": "codec-parity",
-      "reason": "map-str-key-duplicate, map-bool-key-duplicate: as rust, key=1 for both, not `a` and `true`; the forward-compat build keeps unknown fields and passes the unknown-field rows"
-    },
-    {
       "target": "cpp",
       "phase": "C2",
       "owner": "codec-parity",

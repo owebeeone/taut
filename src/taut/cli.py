@@ -54,24 +54,14 @@ def _cmd_gen(args: argparse.Namespace) -> int:
         services: list[str] | None = []
     else:
         services = _split(args.service)  # None => all services in the IR
-    # D1 (ratified): fail-closed is the DEFAULT codec since v0.8.0. `--legacy-codec`
-    # is the deprecated opt-out (removed at v0.10.0); `--fail-closed` is now a no-op.
-    fail_closed = not args.legacy_codec
-    if args.legacy_codec:
-        print("tautc gen: WARNING --legacy-codec emits the DEPRECATED fail-open Rust "
-              "codec (from_cbor -> Self; panics on malformed input). It is removed at "
-              "taut v0.10.0 — migrate by regenerating without --legacy-codec.",
-              file=sys.stderr)
+    # Fail-closed decode is Rust's only codec (the default since v0.8.0; v0.10.0 removed the
+    # legacy codec and its `--legacy-codec` opt-out). `--fail-closed` stays an accepted no-op.
     if args.fail_closed:
-        msg = ("tautc gen: note --fail-closed is now the default and a no-op "
-               "(fail-closed decode became the v0.8.0 default).")
-        if args.legacy_codec:
-            msg += " It conflicts with --legacy-codec, which wins (legacy codec emitted)."
-        print(msg, file=sys.stderr)
+        print("tautc gen: note --fail-closed is a no-op: fail-closed decode is the only Rust codec.",
+              file=sys.stderr)
     written = scaffold.emit(
         schema, Path(args.out), langs=_split(args.lang), services=services,
         runtime=args.with_runtime, forward_compat=args.forward_compat,
-        fail_closed=fail_closed,
         rust_external_types=(json.loads(Path(args.rust_external_types).read_text())
                              if args.rust_external_types else None),
     )
@@ -163,13 +153,9 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--forward-compat", action="store_true",
                    help="generated structs carry a wire_residual field preserving unknown/newer tags (Rust; required if the IR has extensions)")
     g.add_argument("--fail-closed", action="store_true",
-                   help="(deprecated no-op) fail-closed decode is the DEFAULT Rust codec since taut "
-                        "v0.8.0; this flag is accepted for back-compat but has no effect and will be removed.")
-    g.add_argument("--legacy-codec", action="store_true",
-                   help="(deprecated opt-out) emit the LEGACY fail-open Rust codec — today's pre-v0.8.0 "
-                        "output byte-for-byte (from_cbor -> Self; panics on malformed input; default cbor.rs). "
-                        "Warns on use and stamps a deprecation banner into the generated header. Sunset: "
-                        "removed at taut v0.10.0 (D1 two-minor rule). No-op for non-rust targets.")
+                   help="(no-op, accepted so existing build scripts still run) fail-closed decode is the "
+                        "only Rust codec: the default since taut v0.8.0, and v0.10.0 removed the legacy "
+                        "codec and its --legacy-codec opt-out.")
     g.set_defaults(func=_cmd_gen)
 
     c = sub.add_parser("corpus", help="derive a golden conformance corpus (+ parity harness) from an IR")

@@ -1,11 +1,16 @@
 """Generate Rust native types + codec from the IR — taut's text codegen for a
 compiled target (P5). Emits `trial/rs/src/generated.rs`:
 
-  - one Rust enum per IR enum (with wire()/from_wire())
-  - one Rust struct per IR message (with to_cbor()/from_cbor()); transient fields
-    are present in the struct but never on the wire (Default on decode)
+  - one Rust enum per IR enum (with wire() and a fallible from_wire())
+  - one Rust struct per IR message (with to_cbor() and a fallible from_cbor());
+    transient fields are present in the struct but never on the wire (Default on
+    decode)
   - a `roundtrip(message, bytes)` dispatcher
   - the golden corpus as `VECTORS: &[(name, message, hex)]`
+
+Decode is fail-closed everywhere: `from_wire`, `from_cbor` and `roundtrip` return
+`Result<_, DecodeError>` and never panic on input. The legacy (panicking) codec was
+removed at v0.10.0 (TautCheckedDecode.md question 5).
 
 Rust has no std JSON parser, so generating data/types beats pulling a crate — and
 native structs are exactly what a compiled target wants ahead of time.
@@ -30,18 +35,21 @@ def _variant(member: str) -> str:
     return "".join(p.capitalize() for p in member.split("_"))
 
 
-def _rust_type(t: TypeRef, fail_closed: bool = False) -> str:
+def _rust_type(t: TypeRef) -> str:
+    # `int` is `i64`, the frozen wire int subset; decode refuses a wider wire int as
+    # `IntOverflow` rather than wrap it. (A 128-bit int would be a new type, not a
+    # widening of `int`.)
     if isinstance(t, Scalar):
-        return {"int": _rust_int_type(fail_closed), "str": "String", "bytes": "Vec<u8>",
+        return {"int": "i64", "str": "String", "bytes": "Vec<u8>",
                 "bool": "bool", "float": "f64"}[t.kind]
     if isinstance(t, EnumRef):
         return t.name
     if isinstance(t, MsgRef):
         return t.name
     if isinstance(t, ListOf):
-        return f"Vec<{_rust_type(t.elem, fail_closed)}>"
+        return f"Vec<{_rust_type(t.elem)}>"
     if isinstance(t, MapOf):
-        return f"std::collections::BTreeMap<{_rust_type(t.key, fail_closed)}, {_rust_type(t.value, fail_closed)}>"
+        return f"std::collections::BTreeMap<{_rust_type(t.key)}, {_rust_type(t.value)}>"
     raise TypeError(t)
 
 
@@ -58,8 +66,8 @@ def _encode_ref(t: TypeRef, e: str) -> str:
     raise TypeError(t)
 
 
-def _field_type(f: FieldDef, fail_closed: bool = False) -> str:
-    base = _rust_type(f.type, fail_closed)
+def _field_type(f: FieldDef) -> str:
+    base = _rust_type(f.type)
     return f"Option<{base}>" if f.optional else base
 
 
@@ -91,32 +99,8 @@ def _encode_optional(t: TypeRef, expr: str) -> str:
     return _encode(t, expr)
 
 
-def _decode(t: TypeRef, expr: str) -> str:
-    if isinstance(t, Scalar):
-        return {
-            "int": f"{expr}.int()",
-            "str": f"{expr}.text()",
-            "bytes": f"{expr}.bytes()",
-            "bool": f"{expr}.boolean()",
-            "float": f"{expr}.float()",
-        }[t.kind]
-    if isinstance(t, EnumRef):
-        return f"{t.name}::from_wire({expr}.int())"
-    if isinstance(t, MsgRef):
-        return f"{t.name}::from_cbor({expr})"
-    if isinstance(t, ListOf):
-        return f"{expr}.array().iter().map(|x| {_decode(t.elem, 'x')}).collect()"
-    if isinstance(t, MapOf):
-        return (f"{expr}.array().iter().map(|e| "
-                f"({_decode(t.key, 'e.get(1)')}, {_decode(t.value, 'e.get(2)')})).collect()")
-    raise TypeError(t)
-
-
-# --- fail-closed (opt-in) decode ---------------------------------------------
-# Mirror of `_decode` that propagates a typed `DecodeError` with `?` instead of
-# panicking. Selected by the `fail_closed` flag (see `_emit_message`); the
-# default path above is left byte-for-byte unchanged so a consumer that
-# regenerates WITHOUT the flag gets today's output.
+# --- fail-closed decode -------------------------------------------------------
+# Every decode expression propagates a typed `DecodeError` with `?`; none panics.
 
 def _decode_try(t: TypeRef, expr: str) -> str:
     """A `?`-propagating decode expression against the fallible runtime API.
@@ -145,28 +129,27 @@ def _decode_try(t: TypeRef, expr: str) -> str:
     raise TypeError(t)
 
 
-# `DuplicateMapKey` carries an `i64`, so a repeated `map<K,V>` key is reported as
-# itself for an int key, as 0 or 1 for a bool key and, since no `i64` can carry a
-# str key, as the index of the repeated entry (`i` in `_decode_try_map`).
-_DUPLICATE_KEY_PAYLOAD = {"int": "k", "bool": "i64::from(k)", "str": "i as i64"}
+# The `map<K,V>` key kinds (validate allows no other). A repeated key is reported as
+# itself: the runtime's `MapKey` converts from each kind's Rust type (`k.into()`), and
+# its text is question 9's, an int in decimal, a str as itself, a bool as `true` or
+# `false` (TautCheckedDecode.md §8).
+_MAP_KEY_KINDS = frozenset({"int", "str", "bool"})
 
 
 def _decode_try_map(t: MapOf, expr: str) -> str:
     """A `map<K,V>` block expression: an array of `{1: key, 2: value}` entry maps
     (D24), read entry by entry in order (CD-E5). Each entry must be a map holding
     key 1 and then key 2 before either is decoded; then its key is decoded, a
-    repeated key is `DuplicateMapKey` (`_DUPLICATE_KEY_PAYLOAD`), and only then
-    its value is decoded. The block `return`s its error, from `from_cbor` or from
-    a list element's closure."""
+    repeated key is `DuplicateMapKey` with the key itself, and only then its value
+    is decoded. The block `return`s its error, from `from_cbor` or from a list
+    element's closure."""
     key = t.key
-    if not isinstance(key, Scalar) or key.kind not in _DUPLICATE_KEY_PAYLOAD:
+    if not isinstance(key, Scalar) or key.kind not in _MAP_KEY_KINDS:
         raise TypeError(t)   # validate allows only int, str and bool keys
-    entries = f"{expr}.try_array()?"
-    loop = f"for (i, e) in {entries}.iter().enumerate()" if key.kind == "str" else f"for e in {entries}"
     return ("{ let mut m = std::collections::BTreeMap::new(); "
-            f"{loop} {{ let ek = e.try_get(1)?; let ev = e.try_get(2)?; "
+            f"for e in {expr}.try_array()? {{ let ek = e.try_get(1)?; let ev = e.try_get(2)?; "
             f"let k = {_decode_try(key, 'ek')}; "
-            f"if m.contains_key(&k) {{ return Err(DecodeError::DuplicateMapKey({_DUPLICATE_KEY_PAYLOAD[key.kind]})); }} "
+            "if m.contains_key(&k) { return Err(DecodeError::DuplicateMapKey(k.into())); } "
             f"m.insert(k, {_decode_try(t.value, 'ev')}); }} m }}")
 
 
@@ -183,60 +166,38 @@ def _decode_try_elem(t: TypeRef, expr: str) -> str:
     return f"Ok({_decode_try(t, expr)})"
 
 
-def _rust_int_type(fail_closed: bool) -> str:
-    """Rust carrier for a taut `int` field: `i64` in both modes.
-
-    The frozen wire int subset is `i64` (`[-2^63, 2^63-1]`). The default path
-    truncates a wider CBOR int (`n as i64`); the fail-closed path keeps the same
-    `i64` carrier but rejects an out-of-`i64` wire int as a typed `DecodeError`
-    (never a silent wrap, a panic, or a wider carry) — so decode is fail-closed
-    without changing the value model. (If 128-bit is ever needed it will be a
-    distinct type, not a widening of `int`.)"""
-    return "i64"
-
-
-def _emit_enum(name: str, members: dict[str, int], fail_closed: bool = False) -> list[str]:
+def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     variants = [(_variant(m), v) for m, v in members.items()]
-    int_ty = _rust_int_type(fail_closed)
     out = ["#[derive(Clone, Copy, Debug, PartialEq, Default)]", f"pub enum {name} {{"]
     for i, (vn, _) in enumerate(variants):
         out.append(f"    {'#[default] ' if i == 0 else ''}{vn},")
     out.append("}")
     out.append(f"impl {name} {{")
-    out.append(f"    pub fn wire(self) -> {int_ty} {{ match self {{")
+    out.append("    pub fn wire(self) -> i64 { match self {")
     for vn, v in variants:
         out.append(f"        Self::{vn} => {v},")
     out.append("    } }")
-    if fail_closed:
-        # fail-closed: an unknown wire value is a typed error, never a panic.
-        out.append(f"    pub fn from_wire(v: {int_ty}) -> Result<Self, DecodeError> {{ Ok(match v {{")
-        for vn, v in variants:
-            out.append(f"        {v} => Self::{vn},")
-        out.append(f'        _ => return Err(DecodeError::UnknownEnum {{ enum_name: "{name}", value: v }}),')
-        out.append("    }) }")
-    else:
-        out.append(f"    pub fn from_wire(v: {int_ty}) -> Self {{ match v {{")
-        for vn, v in variants:
-            out.append(f"        {v} => Self::{vn},")
-        out.append(f'        _ => panic!("bad {name} wire value {{}}", v),')
-        out.append("    } }")
+    # An unknown wire value is a typed error, never a panic.
+    out.append("    pub fn from_wire(v: i64) -> Result<Self, DecodeError> { Ok(match v {")
+    for vn, v in variants:
+        out.append(f"        {v} => Self::{vn},")
+    out.append(f'        _ => return Err(DecodeError::UnknownEnum {{ enum_name: "{name}", value: v }}),')
+    out.append("    }) }")
     out.append("}")
     return out
 
 
-def _emit_message(msg, forward_compat: bool = False, fail_closed: bool = False) -> list[str]:
+def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     out = ["#[derive(Clone, Debug, PartialEq, Default)]", f"pub struct {msg.name} {{"]
     for f in msg.fields:
-        out.append(f"    pub {f.name}: {_field_type(f, fail_closed)},")
+        out.append(f"    pub {f.name}: {_field_type(f)},")
     if forward_compat:
-        # unknown/newer-version fields, preserved verbatim (empty when none).
-        # These are (map-key, value) pairs — map keys stay i64 in both modes
-        # (CBOR field tags; the value carrier is what widens under fail-closed).
+        # unknown/newer-version fields, preserved verbatim (empty when none):
+        # (map-key, value) pairs, the keys `i64` CBOR field tags.
         out.append("    pub wire_residual: Vec<(i64, Cbor)>,")
     out.append("}")
     out.append(f"impl {msg.name} {{")
-    # encoded (tag, expr) pairs for the known wire fields. Encode is identical in
-    # both modes (deterministic minimal CBOR) — only the field carrier widens.
+    # encoded (tag, expr) pairs for the known wire fields (deterministic minimal CBOR).
     pairs = []
     for f in msg.wire_fields():
         if f.optional:
@@ -259,44 +220,12 @@ def _emit_message(msg, forward_compat: bool = False, fail_closed: bool = False) 
             out.append(f"            ({tag}, {enc}),")
         out.append("        ])")
     out.append("    }")
-    # from_cbor — panicking (default) or `Result`-returning (fail-closed).
-    if fail_closed:
-        out += _from_cbor_fail_closed(msg, forward_compat)
-    else:
-        out += _from_cbor_default(msg, forward_compat)
+    out += _from_cbor(msg, forward_compat)
     out.append("}")
     return out
 
 
-def _from_cbor_default(msg, forward_compat: bool) -> list[str]:
-    """Today's infallible `from_cbor` (panics on malformed input). Unchanged."""
-    out = ["    pub fn from_cbor(c: &Cbor) -> Self {"]
-    if not msg.wire_fields():
-        out.append('        assert!(c.is_map(), "expected map");')
-    out.append("        Self {")
-    for f in msg.fields:
-        if f.transient:
-            dec = "Default::default()"
-        elif f.optional:
-            if f.optional == MISSING_OK:
-                dec = (f"{{ let v = c.get_opt({f.tag}); match v {{ None => None, Some(v) => "
-                       f"if v.is_null() {{ None }} else {{ Some({_decode(f.type, 'v')}) }} }} }}")
-            else:
-                dec = (f"{{ let v = c.get({f.tag}); "
-                       f"if v.is_null() {{ None }} else {{ Some({_decode(f.type, 'v')}) }} }}")
-        else:
-            dec = _decode(f.type, f"c.get({f.tag})")
-        out.append(f"            {f.name}: {dec},")
-    if forward_compat:
-        known = [str(f.tag) for f in msg.wire_fields()]
-        pred = f"!matches!(*t, {' | '.join(known)})" if known else "true"
-        out.append(f"            wire_residual: c.map_entries().iter()"
-                   f".filter(|(t, _)| {pred}).map(|(t, v)| (*t, v.clone())).collect(),")
-    out += ["        }", "    }"]
-    return out
-
-
-def _from_cbor_fail_closed(msg, forward_compat: bool) -> list[str]:
+def _from_cbor(msg, forward_compat: bool) -> list[str]:
     """Fail-closed `from_cbor`: returns `Result<Self, DecodeError>`, propagates
     a typed error with `?` on every missing key / wrong type / unknown enum
     arm / short field, and never panics on any input."""
@@ -330,7 +259,7 @@ def _emit(schema: Schema, golden: dict) -> str:
     lines = [
         "// GENERATED from taut/ir + corpus by taut/src/taut/gen/rust.py — do not edit.",
         "#![allow(dead_code)]",
-        "use crate::cbor::Cbor;",
+        "use crate::cbor::{Cbor, DecodeError};",
         "",
     ]
     for e in schema.enums.values():
@@ -338,16 +267,16 @@ def _emit(schema: Schema, golden: dict) -> str:
     for m in schema.messages.values():
         lines += _emit_message(m) + [""]
 
-    # roundtrip dispatcher: bytes -> typed struct -> bytes
-    lines.append("pub fn roundtrip(message: &str, bytes: &[u8]) -> Vec<u8> {")
-    lines.append("    let c = crate::cbor::decode(bytes);")
+    # roundtrip dispatcher: bytes -> typed struct -> bytes, fail-closed like the
+    # package codegen (scaffold.rust_api), whose message decoders it shares.
+    lines.append("/// `bytes` decoded as `message` and encoded again. Malformed input is a")
+    lines.append("/// `DecodeError`; a `message` the schema lacks is the caller's error and panics.")
+    lines.append("pub fn roundtrip(message: &str, bytes: &[u8]) -> Result<Vec<u8>, DecodeError> {")
+    lines.append("    let c = crate::cbor::try_decode(bytes)?;")
     lines.append("    match message {")
     for m in schema.messages.values():
-        # This corpus emitter uses the legacy infallible message decoder above;
-        # fail-closed package codegen is owned by scaffold.rust_api/emit.
         lines.append(
-            f'        "{m.name}" => crate::cbor::encode('
-            f'&{m.name}::from_cbor(&c).to_cbor()),'
+            f'        "{m.name}" => {m.name}::from_cbor(&c).map(|v| crate::cbor::encode(&v.to_cbor())),'
         )
     lines.append('        _ => panic!("unknown message {}", message),')
     lines.append("    }")
