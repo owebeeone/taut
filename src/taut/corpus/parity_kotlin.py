@@ -4,7 +4,8 @@ kotlinc is slow, so the gate compiles once: the generated `api.kt`, the vendored
 runtime (`cbor.kt`, `ext.kt`) and the runner go into one jar, which java runs. Both
 tools come from `toolchains.find_kotlin_tools` (on a Mac, Android Studio's). A
 decoded malformed row reports the hex of its re-encoding: `encode` of the tree for
-a raw row, of the typed value's `toCbor()` for a from_cbor row.
+a raw row, of the typed value's `toCbor()` for a from_cbor row. The report is UTF-8,
+so a payload's text (a str map key's, question 9) arrives as itself on any platform.
 """
 
 from __future__ import annotations
@@ -134,6 +135,9 @@ private fun roundTrip(row: IntRow): String? {
 }
 
 fun main() {
+    // A payload is compared as text, a str map key's among them: report in UTF-8, whatever
+    // the platform's default.
+    System.setOut(java.io.PrintStream(java.io.FileOutputStream(java.io.FileDescriptor.out), true, "UTF-8"))
     for (row in ROUND_TRIP) {
         try {
             val failure = roundTrip(row)

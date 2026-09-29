@@ -1,6 +1,8 @@
 """Kotlin generator: mutable `data class`es + `enum class`es + CBOR codec, with
 forward-compat residual. (kotlinc compile/run parity verified out-of-band.)"""
 
+import copy
+import functools
 import json
 import os
 import random
@@ -12,12 +14,13 @@ import pytest
 
 from taut import ext
 from taut.corpus.build import IR_PATH
-from taut.corpus import parity_kotlin
+from taut.corpus import parity, parity_kotlin
 from taut.corpus import resext_build as rb
 from taut.gen import kotlin
 from taut.gen import scaffold
 from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, extension, schema as mk
 from taut.ir.load import load_schema
+from taut.ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec
 
@@ -29,6 +32,22 @@ ANDROID_STUDIO_KOTLINC = Path(
 )
 RESEXT_TAG = BAND_START + 1
 RESEXT_FUZZ_SEED = 0x5EED55_04
+INT_MIN, INT_MAX = -(1 << 63), (1 << 63) - 1
+# The messages with no wire field, which forward-compat must still build: none at all, and
+# only a transient one. The resext harness round-trips them from BARE_WIRES.
+BARE = mk(Msg("Bare"), Msg("Cache", F("hits", 1, INT, transient=True)))
+BARE_WIRES = ["a0", "a10100", "a2010002f6", "a11a0010000182f4f5", "01", "80"]
+# The hosts the extension helpers read beyond the resext corpus: every kind of item that is
+# not a map, malformed input, and (with BAD_HOST_SEED) random and mutated hosts.
+BAD_HOST_SEED = 0xBAD_4057
+NON_MAP_HOSTS = ["01", "20", "40", "6161", "80", "8101", "f4", "f5", "f6", "f93c00", "fb3ff0000000000000"]
+MALFORMED_HOSTS = ["", "ff", "a1", "a101", "a10100ff", "1c", "c0", "a2010001", "a1617800", "a120",
+                   "a1190001", "a11a00100001", "a11a0010000161ff"]
+BAD_HOST_DECISION = {"backend": "b7", "hops": 1}
+# Maps a host may be: empty, without the extension, and holding at RESEXT_TAG a Decision that is
+# incomplete, of the wrong type, or carrying a field its schema lacks.
+ODD_HOSTS = [{}, {1: 1}, {RESEXT_TAG: {1: "b7"}}, {RESEXT_TAG: 5}, {RESEXT_TAG: {1: 5, 2: 1}},
+             {2: "x", RESEXT_TAG: {1: "b7", 2: 1, 3: "x"}}]
 # optional=MISSING_OK reads an absent key as null; optional=True still refuses it.
 LATE = mk(
     Msg("Late", F("note", 1, STR, optional=MISSING_OK)),
@@ -228,7 +247,49 @@ def _fuzz_table_source(rows):
     return "listOf(\n" + ",\n".join(f'"""{chunk}"""' for chunk in chunks) + '\n).joinToString("\\n")'
 
 
-def _kotlin_resext_harness_source(residual_rows, ext_rows, fuzz_rows):
+def _python_ext(op, host):
+    """What ext.py, the reference, makes of `op` at RESEXT_TAG on `host`: `ok <hex>` (for get,
+    the extension's own encoding), `null` (get, none there) or `err <Tag;payload...>`."""
+    try:
+        if op == "set":
+            return "ok " + ext.ext_set(RESEXT, host, "Decision", RESEXT_TAG, BAD_HOST_DECISION).hex()
+        if op == "get":
+            got = ext.ext_get(RESEXT, host, "Decision", RESEXT_TAG)
+            return "null" if got is None else "ok " + codec.encode(RESEXT, "Decision", got).hex()
+        return "ok " + ext.ext_clear(host, RESEXT_TAG).hex()
+    except cbor.DecodeError as exc:
+        return "err " + parity.format_error(exc.tag, exc.payload)
+
+
+@functools.cache
+def _bad_host_rows(count=60, seed=BAD_HOST_SEED):
+    """(op, host hex, what ext.py makes of it) for each op on NON_MAP_HOSTS, MALFORMED_HOSTS,
+    ODD_HOSTS, `count` random byte strings and `count` mutations of strapped hosts. Kept shallow:
+    Kotlin reads a host at the depth ceiling only once D1 lands."""
+    rng = random.Random(seed)
+    hosts = [bytes.fromhex(h) for h in NON_MAP_HOSTS + MALFORMED_HOSTS] + [cbor.dumps(h) for h in ODD_HOSTS]
+    hosts += [bytes(rng.randrange(256) for _ in range(rng.randrange(1, 12))) for _ in range(count)]
+    strapped = [bytes.fromhex(row[2]) for row in _resext_fuzz_rows(count=8, seed=seed)]
+    for i in range(count):
+        mutate = _mutate_tree if i % 2 else _mutate_bytes
+        hosts.append(mutate(rng.choice(strapped), rng))
+    return tuple((op, host.hex(), _python_ext(op, host)) for host in hosts for op in ("set", "get", "clear"))
+
+
+def _bare_rows():
+    """(message, wire, what codec.py makes of it: `ok <re-encoding>` or `err ...`) for BARE."""
+    rows = []
+    for message in BARE.messages:
+        for wire in BARE_WIRES:
+            try:
+                again = codec.encode(BARE, message, codec.decode(BARE, message, bytes.fromhex(wire)))
+                rows.append((message, wire, "ok " + again.hex()))
+            except cbor.DecodeError as exc:
+                rows.append((message, wire, "err " + parity.format_error(exc.tag, exc.payload)))
+    return rows
+
+
+def _kotlin_resext_harness_source(residual_rows, ext_rows, fuzz_rows, bad_host_rows, bare_rows):
     residual_src = ",\n".join(
         f"    ResidualRow({_kt_string(r['note'])}, {_kt_string(r['wire'])})"
         for r in residual_rows
@@ -239,7 +300,9 @@ def _kotlin_resext_harness_source(residual_rows, ext_rows, fuzz_rows):
         f"{r['tag']}L, {_kt_nullable_string(r.get('value'))}, {_kt_string(r['expect'])})"
         for r in ext_rows
     )
+    bare_src = ",\n".join(f"    BareRow({', '.join(_kt_string(v) for v in row)})" for row in bare_rows)
     fuzz_src = _fuzz_table_source(fuzz_rows)
+    bad_host_src = _fuzz_table_source(bad_host_rows)
     return f"""package taut
 
 data class ResidualRow(val note: String, val wire: String)
@@ -252,6 +315,8 @@ data class ExtRow(
     val expect: String,
 )
 data class FuzzRow(val host: String, val value: String, val setExpect: String, val clearExpect: String)
+data class BadHostRow(val op: String, val host: String, val expect: String)
+data class BareRow(val message: String, val wire: String, val expect: String)
 
 private val residualRows = listOf(
 {residual_src}
@@ -261,11 +326,19 @@ private val extRows = listOf(
 {ext_src}
 )
 
+private val bareRows = listOf(
+{bare_src}
+)
+
 private val fuzzRowsText = {fuzz_src}
+
+private val badHostRowsText = {bad_host_src}
 
 private val hexChars = "0123456789abcdef".toCharArray()
 private const val EXT_TAG: Long = {RESEXT_TAG}L
+private const val BAND: Long = {BAND_START}L
 private const val FUZZ_SEED: Long = {RESEXT_FUZZ_SEED}L
+private val BAD_HOST_DECISION = Decision({_kt_string(BAD_HOST_DECISION["backend"])}, {BAD_HOST_DECISION["hops"]}L)
 
 private fun hexToBytes(hex: String): ByteArray {{
     val out = ByteArray(hex.length / 2)
@@ -288,7 +361,9 @@ private fun ByteArray.hex(): String {{
 }}
 
 private fun mismatch(label: String, got: String, want: String): Int {{
-    if (got == want) return 0
+    if (got == want) {{
+        return 0
+    }}
     println(label + ": got " + got + " want " + want)
     return 1
 }}
@@ -298,6 +373,94 @@ private fun parsedFuzzRows(): List<FuzzRow> =
         val parts = it.split('\\t')
         FuzzRow(parts[0], parts[1], parts[2], parts[3])
     }}.toList()
+
+private fun parsedBadHostRows(): List<BadHostRow> =
+    badHostRowsText.lineSequence().filter {{ it.isNotBlank() }}.map {{
+        val parts = it.split('\\t')
+        BadHostRow(parts[0], parts[1], parts[2])
+    }}.toList()
+
+// A DecodeError as the parity gate's `err` detail: its tag, then each payload field it carries.
+private fun describe(e: DecodeError): String = when (e) {{
+    is DecodeError.UnsupportedInfo -> "UnsupportedInfo;info=" + e.info
+    is DecodeError.UnsupportedMajor -> "UnsupportedMajor;major=" + e.major
+    is DecodeError.IntOverflow -> "IntOverflow;value=" + e.value
+    is DecodeError.DuplicateMapKey -> "DuplicateMapKey;key=" + e.key
+    is DecodeError.MissingKey -> "MissingKey;key=" + e.key
+    is DecodeError.WrongType -> "WrongType;expected=" + e.expected
+    is DecodeError.UnknownEnum -> "UnknownEnum;enum=" + e.enumName + ";value=" + e.value
+    is DecodeError.NonCanonicalInt -> "NonCanonicalInt;value=" + e.value
+    is DecodeError.NegativeMapKey -> "NegativeMapKey;key=" + e.key
+    else -> e.javaClass.simpleName
+}}
+
+// What an extension helper makes of `op` at `tag` on `host`: a value or a DecodeError (CD-E4).
+// Anything else escaping is `untyped`, which no row expects.
+private fun extOutcome(op: String, host: ByteArray, tag: Long): String {{
+    try {{
+        return when (op) {{
+            "set" -> {{
+                "ok " + extSet(host, tag, BAD_HOST_DECISION.toCbor()).hex()
+            }}
+            "get" -> {{
+                val got = extGet(host, tag)
+                if (got == null) {{
+                    "null"
+                }} else {{
+                    "ok " + encode(Decision.fromCbor(got).toCbor()).hex()
+                }}
+            }}
+            else -> {{
+                "ok " + extClear(host, tag).hex()
+            }}
+        }}
+    }} catch (e: DecodeError) {{
+        return "err " + describe(e)
+    }} catch (e: Throwable) {{
+        return "untyped " + e.javaClass.name + ": " + e.message
+    }}
+}}
+
+// A tag below the band is the caller's error, IllegalArgumentException, found before the host
+// is read: this host is not even CBOR.
+private fun refusesBelowBand(op: String, tag: Long): Boolean {{
+    val host = hexToBytes("ff")
+    try {{
+        when (op) {{
+            "set" -> {{
+                extSet(host, tag, BAD_HOST_DECISION.toCbor())
+            }}
+            "get" -> {{
+                extGet(host, tag)
+            }}
+            else -> {{
+                extClear(host, tag)
+            }}
+        }}
+    }} catch (e: IllegalArgumentException) {{
+        return e.message.orEmpty().contains("below the band")
+    }} catch (e: DecodeError) {{
+        return false
+    }}
+    return false
+}}
+
+// A message with no wire field, generated with forward-compat: its re-encoding, or the error.
+private fun bareOutcome(message: String, wire: ByteArray): String {{
+    try {{
+        val c = decode(wire)
+        return when (message) {{
+            "Bare" -> {{
+                "ok " + encode(Bare.fromCbor(c).toCbor()).hex()
+            }}
+            else -> {{
+                "ok " + encode(Cache.fromCbor(c).toCbor()).hex()
+            }}
+        }}
+    }} catch (e: DecodeError) {{
+        return "err " + describe(e)
+    }}
+}}
 
 fun main() {{
     var corpusMismatches = 0
@@ -334,22 +497,30 @@ fun main() {{
     }}
 
     var invalidCases = 0
-    try {{
-        extGet(hexToBytes("ff"), 5L)
-        println("below-band tag did not throw")
-        corpusMismatches += 1
-    }} catch (e: IllegalArgumentException) {{
-        check(e.message!!.contains("below the band"))
-        invalidCases += 1
+    for (op in listOf("set", "get", "clear")) {{
+        for (tag in longArrayOf(0L, BAND - 1L, -1L, Long.MIN_VALUE)) {{
+            if (refusesBelowBand(op, tag)) {{
+                invalidCases += 1
+            }} else {{
+                println("ext " + op + ": below-band tag " + tag + " was not refused")
+                corpusMismatches += 1
+            }}
+        }}
     }}
-    try {{
-        val decision = Decision("b7", 1L)
-        extSet(hexToBytes("01"), EXT_TAG, decision.toCbor())
-        println("non-map host did not throw")
-        corpusMismatches += 1
-    }} catch (e: IllegalArgumentException) {{
-        check(e.message!!.contains("top-level CBOR map"))
-        invalidCases += 1
+    val atBand = extOutcome("clear", hexToBytes("a0"), BAND)
+    corpusMismatches += mismatch("ext clear at the band's first tag", atBand, "ok a0")
+
+    var badHostMismatches = 0
+    val badHostRows = parsedBadHostRows()
+    for (row in badHostRows) {{
+        val got = extOutcome(row.op, hexToBytes(row.host), EXT_TAG)
+        badHostMismatches += mismatch("bad host " + row.op + " " + row.host, got, row.expect)
+    }}
+
+    var bareMismatches = 0
+    for (row in bareRows) {{
+        val got = bareOutcome(row.message, hexToBytes(row.wire))
+        bareMismatches += mismatch("bare " + row.message + " " + row.wire, got, row.expect)
     }}
 
     var fuzzMismatches = 0
@@ -375,11 +546,16 @@ fun main() {{
 
     println("kotlin resext corpus_mismatches=" + corpusMismatches +
         " invalid_cases=" + invalidCases +
+        " bad_host_rows=" + badHostRows.size +
+        " bad_host_mismatches=" + badHostMismatches +
+        " bare_mismatches=" + bareMismatches +
         " fuzz_seed=" + FUZZ_SEED +
         " fuzz_rows=" + fuzzRows.size +
         " fuzz_mismatches=" + fuzzMismatches)
     check(corpusMismatches == 0) {{ "corpus mismatches=" + corpusMismatches }}
-    check(invalidCases == 2) {{ "invalid cases=" + invalidCases }}
+    check(invalidCases == 12) {{ "invalid cases=" + invalidCases }}
+    check(badHostMismatches == 0) {{ "bad host mismatches=" + badHostMismatches }}
+    check(bareMismatches == 0) {{ "bare mismatches=" + bareMismatches }}
     check(fuzzRows.size >= 1000) {{ "fuzz rows=" + fuzzRows.size }}
     check(fuzzMismatches == 0) {{ "fuzz mismatches=" + fuzzMismatches + " seed=" + FUZZ_SEED }}
 }}
@@ -406,6 +582,22 @@ def test_forward_compat_adds_residual():
     assert "var wireResidual: List<Pair<Long, Cbor>>" in s
     assert "+ wireResidual" in s                            # re-emitted (encode sorts)
     assert "wireResidual" not in kotlin.emit_types(RAZEL)   # off by default
+
+
+def test_forward_compat_types_its_lists_so_a_message_without_wire_fields_builds():
+    """kotlinc cannot infer T for an empty `listOf()` that nothing types, which a message with
+    no wire field (BARE: none at all, or only a transient one) emitted under forward-compat, in
+    toCbor's known entries and fromCbor's known tags. Both lists name their type; the
+    resext harness compiles BARE so, and the gate's kotlin/fc variant the fixture's Empty."""
+    fc = kotlin.emit_types(mk(Msg("Bare"), Msg("Cache", F("hits", 1, INT, transient=True)),
+                              Msg("One", F("n", 1, INT))), forward_compat=True)
+    assert fc.count("return Cbor.map(listOf<Pair<Long, Cbor>>() + wireResidual)") == 2
+    assert fc.count("wireResidual = c.mapEntries.filter { it.first !in listOf<Long>() },") == 2
+    assert "return Cbor.map(listOf<Pair<Long, Cbor>>(1L to Cbor.int(n)) + wireResidual)" in fc
+    assert "wireResidual = c.mapEntries.filter { it.first !in listOf<Long>(1L) }," in fc
+    assert "listOf()" not in fc
+    plain = kotlin.emit_types(BARE)                  # Cbor.map's parameter types the list
+    assert plain.count("return Cbor.map(listOf())") == 2 and "listOf<" not in plain
 
 
 def test_kotlin_extensions_require_forward_compat(tmp_path):
@@ -472,27 +664,35 @@ def test_kotlin_float_parity_harness_if_kotlinc(tmp_path):
 
 def test_kotlin_passes_the_parity_gate():
     """The shared corpus, lead rows included, through `tautc parity`'s Kotlin runner
-    (`taut.corpus.parity_kotlin`: one kotlinc build). A missing toolchain skips."""
-    report = parity_kotlin.run()
-    if not report.available:
-        pytest.skip(report.skip_reason)
-    assert not report.fault, report.fault
-    assert [(r.name, r.detail) for r in report.failures] == []
-    assert report.green
+    (`taut.corpus.parity_kotlin`: one kotlinc build each), as kotlin and kotlin/fc, each held
+    to the gate's governance: GREEN, or RED and allowlisted. A missing toolchain skips."""
+    reports, violations = parity.governed_variants(parity_kotlin.run)
+    for report in reports:
+        if not report.available:
+            pytest.skip(report.skip_reason)
+    assert violations == [], "\n".join(violations)
+    encode_fail = {r["name"] for r in parity.int_rows() if r["kind"] == "encode_fail"}
+    for report in reports:
+        if not report.fault:  # only an encode-fail row is satisfied by the type system (Long)
+            assert {r.name for r in report.results if r.status == parity.TYPE_SATISFIED} == encode_fail
 
 
 def test_kotlin_resext_corpus_and_fuzz_harness_if_kotlinc(tmp_path):
     kotlinc = _find_kotlinc()
     java = _find_java(kotlinc)
     api = tmp_path / "api.kt"
+    bare = tmp_path / "bare.kt"
     harness = tmp_path / "resext_harness.kt"
     jar = tmp_path / "kotlin-resext-parity.jar"
 
     residual_rows = json.loads(rb.RESIDUAL_PATH.read_text())
     ext_rows = json.loads(rb.EXT_PATH.read_text())
     fuzz_rows = _resext_fuzz_rows()
+    bad_host_rows = _bad_host_rows()
     api.write_text(kotlin.emit_types(RESEXT, forward_compat=True))
-    harness.write_text(_kotlin_resext_harness_source(residual_rows, ext_rows, fuzz_rows))
+    bare.write_text(kotlin.emit_types(BARE, forward_compat=True))
+    harness.write_text(_kotlin_resext_harness_source(residual_rows, ext_rows, fuzz_rows, bad_host_rows,
+                                                     _bare_rows()))
 
     subprocess.run(
         [
@@ -500,6 +700,7 @@ def test_kotlin_resext_corpus_and_fuzz_harness_if_kotlinc(tmp_path):
             str(ROOT / "src/taut/gen/runtime/cbor.kt"),
             str(ROOT / "src/taut/gen/runtime/ext.kt"),
             str(api),
+            str(bare),
             str(harness),
             "-include-runtime",
             "-d",
@@ -520,10 +721,44 @@ def test_kotlin_resext_corpus_and_fuzz_harness_if_kotlinc(tmp_path):
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "corpus_mismatches=0" in result.stdout
-    assert "invalid_cases=2" in result.stdout
+    assert "invalid_cases=12" in result.stdout      # each op refuses four below-band tags
+    assert f"bad_host_rows={len(bad_host_rows)} bad_host_mismatches=0" in result.stdout
+    assert "bare_mismatches=0" in result.stdout
     assert f"fuzz_seed={RESEXT_FUZZ_SEED}" in result.stdout
     assert "fuzz_rows=1000" in result.stdout
     assert "fuzz_mismatches=0" in result.stdout
+
+
+def test_the_bad_hosts_state_what_ext_py_the_reference_does():
+    """CD-E4 in the reference: a host that is not a map is WrongType{map} for every op, a
+    malformed one its DecodeError, and the rows the Kotlin harness replays hold every outcome."""
+    rows = _bad_host_rows()
+    by_host = {}
+    for op, host, outcome in rows:
+        by_host.setdefault(host, {})[op] = outcome
+    for host in NON_MAP_HOSTS:
+        assert by_host[host] == dict.fromkeys(("set", "get", "clear"), "err WrongType;expected=map")
+    assert {host: by_host[host]["get"] for host in MALFORMED_HOSTS} == {
+        "": "err Truncated",
+        "ff": "err UnsupportedInfo;info=31",
+        "a1": "err Truncated",
+        "a101": "err Truncated",
+        "a10100ff": "err TrailingBytes",
+        "1c": "err UnsupportedInfo;info=28",
+        "c0": "err UnsupportedMajor;major=6",
+        "a2010001": "err DuplicateMapKey;key=1",
+        "a1617800": "err NonIntegerMapKey",
+        "a120": "err NegativeMapKey;key=-1",
+        "a1190001": "err NonCanonicalInt;value=1",
+        "a11a00100001": "err Truncated",
+        "a11a0010000161ff": "err InvalidUtf8",
+    }
+    assert [by_host[cbor.dumps(h).hex()]["get"] for h in ODD_HOSTS] == [
+        "null", "null", "err MissingKey;key=2", "err WrongType;expected=map", "err WrongType;expected=text",
+        "ok a3016262370201036178"]
+    kinds = {outcome.split(";")[0] if outcome.startswith("err ") else outcome.split(" ")[0]
+             for _, _, outcome in rows}
+    assert {"ok", "null", "err WrongType", "err MissingKey", "err Truncated", "err InvalidUtf8"} <= kinds
 
 
 def test_a_message_without_wire_fields_still_requires_a_map():
@@ -684,3 +919,233 @@ def test_kotlin_sorts_str_map_keys_by_code_point_if_kotlinc(tmp_path):
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert result.stdout.strip() == codec.encode(KEYED, "Keyed", KEYED_VALUE).hex()
+
+
+# --- beyond the corpus: question 9's key text and fail-closed decode (CD-E4) ---------------
+
+# Question 9 (TautCheckedDecode.md §8): a repeated key's payload is the key as text, an int in
+# decimal, a str as itself and a bool as `true` or `false`. A raw map's keys, (key, text), and
+# a repeated key in each map<K,V> field of the fixture, (message, field tag, key, text).
+Q9_RAW = [(0, "0"), (23, "23"), (24, "24"), (1 << 53, "9007199254740992"), (INT_MAX, str(INT_MAX))]
+Q9_FIELDS = [
+    ("IntBox", 2, -1, "-1"),                        # map<int, int>
+    ("IntBox", 2, INT_MIN, str(INT_MIN)),
+    ("Names", 27, INT_MAX, str(INT_MAX)),
+    ("Shapes", 16, -300, "-300"),                   # map<int, EnumBox>
+    ("Shapes", 14, "", ""),                         # map<str, int>
+    ("Shapes", 14, "a b", "a b"),
+    ("Shapes", 14, "naïve", "naïve"),
+    ("Shapes", 14, "\U0001f600", "\U0001f600"),
+    ("Shapes", 18, "true", "true"),                 # an optional map<str, int>
+    ("Names", 9, "5", "5"),
+    ("Shapes", 15, False, "false"),                 # map<bool, Mode>
+    ("Shapes", 15, True, "true"),
+]
+# Raw inputs at CD-E5's edges; Python, the reference, states what each is.
+RAW_EDGES = [
+    "", "17", "1817", "1818", "1900ff", "190100", "1a0000ffff", "1a00010000", "1b00000000ffffffff",
+    "1b0000000100000000", "3817", "5800", "780161", "9800", "b800", "a1180000", "7b0000000000000001",
+    "1900", "7b0020000000000000", "5b7fffffffffffffff", "7b8000000000000000", "9b7fffffffffffffff",
+    "bb8000000000000000", "fa3f800000", "fb3ff0000000000000", "fa7fc00001", "f97c01", "f98000", "f93c",
+    "f7", "f800", "e0", "ff", "9f", "3c", "d8", "df", "c1", "a1f500", "a2000000", "a2010002",
+    "a20100010002", "a13b7fffffffffffffff00", "a11b7fffffffffffffff00", "a11b800000000000000000",
+    "3bffffffffffffffff", "8261ff00", "63eda080", "62c328", "61c0", "64f4908080", "62c3a9",
+    "64f0908080", "63efbfbf", "82a0a0", "00ff",
+]
+# An enum's wire value that is not a member, or not an int.
+ENUM_EDGES = ["02", "20", "1b7fffffffffffffff", "3b7fffffffffffffff", "6161", "f5", "f6", "80", "a0",
+              "fa3f800000", "1817"]
+BEYOND_SEED = 0xB3_70_4D
+_SAMPLES = {
+    "int": [0, 1, -1, 23, 24, -25, 256, 1 << 40, INT_MIN, INT_MAX],
+    "str": ["", "a", "b", "naïve", "\uffff", "\U00010000"],
+    "bytes": [b"", b"\x00", b"\xff\x00"],
+    "bool": [False, True],
+    "float": [0.0, -0.0, 1.5, 0.1, -2.25, 1e300, float("inf"), float("nan")],
+}
+# What a tree mutation puts in a node's place: each CBOR kind, and maps shaped like a message,
+# a map<K,V> entry or two entries with one key.
+_REPLACEMENTS = [0, 7, -1, "x", b"", True, None, 1.5, [], {}, [0], ["x"], [{}], [[None]], [{1: 0}],
+                 {1: 0}, {1: "x", 2: 0}, [{1: 0, 2: 0}, {1: 0, 2: 1}]]
+
+
+def _native(schema, t, rng):
+    """A random native value of type `t`, as `taut.wire.codec` takes one."""
+    if isinstance(t, Scalar):
+        return rng.choice(_SAMPLES[t.kind])
+    if isinstance(t, EnumRef):
+        return rng.choice(list(schema.enums[t.name].members))
+    if isinstance(t, MsgRef):
+        return {f.name: None if f.optional and rng.randrange(3) == 0 else _native(schema, f.type, rng)
+                for f in schema.messages[t.name].wire_fields()}
+    if isinstance(t, ListOf):
+        return [_native(schema, t.elem, rng) for _ in range(rng.randrange(3))]
+    assert isinstance(t, MapOf)
+    return {_native(schema, t.key, rng): _native(schema, t.value, rng) for _ in range(rng.randrange(3))}
+
+
+def _nodes(node, parent=None, key=None):
+    """`(parent, key, node)` for every node of a decoded CBOR tree; the root's parent is None."""
+    yield parent, key, node
+    children = enumerate(node) if isinstance(node, list) else node.items() if isinstance(node, dict) else ()
+    for child_key, child in list(children):
+        yield from _nodes(child, node, child_key)
+
+
+def _mutate_tree(data, rng):
+    """`data` with one node of its tree replaced, or a key dropped from or added to a map, or an
+    item repeated in or swapped within an array: canonical CBOR a schema may refuse."""
+    tree = cbor.loads(data)
+    parent, key, node = rng.choice(list(_nodes(tree)))
+    move = rng.randrange(5)
+    if move == 1 and isinstance(node, dict) and node:
+        del node[rng.choice(list(node))]
+    elif move == 2 and isinstance(node, dict):
+        node[rng.choice([0, 3, 99, BAND_START, INT_MAX])] = copy.deepcopy(rng.choice(_REPLACEMENTS))
+    elif move == 3 and isinstance(node, list) and node:
+        node.insert(rng.randrange(len(node) + 1), copy.deepcopy(rng.choice(node)))
+    elif move == 4 and isinstance(node, list) and len(node) > 1:
+        i, j = rng.sample(range(len(node)), 2)
+        node[i], node[j] = node[j], node[i]
+    elif parent is None:
+        tree = copy.deepcopy(rng.choice(_REPLACEMENTS))
+    else:
+        parent[key] = copy.deepcopy(rng.choice(_REPLACEMENTS))
+    return cbor.dumps(tree)
+
+
+def _mutate_bytes(data, rng):
+    """`data` truncated, or with one byte changed, inserted, deleted or appended."""
+    out = bytearray(data)
+    move = rng.randrange(5)
+    if move == 0:
+        return bytes(out[:rng.randrange(len(out))])
+    at = rng.randrange(len(out))
+    if move == 1:
+        out[at] = rng.randrange(256)
+    elif move == 2:
+        out.insert(at, rng.randrange(256))
+    elif move == 3:
+        del out[at]
+    else:
+        out.append(rng.randrange(256))
+    return bytes(out)
+
+
+def _drop_unknown(schema, t, value):
+    """A decoded `value` without the unknown fields, at any depth, that a codec generated
+    without forward-compat drops."""
+    if isinstance(t, MsgRef):
+        return {f.name: None if value[f.name] is None else _drop_unknown(schema, f.type, value[f.name])
+                for f in schema.messages[t.name].wire_fields()}
+    if isinstance(t, ListOf):
+        return [_drop_unknown(schema, t.elem, v) for v in value]
+    if isinstance(t, MapOf):
+        return {k: _drop_unknown(schema, t.value, v) for k, v in value.items()}
+    return value
+
+
+def _beyond_row(fixture, name, stage, schema_name, data):
+    """A malformed row expecting what Python, the reference, observes (`expect_dropping` when a
+    codec that drops unknown fields re-encodes it otherwise); None for a bound's tag, whose rows
+    are D1's, and for an accepted enum, which the gate never expects."""
+    row = {"name": name, "stage": stage, "schema": schema_name, "bytes": data.hex()}
+    outcome, detail = parity._observe_python(fixture, row)
+    assert outcome in (parity.OK, parity.ERR), (name, detail)
+    if outcome == parity.ERR:
+        tag, payload = parity.parse_error(detail)
+        if tag in ("TooDeep", "TooLarge"):
+            return None
+        return {**row, "expect": {"tag": tag, **payload}}
+    if stage == "from_wire":
+        return None
+    row["expect"] = {"accept": True, "reencode": detail}
+    if stage == "from_cbor":
+        kept = codec.decode(fixture, schema_name, data)
+        dropped = codec.encode(fixture, schema_name, _drop_unknown(fixture, MsgRef(schema_name), kept)).hex()
+        if dropped != detail:
+            row["expect_dropping"] = {"accept": True, "reencode": dropped}
+    return row
+
+
+def _with_repeated_key(fixture, message, tag, key, rng):
+    """A `message` whose map field `tag` holds two entries with the key `key`."""
+    field = next(f for f in fixture.messages[message].wire_fields() if f.tag == tag)
+    value = _native(fixture, MsgRef(message), rng)
+    value[field.name] = {key: _native(fixture, field.type.value, rng)}
+    tree = cbor.loads(codec.encode(fixture, message, value))
+    tree[tag].append(dict(tree[tag][0]))
+    return cbor.dumps(tree)
+
+
+@functools.cache
+def _beyond_rows(per_message=36, randoms=60, seed=BEYOND_SEED):
+    """Malformed rows beyond the shared corpus, for the gate's own runner and judge: question 9's
+    repeated keys, CD-E5's raw edges, random bytes, `per_message` random encodings of each
+    fixture message (a third as they are, a third with a byte mutated, a third with a node) and
+    bad enum values. Kept shallow: depth is D1's."""
+    fixture = parity.parity_schema()
+    rng = random.Random(seed)
+    rows = []
+    for i, (key, text) in enumerate(Q9_RAW):
+        data = b"\xa2" + cbor.dumps(key) + cbor.dumps(0) + cbor.dumps(key) + cbor.dumps(1)
+        rows.append({"name": f"beyond-q9-raw-{i}", "stage": "raw_decode", "schema": "", "bytes": data.hex(),
+                     "expect": {"tag": "DuplicateMapKey", "key": text}})
+    for i, (message, tag, key, text) in enumerate(Q9_FIELDS):
+        data = _with_repeated_key(fixture, message, tag, key, rng)
+        rows.append({"name": f"beyond-q9-{message}-{i}", "stage": "from_cbor", "schema": message,
+                     "bytes": data.hex(), "expect": {"tag": "DuplicateMapKey", "key": text}})
+    randoms_ = [bytes(rng.randrange(256) for _ in range(rng.randrange(1, 10))) for _ in range(randoms)]
+    for i, data in enumerate([bytes.fromhex(h) for h in RAW_EDGES] + randoms_):
+        rows.append(_beyond_row(fixture, f"beyond-raw-{i}", "raw_decode", "", data))
+    for message in fixture.messages:
+        for i in range(per_message):
+            data = codec.encode(fixture, message, _native(fixture, MsgRef(message), rng))
+            if i % 3:
+                data = (_mutate_tree if i % 3 == 1 else _mutate_bytes)(data, rng)
+            rows.append(_beyond_row(fixture, f"beyond-{message}-{i}", "from_cbor", message, data))
+    for enum in fixture.enums:
+        for i, data in enumerate(bytes.fromhex(h) for h in ENUM_EDGES):
+            rows.append(_beyond_row(fixture, f"beyond-{enum}-{i}", "from_wire", enum, data))
+    return tuple(row for row in rows if row is not None)
+
+
+def test_the_rows_beyond_the_corpus_state_what_python_the_reference_does():
+    fixture = parity.parity_schema()
+    rows = _beyond_rows()
+    assert len({row["name"] for row in rows}) == len(rows)
+    for row in rows:  # python keeps unknown fields: judged by `expect`
+        assert parity.judge("python", row, *parity._observe_python(fixture, row)) == (parity.PASS, ""), row
+    q9 = [row["expect"]["key"] for row in rows if row["name"].startswith("beyond-q9-")]
+    assert q9 == [text for _, text in Q9_RAW] + [text for *_, text in Q9_FIELDS]
+    # a mix: every fixture message accepted and refused at the schema stage, rows that a codec
+    # dropping unknown fields re-encodes otherwise, and each decode tag
+    typed = [row for row in rows if row["stage"] == "from_cbor"]
+    assert {row["schema"] for row in typed if row["expect"].get("accept")} == set(fixture.messages)
+    assert any("expect_dropping" in row for row in typed)
+    tags = {row["expect"].get("tag") for row in rows}
+    assert {"Truncated", "TrailingBytes", "InvalidUtf8", "UnsupportedInfo", "UnsupportedMajor",
+            "NonIntegerMapKey", "NegativeMapKey", "DuplicateMapKey", "NonCanonicalInt", "IntOverflow",
+            "WrongType", "MissingKey", "UnknownEnum"} <= tags
+    refused = {row["schema"] for row in typed if row["expect"].get("tag") in ("WrongType", "MissingKey")}
+    assert refused == set(fixture.messages)
+
+
+def test_kotlin_matches_python_beyond_the_corpus(monkeypatch):
+    """Every public decode entry point (raw `decode`, each fixture message's `fromCbor` and the
+    enum's `fromWire`) returns a value or throws DecodeError, with Python's tag and payload,
+    on the rows beyond the corpus, question 9's repeated keys among them: through the gate's
+    own Kotlin runner and judge, as kotlin and as kotlin/fc. A runner reports anything else
+    escaping as `untyped`, which fails its row. The JVM's own stdout here is ASCII, as on a
+    host whose locale is: the runner still reports a str key such as `naïve` as itself."""
+    rows = list(_beyond_rows())
+    monkeypatch.setattr(parity, "malformed_rows", lambda: rows)
+    options = os.environ.get("JAVA_TOOL_OPTIONS", "")
+    monkeypatch.setenv("JAVA_TOOL_OPTIONS", f"{options} -Dstdout.encoding=US-ASCII".strip())
+    for forward_compat in (False, True):
+        report = parity_kotlin.run(forward_compat=forward_compat)
+        if not report.available:
+            pytest.skip(report.skip_reason)
+        assert not report.fault, report.fault
+        assert [(r.name, r.detail) for r in report.failures] == [], report.target
+        assert {r.name for r in report.results if r.kind == "malformed"} == {row["name"] for row in rows}

@@ -124,7 +124,9 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     if fieldless:
         out.append(f"    override fun equals(other: Any?): Boolean = other is {msg.name}")
         out.append("    override fun hashCode(): Int = 0")
-    # toCbor
+    # toCbor. Under forward-compat the known entries meet the residual in `+`, where nothing
+    # types them, so they name their type: kotlinc cannot infer T for the empty `listOf()` of a
+    # message with no wire field (none, or only transient ones). Likewise its known tags below.
     out.append("    fun toCbor(): Cbor {")
     entries = []
     for f in msg.wire_fields():
@@ -134,7 +136,7 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
         else:
             enc = _enc(f.type, n)
         entries.append(f"{f.tag}L to {enc}")
-    body = "listOf(" + ", ".join(entries) + ")"
+    body = ("listOf<Pair<Long, Cbor>>(" if forward_compat else "listOf(") + ", ".join(entries) + ")"
     out.append(f"        return Cbor.map({body}{' + wireResidual' if forward_compat else ''})")
     out.append("    }")
     out.append("    companion object {")
@@ -159,7 +161,7 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
         out.append(f"                {n} = {dec},")
     if forward_compat:
         known = ", ".join(f"{f.tag}L" for f in msg.wire_fields())
-        out.append(f"                wireResidual = c.mapEntries.filter {{ it.first !in listOf({known}) }},")
+        out.append(f"                wireResidual = c.mapEntries.filter {{ it.first !in listOf<Long>({known}) }},")
     out.append("            )")
     out.append("        }")
     out.append("    }")

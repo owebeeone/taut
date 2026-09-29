@@ -16,12 +16,6 @@
       "reason": "build failed (exit 1): as cpp (the Names field `b`), and the Names field `encode_value` hides the runtime's encode_value, which the forward-compat to_cbor calls unqualified (called object type 'long long' is not a function), so no row runs, names-round-trip among them. With both renamed in a scratch run, map-bool-key-duplicate reports key=1, not `true`"
     },
     {
-      "target": "kotlin/fc",
-      "phase": "C2",
-      "owner": "codec-parity",
-      "reason": "build failed (exit 1): kotlinc cannot infer T for the field-less Empty's `listOf()` in toCbor and fromCbor under forward-compat, so no row runs, unknown-field-round-trip among them. With that inference fixed in a scratch copy, every row passes"
-    },
-    {
       "target": "java",
       "phase": "C2",
       "owner": "codec-parity",

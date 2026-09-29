@@ -13,7 +13,9 @@ sealed class DecodeError(message: String) : RuntimeException(message) {
     class NonIntegerMapKey : DecodeError("non-integer map key")
     class IntOverflow(val value: String) : DecodeError("integer out of i64 range: $value")
     // The repeated key: a Long for a CBOR map key or an int-keyed map<K,V> field, and
-    // the String or Boolean key of a text- or bool-keyed one.
+    // the String or Boolean key of a text- or bool-keyed one. Its text is the key as
+    // text (TautCheckedDecode.md §8 question 9): an int in decimal, a str as itself and
+    // a bool as `true` or `false`.
     class DuplicateMapKey(val key: Any) : DecodeError("duplicate map key $key")
     class MissingKey(val key: Long) : DecodeError("missing map key $key")
     class WrongType(val expected: String) : DecodeError("expected CBOR $expected")
