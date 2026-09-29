@@ -1,6 +1,73 @@
 {
   "version": 1,
   "contract": "taut-codec-parity/i64/v0",
-  "_note": "An allowlisted target's harness STILL RUNS and REPORTS its observed failures (xfail-that-runs); it just doesn't fail CI. The inverse is enforced too: `tautc parity` FAILS if an allowlisted target passes fully (a green target must be de-listed) or a gated (non-allowlisted) target fails. Reasons are populated from observed `tautc parity` results.",
-  "targets": []
+  "_note": "An allowlisted target's harness STILL RUNS and REPORTS its observed failures (xfail-that-runs); it just doesn't fail CI. The inverse is enforced too: `tautc parity` FAILS if an allowlisted target passes fully (a green target must be de-listed) or a gated (non-allowlisted) target fails. An entry names a target or a `<target>/fc` variant (the target generated with forward-compat), each governed on its own. Reasons are populated from observed `tautc parity` results.",
+  "targets": [
+    {
+      "target": "rust",
+      "phase": "C2",
+      "owner": "codec-parity",
+      "reason": "map-str-key-duplicate, map-bool-key-duplicate: DuplicateMapKey(i64) cannot carry question 9's key as text, so the str key \"a\" is reported as its entry's index (key=1) and the bool key true as key=1, not `a` and `true`"
+    },
+    {
+      "target": "rust/fc",
+      "phase": "C2",
+      "owner": "codec-parity",
+      "reason": "map-str-key-duplicate, map-bool-key-duplicate: as rust, key=1 for both, not `a` and `true`; the forward-compat build keeps unknown fields and passes the unknown-field rows"
+    },
+    {
+      "target": "cpp",
+      "phase": "C2",
+      "owner": "codec-parity",
+      "reason": "build failed (exit 1): the Names field `b` meets to_cbor's parameter `Buf& b` (`b.integer(b)`: no conversion from Buf to long long), so no row runs, names-round-trip among them. With that field renamed in a scratch run, map-bool-key-duplicate reports key=1, not `true`"
+    },
+    {
+      "target": "cpp/fc",
+      "phase": "C2",
+      "owner": "codec-parity",
+      "reason": "build failed (exit 1): as cpp (the Names field `b`), and the Names field `encode_value` hides the runtime's encode_value, which the forward-compat to_cbor calls unqualified (called object type 'long long' is not a function), so no row runs, names-round-trip among them. With both renamed in a scratch run, map-bool-key-duplicate reports key=1, not `true`"
+    },
+    {
+      "target": "swift",
+      "phase": "C2",
+      "owner": "codec-parity",
+      "reason": "build failed (exit 1): the Names field `decodeDictionary` hides the runtime's decodeDictionary, which the static fromCbor calls unqualified for each map field (instance member 'decodeDictionary' cannot be used on type 'Names'), so no row runs, names-round-trip among them. With it renamed in a scratch run, map-str-key-duplicate and map-bool-key-duplicate report key=0, not `a` and `true`"
+    },
+    {
+      "target": "swift/fc",
+      "phase": "C2",
+      "owner": "codec-parity",
+      "reason": "build failed (exit 1): as swift, the Names field `decodeDictionary` hides the runtime's decodeDictionary in the static fromCbor, so no row runs, names-round-trip among them. With it renamed in a scratch run, map-str-key-duplicate and map-bool-key-duplicate report key=0, not `a` and `true`"
+    },
+    {
+      "target": "go",
+      "phase": "C2",
+      "owner": "codec-parity",
+      "reason": "map-str-key-duplicate, map-bool-key-duplicate: DecodeError.Key is an int64, so a repeated str or bool key is reported as key=0, not `a` and `true` (question 9)"
+    },
+    {
+      "target": "go/fc",
+      "phase": "C2",
+      "owner": "codec-parity",
+      "reason": "map-str-key-duplicate, map-bool-key-duplicate: as go, key=0, not `a` and `true`; the forward-compat build keeps unknown fields and passes the unknown-field rows"
+    },
+    {
+      "target": "kotlin/fc",
+      "phase": "C2",
+      "owner": "codec-parity",
+      "reason": "build failed (exit 1): kotlinc cannot infer T for the field-less Empty's `listOf()` in toCbor and fromCbor under forward-compat, so no row runs, unknown-field-round-trip among them. With that inference fixed in a scratch copy, every row passes"
+    },
+    {
+      "target": "java",
+      "phase": "C2",
+      "owner": "codec-parity",
+      "reason": "build failed (exit 1): the Names field `m` meets toCbor's local `List<KV> m` (`Cbor.int_(m)`), and the Names field `java` hides the package in the `java.util.List.of` that encodes a map (long cannot be dereferenced), so no row runs, names-round-trip among them. With both renamed in a scratch run, map-str-key-duplicate and map-bool-key-duplicate report no key, not `a` and `true`"
+    },
+    {
+      "target": "java/fc",
+      "phase": "C2",
+      "owner": "codec-parity",
+      "reason": "build failed (exit 1): as java, the Names fields `m` (toCbor's local) and `java` (the package in java.util.List.of), so no row runs, names-round-trip among them. With both renamed in a scratch run, map-str-key-duplicate and map-bool-key-duplicate report no key, not `a` and `true`"
+    }
+  ]
 }

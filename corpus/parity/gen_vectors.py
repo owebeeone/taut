@@ -21,7 +21,8 @@ the **leading** rows: the strict-canonical D2 requirements (`NonCanonicalInt`,
 `2^53+1`, rows M1-M17 of TautCheckedDecode.md §4.4 (one order of checks,
 payload words, and inputs that must decode), and the gaps the language agents
 found (a leading BOM, the other simple values, every field shape, duplicate
-non-int map keys). Per-language *baseline* smoke tests
+non-int map keys), question 10's unknown fields and the `Names` fixture's field
+names. Per-language *baseline* smoke tests
 pin the reviewed set and skip the `lead` rows; the governed `tautc parity` gate
 replays **every** row. This is how the gate LEADS (it demands not-yet-built
 behaviour) without breaking the existing green per-language smoke tests.
@@ -32,6 +33,11 @@ decode without error and re-encode to its own bytes (CD-C2, CD-C4; D2's law,
 decode ok => encode(decode(bytes)) == bytes). An accept row whose re-encoding
 differs by declaration carries it as `"reencode": "<hex>"`: an absent
 `optional=MISSING_OK` key re-encodes as null.
+
+A from_cbor row may add `expect_dropping`, the expectation for a codec that drops a
+message's unknown fields: the seven generated targets built without forward-compat.
+Python, TypeScript and every `<target>/fc` variant keep them and are judged by `expect`
+(TautCheckedDecode.md §8 question 10).
 """
 
 from __future__ import annotations
@@ -45,6 +51,7 @@ ROOT = HERE.parent.parent  # taut/
 sys.path.insert(0, str(ROOT / "src"))
 
 from taut.ir.load import load_schema  # noqa: E402
+from taut.ir.model import Scalar  # noqa: E402
 from taut.wire import cbor, codec  # noqa: E402
 
 CONTRACT = "taut-codec-parity/i64/v0"
@@ -109,12 +116,14 @@ INT_VECTORS = [
 ]
 
 
-def _mal(name, stage, bytes_hex, expect, why, *, schema=None, lead=False) -> dict:
+def _mal(name, stage, bytes_hex, expect, why, *, schema=None, lead=False, expect_dropping=None) -> dict:
     row: dict = {"name": name, "stage": stage}
     if schema is not None:
         row["schema"] = schema  # emitted before `bytes`, matching the reviewed baseline
     row["bytes"] = bytes_hex
     row["expect"] = expect
+    if expect_dropping is not None:
+        row["expect_dropping"] = expect_dropping
     row["why"] = why
     if lead:
         row["lead"] = True
@@ -199,6 +208,28 @@ LATE_INT = cbor.dumps({1: 1}).hex()
 assert (LATE_ABSENT, LATE_NULL, LATE_INT) == ("a0", "a101f6", "a10101")
 
 SHAPES_SPARSE_HEX = _encoded("Shapes", SHAPES_SPARSE)
+
+# Question 10's unknown fields (TautCheckedDecode.md §8): Empty holding a field 1, and an
+# IntBox beside a field 3. A codec that keeps them writes them back; one that drops them
+# writes the message alone.
+EMPTY_HEX = _encoded("Empty", {})
+EMPTY_BESIDE_UNKNOWN_HEX = cbor.dumps({1: 0}).hex()
+assert (EMPTY_HEX, EMPTY_BESIDE_UNKNOWN_HEX) == ("a0", "a10100")
+INTBOX_KNOWN = {"n": 7, "by_id": {1: -1}}
+INTBOX_KNOWN_HEX = _encoded("IntBox", INTBOX_KNOWN)
+INTBOX_BESIDE_UNKNOWN_HEX = cbor.dumps({**codec.encode_struct(SCHEMA, "IntBox", INTBOX_KNOWN), 3: "x"}).hex()
+
+# Names (ir/parity_int.taut.py): every field set, each int to its own tag, so a value
+# written under another field's name changes the bytes.
+NAMES_FILLED = {
+    **{f.name: f.tag for f in SCHEMA.messages["Names"].fields if f.type == Scalar("int")},
+    "c": "c",
+    "e": [1, 2],
+    "k": {"a": 1, "b": 2},
+    "arr": ["x", "y"],
+    "key": True,
+    "entries": {1: 2, 3: 4},
+}
 
 
 # --- malformed-input vectors ----------------------------------------------------
@@ -392,22 +423,44 @@ MALFORMED_VECTORS = [
          lead=True),
     _mal("map-str-key-duplicate", "from_cbor",
          _sparse_altered(tally=[*_entries("tally", {"a": 1}), *_entries("tally", {"a": 2})]),
-         {"tag": "DuplicateMapKey"}, schema="Shapes",
+         {"tag": "DuplicateMapKey", "key": "a"}, schema="Shapes",
          why="shapes-sparse whose map<str,int> holds two entries keyed \"a\": a repeated "
-             "key is refused whatever its type; tag only, as the payload of a non-int key "
-             "is open for the owner",
+             "key is refused whatever its type, and its key payload is the key as text, a "
+             "str as itself (TautCheckedDecode.md §8 question 9)",
          lead=True),
     _mal("map-bool-key-duplicate", "from_cbor",
          _sparse_altered(mode_by_flag=[*_entries("mode_by_flag", {True: "ok"}),
                                        *_entries("mode_by_flag", {True: "alt"})]),
-         {"tag": "DuplicateMapKey"}, schema="Shapes",
+         {"tag": "DuplicateMapKey", "key": "true"}, schema="Shapes",
          why="shapes-sparse whose map<bool,Mode> holds two entries keyed true: "
-             "DuplicateMapKey, tag only, as for map-str-key-duplicate",
+             "DuplicateMapKey with the key as text, a bool as `true` or `false` (question 9)",
          lead=True),
     _mal("list-nested-wrong-type", "from_cbor", _sparse_altered(grid=[["x"]]),
          {"tag": "WrongType", "expected": "int"}, schema="Shapes",
          why="shapes-sparse whose list<list<int>> holds [[\"x\"]]: an inner list's item "
              "is checked as an int",
+         lead=True),
+    # --- leading: question 10, unknown fields (TautCheckedDecode.md §8) ------------
+    _mal("unknown-field-round-trip", "from_cbor", EMPTY_BESIDE_UNKNOWN_HEX,
+         {"accept": True}, schema="Empty",
+         expect_dropping={"accept": True, "reencode": EMPTY_HEX},
+         why="Empty holding a field 1 it does not know: python, typescript and every "
+             "<target>/fc keep the unknown field and write it back; the seven generated "
+             "without forward-compat drop it and re-encode the empty map",
+         lead=True),
+    _mal("unknown-field-beside-known", "from_cbor", INTBOX_BESIDE_UNKNOWN_HEX,
+         {"accept": True}, schema="IntBox",
+         expect_dropping={"accept": True, "reencode": INTBOX_KNOWN_HEX},
+         why="an IntBox {n: 7, by_id: {1: -1}} beside an unknown field 3 = \"x\": a codec "
+             "that keeps unknown fields writes field 3 back after the known ones, one that "
+             "drops them writes the IntBox alone",
+         lead=True),
+    # --- leading: Names, fields named like generated locals (ir/parity_int.taut.py) ----
+    _mal("names-round-trip", "from_cbor", _encoded("Names", NAMES_FILLED),
+         {"accept": True}, schema="Names",
+         why="every Names field set: fields named like the locals, parameters and unqualified "
+             "helpers the generators emit (a Java field `m`, a C++ field `b`) generate, "
+             "compile, decode and re-encode to these bytes",
          lead=True),
 ]
 

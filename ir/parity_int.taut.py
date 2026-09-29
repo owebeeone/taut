@@ -18,6 +18,26 @@ three optional, `list<int>`, `list<EnumBox>` and `list<list<int>>`, `map<str,int
 `map<bool,Mode>` and `map<int,EnumBox>`, an optional list and an optional map, and a
 `str` with `optional=MISSING_OK`. A map key is int, str or bool, a map value is never
 a list or map, lists nest, and any field may be optional.
+
+`Names` catches generated code that clashes with a field's name, as a Java field `m`
+clashes with `toCbor`'s local `m` (TautV010Plan.md §0). Its fields are named like the
+locals, parameters and unqualified helpers the generators (`taut/gen/*.py`) emit in a
+message's code:
+  - every generator: the decoder's parameter `c`;
+  - rust: `m`, `v`, `x`, `k`, `t`, `e`, `i`, `ek`, `ev`;
+  - cpp: `to_cbor`'s parameter `b`, `v`, `f`, `x`, `k`, `e`, `kv`, and the forward-compat
+    `to_cbor`'s unqualified call of the runtime's `encode_value`;
+  - swift: `v`, and `fromCbor`'s unqualified call of the runtime's `decodeDictionary`;
+  - go: the receiver `x`, `m`, `a`, `e`, `ks`, `k`, `i`, `j`, `v`, `fv`, `ok`, `err`,
+    `arr`, `kc`, `vc`, `dup`, `entries`, `kv`;
+  - kotlin: the lambda parameter `it`;
+  - java: `m`, `v`, `f`, `e`, `kv`, and `java`, the root of the `java.util.List.of`
+    that encodes a map;
+  - js: the constructor's `o`, `m`, `v`, `f`, `e`, `k`, `a`, `b`, `key`, `kv`.
+A scalar, a list and a map field are among them, with an optional and a MISSING_OK one.
+None is a keyword in any of the nine languages (keywords are a separate concern), so
+JS's `value` is left out as a Kotlin modifier keyword; `self`, `$0` and C++'s reserved
+`__` names cannot be fields.
 """
 
 import sys
@@ -69,4 +89,36 @@ SCHEMA = schema(
         F("maybe_tally", 18, Map(STR, INT), optional=True),
         F("late_note", 19, STR, optional=MISSING_OK),
         next_id=20),
+    Msg("Names",
+        F("m", 1, INT),
+        F("b", 2, INT),
+        F("c", 3, STR),
+        F("v", 4, INT),
+        F("o", 5, INT),
+        F("f", 6, INT, optional=True),
+        F("x", 7, INT),
+        F("e", 8, List(INT)),
+        F("k", 9, Map(STR, INT)),
+        F("i", 10, INT),
+        F("j", 11, INT),
+        F("a", 12, INT),
+        F("t", 13, INT),
+        F("it", 14, INT),
+        F("kv", 15, INT),
+        F("fv", 16, INT, optional=MISSING_OK),
+        F("ok", 17, INT),
+        F("err", 18, INT),
+        F("arr", 19, List(STR)),
+        F("ks", 20, INT),
+        F("kc", 21, INT),
+        F("vc", 22, INT),
+        F("ek", 23, INT),
+        F("ev", 24, INT),
+        F("key", 25, BOOL),
+        F("dup", 26, INT),
+        F("entries", 27, Map(INT, INT)),
+        F("encode_value", 28, INT),
+        F("java", 29, INT),
+        F("decodeDictionary", 30, INT),
+        next_id=31),
 )

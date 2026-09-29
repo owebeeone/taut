@@ -220,23 +220,25 @@ def _source() -> str:
             .replace("@FROM_WIRE@", from_wire))
 
 
-def run() -> parity.TargetReport:
+def run(forward_compat: bool = False) -> parity.TargetReport:
+    """The kotlin gate, or with `forward_compat` its `kotlin/fc` variant (`parity_rust.py`)."""
+    name = parity.variant(TARGET, forward_compat)
     tools = toolchains.find_kotlin_tools()
     if tools is None:
-        return parity.skipped(TARGET, "kotlinc (and a java to run it) not found")
+        return parity.skipped(name, "kotlinc (and a java to run it) not found")
     kotlinc, java = tools
     env = toolchains.java_env(java)
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        failed = parity.generate(TARGET, work, runtime=True)
+        failed = parity.generate(name, work, runtime=True)
         if failed is not None:
             return failed
         runner = work / "ParityRunner.kt"
         runner.write_text(_source())
         sources = [str(p) for p in sorted((work / TARGET).glob("*.kt"))]
         jar = work / "parity_runner.jar"
-        failed = parity.build(TARGET, [kotlinc, *sources, str(runner), "-include-runtime", "-d", str(jar)],
+        failed = parity.build(name, [kotlinc, *sources, str(runner), "-include-runtime", "-d", str(jar)],
                               cwd=work, env=env)
         if failed is not None:
             return failed
-        return parity.run_runner(TARGET, [java, "-jar", str(jar)], cwd=work, env=env)
+        return parity.run_runner(name, [java, "-jar", str(jar)], cwd=work, env=env)

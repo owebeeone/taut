@@ -130,12 +130,16 @@ def _failures(report: parity.TargetReport) -> str:
 
 
 def test_go_parity_gate_is_green():
-    """`tautc parity -t go`: every int and malformed row through the generated Go codec."""
+    """`tautc parity -t go`: every int and malformed row through the generated Go codec, as
+    go and go/fc, each held to the gate's governance: GREEN, or RED and allowlisted."""
     _needs_go()
-    report = parity_go.run()
-    assert report.green, _failures(report)
+    reports, violations = parity.governed_variants(parity_go.run)
+    assert violations == [], "\n".join(violations)
     encode_fail = {r["name"] for r in parity.int_rows() if r["kind"] == "encode_fail"}
-    assert {r.name for r in report.results if r.status == parity.TYPE_SATISFIED} == encode_fail
+    for report in reports:
+        if not report.fault:
+            satisfied = {r.name for r in report.results if r.status == parity.TYPE_SATISFIED}
+            assert satisfied == encode_fail, report.target
 
 
 # Raw inputs beyond the corpus, each with what CD-E5 says of it. Python, the reference,

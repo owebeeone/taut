@@ -1,15 +1,20 @@
 """The governed parity gate (TautCodecParityPlan.md §8 P1; TautCheckedDecode.md CD-C4, §5.4).
 
-Which targets are gated and which allowlisted is data, in corpus/parity/allowlist.json;
-no test here pins a target's status. The tests check that the artifacts validate,
-that the comparator and the report parser enforce the runner protocol (an accept row
-and its re-encoding, payloads compared as strings, a row never reported, a runner
-exiting non-zero, a build that fails), that a target's runner is found by module, and,
+Which targets and variants are gated and which allowlisted is data, in
+corpus/parity/allowlist.json; no test here pins a status. The tests check that the
+artifacts validate, that the comparator and the report parser enforce the runner protocol
+(an accept row and its re-encoding, the expectation for a codec that drops unknown fields,
+payloads compared as strings, a row never reported, a runner exiting non-zero, a build that
+fails), that a target's runner is found by module and runs each of its variants, and,
 end-to-end with whatever toolchains are present, that the gate's governance is clean.
 """
 
+import dataclasses
+import importlib
 import importlib.util
+import inspect
 import json
+import keyword
 import os
 import sys
 import textwrap
@@ -19,25 +24,29 @@ import pytest
 import taut.corpus
 from taut.cli import main
 from taut.corpus import parity, toolchains
+from taut.gen import kotlin as kotlin_gen
 from taut.gen import scaffold
+from taut.gen import swift as swift_gen
 from taut.ir.dsl import STR, F, Msg, schema as mk
 from taut.ir.model import MISSING_OK, EnumRef, ListOf, MapOf, Scalar
+from taut.wire import codec
 
 INT_ROWS = 11
-MALFORMED_ROWS = 44
+MALFORMED_ROWS = 47
+GENERATED = ("rust", "js", "cpp", "swift", "go", "kotlin", "java")
 
 
 def _row(name):
     return next(r for r in parity.malformed_rows() if r["name"] == name)
 
 
-def _passing_lines():
-    """The report a runner prints when every row behaves as the corpus expects."""
+def _passing_lines(target="js"):
+    """The report `target`'s runner prints when every row behaves as the corpus expects of it."""
     lines = [f"{row['name']}\t{parity.PASS}\t" for row in parity.int_rows()]
     for row in parity.malformed_rows():
-        expect = row["expect"]
+        expect = parity.row_expect(target, row)
         if expect.get("accept"):
-            lines.append(f"{row['name']}\t{parity.OK}\t{parity.expected_reencoding(row)}")
+            lines.append(f"{row['name']}\t{parity.OK}\t{parity.expected_reencoding(row, expect)}")
         else:
             lines.append(f"{row['name']}\t{parity.ERR}\t{parity.format_error(expect['tag'], expect)}")
     return lines
@@ -55,7 +64,8 @@ def test_malformed_rows_expect_a_known_tag_or_accept(tmp_path):
     accept = {r["name"] for r in data["vectors"] if "accept" in r["expect"]}
     assert {"map-key-2^53", "optional-present-null", "missing-ok-absent", "text-leading-bom",
             "shapes-filled", "shapes-sparse", "shapes-missing-ok-absent",
-            "map-str-key-order"} <= accept                                          # M8, M15, M16
+            "map-str-key-order", "unknown-field-round-trip", "unknown-field-beside-known",
+            "names-round-trip"} <= accept                                           # M8, M15, M16
     path = tmp_path / "malformed.vectors.json"
     data["vectors"][0]["expect"] = {"accept": True, "reencode": "a0"}  # a re-encoding may be named
     path.write_text(json.dumps(data))
@@ -80,6 +90,25 @@ def test_a_from_wire_row_never_accepts(tmp_path):
         parity.validate_malformed_vectors(path)
 
 
+def test_expect_dropping_is_a_from_cbor_rows_second_expectation(tmp_path):
+    """`expect_dropping` names what a codec that drops unknown fields must do (question 10):
+    well-formed like `expect`, only on a from_cbor row, and never a copy of `expect`."""
+    data = json.loads(parity.MALFORMED_VECTORS.read_text())
+    path = tmp_path / "malformed.vectors.json"
+    index = next(i for i, r in enumerate(data["vectors"]) if r["name"] == "unknown-field-round-trip")
+    raw = next(i for i, r in enumerate(data["vectors"]) if r["stage"] == "raw_decode")
+    assert data["vectors"][index]["expect_dropping"] == {"accept": True, "reencode": "a0"}
+    for where, bad, match in ((index, {"accept": False}, "accept row"),
+                              (index, {"tag": "Malformed"}, "unknown decode tag"),
+                              (index, {"accept": True}, "equals expect"),
+                              (raw, {"accept": True, "reencode": "a0"}, "from_cbor")):
+        rows = json.loads(parity.MALFORMED_VECTORS.read_text())
+        rows["vectors"][where]["expect_dropping"] = bad
+        path.write_text(json.dumps(rows))
+        with pytest.raises(parity.ParityValidationError, match=match):
+            parity.validate_malformed_vectors(path)
+
+
 def test_malformed_rows_name_the_fixture_messages():
     schema = parity.parity_schema()
     for row in parity.malformed_rows():
@@ -87,7 +116,7 @@ def test_malformed_rows_name_the_fixture_messages():
             assert row["schema"] in schema.messages, row["name"]
         if row["stage"] == "from_wire":
             assert row["schema"] in schema.enums, row["name"]
-    assert {"OptBox", "Empty", "Late", "Shapes"} <= set(schema.messages)
+    assert {"OptBox", "Empty", "Late", "Shapes", "Names"} <= set(schema.messages)
 
 
 def _shape(t):
@@ -110,6 +139,50 @@ def test_shapes_holds_every_legal_field_shape():
     assert {*required, *optional, *collections, ("str", MISSING_OK)} <= held
 
 
+# The locals, parameters and unqualified helpers the generators' message code declares or
+# calls (`taut/gen/*.py`); each is a field of Names. `value` (a JS lambda parameter) is left
+# out as a Kotlin modifier keyword, and `self`, `$0` and C++'s `__`-names cannot be fields.
+NAMES = {"m", "b", "c", "v", "o", "f", "x", "e", "k", "i", "j", "a", "t", "it", "kv", "fv", "ok",
+         "err", "arr", "ks", "kc", "vc", "ek", "ev", "key", "dup", "entries",
+         "encode_value", "java", "decodeDictionary"}
+
+# The nine languages' keywords, reserved and contextual words: Python's from `keyword`,
+# Swift's and Kotlin's hard ones from their generators, and the others here.
+_KEYWORDS = {
+    *keyword.kwlist, *keyword.softkwlist, *swift_gen._SWIFT_KEYWORDS, *kotlin_gen._KT_KEYWORDS,
+    *"""abstract as async await become box break const continue crate do dyn else enum extern
+        false final fn for gen if impl in let loop macro match mod move mut override priv pub
+        ref return self static struct super trait true try type typeof union unsafe unsized use
+        virtual where while yield""".split(),                                              # rust
+    *"""alignas alignof and and_eq asm auto bitand bitor bool case catch char char8_t char16_t
+        char32_t class co_await co_return co_yield compl concept const_cast consteval constexpr
+        constinit decltype default delete double dynamic_cast explicit export float friend goto
+        inline int long mutable namespace new noexcept not not_eq nullptr operator or or_eq
+        private protected public register reinterpret_cast requires short signed sizeof
+        static_assert static_cast switch template this thread_local throw typedef typeid
+        typename unsigned using void volatile wchar_t xor xor_eq""".split(),               # c++
+    *"""assert boolean byte extends finally implements import instanceof interface native
+        package permits record sealed strictfp synchronized throws transient var""".split(),  # java
+    *"""arguments debugger declare eval function infer is keyof module null readonly
+        undefined with""".split(),                                              # js, typescript
+    *"chan defer fallthrough func go map range select".split(),                        # go
+    *"""by constructor delegate dynamic field file get init out param property receiver set
+        setparam value""".split(),                                     # kotlin soft keywords
+}
+
+
+def test_names_fields_are_named_like_what_the_generators_emit():
+    """Names catches a field that clashes with a generated local, parameter or unqualified
+    helper (a Java field `m`). It holds a scalar, a list and a map, and none of its names
+    is a keyword in any of the nine languages: keywords are a separate concern."""
+    fields = parity.parity_schema().messages["Names"].fields
+    names = {f.name for f in fields}
+    assert names == NAMES
+    assert {"int", "str", "bool", "list<int>", "map<str,int>"} <= {_shape(f.type) for f in fields}
+    assert not names & _KEYWORDS
+    assert _row("names-round-trip")["expect"] == {"accept": True}
+
+
 def test_committed_vectors_match_generator():
     """The committed .json is exactly `gen_vectors.py` output — reviewable AND
     regenerable, and no hand-edit has drifted from the generator."""
@@ -126,7 +199,7 @@ def test_committed_vectors_match_generator():
 def test_every_allowlisted_target_has_phase_owner_and_reason():
     entries = json.loads(parity.ALLOWLIST.read_text())["targets"]
     for entry in entries:
-        assert entry["target"] in parity.TARGETS
+        assert entry["target"] in parity.variants()
         for key in ("phase", "owner", "reason"):
             assert isinstance(entry.get(key), str) and entry[key], (entry["target"], key)
     statuses = {s.target: s for s in parity.target_statuses()}
@@ -155,6 +228,18 @@ def test_target_statuses_rejects_duplicate_allowlist_entry(tmp_path):
         parity.target_statuses(_allowlist(tmp_path, ENTRY, dict(ENTRY)))
 
 
+def test_the_allowlist_takes_variant_names(tmp_path):
+    """A `<target>/fc` variant is gated or allowlisted on its own, like a target."""
+    fc = {**ENTRY, "target": "java/fc"}
+    statuses = {s.target: s.status for s in parity.target_statuses(_allowlist(tmp_path, fc))}
+    assert list(statuses) == list(parity.variants())
+    assert statuses["java/fc"] == "allowlisted" and statuses["java"] == "gated"
+    assert parity.allowlisted_targets(_allowlist(tmp_path, ENTRY, fc)) == {"java", "java/fc"}
+    for bad in ("python/fc", "typescript/fc", "java/xx", "fc"):
+        with pytest.raises(parity.ParityValidationError, match="unknown target"):
+            parity.target_statuses(_allowlist(tmp_path, {**ENTRY, "target": bad}))
+
+
 def test_governance_flags_a_green_but_allowlisted_target():
     # Inverse check that makes the gate LEAD: the day a target passes fully it
     # must be de-listed, or CI fails.
@@ -178,6 +263,34 @@ def test_skipped_target_is_not_a_violation():
     assert not skipped.available and skipped.skip_reason == "rustc absent"
     assert parity.governance({"rust": skipped}, set()) == []
     assert parity.governance({"rust": skipped}, {"rust"}) == []
+
+
+def test_governed_variants_judges_a_target_and_its_fc_variant_as_the_gate_does(tmp_path):
+    """The per-language tests' helper: each variant GREEN, or RED and allowlisted."""
+    def run(forward_compat=False):
+        name = parity.variant("go", forward_compat)
+        if forward_compat:
+            return parity.red(name, "build failed (exit 1)\nno such thing")
+        return parity.parse_report(name, "\n".join(_passing_lines(name)))
+
+    reports, violations = parity.governed_variants(run, _allowlist(tmp_path))
+    assert [(r.target, r.green) for r in reports] == [("go", True), ("go/fc", False)]
+    assert violations == ["go/fc: RED build failed (exit 1) and is not allowlisted\n"
+                          "build failed (exit 1)\nno such thing"]
+    fc = {**ENTRY, "target": "go/fc"}
+    assert parity.governed_variants(run, _allowlist(tmp_path, fc))[1] == []
+    assert parity.governed_variants(run, _allowlist(tmp_path, fc, {**ENTRY, "target": "go"}))[1] == \
+        ["go: PASSES fully but is allowlisted — remove it from allowlist.json"]
+
+
+def test_governance_judges_a_variant_like_a_target():
+    red = parity.red("go/fc", "build failed (exit 1)")
+    green = parity.parse_report("go/fc", "\n".join(_passing_lines("go/fc")))
+    assert green.green and not red.green
+    assert parity.governance({"go/fc": red}, set()) == ["go/fc: RED build failed (exit 1) and is not allowlisted"]
+    assert parity.governance({"go/fc": red}, {"go/fc"}) == []
+    assert parity.governance({"go/fc": red}, {"go"}) != []           # the target's entry is not the variant's
+    assert parity.governance({"go/fc": green}, {"go/fc"}) != []      # a green variant must be de-listed
 
 
 # --- the comparator -------------------------------------------------------------
@@ -235,8 +348,54 @@ def test_payload_exemptions_are_per_target():
     row = _row("positive-int-overflow")                  # {"tag": "IntOverflow", "value": "9223372036854775808"}
     assert parity.PAYLOAD_EXEMPT == {"rust": frozenset({("IntOverflow", "value")})}
     assert parity.judge("rust", row, parity.ERR, "IntOverflow")[0] == parity.PASS
+    assert parity.judge("rust/fc", row, parity.ERR, "IntOverflow")[0] == parity.PASS   # the target's runtime
     assert parity.judge("python", row, parity.ERR, "IntOverflow")[0] == parity.FAIL
     assert parity.judge("python", row, parity.ERR, "IntOverflow;value=9223372036854775808")[0] == parity.PASS
+
+
+# --- unknown fields and the forward-compat variants (TautCheckedDecode.md §8 question 10) ---
+
+def test_python_typescript_and_every_fc_variant_keep_unknown_fields():
+    keepers = {"python", "typescript", *(f"{target}/fc" for target in GENERATED)}
+    assert {name for name in parity.variants() if parity.keeps_unknown_fields(name)} == keepers
+
+
+def test_a_codec_that_drops_unknown_fields_is_judged_by_expect_dropping():
+    row = _row("unknown-field-round-trip")                   # Empty holding field 1 = 0
+    assert (row["schema"], row["bytes"]) == ("Empty", "a10100")
+    for keeper in ("python", "typescript", "rust/fc", "kotlin/fc"):
+        assert parity.row_expect(keeper, row) == {"accept": True}
+        assert parity.judge(keeper, row, parity.OK, "a10100") == (parity.PASS, "")
+        assert parity.judge(keeper, row, parity.OK, "a0") == (parity.FAIL, "re-encoded a0, expected a10100")
+    for dropper in GENERATED:
+        assert parity.row_expect(dropper, row) == {"accept": True, "reencode": "a0"}
+        assert parity.judge(dropper, row, parity.OK, "a0") == (parity.PASS, "")
+        assert parity.judge(dropper, row, parity.OK, "a10100") == \
+            (parity.FAIL, "re-encoded a10100, expected a0")
+    plain = _row("shapes-sparse")                            # no expect_dropping: expect for every codec
+    assert parity.row_expect("rust", plain) is plain["expect"]
+    assert parity.judge("rust", plain, parity.OK, plain["bytes"]) == (parity.PASS, "")
+
+
+def test_an_unknown_field_beside_known_ones_is_kept_or_dropped_whole():
+    schema = parity.parity_schema()
+    row = _row("unknown-field-beside-known")
+    decoded = codec.decode(schema, "IntBox", bytes.fromhex(row["bytes"]))
+    unknown = decoded.pop("__unknown__")
+    assert list(unknown) == [3] and decoded["by_id"]
+    assert parity.expected_reencoding(row) == row["bytes"]
+    assert parity.expected_reencoding(row, row["expect_dropping"]) == codec.encode(schema, "IntBox", decoded).hex()
+
+
+def test_a_repeated_map_key_is_reported_as_text():
+    """Question 9: the key as text, an int in decimal, a str as itself and a bool as `true`."""
+    assert _row("map-field-duplicate")["expect"] == {"tag": "DuplicateMapKey", "key": 5}
+    assert _row("map-str-key-duplicate")["expect"] == {"tag": "DuplicateMapKey", "key": "a"}
+    assert _row("map-bool-key-duplicate")["expect"] == {"tag": "DuplicateMapKey", "key": "true"}
+    schema = parity.parity_schema()
+    assert parity._observe_python(schema, _row("map-bool-key-duplicate")) == \
+        (parity.ERR, "DuplicateMapKey;key=true")
+    assert parity._observe_python(schema, _row("map-str-key-duplicate")) == (parity.ERR, "DuplicateMapKey;key=a")
 
 
 # --- report parsing and hardening -----------------------------------------------------
@@ -245,6 +404,10 @@ def test_a_complete_passing_report_is_green():
     report = parity.parse_report("js", "\n".join(_passing_lines()) + "\n")
     assert report.green
     assert len(report.results) == INT_ROWS + MALFORMED_ROWS
+    # a keeper's report is a dropper's failure on the unknown-field rows, and the reverse
+    kept = parity.parse_report("js", "\n".join(_passing_lines("js/fc")))
+    assert sorted(r.name for r in kept.failures) == ["unknown-field-beside-known", "unknown-field-round-trip"]
+    assert parity.parse_report("js/fc", "\n".join(_passing_lines("js/fc"))).green
 
 
 def test_a_row_never_reported_fails():
@@ -288,6 +451,15 @@ def test_a_generator_refusal_is_red(tmp_path):
     red = parity.generate("no-such-language", tmp_path)
     assert red is not None and red.available and not red.green
     assert red.fault.startswith("generation failed")
+    red = parity.generate("no-such-language/fc", tmp_path)
+    assert red.target == "no-such-language/fc" and red.fault.startswith("generation failed")
+
+
+def test_an_fc_variant_is_generated_with_forward_compat(tmp_path):
+    assert parity.generate("go/fc", tmp_path / "fc") is None
+    assert "WireResidual" in (tmp_path / "fc" / "go" / "api.go").read_text()
+    assert parity.generate("go", tmp_path / "plain") is None
+    assert "WireResidual" not in (tmp_path / "plain" / "go" / "api.go").read_text()
 
 
 def test_every_target_generates_missing_ok(tmp_path):
@@ -334,12 +506,71 @@ def test_python_harness_uses_the_gate_comparator(monkeypatch):
 
 # --- the registry and the default run ---------------------------------------------------
 
+def test_the_seven_generated_targets_also_run_as_fc_variants():
+    """TARGETS stays the nine languages; each generated one also runs as `<target>/fc`,
+    listed after it."""
+    assert parity.TARGETS == ("rust", "python", "typescript", "js", "cpp", "swift", "go", "kotlin", "java")
+    assert parity.FC_TARGETS == GENERATED
+    assert parity.variants() == ("rust", "rust/fc", "python", "typescript", "js", "js/fc", "cpp", "cpp/fc",
+                                 "swift", "swift/fc", "go", "go/fc", "kotlin", "kotlin/fc", "java", "java/fc")
+    assert parity.split_variant("kotlin/fc") == ("kotlin", True)
+    assert parity.split_variant("kotlin") == ("kotlin", False)
+    assert (parity.variant("go", True), parity.variant("go", False)) == ("go/fc", "go")
+
+
 def test_a_target_has_a_runner_exactly_when_its_module_exists():
-    for target in parity.TARGETS:
+    for name in parity.variants():
+        target, _ = parity.split_variant(name)
         module = importlib.util.find_spec(f"taut.corpus.parity_{target}")
-        assert (target in parity._RUNNERS) == (target == "python" or module is not None), target
+        assert (name in parity._RUNNERS) == (target == "python" or module is not None), name
     assert "python" in parity._RUNNERS and "no-such-target" not in parity._RUNNERS
-    assert list(parity._RUNNERS) == [t for t in parity.TARGETS if t in parity._RUNNERS]
+    assert "python/fc" not in parity._RUNNERS and "typescript/fc" not in parity._RUNNERS
+    assert list(parity._RUNNERS) == [name for name in parity.variants() if name in parity._RUNNERS]
+
+
+def test_every_runner_takes_forward_compat_off_by_default():
+    for target in parity.TARGETS:
+        if target != "python":
+            run = importlib.import_module(f"taut.corpus.parity_{target}").run
+            assert inspect.signature(run).parameters["forward_compat"].default is False, target
+    from taut.corpus import parity_typescript
+
+    with pytest.raises(ValueError, match="no forward-compat variant"):
+        parity_typescript.run(forward_compat=True)
+
+
+def test_the_cpp_runner_describes_an_error_while_its_input_lives(monkeypatch):
+    """A C++ DuplicateMapKey's text key is a view of the row's input, so the runner describes
+    the error before that input goes; it reported `key=\\x00` when it described it later.
+    Built without Names, whose field `b` C++ does not compile yet."""
+    from taut.corpus import parity_cpp
+
+    if toolchains.find_cxx() is None:
+        pytest.skip("no C++ compiler")
+    fixture = parity.parity_schema()
+    without_names = dataclasses.replace(
+        fixture, messages={name: m for name, m in fixture.messages.items() if name != "Names"})
+    row = _row("map-str-key-duplicate")
+    monkeypatch.setattr(parity, "parity_schema", lambda: without_names)
+    monkeypatch.setattr(parity, "int_rows", lambda: [])
+    monkeypatch.setattr(parity, "malformed_rows", lambda: [row])
+    report = parity_cpp.run()
+    assert [(r.name, r.status, r.detail) for r in report.results] == [(row["name"], parity.PASS, "")], report.fault
+
+
+def test_an_fc_variant_runs_its_targets_runner_with_forward_compat(monkeypatch):
+    from taut.corpus import parity_go
+
+    calls = []
+
+    def run(forward_compat=False):
+        calls.append(forward_compat)
+        return parity.skipped(parity.variant("go", forward_compat), "fake toolchain")
+
+    monkeypatch.setattr(parity_go, "run", run)
+    assert parity._RUNNERS["go"]().target == "go"
+    assert parity._RUNNERS["go/fc"]().target == "go/fc"
+    assert calls == [False, True]
 
 
 def test_adding_a_runner_module_adds_a_target_to_the_gate(tmp_path, monkeypatch):
@@ -378,11 +609,27 @@ def test_the_gate_runs_every_target_with_a_runner_by_default(monkeypatch):
     def fake(target):
         return lambda: parity.skipped(target, "fake toolchain")
 
-    monkeypatch.setattr(parity, "_RUNNERS", {"python": fake("python"), "go": fake("go")})
-    assert set(parity.run_gate().reports) == {"python", "go"}
+    monkeypatch.setattr(parity, "_RUNNERS", {name: fake(name) for name in ("python", "go", "go/fc")})
+    assert set(parity.run_gate().reports) == {"python", "go", "go/fc"}
     assert set(parity.run_gate(run_compiled=False).reports) == {"python"}
-    assert set(parity.run_gate(target="go").reports) == {"go"}
+    assert set(parity.run_gate(target="go").reports) == {"go", "go/fc"}   # a target: each variant
+    assert set(parity.run_gate(target="go/fc").reports) == {"go/fc"}      # a variant: itself
     assert parity.run_gate(target="java").reports == {}           # no runner: not run
+    for unknown in ("python/fc", "go/xx"):
+        with pytest.raises(parity.ParityValidationError, match="unknown target"):
+            parity.run_gate(target=unknown)
+
+
+def test_the_summary_gives_each_variant_its_own_line(monkeypatch):
+    def fake(name):
+        return lambda: parity.parse_report(name, "\n".join(_passing_lines(name)))
+
+    monkeypatch.setattr(parity, "_RUNNERS", {name: fake(name) for name in ("python", "go", "go/fc")})
+    lines = parity.run_gate().lines
+    table = {name: [line for line in lines if line.startswith(f"{name:<11} ")] for name in parity.variants()}
+    assert all(len(found) == 1 for found in table.values()), table
+    assert table["go"][0].endswith("GREEN") and table["go/fc"][0].endswith("GREEN")
+    assert "not run" in table["rust/fc"][0]
 
 
 def test_a_runner_that_raises_is_red_and_the_others_still_run(monkeypatch):
@@ -396,6 +643,20 @@ def test_a_runner_that_raises_is_red_and_the_others_still_run(monkeypatch):
     assert outcome.reports["go"].fault == "runner raised\nRuntimeError: runner bug"
     assert "  ! RuntimeError: runner bug" in outcome.lines
     assert f"  - no row reported ({INT_ROWS + MALFORMED_ROWS} rows)" in outcome.lines
+
+
+def test_the_cli_takes_a_target_or_an_fc_variant(monkeypatch, capsys):
+    def fake(name):
+        return lambda: parity.skipped(name, "fake toolchain")
+
+    monkeypatch.setattr(parity, "_RUNNERS", {name: fake(name) for name in ("python", "go", "go/fc")})
+    assert main(["parity", "-t", "go/fc"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert "skipped" in next(line for line in lines if line.startswith(f"{'go/fc':<11} "))
+    assert "not run" in next(line for line in lines if line.startswith(f"{'go':<11} "))
+    with pytest.raises(SystemExit) as refused:
+        main(["parity", "-t", "python/fc"])
+    assert refused.value.code == 2
 
 
 def test_parity_cli_python_only_reports_clean(capsys):

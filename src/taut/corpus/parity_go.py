@@ -311,22 +311,24 @@ def _build_env(work: Path) -> dict[str, str]:
     return env
 
 
-def run() -> parity.TargetReport:
+def run(forward_compat: bool = False) -> parity.TargetReport:
+    """The go gate, or with `forward_compat` its `go/fc` variant (`parity_rust.py`)."""
+    name = parity.variant(TARGET, forward_compat)
     go = toolchains.find_go()
     if go is None:
-        return parity.skipped(TARGET, "go not found")
+        return parity.skipped(name, "go not found")
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
         package = work / "gopath" / "src" / _PACKAGE
-        failed = parity.generate(TARGET, package, runtime=True)
+        failed = parity.generate(name, package, runtime=True)
         if failed is not None:
             return failed
         runner = package / "runner"
         runner.mkdir()
         (runner / "main.go").write_text(_source())
         binary = work / "parity_runner"
-        failed = parity.build(TARGET, [go, "build", "-o", str(binary), f"{_PACKAGE}/runner"],
+        failed = parity.build(name, [go, "build", "-o", str(binary), f"{_PACKAGE}/runner"],
                               cwd=work, env=_build_env(work))
         if failed is not None:
             return failed
-        return parity.run_runner(TARGET, [str(binary)], cwd=work)
+        return parity.run_runner(name, [str(binary)], cwd=work)

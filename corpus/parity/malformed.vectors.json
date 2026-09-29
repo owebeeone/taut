@@ -340,8 +340,8 @@
       "stage": "from_cbor",
       "schema": "Shapes",
       "bytes": "b3010002f900000360044005f4060007a1010008f609f60af60b800c800d800e82a20161610201a201616102020f80108011f612f613f6",
-      "expect": {"tag": "DuplicateMapKey"},
-      "why": "shapes-sparse whose map<str,int> holds two entries keyed \"a\": a repeated key is refused whatever its type; tag only, as the payload of a non-int key is open for the owner",
+      "expect": {"tag": "DuplicateMapKey", "key": "a"},
+      "why": "shapes-sparse whose map<str,int> holds two entries keyed \"a\": a repeated key is refused whatever its type, and its key payload is the key as text, a str as itself (TautCheckedDecode.md \u00a78 question 9)",
       "lead": true
     },
     {
@@ -349,8 +349,8 @@
       "stage": "from_cbor",
       "schema": "Shapes",
       "bytes": "b3010002f900000360044005f4060007a1010008f609f60af60b800c800d800e800f82a201f50200a201f50201108011f612f613f6",
-      "expect": {"tag": "DuplicateMapKey"},
-      "why": "shapes-sparse whose map<bool,Mode> holds two entries keyed true: DuplicateMapKey, tag only, as for map-str-key-duplicate",
+      "expect": {"tag": "DuplicateMapKey", "key": "true"},
+      "why": "shapes-sparse whose map<bool,Mode> holds two entries keyed true: DuplicateMapKey with the key as text, a bool as `true` or `false` (question 9)",
       "lead": true
     },
     {
@@ -360,6 +360,35 @@
       "bytes": "b3010002f900000360044005f4060007a1010008f609f60af60b800c800d818161780e800f80108011f612f613f6",
       "expect": {"tag": "WrongType", "expected": "int"},
       "why": "shapes-sparse whose list<list<int>> holds [[\"x\"]]: an inner list's item is checked as an int",
+      "lead": true
+    },
+    {
+      "name": "unknown-field-round-trip",
+      "stage": "from_cbor",
+      "schema": "Empty",
+      "bytes": "a10100",
+      "expect": {"accept": true},
+      "expect_dropping": {"accept": true, "reencode": "a0"},
+      "why": "Empty holding a field 1 it does not know: python, typescript and every <target>/fc keep the unknown field and write it back; the seven generated without forward-compat drop it and re-encode the empty map",
+      "lead": true
+    },
+    {
+      "name": "unknown-field-beside-known",
+      "stage": "from_cbor",
+      "schema": "IntBox",
+      "bytes": "a301070281a201010220036178",
+      "expect": {"accept": true},
+      "expect_dropping": {"accept": true, "reencode": "a201070281a201010220"},
+      "why": "an IntBox {n: 7, by_id: {1: -1}} beside an unknown field 3 = \"x\": a codec that keeps unknown fields writes field 3 back after the known ones, one that drops them writes the IntBox alone",
+      "lead": true
+    },
+    {
+      "name": "names-round-trip",
+      "stage": "from_cbor",
+      "schema": "Names",
+      "bytes": "b81e010102020361630404050506060707088201020982a20161610201a201616202020a0a0b0b0c0c0d0d0e0e0f0f1010111112121382617861791414151516161717181818181819f5181a181a181b82a201010202a201030204181c181c181d181d181e181e",
+      "expect": {"accept": true},
+      "why": "every Names field set: fields named like the locals, parameters and unqualified helpers the generators emit (a Java field `m`, a C++ field `b`) generate, compile, decode and re-encode to these bytes",
       "lead": true
     }
   ]

@@ -11,11 +11,23 @@ be de-listed) or a *gated* target fails.
 
 Runners. `python` replays in-process (`run_python`). Any other target has a runner
 exactly when the module `taut.corpus.parity_<target>` exists and exposes
-`run() -> TargetReport`: `_RUNNERS` resolves it, so adding a target is adding that
-module and deleting its allowlist entry. `parity_rust.py` is the model a compiled
-runner copies: find the toolchain (`toolchains.py`), generate the fixture's code,
-build, run. A missing toolchain is the only skip; a failed generation or build is
-RED (TautCheckedDecode.md §5.4).
+`run(forward_compat: bool = False) -> TargetReport`: `_RUNNERS` resolves it, so adding a
+target is adding that module and deleting its allowlist entry. `parity_rust.py` is the
+model a compiled runner copies: find the toolchain (`toolchains.py`), generate the
+fixture's code, build, run. A missing toolchain is the only skip; a failed generation or
+build is RED (TautCheckedDecode.md §5.4).
+
+Variants (TautCheckedDecode.md §8 question 10). The seven generated targets
+(`FC_TARGETS`) each run twice: as themselves, and as `<target>/fc`, the fixture generated
+with `forward_compat=True` (their runner's `run(forward_compat=True)`). `variants()` lists
+every name the gate runs; a variant is gated or allowlisted, and governed, like a target,
+and has its own summary line. `TARGETS` stays the nine languages.
+
+Unknown fields. Python, TypeScript and every `<target>/fc` keep a message's unknown
+fields on re-encode; the seven generated without forward-compat drop them
+(`keeps_unknown_fields`). A from_cbor row may add `expect_dropping` beside `expect`: a
+codec that drops unknown fields is judged by it, and every other codec by `expect`
+(`row_expect`).
 
 Runner protocol (TautCheckedDecode.md CD-C4). A runner prints one line per row,
 `name<TAB>outcome<TAB>detail`:
@@ -29,7 +41,8 @@ Runner protocol (TautCheckedDecode.md CD-C4). A runner prints one line per row,
     `;field=value` for each payload field its DecodeError carries
     (`PAYLOAD_FIELDS`); or `untyped`, with a description, when anything other than
     the language's DecodeError escapes.
-The gate, not the runner, judges a malformed row (`judge`). An accept row,
+The gate, not the runner, judges a malformed row (`judge`), by the expectation that
+applies to the runner's codec (`row_expect`). An accept expectation,
 `{"accept": true}` or `{"accept": true, "reencode": "<hex>"}`, passes only on `ok`
 whose detail equals its expected re-encoding: `reencode` when given, else the row's
 own bytes. That is D2's law, decode ok => encode(decode(bytes)) == bytes, and
@@ -48,6 +61,7 @@ per-language *baseline* smoke tests in `src/tests/test_{rust,ts,js,go,...}.py`.
 
 from __future__ import annotations
 
+import functools
 import importlib
 import importlib.util
 import json
@@ -70,6 +84,13 @@ INT_MIN = -(1 << 63)
 INT_MAX = (1 << 63) - 1
 
 TARGETS = ("rust", "python", "typescript", "js", "cpp", "swift", "go", "kotlin", "java")
+# The seven generated targets: each also runs as `<target>/fc`, generated with
+# forward_compat (TautCheckedDecode.md §8 question 10).
+FC_TARGETS = ("rust", "js", "cpp", "swift", "go", "kotlin", "java")
+FC_SUFFIX = "/fc"
+# The IR-driven codecs, which keep a message's unknown fields on re-encode without a
+# forward-compat build.
+KEEP_UNKNOWN = frozenset({"python", "typescript"})
 DECODE_TAGS = {
     "Truncated",
     "TrailingBytes",
@@ -108,6 +129,47 @@ class ParityStatus:
     reason: str
     phase: str = ""
     owner: str = ""
+
+
+# --- variants and the unknown-field model ---------------------------------------------
+
+def variant(target: str, forward_compat: bool) -> str:
+    """The name of `target`'s variant: `<target>/fc` for its forward-compat build."""
+    return target + FC_SUFFIX if forward_compat else target
+
+
+def split_variant(name: str) -> tuple[str, bool]:
+    """A variant name's target, and whether it names that target's forward-compat build."""
+    if name.endswith(FC_SUFFIX):
+        return name[: -len(FC_SUFFIX)], True
+    return name, False
+
+
+def variants() -> tuple[str, ...]:
+    """Every name the gate runs, gates and allowlists, in summary order: each target, and
+    after each generated target its `<target>/fc`."""
+    names: list[str] = []
+    for target in TARGETS:
+        names.append(target)
+        if target in FC_TARGETS:
+            names.append(variant(target, True))
+    return tuple(names)
+
+
+def keeps_unknown_fields(name: str) -> bool:
+    """Whether the codec `name` names keeps a message's unknown fields on re-encode:
+    python, typescript and every `<target>/fc` do; the generated targets built without
+    forward-compat drop them (TautCheckedDecode.md §8 question 10)."""
+    target, forward_compat = split_variant(name)
+    return forward_compat or target in KEEP_UNKNOWN
+
+
+def row_expect(name: str, row: Mapping[str, Any]) -> dict[str, Any]:
+    """The expectation `name`'s codec is judged by: a row's `expect_dropping` when it has
+    one and the codec drops unknown fields, else its `expect`."""
+    if "expect_dropping" in row and not keeps_unknown_fields(name):
+        return row["expect_dropping"]
+    return row["expect"]
 
 
 # --- artifact validation ------------------------------------------------------
@@ -158,7 +220,7 @@ def _native_intbox(value: dict[str, Any], where: str) -> dict[str, Any]:
     return {"n": _as_int(value.get("n"), f"{where}.n"), "by_id": dict(pairs)}
 
 
-def _check_expect(expect: Any, where: str) -> None:
+def _check_one_expect(expect: Any, where: str) -> None:
     """`{"accept": true}`, optionally with the expected re-encoding as
     `"reencode": "<hex>"`, or a known decode tag with known payload fields (CD-C2)."""
     if not isinstance(expect, dict):
@@ -176,6 +238,21 @@ def _check_expect(expect: Any, where: str) -> None:
     unknown = sorted(set(expect) - {"tag", *PAYLOAD_FIELDS})
     if unknown:
         raise ParityValidationError(f"{where}: unknown payload field(s) {unknown}")
+
+
+def _check_expect(row: Mapping[str, Any], where: str) -> None:
+    """A malformed row's `expect` and, on a from_cbor row, its optional `expect_dropping`:
+    what a codec that drops a message's unknown fields must do instead (question 10). Each
+    is a well-formed expectation, and `expect_dropping` differs from `expect`."""
+    _check_one_expect(row.get("expect"), f"{where}.expect")
+    if "expect_dropping" not in row:
+        return
+    if row.get("stage") != "from_cbor":
+        raise ParityValidationError(f"{where}: only a from_cbor row has expect_dropping; "
+                                    "unknown fields are a message's")
+    _check_one_expect(row["expect_dropping"], f"{where}.expect_dropping")
+    if row["expect_dropping"] == row["expect"]:
+        raise ParityValidationError(f"{where}: expect_dropping equals expect; leave it out")
 
 
 def validate_int_vectors(path: Path = INT_VECTORS) -> int:
@@ -229,7 +306,7 @@ def validate_malformed_vectors(path: Path = MALFORMED_VECTORS) -> int:
         if stage not in {"raw_decode", "from_cbor", "from_wire"}:
             raise ParityValidationError(f"{path}:{name}: bad stage {stage!r}")
         _hex(row.get("bytes"), f"{path}:{name}.bytes")
-        _check_expect(row.get("expect"), f"{path}:{name}.expect")
+        _check_expect(row, f"{path}:{name}")
         entrypoint = row.get("schema")
         if stage == "from_cbor" and entrypoint not in schema.messages:
             raise ParityValidationError(f"{path}:{name}: unknown message {entrypoint!r}")
@@ -244,6 +321,8 @@ def validate_malformed_vectors(path: Path = MALFORMED_VECTORS) -> int:
 
 
 def target_statuses(path: Path = ALLOWLIST) -> list[ParityStatus]:
+    """Each variant's status, in `variants()` order: allowlisted when the allowlist names it,
+    else gated. An entry names a target or a `<target>/fc` variant, each on its own."""
     data = _load_json(path)
     if data.get("version") != 1:
         raise ParityValidationError(f"{path}: unsupported version {data.get('version')!r}")
@@ -253,11 +332,12 @@ def target_statuses(path: Path = ALLOWLIST) -> list[ParityStatus]:
         if target in entries:
             raise ParityValidationError(f"{path}: duplicate target {target}")
         entries[target] = row
-    unknown = sorted(set(entries) - set(TARGETS))
+    known = variants()
+    unknown = sorted(set(entries) - set(known), key=str)
     if unknown:
         raise ParityValidationError(f"{path}: unknown target(s) {unknown}")
     statuses: list[ParityStatus] = []
-    for target in TARGETS:
+    for target in known:
         row = entries.get(target)
         if row is None:
             statuses.append(ParityStatus(target, "gated", "shared replay harness enforced"))
@@ -366,20 +446,23 @@ def parse_error(detail: str) -> tuple[str, dict[str, str]]:
     return tag, payload
 
 
-def expected_reencoding(row: Mapping[str, Any]) -> str:
-    """An accept row's expected re-encoding, as hex: its `reencode`, else its own bytes."""
-    return row["expect"].get("reencode", row["bytes"])
+def expected_reencoding(row: Mapping[str, Any], expect: Mapping[str, Any] | None = None) -> str:
+    """An accept expectation's re-encoding, as hex: its `reencode`, else the row's own
+    bytes. `expect` is the row's `expect` unless given (`row_expect`)."""
+    expect = row["expect"] if expect is None else expect
+    return expect.get("reencode", row["bytes"])
 
 
 def judge(target: str, row: Mapping[str, Any], outcome: str, detail: str) -> tuple[str, str]:
-    """The comparator: (PASS or FAIL, why) for one malformed row's observation. An
-    accept row's `ok` must carry its expected re-encoding (D2's law)."""
-    expect = row["expect"]
+    """The comparator: (PASS or FAIL, why) for one malformed row's observation by
+    `target`, a target or variant, judged by `row_expect(target, row)`. An accept
+    expectation's `ok` must carry its re-encoding (D2's law)."""
+    expect = row_expect(target, row)
     want = "accept" if expect.get("accept") else format_error(expect["tag"], expect)
     if outcome == OK:
         if want != "accept":
             return FAIL, f"decoded ok, expected {want}"
-        reencoding = expected_reencoding(row)
+        reencoding = expected_reencoding(row, expect)
         if not detail:
             return FAIL, "no re-encoding reported"
         if detail != reencoding:
@@ -392,7 +475,7 @@ def judge(target: str, row: Mapping[str, Any], outcome: str, detail: str) -> tup
     if want == "accept":
         return FAIL, f"got {detail}, expected accept"
     tag, payload = parse_error(detail)
-    exempt = PAYLOAD_EXEMPT.get(target, frozenset())
+    exempt = PAYLOAD_EXEMPT.get(split_variant(target)[0], frozenset())  # the target's runtime
     drift = [name for name in expect
              if name != "tag" and (tag, name) not in exempt and payload.get(name) != str(expect[name])]
     if tag != expect["tag"] or drift:
@@ -410,8 +493,9 @@ def _row_index() -> dict[str, tuple[str, dict]]:
     return index
 
 
-def _result(kind: str, row: Mapping[str, Any], status: str, detail: str) -> VectorResult:
-    expect = row.get("expect", {})
+def _result(target: str, kind: str, row: Mapping[str, Any], status: str, detail: str) -> VectorResult:
+    """One row's result for `target`, naming the expectation it was judged by."""
+    expect = row_expect(target, row) if kind == "malformed" else row.get("expect", {})
     expected = "accept" if expect.get("accept") else expect.get("tag", "")
     return VectorResult(row["name"], kind, expected, status, detail, bool(row.get("lead")))
 
@@ -440,15 +524,15 @@ def parse_report(target: str, stdout: str, *, returncode: int = 0, stderr: str =
             continue
         kind, row = rows[name]
         if name in judged:
-            judged[name] = _result(kind, row, FAIL, "reported more than once")
+            judged[name] = _result(target, kind, row, FAIL, "reported more than once")
         elif kind == "malformed":
-            judged[name] = _result(kind, row, *judge(target, row, outcome, detail))
+            judged[name] = _result(target, kind, row, *judge(target, row, outcome, detail))
         elif outcome in (PASS, FAIL, TYPE_SATISFIED):
-            judged[name] = _result(kind, row, outcome, detail)
+            judged[name] = _result(target, kind, row, outcome, detail)
         else:
-            judged[name] = _result(kind, row, FAIL, f"unknown outcome {outcome!r}")
+            judged[name] = _result(target, kind, row, FAIL, f"unknown outcome {outcome!r}")
     report = TargetReport(target, available=True)
-    report.results = [judged.get(name) or _result(kind, row, FAIL, NO_REPORT)
+    report.results = [judged.get(name) or _result(target, kind, row, FAIL, NO_REPORT)
                       for name, (kind, row) in rows.items()]
     faults = []
     if returncode != 0:
@@ -471,15 +555,18 @@ def red(target: str, fault: str) -> TargetReport:
     return report
 
 
-def generate(target: str, out_dir: Path, **emit_options: Any) -> TargetReport | None:
-    """Generate the fixture's `target` code into `out_dir/<target>`; None on success,
-    else the RED report (a generator that refuses the fixture fails its target)."""
+def generate(name: str, out_dir: Path, **emit_options: Any) -> TargetReport | None:
+    """Generate the fixture's code for `name`, a target or its `<target>/fc` variant
+    (generated with `forward_compat=True`), into `out_dir/<target>`; None on success, else
+    the RED report (a generator that refuses the fixture fails its variant)."""
     from ..gen import scaffold
 
+    target, forward_compat = split_variant(name)
     try:
-        scaffold.emit(parity_schema(), out_dir, langs=[target], services=[], **emit_options)
+        scaffold.emit(parity_schema(), out_dir, langs=[target], services=[],
+                      forward_compat=forward_compat, **emit_options)
     except Exception as exc:  # noqa: BLE001 — any generator failure makes the target RED
-        return red(target, f"generation failed\n{type(exc).__name__}: {exc}")
+        return red(name, f"generation failed\n{type(exc).__name__}: {exc}")
     return None
 
 
@@ -567,11 +654,11 @@ def run_python() -> TargetReport:
                 status, detail = (PASS, "") if exc.tag == tag else (FAIL, f"tag {exc.tag} != {tag}")
             except Exception as exc:  # noqa: BLE001
                 status, detail = FAIL, f"raised {type(exc).__name__}"
-        report.results.append(_result(row["kind"], row, status, detail))
+        report.results.append(_result("python", row["kind"], row, status, detail))
 
     for row in malformed_rows():
         outcome, observed = _observe_python(schema, row)
-        report.results.append(_result("malformed", row, *judge("python", row, outcome, observed)))
+        report.results.append(_result("python", "malformed", row, *judge("python", row, outcome, observed)))
 
     return report
 
@@ -583,24 +670,33 @@ def _runner_module(target: str) -> str:
 
 
 class _Runners(Mapping[str, Callable[[], TargetReport]]):
-    """target -> run(): `run_python` in-process, else `taut.corpus.parity_<target>.run`
-    when that module exists. A target with neither has no runner and is not run."""
+    """variant -> run(): `run_python` in-process, else `taut.corpus.parity_<target>.run`
+    when that module exists, called with `forward_compat=True` for `<target>/fc`. A
+    variant with neither has no runner and is not run."""
 
-    def __contains__(self, target: object) -> bool:
-        if target == "python":
+    def __contains__(self, name: object) -> bool:
+        if name == "python":
             return True
-        return (isinstance(target, str) and target in TARGETS
-                and importlib.util.find_spec(_runner_module(target)) is not None)
+        if not isinstance(name, str):
+            return False
+        target, forward_compat = split_variant(name)
+        if target not in TARGETS or (forward_compat and target not in FC_TARGETS):
+            return False
+        return importlib.util.find_spec(_runner_module(target)) is not None
 
-    def __getitem__(self, target: str) -> Callable[[], TargetReport]:
-        if target not in self:
-            raise KeyError(target)
-        if target == "python":
+    def __getitem__(self, name: str) -> Callable[[], TargetReport]:
+        if name not in self:
+            raise KeyError(name)
+        if name == "python":
             return run_python
-        return importlib.import_module(_runner_module(target)).run
+        target, forward_compat = split_variant(name)
+        run = importlib.import_module(_runner_module(target)).run
+        if forward_compat:
+            return functools.partial(run, forward_compat=True)
+        return run
 
     def __iter__(self) -> Iterator[str]:
-        return (target for target in TARGETS if target in self)
+        return (name for name in variants() if name in self)
 
     def __len__(self) -> int:
         return sum(1 for _ in self)
@@ -610,8 +706,8 @@ _RUNNERS: Mapping[str, Callable[[], TargetReport]] = _Runners()
 
 
 def run_targets(targets: Iterable[str]) -> dict[str, TargetReport]:
-    """Run each target that has a runner; a target without one is left out, and a
-    runner that raises is RED rather than stopping the other targets."""
+    """Run each target or variant that has a runner; one without is left out, and a
+    runner that raises is RED rather than stopping the others."""
     reports: dict[str, TargetReport] = {}
     for target in targets:
         if target not in _RUNNERS:
@@ -644,6 +740,23 @@ def governance(reports: dict[str, TargetReport], allow: set[str]) -> list[str]:
     return violations
 
 
+def governed_variants(run: Callable[..., TargetReport],
+                      path: Path = ALLOWLIST) -> tuple[list[TargetReport], list[str]]:
+    """A generated target's own test, held to what the gate holds it to: `run`, its runner's
+    `run`, as the target and as its `<target>/fc`, and the violations `governance` finds
+    for each against the allowlist, with the fault and failing rows behind each. None means
+    each report is GREEN, or RED and allowlisted, or skipped (which the test reports)."""
+    reports = [run(), run(forward_compat=True)]
+    allow = allowlisted_targets(path)
+    violations: list[str] = []
+    for report in reports:
+        for violation in governance({report.target: report}, allow):
+            rows = [f"{r.name}: {r.detail}" for r in report.failures
+                    if not (report.fault and r.detail == NO_REPORT)]
+            violations.append("\n".join(line for line in (violation, report.fault, *rows) if line))
+    return reports, violations
+
+
 def _summary(reports: dict[str, TargetReport], statuses: list[ParityStatus],
              int_count: int, mal_count: int) -> list[str]:
     lines = [
@@ -652,7 +765,7 @@ def _summary(reports: dict[str, TargetReport], statuses: list[ParityStatus],
         f"{'target':<11} {'status':<12} {'pass':>4} {'fail':>4} {'skip/type':>9}  observed",
     ]
     status_by = {s.target: s for s in statuses}
-    for target in TARGETS:
+    for target in variants():  # each variant on its own line
         st = status_by[target]
         rep = reports.get(target)
         if rep is None:
@@ -691,22 +804,31 @@ class GateOutcome:
     reports: dict[str, TargetReport]
 
 
+def _selected(target: str) -> tuple[str, ...]:
+    """The variants `target` selects: a target's own and its `<target>/fc`, or a variant
+    alone. An unknown name is refused."""
+    known = variants()
+    if target not in known:
+        raise ParityValidationError(f"unknown target {target!r}; known: {', '.join(known)}")
+    if split_variant(target)[1]:
+        return (target,)
+    return tuple(name for name in known if split_variant(name)[0] == target)
+
+
 def run_gate(*, target: str | None = None, run_compiled: bool = True) -> GateOutcome:
     """Validate the artifacts, run the runners and judge governance. By default every
-    target that has a runner; `run_compiled=False` runs Python only."""
-    if target is not None and target not in TARGETS:
-        raise ParityValidationError(f"unknown target {target!r}; known: {', '.join(TARGETS)}")
+    variant that has a runner; `target` runs a target's variants or one variant, and
+    `run_compiled=False` runs Python only."""
+    if target is not None:
+        wanted = _selected(target)
+    elif run_compiled:
+        wanted = variants()
+    else:
+        wanted = ("python",)
     int_count = validate_int_vectors()
     mal_count = validate_malformed_vectors()
     statuses = target_statuses()
     allow = {s.target for s in statuses if s.status == "allowlisted"}
-
-    if target is not None:
-        wanted: tuple[str, ...] = (target,)
-    elif run_compiled:
-        wanted = TARGETS
-    else:
-        wanted = ("python",)
     reports = run_targets(wanted)
 
     violations = governance(reports, allow)
@@ -724,11 +846,10 @@ def run_gate(*, target: str | None = None, run_compiled: bool = True) -> GateOut
 # --- back-compat: validate-only view (used by artifact tests) -----------------
 
 def validate_all(*, target: str | None = None) -> list[str]:
-    if target is not None and target not in TARGETS:
-        raise ParityValidationError(f"unknown target {target!r}; known: {', '.join(TARGETS)}")
+    selected = _selected(target) if target is not None else variants()
     int_count = validate_int_vectors()
     malformed_count = validate_malformed_vectors()
-    statuses = [s for s in target_statuses() if target is None or s.target == target]
+    statuses = [s for s in target_statuses() if s.target in selected]
     lines = [f"int vectors: {int_count}", f"malformed vectors: {malformed_count}"]
     for status in statuses:
         lines.append(f"{status.target}: {status.status} - {status.reason}")

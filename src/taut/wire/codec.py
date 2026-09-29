@@ -166,7 +166,8 @@ def _from_wire(schema: Schema, tref: TypeRef, cv: Any, *, strict: bool = False) 
                 raise DecodeError("MissingKey", key=2)
             key = _from_wire(schema, tref.key, e[1], strict=strict)
             if key in out:
-                raise DecodeError("DuplicateMapKey", key=key)
+                # The key as text (TautCheckedDecode.md §8 question 9): a bool is `true` or `false`.
+                raise DecodeError("DuplicateMapKey", key=str(key).lower() if isinstance(key, bool) else key)
             out[key] = _from_wire(schema, tref.value, e[2], strict=strict)
         return out
     if isinstance(tref, MsgRef):

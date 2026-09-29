@@ -2,7 +2,9 @@
 
 node runs the IR-driven codec's `.ts` sources directly (`--experimental-strip-types`),
 so there is no separate build: a runner that fails to load exits non-zero, which
-fails the target. The rows and `dispatch.json` are copied beside it. A decoded
+fails the target. The codec is IR-driven and keeps a message's unknown fields, so it has
+no forward-compat build and no `typescript/fc` variant (TautCheckedDecode.md §8
+question 10). The rows and `dispatch.json` are copied beside it. A decoded
 malformed row reports the hex of its re-encoding: `cbor.ts`'s `encode` of the tree
 for a raw row, the codec's `encode` of the decoded value for a from_cbor row.
 """
@@ -118,7 +120,10 @@ for (const row of malformed) {
 '''
 
 
-def run() -> parity.TargetReport:
+def run(forward_compat: bool = False) -> parity.TargetReport:
+    """The typescript gate. There is no forward-compat build: `forward_compat` is refused."""
+    if forward_compat:
+        raise ValueError("typescript has no forward-compat variant: its IR-driven codec keeps unknown fields")
     node = toolchains.find_node_for_typescript()
     if node is None:
         return parity.skipped(TARGET, "node with --experimental-strip-types (node >= 22.6) not found")

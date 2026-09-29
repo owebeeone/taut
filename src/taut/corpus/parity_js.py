@@ -122,16 +122,18 @@ for (const row of malformed) {
 '''
 
 
-def run() -> parity.TargetReport:
+def run(forward_compat: bool = False) -> parity.TargetReport:
+    """The js gate, or with `forward_compat` its `js/fc` variant (`parity_rust.py`)."""
+    name = parity.variant(TARGET, forward_compat)
     node = toolchains.find_node()
     if node is None:
-        return parity.skipped(TARGET, "node not found")
+        return parity.skipped(name, "node not found")
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        failed = parity.generate(TARGET, work, runtime=True)
+        failed = parity.generate(name, work, runtime=True)
         if failed is not None:
             return failed
         js_dir = work / TARGET
         parity.write_json_rows(js_dir)
         (js_dir / "runner.js").write_text(_RUNNER)
-        return parity.run_runner(TARGET, [node, "runner.js"], cwd=js_dir)
+        return parity.run_runner(name, [node, "runner.js"], cwd=js_dir)

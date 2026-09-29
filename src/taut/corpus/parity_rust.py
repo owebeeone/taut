@@ -1,10 +1,13 @@
 """Rust runner for the parity gate — the model a compiled runner copies.
 
 The gate finds a target's runner by module name, `taut.corpus.parity_<target>`,
-and calls its `run() -> TargetReport` (see `parity._RUNNERS`). The steps:
+and calls its `run(forward_compat: bool = False) -> TargetReport` (see
+`parity._RUNNERS`): once as the target, and once with `forward_compat=True` as its
+`<target>/fc` variant, whose name the report carries (`parity.variant`). The steps:
 
   1. find the toolchain (`toolchains`); a missing one is the only skip;
-  2. generate the fixture's code (`parity.generate`); a refusal is RED;
+  2. generate the fixture's code (`parity.generate`, which generates the `/fc` variant
+     with forward_compat); a refusal is RED;
   3. write a runner whose row tables come from `parity.int_rows()` and
      `parity.malformed_rows()` and whose dispatch comes from
      `parity.fixture_dispatch()`, never from hard-coded message names;
@@ -130,7 +133,8 @@ fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
 fn main() {
     for row in ROUND_TRIP {
         let by_id: BTreeMap<i64, i64> = row.by_id.iter().map(|(k, v)| (pi(k), pi(v))).collect();
-        let built = api::IntBox { n: pi(row.n), by_id: by_id.clone() };
+        // `..Default::default()` fills the forward-compat `wire_residual`.
+        let built = api::IntBox { n: pi(row.n), by_id: by_id.clone(), ..Default::default() };
         let enc = hexof(&encode(&built.to_cbor()));
         if enc != row.cbor {
             emit(row.name, "fail", &format!("encode {} != {}", enc, row.cbor));
@@ -211,19 +215,21 @@ def _source(generated: Path) -> str:
             .replace("@FROM_WIRE@", from_wire))
 
 
-def run() -> parity.TargetReport:
+def run(forward_compat: bool = False) -> parity.TargetReport:
+    """The rust gate, or with `forward_compat` its `rust/fc` variant."""
+    name = parity.variant(TARGET, forward_compat)
     rustc = toolchains.find_rustc()
     if rustc is None:
-        return parity.skipped(TARGET, "rustc not found")
+        return parity.skipped(name, "rustc not found")
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        failed = parity.generate(TARGET, work, runtime=True, fail_closed=True)
+        failed = parity.generate(name, work, runtime=True, fail_closed=True)
         if failed is not None:
             return failed
         runner = work / "parity_runner.rs"
         runner.write_text(_source(work / TARGET))
         binary = work / "parity_runner"
-        failed = parity.build(TARGET, [rustc, "--edition", "2021", str(runner), "-o", str(binary)], cwd=work)
+        failed = parity.build(name, [rustc, "--edition", "2021", str(runner), "-o", str(binary)], cwd=work)
         if failed is not None:
             return failed
-        return parity.run_runner(TARGET, [str(binary)], cwd=work)
+        return parity.run_runner(name, [str(binary)], cwd=work)

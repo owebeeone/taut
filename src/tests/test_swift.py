@@ -14,7 +14,7 @@ from pathlib import Path
 
 from taut import ext
 from taut.corpus.build import IR_PATH
-from taut.corpus import parity_swift
+from taut.corpus import parity, parity_swift
 from taut.corpus import resext_build as rb
 from taut.gen import scaffold, swift
 from taut.ir.dsl import FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, schema as mk
@@ -250,12 +250,13 @@ def test_float_codegen_shape():
 
 def test_swift_parity_gate_is_green():
     # The shared corpus, lead rows included, through the gate's own Swift runner
-    # (`tautc parity -t swift`): every row reported, judged on tag and payload.
-    report = parity_swift.run()
-    if not report.available:
-        pytest.skip(report.skip_reason)
-    failures = [f"{r.name}: {r.detail}" for r in report.failures]
-    assert report.green, "\n".join([report.fault, *failures])
+    # (`tautc parity -t swift`), as swift and swift/fc: every row reported, judged on tag
+    # and payload, each held to the gate's governance: GREEN, or RED and allowlisted.
+    reports, violations = parity.governed_variants(parity_swift.run)
+    for report in reports:
+        if not report.available:
+            pytest.skip(report.skip_reason)
+    assert violations == [], "\n".join(violations)
 
 
 def test_missing_ok_generates_for_swift(tmp_path):

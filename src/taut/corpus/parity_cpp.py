@@ -61,10 +61,10 @@ const std::vector<Mal> MALFORMED = {
 @MALFORMED@
 };
 
-// A malformed row's outcome: its DecodeError, or none when it decoded, with the hex of
-// the re-encoding (empty for a from_wire row: an enum row never accepts).
+// A malformed row's outcome: its DecodeError described, or none when it decoded, with the
+// hex of the re-encoding (empty for a from_wire row: an enum row never accepts).
 struct Outcome {
-    std::optional<taut::DecodeError> error;
+    std::optional<std::string> error;
     std::string again;
 };
 
@@ -183,8 +183,9 @@ std::string describe(const taut::DecodeError& e) {
 // than half a Buf is not re-encoded.
 constexpr std::size_t REENCODE_INPUT_MAX = sizeof(taut::Buf::d) / 2;
 
+// Described here, while the row's input is alive: a DuplicateMapKey's text key views it.
 Outcome failed(const taut::DecodeError& e) {
-    return Outcome{e, {}};
+    return Outcome{describe(e), {}};
 }
 
 Outcome decoded(const taut::Buf& again) {
@@ -316,7 +317,7 @@ int main() {
         try {
             Outcome seen = decode_row(row);
             if (seen.error) {
-                emit(row.name, "err", describe(*seen.error));
+                emit(row.name, "err", *seen.error);
             } else {
                 emit(row.name, "ok", seen.again);
             }
@@ -382,20 +383,22 @@ def _source() -> str:
             .replace("@FROM_WIRE@", from_wire))
 
 
-def run() -> parity.TargetReport:
+def run(forward_compat: bool = False) -> parity.TargetReport:
+    """The cpp gate, or with `forward_compat` its `cpp/fc` variant (`parity_rust.py`)."""
+    name = parity.variant(TARGET, forward_compat)
     cxx = toolchains.find_cxx()
     if cxx is None:
-        return parity.skipped(TARGET, "no C++ compiler (c++, clang++ or g++) found")
+        return parity.skipped(name, "no C++ compiler (c++, clang++ or g++) found")
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        failed = parity.generate(TARGET, work, runtime=True)
+        failed = parity.generate(name, work, runtime=True)
         if failed is not None:
             return failed
         runner = work / "parity_runner.cpp"
         runner.write_text(_source())
         binary = work / "parity_runner"
-        failed = parity.build(TARGET, [cxx, "-std=c++20", "-I", str(work / TARGET), str(runner),
-                                       "-o", str(binary)], cwd=work)
+        failed = parity.build(name, [cxx, "-std=c++20", "-I", str(work / TARGET), str(runner),
+                                     "-o", str(binary)], cwd=work)
         if failed is not None:
             return failed
-        return parity.run_runner(TARGET, [str(binary)], cwd=work)
+        return parity.run_runner(name, [str(binary)], cwd=work)

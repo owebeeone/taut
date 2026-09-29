@@ -243,15 +243,17 @@ def _source() -> str:
             .replace("@PAYLOAD@", _payload()))
 
 
-def run() -> parity.TargetReport:
+def run(forward_compat: bool = False) -> parity.TargetReport:
+    """The java gate, or with `forward_compat` its `java/fc` variant (`parity_rust.py`)."""
+    name = parity.variant(TARGET, forward_compat)
     tools = toolchains.find_java_tools()
     if tools is None:
-        return parity.skipped(TARGET, "javac/java not found (JAVA_HOME, Android Studio's JBR, PATH)")
+        return parity.skipped(name, "javac/java not found (JAVA_HOME, Android Studio's JBR, PATH)")
     javac, java = tools
     env = toolchains.java_env(java)
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        failed = parity.generate(TARGET, work, runtime=True)
+        failed = parity.generate(name, work, runtime=True)
         if failed is not None:
             return failed
         generated = work / TARGET
@@ -260,8 +262,8 @@ def run() -> parity.TargetReport:
         sources = sorted(str(path) for path in generated.glob("*.java"))
         classes = work / "classes"
         classes.mkdir()
-        failed = parity.build(TARGET, [javac, "-encoding", "UTF-8", "-d", str(classes), *sources],
+        failed = parity.build(name, [javac, "-encoding", "UTF-8", "-d", str(classes), *sources],
                               cwd=work, env=env)
         if failed is not None:
             return failed
-        return parity.run_runner(TARGET, [java, "-cp", str(classes), f"taut.{_CLASS}"], cwd=work, env=env)
+        return parity.run_runner(name, [java, "-cp", str(classes), f"taut.{_CLASS}"], cwd=work, env=env)

@@ -150,15 +150,19 @@ def test_cpp_codegen_emits_fallible_decode_path_for_i64_and_enums():
 
 
 def test_cpp_passes_the_parity_gate():
-    """Every row of the shared corpus through the gate's C++ runner (`tautc parity -t cpp`)."""
-    report = parity_cpp.run()
-    if not report.available:
-        pytest.skip(report.skip_reason)
-    failures = [f"{r.name}: {r.detail}" for r in report.failures]
-    assert report.green, "\n".join([report.fault, *failures])
+    """Every row of the shared corpus through the gate's C++ runner (`tautc parity -t cpp`),
+    as cpp and cpp/fc, each held to the gate's governance: GREEN, or RED and allowlisted."""
+    reports, violations = parity.governed_variants(parity_cpp.run)
+    for report in reports:
+        if not report.available:
+            pytest.skip(report.skip_reason)
+    assert violations == [], "\n".join(violations)
     # Only an encode-fail row may be satisfied by the type system; every other row ran.
-    satisfied = {r.name for r in report.results if r.status == parity.TYPE_SATISFIED}
-    assert satisfied == {r["name"] for r in parity.int_rows() if r["kind"] == "encode_fail"}
+    for report in reports:
+        if not report.fault:
+            satisfied = {r.name for r in report.results if r.status == parity.TYPE_SATISFIED}
+            assert satisfied == {r["name"] for r in parity.int_rows() if r["kind"] == "encode_fail"}, \
+                report.target
 
 
 # Inputs beyond the shared corpus, each with the result Python (the reference) gives:
@@ -227,6 +231,10 @@ def test_cpp_decode_matches_python_beyond_the_corpus(monkeypatch):
     assert [parity.judge("python", row, *seen) for row, (_, seen) in zip(extra, observed)] == \
         [(parity.PASS, "")] * len(extra)
 
+    listed = {s.target: s for s in parity.target_statuses() if s.status == "allowlisted"}
+    if "cpp" in listed:  # the whole fixture must build and pass before the rows beyond it can
+        pytest.skip(f"cpp is allowlisted in corpus/parity/allowlist.json (phase {listed['cpp'].phase}): "
+                    f"{listed['cpp'].reason}")
     corpus = parity.malformed_rows()
     monkeypatch.setattr(parity, "malformed_rows", lambda: [*corpus, *extra])
     report = parity_cpp.run()
@@ -445,12 +453,10 @@ def _reference_outcome(s, message: str, data: bytes) -> str:
     return f"ok {again.hex()}"
 
 
-def test_cpp_generates_every_legal_shape_at_any_nesting(tmp_path):
-    """Each value is built natively and encodes to the reference's bytes, which decode back,
-    checked and unchecked; each input decodes, checked, as the reference does. Deep has no map,
-    so the constexpr corpus oracle proves its values at compile time too."""
-    assert validate(S_NESTED) == []
-    assert "#include <map>" in cpp_gen._emit_types(mk(Msg("M", F("pages", 1, List(Map(STR, INT))))))
+@pytest.fixture(scope="module")
+def nested_shapes(tmp_path_factory):
+    """One C++ program over S_NESTED: (observed, expected), each expectation the reference's."""
+    tmp_path = tmp_path_factory.mktemp("nested")
     deep = {name: ref for name, ref in NESTED_VALUES.items() if ref[0] == "Deep"}
     (tmp_path / "cpp").mkdir()
     (tmp_path / "cpp" / "types.hpp").write_text('#pragma once\n#include "api.hpp"\n')
@@ -476,9 +482,6 @@ def test_cpp_generates_every_legal_shape_at_any_nesting(tmp_path):
         if outcome.startswith("ok "):
             expected[f"{name} unchecked"] = outcome.removeprefix("ok ")
             prints.append(f'    std::cout << "{name} unchecked\\t" << unchecked<taut::{message}>("{hexed}") << "\\n";')
-    # The inputs reach every tag `describe` above reports with its payload, and no other.
-    assert {outcome.split(";")[0] for outcome in expected.values() if outcome.startswith("err ")} == {
-        "err WrongType", "err MissingKey", "err DuplicateMapKey"}
 
     observed = _observe(tmp_path, S_NESTED, r"""
 #include "corpus.hpp"
@@ -504,7 +507,36 @@ std::string unchecked(std::string_view hex) {
 }
 
 """ + "\n\n".join(built) + "\n\nint main() {\n" + "\n".join(prints) + "\n    return 0;\n}\n")
-    assert observed == expected
+    return observed, expected
+
+
+# A repeated bool map key: question 9 rules its payload the key as text, `true`; C++ reports 1.
+BOOL_KEY_CASE = "shelf-repeated-bool-key checked"
+
+
+def test_cpp_generates_every_legal_shape_at_any_nesting(nested_shapes):
+    """Each value is built natively and encodes to the reference's bytes, which decode back,
+    checked and unchecked; each input decodes, checked, as the reference does. Deep has no map,
+    so the constexpr corpus oracle proves its values at compile time too. Question 9's bool
+    key is the strict xfail below."""
+    assert validate(S_NESTED) == []
+    assert "#include <map>" in cpp_gen._emit_types(mk(Msg("M", F("pages", 1, List(Map(STR, INT))))))
+    observed, expected = nested_shapes
+    # The inputs reach every tag `describe` above reports with its payload, and no other.
+    assert {outcome.split(";")[0] for outcome in expected.values() if outcome.startswith("err ")} == {
+        "err WrongType", "err MissingKey", "err DuplicateMapKey"}
+    assert expected[BOOL_KEY_CASE] == "err DuplicateMapKey;key=true"
+    assert set(observed) == set(expected)
+    assert {name: seen for name, seen in observed.items() if name != BOOL_KEY_CASE} == \
+        {name: want for name, want in expected.items() if name != BOOL_KEY_CASE}
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="question 9 (TautCheckedDecode.md §8): a repeated bool map key is `true`; "
+                          "C++ reports it as 1")
+def test_cpp_reports_a_repeated_bool_map_key_as_text(nested_shapes):
+    observed, expected = nested_shapes
+    assert observed[BOOL_KEY_CASE] == expected[BOOL_KEY_CASE]
 
 
 def test_cpp_generated_scalar_list_float_static_asserts_cxx20(tmp_path):

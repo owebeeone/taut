@@ -192,8 +192,9 @@ def main(argv: list[str] | None = None) -> int:
         "parity",
         help="run the leading cross-language codec-parity gate (every target with a runner + "
              "allowlist governance). SUPPLEMENTS `tautc corpus` — never replaces the message golden corpora.")
-    pr.add_argument("-t", "--target", choices=parity.TARGETS,
-                    help="replay only this target's runner (default: every target that has one — python "
+    pr.add_argument("-t", "--target", choices=parity.variants(),
+                    help="replay only this target's runners, the target and its <target>/fc, or one "
+                         "variant such as rust/fc (default: every variant that has a runner — python "
                          "in-process, any other through its taut.corpus.parity_<target> module)")
     pr.add_argument("--no-compile", action="store_true",
                     help="skip the compiled/subprocess targets; run only the direct Python harness")

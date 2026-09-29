@@ -521,16 +521,17 @@ def test_ext_runtime_public_api_source_shape():
 
 def test_java_passes_the_shared_parity_gate():
     """Every row of the shared corpus through the gate's Java runner (`tautc parity -t
-    java`): the int rows round-trip or are satisfied by `long`, and each malformed row
-    reports the tag and payload the gate expects."""
-    report = parity_java.run()
-    if not report.available:
-        pytest.skip(report.skip_reason)
-    assert not report.fault, report.fault
-    assert [(r.name, r.detail) for r in report.failures] == []
-    assert report.green
-    satisfied = {r.name for r in report.results if r.status == parity.TYPE_SATISFIED}
-    assert satisfied == {r.name for r in report.results if r.kind == "encode_fail"}
+    java`), as java and java/fc, each held to the gate's governance: GREEN, or RED and
+    allowlisted. A run's int rows round-trip or are satisfied by `long`."""
+    reports, violations = parity.governed_variants(parity_java.run)
+    for report in reports:
+        if not report.available:
+            pytest.skip(report.skip_reason)
+    assert violations == [], "\n".join(violations)
+    for report in reports:
+        if not report.fault:
+            satisfied = {r.name for r in report.results if r.status == parity.TYPE_SATISFIED}
+            assert satisfied == {r.name for r in report.results if r.kind == "encode_fail"}, report.target
 
 
 def test_java_missing_ok_reads_an_absent_key_as_null(tmp_path):

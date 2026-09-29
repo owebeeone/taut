@@ -1,10 +1,11 @@
 """Swift runner for the parity gate, modelled on `parity_rust.py`.
 
-The gate finds it by module name (`parity._RUNNERS`) and calls `run()`:
+The gate finds it by module name (`parity._RUNNERS`) and calls `run()`, and
+`run(forward_compat=True)` for the `swift/fc` variant:
 
   1. find swiftc (`toolchains.find_swiftc`); a missing one is the only skip;
-  2. generate the fixture's Swift with its vendored runtime (`parity.generate`);
-     a refusal is RED;
+  2. generate the fixture's Swift with its vendored runtime (`parity.generate`, with
+     forward_compat for `swift/fc`); a refusal is RED;
   3. write `main.swift`, whose row tables come from `parity.int_rows()` and
      `parity.malformed_rows()` and whose dispatch comes from
      `parity.fixture_dispatch()`, never from hard-coded message names;
@@ -302,20 +303,22 @@ def _source() -> str:
             .replace("@FROM_WIRE@", from_wire))
 
 
-def run() -> parity.TargetReport:
+def run(forward_compat: bool = False) -> parity.TargetReport:
+    """The swift gate, or with `forward_compat` its `swift/fc` variant."""
+    name = parity.variant(TARGET, forward_compat)
     swiftc = toolchains.find_swiftc()
     if swiftc is None:
-        return parity.skipped(TARGET, "swiftc not found")
+        return parity.skipped(name, "swiftc not found")
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        failed = parity.generate(TARGET, work, runtime=True)
+        failed = parity.generate(name, work, runtime=True)
         if failed is not None:
             return failed
         main = work / "main.swift"
         main.write_text(_source())
         sources = [str(path) for path in sorted((work / TARGET).glob("*.swift"))]
         binary = work / "parity_runner"
-        failed = parity.build(TARGET, [swiftc, *sources, str(main), "-o", str(binary)], cwd=work)
+        failed = parity.build(name, [swiftc, *sources, str(main), "-o", str(binary)], cwd=work)
         if failed is not None:
             return failed
-        return parity.run_runner(TARGET, [str(binary)], cwd=work)
+        return parity.run_runner(name, [str(binary)], cwd=work)
