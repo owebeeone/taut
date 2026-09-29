@@ -24,6 +24,7 @@ from . import swift as _swift
 from ..ir.model import (
     EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef,
 )
+from ..ir.options import OPTIONS
 
 # Compiled targets whose generated code imports external runtime modules. Maps
 # lang -> list of (output path relative to its lang dir, vendored resource file).
@@ -568,6 +569,22 @@ _LANGS = {
     "java":       ("java",  java_api,   java_client,   java_server),
 }
 
+# The options each target implements (TautOptions.md OPT-F2): the wire options, which all nine
+# implement in v0.10.0 (TautV010Plan.md D1). emit() refuses a requested target that lacks an option
+# the schema declares. Wire and semantic options bind every target; a target may ignore a metadata
+# option, and a codegen option whose `targets` leave it out (OPT-D2).
+_IMPLEMENTED_OPTIONS: dict[str, frozenset[str]] = {
+    "python":     frozenset({"max_depth", "max_encoded_len"}),
+    "typescript": frozenset({"max_depth", "max_encoded_len"}),
+    "rust":       frozenset({"max_depth", "max_encoded_len"}),
+    "cpp":        frozenset({"max_depth", "max_encoded_len"}),
+    "swift":      frozenset({"max_depth", "max_encoded_len"}),
+    "go":         frozenset({"max_depth", "max_encoded_len"}),
+    "kotlin":     frozenset({"max_depth", "max_encoded_len"}),
+    "js":         frozenset({"max_depth", "max_encoded_len"}),
+    "java":       frozenset({"max_depth", "max_encoded_len"}),
+}
+
 
 # D1 opt-out (--legacy-codec) deprecation banner, stamped into the generated Rust
 # api header when the LEGACY (fail-open) codec is emitted. One line (§ task); the
@@ -644,6 +661,27 @@ def emit(
             f"({'/'.join(sorted(_GENERATED))}) requires forward_compat (extensions ride "
             "the residual space) — pass --forward-compat"
         )
+    # OPT-F2: before writing anything, refuse a requested target that lacks an option the schema
+    # declares at any level (declared, not defaulted), so that no target ignores a declared value.
+    # An option the registry does not know binds every target (OPT-F1).
+    declared = set(schema.options)
+    for enum_def in schema.enums.values():
+        declared.update(enum_def.options)
+    for msg in schema.messages.values():
+        declared.update(msg.options)
+        for fld in msg.fields:
+            declared.update(fld.options)
+    lacking: list[str] = []
+    for lang in lang_keys:
+        for name in sorted(declared - _IMPLEMENTED_OPTIONS[lang]):
+            defn = OPTIONS.get(name)
+            ignorable = defn is not None and (defn.klass == "metadata" or (
+                defn.klass == "codegen" and defn.targets is not None and lang not in defn.targets))
+            if not ignorable:
+                lacking.append(f"{lang} lacks {name}")
+    if lacking:
+        raise ValueError("this schema declares options a requested target does not implement, "
+                         f"so its code would ignore them: {'; '.join(lacking)}")
     # D1 (ratified): fail-closed is the DEFAULT codec. It only changes the *Rust*
     # codegen (fallible from_cbor + the hardened vendored cbor.rs); for every other
     # target it is a NO-OP — TS/js/python harden at the runtime-library level

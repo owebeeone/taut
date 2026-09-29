@@ -16,21 +16,38 @@ decoders read declared wire-fields by tag):
               param types/output/event types; remove a method param or add one.
 
 Transient fields are off the wire and ignored by the diff.
+
+Options (D27, TautOptions.md OPT-K1-K4). A wire or semantic option is compared by its effective
+value at every root present in both schemas: each message, and each method slot not typed as a
+message, which takes the file's values. Any change is breaking, raised or lowered; an undeclared
+max_encoded_len is none, unbounded, so a first declaration lowers it. A move that changes no root's
+value is no change, and a new message is "message added" whatever it declares. Codegen and metadata
+declarations are listed as written, compatible, a codegen change with a note; a change of an option
+the registry does not know is breaking, since its class is unknown. Defaults and ceilings are taut's
+own: both schemas resolve under this taut's, so changing one is a taut release (OPT-K4).
 """
 
 from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from .load import schema_from_json
 from .model import MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from .options import OPTIONS, effective
 
 # Presence is a ladder: each value reads every message the one before it reads, so a move up is
 # compatible and a move down breaking.
 _PRESENCE_RANK = {False: 0, True: 1, MISSING_OK: 2}
 _PRESENCE_NAME = {False: "required", True: "optional", MISSING_OK: "missing_ok"}
+
+# Option classes graded at roots, breaking when an effective value changes: wire options change
+# what decodes (OPT-K1), semantic ones what readers compute from the same bytes (question 7).
+_AT_ROOTS = ("wire", "semantic")
+# The classes that leave the wire alone, listed as declared (OPT-K2), with each one's note.
+_LISTED = {"codegen": " (wire-compatible; the generated API may change)", "metadata": ""}
 
 
 @dataclass(frozen=True)
@@ -165,11 +182,93 @@ def _diff_services(old: Schema, new: Schema, out: list[Change]) -> None:
             out.append(Change("compatible", f"service {sname} added"))
 
 
+def _slots(s: Schema) -> dict[str, TypeRef]:
+    """Every method slot, each param and out slot, by the name the gate reports it under."""
+    slots: dict[str, TypeRef] = {}
+    for sname, svc in s.services.items():
+        for m in svc.methods:
+            for pn, pt in m.params:
+                slots[f"method {sname}.{m.name} param {pn}"] = pt
+            for slot, st in m.out:
+                slots[f"method {sname}.{m.name} out {slot}"] = st
+    return slots
+
+
+def _roots(old: Schema, new: Schema) -> list[tuple[str, str | None]]:
+    """The decode roots present in both schemas (OPT-D4, OPT-D5), each with the message whose
+    effective values bound it, or None for the file's: every message, and every method slot whose
+    type is not a message in either. A slot typed as a message is rooted at that message."""
+    roots: list[tuple[str, str | None]] = [
+        (f"message {name}", name) for name in old.messages if name in new.messages
+    ]
+    new_slots = _slots(new)
+    for where, t in _slots(old).items():
+        nt = new_slots.get(where)
+        if nt is not None and not isinstance(t, MsgRef) and not isinstance(nt, MsgRef):
+            roots.append((where, None))
+    return roots
+
+
+def _declarations(old: Schema, new: Schema) -> Iterator[tuple[str, dict, dict]]:
+    """The declared options of each element present in both schemas: the file, each message and its
+    fields, matched by name, and each enum."""
+    yield "file", old.options, new.options
+    for name, om in old.messages.items():
+        nm = new.messages.get(name)
+        if nm is None:
+            continue
+        yield f"message {name}", om.options, nm.options
+        new_fields = {f.name: f for f in nm.fields}
+        for of in om.fields:
+            nf = new_fields.get(of.name)
+            if nf is not None:
+                yield f"{name}.{of.name}", of.options, nf.options
+    for name, oe in old.enums.items():
+        ne = new.enums.get(name)
+        if ne is not None:
+            yield f"enum {name}", oe.options, ne.options
+
+
+def _effective_text(value: object) -> str:
+    return "none" if value is None else repr(value)
+
+
+def _declared_text(options: dict[str, object], name: str) -> str:
+    return repr(options[name]) if name in options else "unset"
+
+
+def _diff_options(old: Schema, new: Schema, out: list[Change]) -> None:
+    """Options (OPT-K1, K2): effective values at roots, then the other classes as declared."""
+    for where, message in _roots(old, new):
+        for name, defn in OPTIONS.items():
+            if defn.klass not in _AT_ROOTS:
+                continue
+            before = effective(old, name, message=message)
+            after = effective(new, name, message=message)
+            if before != after:
+                out.append(Change("breaking", f"{where} {defn.klass} option {name} "
+                                              f"{_effective_text(before)}->{_effective_text(after)}"))
+    for where, before, after in _declarations(old, new):
+        for name in dict.fromkeys((*before, *after)):
+            defn = OPTIONS.get(name)
+            if defn is not None and defn.klass in _AT_ROOTS:
+                continue   # graded at the roots above
+            if name in before and name in after and before[name] == after[name]:
+                continue
+            change = f"{_declared_text(before, name)}->{_declared_text(after, name)}"
+            if defn is None:
+                out.append(Change("breaking", f"{where} unknown option {name} {change}"))
+            else:
+                out.append(Change("compatible", f"{where} {defn.klass} option {name} {change}"
+                                                f"{_LISTED[defn.klass]}"))
+
+
 def diff(old: Schema, new: Schema) -> list[Change]:
     out: list[Change] = []
     _diff_enums(old, new, out)
     _diff_messages(old, new, out)
     _diff_services(old, new, out)
+    _diff_options(old, new, out)
     return out
 
 

@@ -83,13 +83,13 @@ Both notes mark their questions ruled, and `TautDecisions.md` gains D26 and D27.
 | Step | Goal | After |
 |---|---|---|
 | C1 | Python's bounds, the reference: `cbor.loads(data, *, max_depth=32, max_encoded_len=None)`, the two tags, `codec.decode` resolving through `effective()`, `ext.py` fail-closed | B |
-| C2 | The bounds rows (CD-C1-C4): `bounds.vectors.json` B1-B30 and its six fixture messages; segmented `bytes`, `len`, `limits`; header constants; typed rows through the typed entry point, with each runner reporting its constants and the row's resolved bounds; contract v1. Python GREEN, the other eight allowlisted. | B, with C1 |
-| C3 | Question 10's forward-compat variants (`<target>/fc`) and rows that apply by whether a codec keeps unknown fields; question 9's rows pinning the key as text; the `Names` fixture | C2 |
+| C2 | Question 10's forward-compat variants (`<target>/fc`), with `expect_dropping` for a codec that drops unknown fields; question 9's rows pinning the key as text; the `Names` fixture (a field named like a generated local) | B1 |
+| C3 | The bounds rows (CD-C1-C4): `bounds.vectors.json` B1-B30 and its six fixture messages; segmented `bytes`, `len`, `limits`; header constants; typed rows through the typed entry point, with each runner reporting its constants and the row's resolved bounds; contract v1. Python GREEN, the rest allowlisted. | B, C1, C2 |
 
 ### Phase D: one step per language per wave (parallel)
 | Wave | Goal per language | Done when |
 |---|---|---|
-| D1 | the two tags; raw depth and length bounds with the caller's limits; typed decode from bytes (generated: constants and `decode` per message; typescript: from the IR's `effective`); the runner speaks C2's protocol | GREEN on the B rows |
+| D1 | the two tags; raw depth and length bounds with the caller's limits; typed decode from bytes (generated: constants and `decode` per message; typescript: from the IR's `effective`); the runner speaks C3's protocol | GREEN on the B rows |
 | D2 | question 9's payload; the fc variant GREEN; fail-closed extension helpers; no panicking or aborting decode entry point (rust: the whole legacy path, the corpus emitter, `glade_build`); `Names` compiles | GREEN everywhere, de-listed |
 
 The languages are rust, python (C1 covers D1), typescript, js, cpp, swift, go, kotlin and java.
