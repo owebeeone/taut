@@ -3,6 +3,10 @@
 // runtimes: the same tiny subset (int, bytes, text, array, int-keyed map, bool,
 // null, float) in core-deterministic encoding (definite length, shortest-form
 // ints/floats, ascending map keys). Hand-rolled, stdlib only.
+//
+// Every decode entry point (TautCheckedDecode.md CD-E4), TryDecode here and the
+// generated TryXFromCbor and TryXFromWire, returns (value, error), with a
+// *DecodeError for bad input; none panics.
 package taut
 
 import (
@@ -61,11 +65,15 @@ const (
 
 const maxInt64Uint = uint64(1<<63 - 1)
 
+// DecodeError is the one error of decode: its Tag, and the payload fields that tag
+// carries (TautCheckedDecode.md CD-E1). Key, of NegativeMapKey, DuplicateMapKey and
+// MissingKey, is the key as text (question 9): an int in decimal, a str as itself, a
+// bool as true or false.
 type DecodeError struct {
 	Tag      string
 	Info     byte
 	Major    byte
-	Key      int64
+	Key      string
 	Expected string
 	Enum     string
 	Value    string
@@ -75,6 +83,12 @@ func UnknownEnumError(enum string, value int64) error {
 	return &DecodeError{Tag: DecodeErrUnknownEnum, Enum: enum, Value: strconv.FormatInt(value, 10)}
 }
 
+// DuplicateMapKeyError is the error for a repeated map<K,V> entry key, the key as
+// text: fmt prints an int64 in decimal, a string as itself and a bool as true or false.
+func DuplicateMapKeyError[K int64 | string | bool](key K) error {
+	return &DecodeError{Tag: DecodeErrDuplicateMapKey, Key: fmt.Sprint(key)}
+}
+
 func (e *DecodeError) Error() string {
 	switch e.Tag {
 	case DecodeErrUnsupportedInfo:
@@ -82,7 +96,7 @@ func (e *DecodeError) Error() string {
 	case DecodeErrUnsupportedMajor:
 		return fmt.Sprintf("%s(%d)", e.Tag, e.Major)
 	case DecodeErrNegativeMapKey, DecodeErrDuplicateMapKey, DecodeErrMissingKey:
-		return fmt.Sprintf("%s(%d)", e.Tag, e.Key)
+		return fmt.Sprintf("%s(%s)", e.Tag, e.Key)
 	case DecodeErrWrongType:
 		return fmt.Sprintf("%s(%s)", e.Tag, e.Expected)
 	case DecodeErrUnknownEnum:
@@ -109,26 +123,21 @@ func CBool(b bool) Cbor {
 	return c
 }
 
-// Get returns the value for an integer map key (panics if absent).
-func (c Cbor) Get(key int64) Cbor {
-	v, err := c.Require(key)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
+// Require returns the value for an integer map key: WrongType{map} when c is not a
+// map, MissingKey when the key is absent.
 func (c Cbor) Require(key int64) (Cbor, error) {
 	v, ok, err := c.Lookup(key)
 	if err != nil {
 		return Cbor{}, err
 	}
 	if !ok {
-		return Cbor{}, &DecodeError{Tag: DecodeErrMissingKey, Key: key}
+		return Cbor{}, &DecodeError{Tag: DecodeErrMissingKey, Key: strconv.FormatInt(key, 10)}
 	}
 	return v, nil
 }
 
+// Lookup returns the value for an integer map key and whether it is present:
+// WrongType{map} when c is not a map.
 func (c Cbor) Lookup(key int64) (Cbor, bool, error) {
 	m, err := c.TryMap()
 	if err != nil {
@@ -365,14 +374,10 @@ func halfToFloat64(h uint16) float64 {
 	}
 }
 
-func Decode(data []byte) Cbor {
-	v, err := TryDecode(data)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
+// TryDecode decodes one item that spans all of data, or returns the *DecodeError of
+// the first check that fails (CD-E5).
+// TODO(D1): bound the depth (TooDeep); until then, deep enough nesting exhausts the
+// goroutine stack.
 func TryDecode(data []byte) (Cbor, error) {
 	v, off, err := dec(data, 0)
 	if err != nil {
@@ -511,10 +516,10 @@ func dec(data []byte, off int) (Cbor, int, error) {
 				return Cbor{}, o2, &DecodeError{Tag: DecodeErrNonIntegerMapKey}
 			}
 			if kc.I < 0 {
-				return Cbor{}, o2, &DecodeError{Tag: DecodeErrNegativeMapKey, Key: kc.I}
+				return Cbor{}, o2, &DecodeError{Tag: DecodeErrNegativeMapKey, Key: strconv.FormatInt(kc.I, 10)}
 			}
 			if seen[kc.I] {
-				return Cbor{}, o2, &DecodeError{Tag: DecodeErrDuplicateMapKey, Key: kc.I}
+				return Cbor{}, o2, &DecodeError{Tag: DecodeErrDuplicateMapKey, Key: strconv.FormatInt(kc.I, 10)}
 			}
 			seen[kc.I] = true
 			vc, o3, err := dec(data, o2)

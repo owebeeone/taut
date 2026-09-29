@@ -201,7 +201,7 @@ func describe(e *taut.DecodeError) (string, bool) {
 	case "UnsupportedMajor":
 		return fmt.Sprintf("%s;major=%d", e.Tag, e.Major), true
 	case "NegativeMapKey", "DuplicateMapKey", "MissingKey":
-		return fmt.Sprintf("%s;key=%d", e.Tag, e.Key), true
+		return fmt.Sprintf("%s;key=%s", e.Tag, e.Key), true
 	case "WrongType":
 		return fmt.Sprintf("%s;expected=%s", e.Tag, e.Expected), true
 	case "UnknownEnum":

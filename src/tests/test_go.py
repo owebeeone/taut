@@ -64,8 +64,28 @@ def test_emits_structs_enums_and_codec():
     assert re.search(r"\n\tBuildStatusBuilt +BuildStatus = 1\n", s)
     assert "func (x BuildResult) ToCbor() Cbor {" in s
     assert "func TryBuildResultFromCbor(c Cbor) (BuildResult, error) {" in s
-    assert "func BuildResultFromCbor(c Cbor) BuildResult {" in s
     assert "func TryBuildStatusFromWire(v int64) (BuildStatus, error) {" in s
+    assert "func TryBuildStatusFromCbor(c Cbor) (BuildStatus, error) {" in s
+
+
+RUNTIME = ROOT / "src" / "taut" / "gen" / "runtime"
+
+
+def test_no_panicking_decode_entry_point_survives():
+    """Question 5 and CD-E4: every decode entry point returns `(value, error)`. Generated Go
+    has only `TryXFromCbor` and `TryXFromWire`, and neither it nor the runtime it vendors
+    (`cbor.go`, `ext.go`) panics: the runtime's `Decode` and `Get` are gone."""
+    entry_points = []
+    for name, source in _generated_go().items():
+        assert "panic(" not in source, name
+        entry_points += re.findall(r"^func (\w+?)From(?:Cbor|Wire)\(", source, re.M)
+    assert entry_points and all(e.startswith("Try") for e in entry_points), sorted(set(entry_points))
+    for rel, _ in scaffold._RUNTIMES["go"]:
+        source = (RUNTIME / rel).read_text()
+        assert "panic(" not in source, rel
+    cbor_go = (RUNTIME / "cbor.go").read_text()
+    assert "func Decode(" not in cbor_go and ") Get(" not in cbor_go
+    assert "func TryDecode(data []byte) (Cbor, error) {" in cbor_go
 
 
 def test_fields_pascalcased_and_optional_is_pointer():
@@ -226,7 +246,7 @@ def test_go_runtime_and_parity_runner_are_gofmt_clean(tmp_path):
         pytest.skip("gofmt not installed")
     runner = tmp_path / "main.go"
     runner.write_text(parity_go._source())
-    runtime = sorted(str(p) for p in (ROOT / "src/taut/gen/runtime").glob("*.go"))
+    runtime = sorted(str(p) for p in RUNTIME.glob("*.go"))
     result = subprocess.run([gofmt, "-l", str(runner), *runtime], capture_output=True, text=True, check=False)
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
 
@@ -352,14 +372,12 @@ def _mutated(tree, rng: random.Random):
 
 
 def _python_expect(data: bytes) -> dict:
-    """What `taut.wire.codec`, the reference, makes of `data` as a `Deep`: a row's expect.
-    Go's `DecodeError.Key` is an int64, so a repeated str or bool key is judged by its tag."""
+    """What `taut.wire.codec`, the reference, makes of `data` as a `Deep`: a row's expect,
+    the whole payload, so a repeated str or bool key is judged by its text (question 9)."""
     try:
         again = codec.encode(DEEP_SCHEMA, "Deep", codec.decode(DEEP_SCHEMA, "Deep", data))
     except cbor.DecodeError as exc:
-        payload = {name: value for name, value in exc.payload.items()
-                   if exc.tag != "DuplicateMapKey" or type(value) is int}
-        return {"tag": exc.tag, **payload}
+        return {"tag": exc.tag, **exc.payload}
     return {"accept": True, "reencode": again.hex()}
 
 
@@ -392,6 +410,8 @@ def test_go_decodes_and_reencodes_every_shape_at_depth_as_python_does(monkeypatc
     rows = _deep_rows()
     assert {row["expect"].get("tag", "accept") for row in rows} >= {
         "accept", "WrongType", "MissingKey", "DuplicateMapKey", "UnknownEnum"}
+    duplicate_keys = {row["expect"]["key"] for row in rows if row["expect"].get("tag") == "DuplicateMapKey"}
+    assert {"true", "false", "", "a", -1} <= duplicate_keys   # bool, str and int keys, as text
     assert rows[1]["expect"]["reencode"] != rows[0]["expect"]["reencode"]   # empty is not null
     monkeypatch.setattr(parity, "parity_schema", lambda: DEEP_SCHEMA)
     monkeypatch.setattr(parity, "malformed_rows", lambda: rows)
@@ -407,7 +427,10 @@ PRESENCE_SCHEMA = mk(Msg("Late", F("note", 1, STR, optional=MISSING_OK)),
 
 
 def _decoder(src: str, name: str) -> str:
-    return src[src.index(f"func Try{name}FromCbor("):src.index(f"func {name}FromCbor(")]
+    """The body of the generated `TryXFromCbor` for message `name`."""
+    start = src.index(f"func Try{name}FromCbor(")
+    end = src.find("\nfunc ", start)
+    return src[start:] if end < 0 else src[start:end]
 
 
 def test_missing_ok_looks_the_key_up_and_optional_requires_it():
@@ -496,7 +519,7 @@ def test_go_missing_ok_runtime(tmp_path):
 
         func TestOptRequiresTheKeyAndReadsNullAsNil(t *testing.T) {
             _, err := TryOptFromCbor(decodeHex(t, "a0"))
-            wantDecodeError(t, "a0", err, DecodeError{Tag: DecodeErrMissingKey, Key: 1})
+            wantDecodeError(t, "a0", err, DecodeError{Tag: DecodeErrMissingKey, Key: "1"})
             opt, err := TryOptFromCbor(decodeHex(t, "a101f6"))
             if err != nil {
                 t.Fatal(err)
@@ -519,28 +542,36 @@ def _run_go_tests(go_dir: Path, tmp_path: Path, *names: str) -> None:
         assert f"--- PASS: {name}" in result.stdout
 
 
-# A repeated `map<K,V>` entry key is refused whatever K is; the corpus (M13) pins an int key.
-KEYS_SCHEMA = mk(Msg("Keys", F("by_name", 1, Map(STR, INT)), F("by_flag", 2, Map(BOOL, INT))))
-KEYS_DISTINCT = cbor.dumps({1: [{1: "a", 2: 1}, {1: "b", 2: 2}], 2: [{1: False, 2: 0}, {1: True, 2: 1}]})
+# A repeated `map<K,V>` entry key is refused whatever K is, and its payload is the key as text
+# (TautCheckedDecode.md §8 question 9): an int in decimal, a str as itself, a bool as `true` or
+# `false`. The corpus pins an int key (M13), a str and a bool one.
+KEYS_SCHEMA = mk(Msg("Keys", F("by_name", 1, Map(STR, INT)), F("by_flag", 2, Map(BOOL, INT)),
+                     F("by_id", 3, Map(INT, INT))))
+KEYS_DISTINCT = cbor.dumps({1: [{1: "a", 2: 1}, {1: "b", 2: 2}], 2: [{1: False, 2: 0}, {1: True, 2: 1}],
+                            3: [{1: -7, 2: 0}, {1: 7, 2: 1}]})
+# The repeated key's text -> a `Keys` with one map that repeats that key.
 KEYS_REPEATED = {
-    "name": cbor.dumps({1: [{1: "a", 2: 1}, {1: "a", 2: 2}], 2: []}),
-    "flag": cbor.dumps({1: [], 2: [{1: True, 2: 1}, {1: True, 2: 2}]}),
+    "a": cbor.dumps({1: [{1: "a", 2: 1}, {1: "a", 2: 2}], 2: [], 3: []}),
+    "true": cbor.dumps({1: [], 2: [{1: True, 2: 1}, {1: True, 2: 2}], 3: []}),
+    "false": cbor.dumps({1: [], 2: [{1: False, 2: 1}, {1: False, 2: 2}], 3: []}),
+    "-7": cbor.dumps({1: [], 2: [], 3: [{1: -7, 2: 1}, {1: -7, 2: 2}]}),
 }
 
 
-def test_python_refuses_a_repeated_str_or_bool_map_key():
+def test_python_refuses_a_repeated_map_key_with_the_key_as_text():
     assert codec.decode(KEYS_SCHEMA, "Keys", KEYS_DISTINCT) == {
-        "by_name": {"a": 1, "b": 2}, "by_flag": {False: 0, True: 1}}
-    for data in KEYS_REPEATED.values():
+        "by_name": {"a": 1, "b": 2}, "by_flag": {False: 0, True: 1}, "by_id": {-7: 0, 7: 1}}
+    for text, data in KEYS_REPEATED.items():
         with pytest.raises(cbor.DecodeError) as caught:
             codec.decode(KEYS_SCHEMA, "Keys", data)
-        assert caught.value.tag == "DuplicateMapKey"
+        assert (caught.value.tag, str(caught.value.payload["key"])) == ("DuplicateMapKey", text)
 
 
-def test_go_map_field_refuses_a_repeated_str_or_bool_key(tmp_path):
+def test_go_map_field_refuses_a_repeated_key_with_the_key_as_text(tmp_path):
     _needs_go()
     scaffold.emit(KEYS_SCHEMA, tmp_path, langs=["go"], services=[], runtime=True)
     go_dir = tmp_path / "go"
+    repeated = ", ".join(f'{{"{data.hex()}", {_go_str(text)}}}' for text, data in KEYS_REPEATED.items())
     (go_dir / "keys_test.go").write_text(textwrap.dedent(f"""
         package taut
 
@@ -573,19 +604,26 @@ def test_go_map_field_refuses_a_repeated_str_or_bool_key(tmp_path):
             if len(keys.ByFlag) != 2 || keys.ByFlag[false] != 0 || keys.ByFlag[true] != 1 {{
                 t.Fatalf("by_flag %v", keys.ByFlag)
             }}
+            if len(keys.ById) != 2 || keys.ById[-7] != 0 || keys.ById[7] != 1 {{
+                t.Fatalf("by_id %v", keys.ById)
+            }}
         }}
 
-        func TestKeysRefusesARepeatedKey(t *testing.T) {{
-            for _, input := range []string{{"{KEYS_REPEATED['name'].hex()}", "{KEYS_REPEATED['flag'].hex()}"}} {{
-                _, err := decodeKeys(t, input)
+        func TestKeysRefusesARepeatedKeyWithTheKeyAsText(t *testing.T) {{
+            for _, c := range []struct{{ input, key string }}{{{repeated}}} {{
+                _, err := decodeKeys(t, c.input)
+                want := DecodeError{{Tag: DecodeErrDuplicateMapKey, Key: c.key}}
                 got, ok := err.(*DecodeError)
-                if !ok || got.Tag != DecodeErrDuplicateMapKey {{
-                    t.Fatalf("%s: got %T %v, want DuplicateMapKey", input, err, err)
+                if !ok || *got != want {{
+                    t.Fatalf("%s: got %T %v, want %#v", c.input, err, err, want)
+                }}
+                if text := got.Error(); text != "DuplicateMapKey("+c.key+")" {{
+                    t.Fatalf("%s: Error() is %q", c.input, text)
                 }}
             }}
         }}
     """))
-    _run_go_tests(go_dir, tmp_path, "TestKeysDecodesDistinctKeys", "TestKeysRefusesARepeatedKey")
+    _run_go_tests(go_dir, tmp_path, "TestKeysDecodesDistinctKeys", "TestKeysRefusesARepeatedKeyWithTheKeyAsText")
 
 
 def _go_str(s: str) -> str:
@@ -699,8 +737,7 @@ def _write_resext_go_harness(tmp_path: Path) -> Path:
 
         import (
             "encoding/hex"
-            "fmt"
-            "strings"
+            "errors"
             "testing"
         )
 
@@ -728,10 +765,11 @@ def _write_resext_go_harness(tmp_path: Path) -> Path:
             clearExpect string
         }}
 
-        func mustHex(s string) []byte {{
+        func mustHex(t *testing.T, s string) []byte {{
+            t.Helper()
             b, err := hex.DecodeString(s)
             if err != nil {{
-                panic(err)
+                t.Fatalf("bad hex %q: %v", s, err)
             }}
             return b
         }}
@@ -740,18 +778,71 @@ def _write_resext_go_harness(tmp_path: Path) -> Path:
             return hex.EncodeToString(b)
         }}
 
-        func mustPanicContains(t *testing.T, want string, fn func()) {{
+        func mustDecode(t *testing.T, wire []byte) Cbor {{
             t.Helper()
-            defer func() {{
-                r := recover()
-                if r == nil {{
-                    t.Fatalf("expected panic containing %q", want)
-                }}
-                if !strings.Contains(fmt.Sprint(r), want) {{
-                    t.Fatalf("panic = %v, want substring %q", r, want)
-                }}
-            }}()
-            fn()
+            c, err := TryDecode(wire)
+            if err != nil {{
+                t.Fatalf("decode %x: %v", wire, err)
+            }}
+            return c
+        }}
+
+        func mustHost(t *testing.T, wire string) Host {{
+            t.Helper()
+            host, err := TryHostFromCbor(mustDecode(t, mustHex(t, wire)))
+            if err != nil {{
+                t.Fatalf("host %s: %v", wire, err)
+            }}
+            return host
+        }}
+
+        func mustDecision(t *testing.T, c Cbor) Decision {{
+            t.Helper()
+            decision, err := TryDecisionFromCbor(c)
+            if err != nil {{
+                t.Fatalf("decision %x: %v", Encode(c), err)
+            }}
+            return decision
+        }}
+
+        func mustExtSet(t *testing.T, host []byte, tag int64, value Cbor) []byte {{
+            t.Helper()
+            out, err := ExtSet(host, tag, value)
+            if err != nil {{
+                t.Fatalf("ExtSet(%x, %d): %v", host, tag, err)
+            }}
+            return out
+        }}
+
+        func mustExtGet(t *testing.T, host []byte, tag int64) (Cbor, bool) {{
+            t.Helper()
+            value, ok, err := ExtGet(host, tag)
+            if err != nil {{
+                t.Fatalf("ExtGet(%x, %d): %v", host, tag, err)
+            }}
+            return value, ok
+        }}
+
+        func mustExtClear(t *testing.T, host []byte, tag int64) []byte {{
+            t.Helper()
+            out, err := ExtClear(host, tag)
+            if err != nil {{
+                t.Fatalf("ExtClear(%x, %d): %v", host, tag, err)
+            }}
+            return out
+        }}
+
+        // extErrors runs ExtSet, ExtGet and ExtClear on host at tag, each expected to fail, and
+        // returns their errors; a failing accessor returns no bytes and reports no value.
+        func extErrors(t *testing.T, host []byte, tag int64) []error {{
+            t.Helper()
+            set, setErr := ExtSet(host, tag, CMap(nil))
+            _, ok, getErr := ExtGet(host, tag)
+            cleared, clearErr := ExtClear(host, tag)
+            if set != nil || ok || cleared != nil {{
+                t.Fatalf("%x at %d: a failing accessor returned %x, %v, %x", host, tag, set, ok, cleared)
+            }}
+            return []error{{setErr, getErr, clearErr}}
         }}
 
         {_go_residual_rows("residualCorpus", residual_rows)}
@@ -765,7 +856,7 @@ def _write_resext_go_harness(tmp_path: Path) -> Path:
         func TestResExtResidualCorpus(t *testing.T) {{
             mismatches := 0
             for _, row := range residualCorpus {{
-                got := hexOf(Encode(HostFromCbor(Decode(mustHex(row.wire))).ToCbor()))
+                got := hexOf(Encode(mustHost(t, row.wire).ToCbor()))
                 if got != row.wire {{
                     t.Errorf("%s: got %s want %s", row.note, got, row.wire)
                     mismatches++
@@ -779,14 +870,14 @@ def _write_resext_go_harness(tmp_path: Path) -> Path:
             for _, row := range extCorpus {{
                 switch row.op {{
                 case "set":
-                    typed := DecisionFromCbor(Decode(mustHex(row.value)))
-                    got := hexOf(ExtSet(mustHex(row.host), row.tag, typed.ToCbor()))
+                    typed := mustDecision(t, mustDecode(t, mustHex(t, row.value)))
+                    got := hexOf(mustExtSet(t, mustHex(t, row.host), row.tag, typed.ToCbor()))
                     if got != row.expect {{
                         t.Errorf("%s set: got %s want %s", row.note, got, row.expect)
                         mismatches++
                     }}
                 case "get":
-                    got, ok := ExtGet(mustHex(row.host), row.tag)
+                    got, ok := mustExtGet(t, mustHex(t, row.host), row.tag)
                     if row.expect == "null" {{
                         if ok {{
                             t.Errorf("%s get: got present value, want absent", row.note)
@@ -799,13 +890,13 @@ def _write_resext_go_harness(tmp_path: Path) -> Path:
                         mismatches++
                         continue
                     }}
-                    typed := DecisionFromCbor(got)
+                    typed := mustDecision(t, got)
                     if gotHex := hexOf(Encode(typed.ToCbor())); gotHex != row.expect {{
                         t.Errorf("%s get: got %s want %s", row.note, gotHex, row.expect)
                         mismatches++
                     }}
                 case "clear":
-                    got := hexOf(ExtClear(mustHex(row.host), row.tag))
+                    got := hexOf(mustExtClear(t, mustHex(t, row.host), row.tag))
                     if got != row.expect {{
                         t.Errorf("%s clear: got %s want %s", row.note, got, row.expect)
                         mismatches++
@@ -817,56 +908,74 @@ def _write_resext_go_harness(tmp_path: Path) -> Path:
             t.Logf("extension corpus mismatches=%d rows=%d", mismatches, len(extCorpus))
         }}
 
-        func TestResExtInvalidCases(t *testing.T) {{
-            mustPanicContains(t, "below band", func() {{
-                ExtSet([]byte{{0xff}}, BandStart-1, CMap(nil))
-            }})
-            mustPanicContains(t, "below band", func() {{
-                ExtGet([]byte{{0xff}}, BandStart-1)
-            }})
-            mustPanicContains(t, "below band", func() {{
-                ExtClear([]byte{{0xff}}, BandStart-1)
-            }})
-            mustPanicContains(t, "not a map", func() {{
-                ExtSet(mustHex("01"), BandStart, CMap(nil))
-            }})
-            mustPanicContains(t, "not a map", func() {{
-                ExtGet(mustHex("01"), BandStart)
-            }})
-            mustPanicContains(t, "not a map", func() {{
-                ExtClear(mustHex("01"), BandStart)
-            }})
+        // CD-E4: a tag below the band is the caller's error, an *ExtTagError and not a
+        // *DecodeError, checked before the host is read (here it is not CBOR at all).
+        func TestResExtRefusesATagBelowTheBandAsACallerError(t *testing.T) {{
+            for op, err := range extErrors(t, []byte{{0xff}}, BandStart-1) {{
+                var tagErr *ExtTagError
+                if !errors.As(err, &tagErr) || tagErr.Tag != BandStart-1 {{
+                    t.Fatalf("op %d: got %T %v, want an *ExtTagError for %d", op, err, err, BandStart-1)
+                }}
+                var decodeErr *DecodeError
+                if errors.As(err, &decodeErr) {{
+                    t.Fatalf("op %d: a caller error is a *DecodeError: %v", op, err)
+                }}
+            }}
+        }}
+
+        // CD-E4: bad host bytes are a *DecodeError, and a host that is not a map is WrongType{{map}}.
+        func TestResExtRefusesABadHostWithADecodeError(t *testing.T) {{
+            cases := []struct {{
+                host string
+                want DecodeError
+            }}{{
+                {{"01", DecodeError{{Tag: DecodeErrWrongType, Expected: "map"}}}},
+                {{"80", DecodeError{{Tag: DecodeErrWrongType, Expected: "map"}}}},
+                {{"", DecodeError{{Tag: DecodeErrTruncated}}}},
+                {{"a1", DecodeError{{Tag: DecodeErrTruncated}}}},
+                {{"ff", DecodeError{{Tag: DecodeErrUnsupportedInfo, Info: 31}}}},
+                {{"a2000000", DecodeError{{Tag: DecodeErrDuplicateMapKey, Key: "0"}}}},
+                {{"a000", DecodeError{{Tag: DecodeErrTrailingBytes}}}},
+            }}
+            for _, c := range cases {{
+                for op, err := range extErrors(t, mustHex(t, c.host), BandStart) {{
+                    got, ok := err.(*DecodeError)
+                    if !ok || *got != c.want {{
+                        t.Fatalf("%q op %d: got %T %v, want %#v", c.host, op, err, err, c.want)
+                    }}
+                }}
+            }}
         }}
 
         func TestResExtFuzzFixedSeed(t *testing.T) {{
             mismatches := 0
             for _, row := range fuzzResidualCorpus {{
-                got := hexOf(Encode(HostFromCbor(Decode(mustHex(row.wire))).ToCbor()))
+                got := hexOf(Encode(mustHost(t, row.wire).ToCbor()))
                 if got != row.wire {{
                     t.Errorf("%s residual: got %s want %s seed=0x5504", row.note, got, row.wire)
                     mismatches++
                 }}
             }}
             for _, row := range fuzzExtCorpus {{
-                typed := DecisionFromCbor(Decode(mustHex(row.value)))
-                setBytes := ExtSet(mustHex(row.host), row.tag, typed.ToCbor())
+                typed := mustDecision(t, mustDecode(t, mustHex(t, row.value)))
+                setBytes := mustExtSet(t, mustHex(t, row.host), row.tag, typed.ToCbor())
                 if got := hexOf(setBytes); got != row.setExpect {{
                     t.Errorf("%s set: got %s want %s seed=0x5504", row.note, got, row.setExpect)
                     mismatches++
                     continue
                 }}
-                gotCbor, ok := ExtGet(setBytes, row.tag)
+                gotCbor, ok := mustExtGet(t, setBytes, row.tag)
                 if !ok {{
                     t.Errorf("%s get: got absent want %s seed=0x5504", row.note, row.getExpect)
                     mismatches++
                 }} else {{
-                    gotTyped := DecisionFromCbor(gotCbor)
+                    gotTyped := mustDecision(t, gotCbor)
                     if got := hexOf(Encode(gotTyped.ToCbor())); got != row.getExpect {{
                         t.Errorf("%s get: got %s want %s seed=0x5504", row.note, got, row.getExpect)
                         mismatches++
                     }}
                 }}
-                if got := hexOf(ExtClear(setBytes, row.tag)); got != row.clearExpect {{
+                if got := hexOf(mustExtClear(t, setBytes, row.tag)); got != row.clearExpect {{
                     t.Errorf("%s clear: got %s want %s seed=0x5504", row.note, got, row.clearExpect)
                     mismatches++
                 }}
@@ -878,18 +987,8 @@ def _write_resext_go_harness(tmp_path: Path) -> Path:
 
 
 def test_go_resext_phase2_harness(tmp_path):
-    if shutil.which("go") is None:
-        pytest.skip("go not installed")
-
+    _needs_go()
     go_dir = _write_resext_go_harness(tmp_path)
-    env = _go_test_env(tmp_path)
-    result = subprocess.run(
-        ["go", "test", "-v"],
-        cwd=go_dir,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
-    )
-    assert result.returncode == 0, result.stdout
+    _run_go_tests(go_dir, tmp_path, "TestResExtResidualCorpus", "TestResExtExtensionCorpus",
+                  "TestResExtRefusesATagBelowTheBandAsACallerError",
+                  "TestResExtRefusesABadHostWithADecodeError", "TestResExtFuzzFixedSeed")

@@ -50,6 +50,15 @@ func hexBytes(t *testing.T, s string) []byte {
 	return b
 }
 
+func mustDecode(t *testing.T, data []byte) Cbor {
+	t.Helper()
+	c, err := TryDecode(data)
+	if err != nil {
+		t.Fatalf("decode %x: %v", data, err)
+	}
+	return c
+}
+
 func f64FromHex(t *testing.T, s string) float64 {
 	t.Helper()
 	b := hexBytes(t, s)
@@ -66,7 +75,7 @@ func TestFloatVectorsEncodeReencodeAndDecodeBits(t *testing.T) {
 			t.Fatalf("%s encode: got %s want %s", row.Note, got, row.Cbor)
 		}
 
-		decoded := Decode(hexBytes(t, row.Cbor))
+		decoded := mustDecode(t, hexBytes(t, row.Cbor))
 		if decoded.Kind != KFloat {
 			t.Fatalf("%s decode kind: got %v want KFloat", row.Note, decoded.Kind)
 		}
@@ -81,7 +90,7 @@ func TestFloatVectorsEncodeReencodeAndDecodeBits(t *testing.T) {
 
 func TestFloatDecodeAcceptsAllWidths(t *testing.T) {
 	for _, hx := range []string{"f93c00", "fa3f800000", "fb3ff0000000000000"} {
-		if got := Decode(hexBytes(t, hx)).Float(); got != 1.0 {
+		if got := mustDecode(t, hexBytes(t, hx)).Float(); got != 1.0 {
 			t.Fatalf("%s decoded to %v", hx, got)
 		}
 	}

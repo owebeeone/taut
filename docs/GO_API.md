@@ -17,8 +17,8 @@ Writes, into `<out>/go/`:
 
 | file | what |
 | --- | --- |
-| `api.go` | native types (`int64` enums / structs) + `ToCbor`/`FromCbor` |
-| `cbor.go` | the deterministic-CBOR runtime (`Cbor`, `Encode`, `Decode`) |
+| `api.go` | native types (`int64` enums / structs) + `ToCbor`/`TryXFromCbor` |
+| `cbor.go` | the deterministic-CBOR runtime (`Cbor`, `Encode`, `TryDecode`, `DecodeError`) |
 | `ext.go` | extension accessors (`ExtSet`/`ExtGet`/`ExtClear`) |
 | `client.go` / `server.go` | typed stubs over a transport (see [Server.md](Server.md)) |
 
@@ -37,9 +37,12 @@ const (
 	TaskStateDoing TaskState = 1
 	TaskStateDone  TaskState = 2
 )
+
+func TryTaskStateFromWire(v int64) (TaskState, error)   // UnknownEnum for any other value
+func TryTaskStateFromCbor(c Cbor) (TaskState, error)
 ```
 
-Messages are structs with `ToCbor` / `FromCbor`:
+Messages are structs with `ToCbor` / `TryXFromCbor`:
 
 ```go
 type User struct {
@@ -47,8 +50,8 @@ type User struct {
 	Name string
 }
 
-func (x User) ToCbor() Cbor      // CMap([]KV{{1, ..}, {2, ..}})
-func UserFromCbor(c Cbor) User   // c.Get(1).Int(), c.Get(2).Text()
+func (x User) ToCbor() Cbor                  // CMap([]KV{{1, ..}, {2, ..}})
+func TryUserFromCbor(c Cbor) (User, error)   // c.Require(1) then .TryInt(), ...
 ```
 
 Field mapping: `INT → int64`, `STR → string`, `BYTES → []byte`, `BOOL → bool`,
@@ -59,13 +62,23 @@ never on the wire (left as the Go zero value on decode).
 
 ## 3. Encode / decode
 
-A message ↔ CBOR bytes goes through the generated `ToCbor`/`FromCbor` plus the
-runtime `Encode`/`Decode`:
+A message ↔ CBOR bytes goes through the generated `ToCbor`/`TryXFromCbor` plus the
+runtime `Encode`/`TryDecode`:
 
 ```go
-b := Encode(task.ToCbor())        // serialize: []byte
-task := TaskFromCbor(Decode(b))   // deserialize
+b := Encode(task.ToCbor()) // serialize: []byte
+c, err := TryDecode(b)     // deserialize: the CBOR item...
+if err != nil {
+	return err
+}
+decoded, err := TryTaskFromCbor(c) // ...then the message
+if err != nil {
+	return err
+}
 ```
+
+Every decode entry point returns `(value, error)`, with a `*DecodeError` for bad
+input; none panics.
 
 ## 4. The `Cbor` runtime (`cbor.go`)
 
@@ -87,19 +100,26 @@ type Cbor struct {
 }
 
 func Encode(c Cbor) []byte
-func Decode(data []byte) Cbor
+func TryDecode(data []byte) (Cbor, error)
 ```
 
 Constructors: `CInt(int64)`, `CText(string)`, `CBytes([]byte)`, `CArr([]Cbor)`,
 `CMap([]KV)`, `CNull()`, `CFloat(float64)`, `CBool(bool)`. Accessors (return the
 zero value on the wrong `Kind`): `.Int()`, `.Text()`, `.Bytes()`, `.Bool()`,
-`.Float()`, `.Array()`, `.Get(key int64)` (map value by key — **panics if absent**),
-`.MapEntries()`, `.IsNull()`.
+`.Float()`, `.Array()`, `.MapEntries()`, `.IsNull()`. Checked accessors return a
+`*DecodeError` instead: `.TryInt()`, `.TryText()`, `.TryBytes()`, `.TryBool()`,
+`.TryFloat()`, `.TryArray()`, `.TryMap()` (`WrongType`), `.Require(key int64)` (map
+value by key, `MissingKey` if absent) and `.Lookup(key int64)` (value, present).
+
+`DecodeError` carries a `Tag` (`Truncated`, `WrongType`, `MissingKey`,
+`DuplicateMapKey`, ...) and the payload fields that tag names: `Info`, `Major`,
+`Key`, `Expected`, `Enum` and `Value`. `Key` is the key as text: an int in decimal, a
+str as itself, a bool as `true` or `false`.
 
 ## 5. Forward-compatibility (unknown-field preservation)
 
 Generate with `--forward-compat` and each struct gains `WireResidual []KV`. On
-`FromCbor`, keys the struct doesn't name are captured there; on `ToCbor`, they're
+`TryXFromCbor`, keys the struct doesn't name are captured there; on `ToCbor`, they're
 appended to the known entries and `Encode` sorts the map by key — so the result is
 canonical and a node that *decodes → edits → re-encodes* a newer message never
 drops fields it doesn't understand. Because Go's `Encode` sorts ascending, the
@@ -116,28 +136,40 @@ knowing only the extension's schema (never the host's). Tags live in the band
 ≥ `1<<20` (`BandStart`):
 
 ```go
-func ExtSet(host []byte, tag int64, value Cbor) []byte   // attach / replace
-func ExtGet(host []byte, tag int64) (Cbor, bool)         // ok=false if absent
-func ExtClear(host []byte, tag int64) []byte             // strip
+func ExtSet(host []byte, tag int64, value Cbor) ([]byte, error)   // attach / replace
+func ExtGet(host []byte, tag int64) (Cbor, bool, error)          // ok=false if absent
+func ExtClear(host []byte, tag int64) ([]byte, error)            // strip
 ```
 
 `value` is the generated extension message's `ToCbor()`; decode `ExtGet`'s result
-with `…FromCbor`:
+with `Try…FromCbor`:
 
 ```go
-raw := ExtSet(host, 0x100001, decision.ToCbor())
-if c, ok := ExtGet(raw, 0x100001); ok {
-	decision := DecisionFromCbor(c)
+raw, err := ExtSet(host, 0x100001, decision.ToCbor())
+if err != nil {
+	return err
 }
-raw = ExtClear(raw, 0x100001)
+c, ok, err := ExtGet(raw, 0x100001)
+if err != nil {
+	return err
+}
+if ok {
+	decision, err := TryDecisionFromCbor(c)
+	if err != nil {
+		return err
+	}
+	use(decision)
+}
+raw, err = ExtClear(raw, 0x100001)
 ```
 
-A below-band `tag` panics (`"extension tag below band"`); a non-map host panics
-(`"extension host is not a map"`). The host app decodes its own message obliviously
-— the extension rides in `WireResidual` and survives.
+A below-band `tag` is an `*ExtTagError`, the caller's error, checked first. Host bytes
+that do not decode are a `*DecodeError`, and a host that is not a map is `WrongType`
+(`map`). The host app decodes its own message obliviously — the extension rides in
+`WireResidual` and survives.
 
 ## 7. Consuming the runtime
 
 `cbor.go` / `ext.go` are vendored, dependency-free source — drop them into the
-`taut` package alongside `api.go`. `go build` / `go test` is the only toolchain. The
-bytes match every other taut target.
+`taut` package alongside `api.go`. `go build` / `go test` (Go 1.18 or later) is the
+only toolchain. The bytes match every other taut target.

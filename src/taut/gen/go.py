@@ -23,9 +23,14 @@ after its depth, so an inner one never shadows an outer one. `ToCbor` appends ea
 field in IR order. `TryXFromCbor` decodes the fields in IR order with the checks of
 `taut.wire.codec`, in its order (TautCheckedDecode.md CD-E5): a message is a map, a
 list an array, a map an array of entry maps each holding keys 1 and 2 before either
-is decoded, a repeated map key is `DuplicateMapKey`, and a wrong type is `WrongType`
-with its payload word. The output is gofmt-clean: every block is braced over its own
-lines, and struct fields and enum constants are aligned as gofmt aligns them.
+is decoded, a repeated map key is `DuplicateMapKey` with the key as text (§8 question
+9), and a wrong type is `WrongType` with its payload word. The output is gofmt-clean:
+every block is braced over its own lines, and struct fields and enum constants are
+aligned as gofmt aligns them.
+
+Fail-closed (CD-E4, question 5). The decode entry points are `TryXFromCbor` for a
+message or an enum and `TryXFromWire` for an enum, and each returns `(value, error)`,
+with a `*DecodeError` for bad input; no generated code panics.
 """
 
 from __future__ import annotations
@@ -95,12 +100,6 @@ def _emit_err_check(out: list[str], ind: str, result: str = "v") -> None:
     out.append(f"{ind}if err != nil {{")
     out.append(f"{ind}\treturn {result}, err")
     out.append(f"{ind}}}")
-
-
-def _emit_panic_check(out: list[str]) -> None:
-    out.append("\tif err != nil {")
-    out.append("\t\tpanic(err)")
-    out.append("\t}")
 
 
 # --- encode ------------------------------------------------------------------------------
@@ -185,14 +184,6 @@ def _try_dec_leaf(t: TypeRef, expr: str) -> str:
     raise TypeError(t)
 
 
-def _duplicate_key_error(key: Scalar, k: str) -> str:
-    """The error for a repeated `map<K,V>` entry key `k`. `DecodeError.Key` is an int64,
-    so it carries an int key; a str or bool key is refused with the same tag and no key."""
-    if key.kind == "int":
-        return f"&DecodeError{{Tag: DecodeErrDuplicateMapKey, Key: {k}}}"
-    return "&DecodeError{Tag: DecodeErrDuplicateMapKey}"
-
-
 def _emit_decode(out: list[str], t: TypeRef, expr: str, ind: str, depth: int = 0) -> str:
     """Emit at indent `ind` the statements that decode `expr`, a Cbor, as type `t` into a
     new variable, and return its name (`x`, then `x1`, `x2`... by depth). Any error returns
@@ -226,7 +217,7 @@ def _emit_decode(out: list[str], t: TypeRef, expr: str, ind: str, depth: int = 0
         out.append(f"{body}{k}, err := {_try_dec_leaf(key, kc)}")
         _emit_err_check(out, body)
         out.append(f"{body}if _, dup := {x}[{k}]; dup {{")
-        out.append(f"{body}\treturn v, {_duplicate_key_error(key, k)}")
+        out.append(f"{body}\treturn v, DuplicateMapKeyError({k})")   # the key as text, any K
         out.append(f"{body}}}")
         value = _emit_decode(out, t.value, vc, body, depth + 1)
         out.append(f"{body}{x}[{k}] = {value}")
@@ -282,12 +273,6 @@ def _emit_from_cbor(msg: MessageDef, forward_compat: bool) -> list[str]:
         out.append("\t}")
     out.append("\treturn v, nil")
     out.append("}")
-    out.append("")
-    out.append(f"func {msg.name}FromCbor(c Cbor) {msg.name} {{")
-    out.append(f"\tv, err := Try{msg.name}FromCbor(c)")
-    _emit_panic_check(out)
-    out.append("\treturn v")
-    out.append("}")
     return out
 
 
@@ -308,22 +293,10 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     out.append("\t}")
     out.append("}")
     out.append("")
-    out.append(f"func {name}FromWire(v int64) {name} {{")
-    out.append(f"\tx, err := Try{name}FromWire(v)")
-    _emit_panic_check(out)
-    out.append("\treturn x")
-    out.append("}")
-    out.append("")
     out.append(f"func Try{name}FromCbor(c Cbor) ({name}, error) {{")
     out.append("\tv, err := c.TryInt()")
     _emit_err_check(out, "\t", result="0")
     out.append(f"\treturn Try{name}FromWire(v)")
-    out.append("}")
-    out.append("")
-    out.append(f"func {name}FromCbor(c Cbor) {name} {{")
-    out.append(f"\tx, err := Try{name}FromCbor(c)")
-    _emit_panic_check(out)
-    out.append("\treturn x")
     out.append("}")
     return out
 

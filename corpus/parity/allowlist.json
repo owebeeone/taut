@@ -40,18 +40,6 @@
       "reason": "build failed (exit 1): as swift, the Names field `decodeDictionary` hides the runtime's decodeDictionary in the static fromCbor, so no row runs, names-round-trip among them. With it renamed in a scratch run, map-str-key-duplicate and map-bool-key-duplicate report key=0, not `a` and `true`"
     },
     {
-      "target": "go",
-      "phase": "C2",
-      "owner": "codec-parity",
-      "reason": "map-str-key-duplicate, map-bool-key-duplicate: DecodeError.Key is an int64, so a repeated str or bool key is reported as key=0, not `a` and `true` (question 9)"
-    },
-    {
-      "target": "go/fc",
-      "phase": "C2",
-      "owner": "codec-parity",
-      "reason": "map-str-key-duplicate, map-bool-key-duplicate: as go, key=0, not `a` and `true`; the forward-compat build keeps unknown fields and passes the unknown-field rows"
-    },
-    {
       "target": "kotlin/fc",
       "phase": "C2",
       "owner": "codec-parity",
