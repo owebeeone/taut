@@ -12,7 +12,7 @@ the backtick languages.
 
 from __future__ import annotations
 
-from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 
 def _java_ty(t: TypeRef, boxed: bool = False) -> str:
@@ -62,11 +62,9 @@ def _dec(t: TypeRef, expr: str) -> str:
         return f"{t.name}.fromCbor({expr})"
     if isinstance(t, ListOf):
         return f"{expr}.asArray().stream().map(e -> {_dec(t.elem, 'e')}).toList()"
-    if isinstance(t, MapOf):
-        return (f"{expr}.asArray().stream().collect(java.util.stream.Collectors.toMap("
-                f"e -> {_dec(t.key, 'e.get(1)')}, e -> {_dec(t.value, 'e.get(2)')}, "
-                f"(a, b) -> {{ throw Cbor.DecodeError.duplicateMapKey(0); }}, "
-                f"java.util.LinkedHashMap::new))")
+    if isinstance(t, MapOf):  # entry maps: keys 1 and 2 checked first, a repeated key refused
+        return (f"Cbor.decodeMap({expr}, e -> {_dec(t.key, 'e.get(1)')}, "
+                f"e -> {_dec(t.value, 'e.get(2)')})")
     raise TypeError(t)
 
 
@@ -103,11 +101,16 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     out.append("    }")
     # fromCbor
     out.append(f"    static {msg.name} fromCbor(Cbor c) {{")
+    # A message is a map even when it has no field to read (CD-E5).
+    out.append("        if (c.kind != Cbor.MAP) { throw Cbor.DecodeError.wrongType(\"map\"); }")
     out.append(f"        {msg.name} v = new {msg.name}();")
     for f in msg.fields:
         if f.transient:
             continue  # native-only; left at Java default
-        if f.optional:
+        if f.optional == MISSING_OK:  # an absent key reads as null, like a present null
+            out.append(f"        {{ Cbor f = c.getOpt({f.tag}); "
+                       f"v.{f.name} = (f == null || f.isNull()) ? null : {_dec(f.type, 'f')}; }}")
+        elif f.optional:
             out.append(f"        {{ Cbor f = c.get({f.tag}); v.{f.name} = f.isNull() ? null : {_dec(f.type, 'f')}; }}")
         else:
             out.append(f"        v.{f.name} = {_dec(f.type, f'c.get({f.tag})')};")

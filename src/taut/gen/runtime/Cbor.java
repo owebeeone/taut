@@ -11,8 +11,11 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 public final class Cbor {
     public static final int INT = 0, BYTES = 1, TEXT = 2, ARR = 3, MAP = 4, BOOL = 5, NULL = 6, FLOAT = 7;
@@ -35,7 +38,9 @@ public final class Cbor {
         DuplicateMapKey,
         MissingKey,
         WrongType,
-        UnknownEnum
+        UnknownEnum,
+        NonCanonicalInt,
+        NegativeMapKey
     }
 
     public static final class DecodeError extends RuntimeException {
@@ -173,6 +178,49 @@ public final class Cbor {
                     null,
                     null);
         }
+
+        // `value` is the raw unsigned argument, which a shorter form could have held.
+        public static DecodeError nonCanonicalInt(long value) {
+            String text = Long.toUnsignedString(value);
+            return new DecodeError(
+                    DecodeTag.NonCanonicalInt,
+                    "non-canonical CBOR argument " + text,
+                    null,
+                    null,
+                    null,
+                    text,
+                    null,
+                    null);
+        }
+
+        public static DecodeError negativeMapKey(long key) {
+            return new DecodeError(
+                    DecodeTag.NegativeMapKey,
+                    "negative CBOR map key " + key,
+                    key,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        // A repeated `map<K,V>` key. An integer key is the payload `key`; the payload has
+        // no field for a text or bool key, so only the message names one.
+        static DecodeError duplicateEntryKey(Object key) {
+            if (key instanceof Long n) {
+                return duplicateMapKey(n);
+            }
+            return new DecodeError(
+                    DecodeTag.DuplicateMapKey,
+                    "duplicate map key " + key,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
     }
 
     private Cbor(int kind, long i, double d, String s, byte[] b, List<Cbor> arr, List<KV> map) {
@@ -191,6 +239,34 @@ public final class Cbor {
         if (kind != MAP) throw DecodeError.wrongType("map");
         for (KV kv : map) if (kv.k == key) return kv.v;
         throw DecodeError.missingKey(key);
+    }
+    // The value for `key`, or null when the map lacks it: an `optional=MISSING_OK` field.
+    public Cbor getOpt(long key) {
+        if (kind != MAP) {
+            throw DecodeError.wrongType("map");
+        }
+        for (KV kv : map) {
+            if (kv.k == key) {
+                return kv.v;
+            }
+        }
+        return null;
+    }
+    // A `map<K,V>` field: an array of entry maps {1: key, 2: value}. Each entry must
+    // hold keys 1 and 2 before either is decoded; `key` and `value` decode an entry's
+    // two items, and a repeated key is DuplicateMapKey.
+    public static <K, V> Map<K, V> decodeMap(Cbor c, Function<Cbor, K> key, Function<Cbor, V> value) {
+        Map<K, V> out = new LinkedHashMap<>();
+        for (Cbor entry : c.asArray()) {
+            entry.get(1);
+            entry.get(2);
+            K k = key.apply(entry);
+            if (out.containsKey(k)) {
+                throw DecodeError.duplicateEntryKey(k);
+            }
+            out.put(k, value.apply(entry));
+        }
+        return out;
     }
     public boolean isNull() { return kind == NULL; }
     public long asInt() { if (kind == INT) return i; throw DecodeError.wrongType("int"); }
@@ -335,29 +411,54 @@ public final class Cbor {
     private static void require(byte[] d, int off, int len) {
         if (off < 0 || len < 0 || off > d.length || len > d.length - off) throw DecodeError.truncated();
     }
-    private static long readArg(byte[] d, int[] off, int info) {
-        if (info < 24) return info;
-        if (info == 24) { require(d, off[0], 1); long v = u(d, off[0]); off[0] += 1; return v; }
-        if (info == 25) { require(d, off[0], 2); long v = ((long) u(d, off[0]) << 8) | u(d, off[0] + 1); off[0] += 2; return v; }
-        if (info == 26) {
-            require(d, off[0], 4);
-            long v = 0;
-            for (int j = 0; j < 4; j++) v = (v << 8) | u(d, off[0] + j);
-            off[0] += 4;
-            return v;
+    // The argument's raw bits: `info` itself, or the 1, 2, 4 or 8 bytes after the head.
+    private static long readRaw(byte[] d, int[] off, int info) {
+        if (info < 24) {
+            return info;
         }
-        if (info == 27) {
-            require(d, off[0], 8);
-            long v = 0;
-            for (int j = 0; j < 8; j++) v = (v << 8) | u(d, off[0] + j);
-            off[0] += 8;
-            return v;
+        int width;
+        if (info == 24) {
+            width = 1;
+        } else if (info == 25) {
+            width = 2;
+        } else if (info == 26) {
+            width = 4;
+        } else if (info == 27) {
+            width = 8;
+        } else {
+            throw DecodeError.unsupportedInfo(info);
         }
-        throw DecodeError.unsupportedInfo(info);
+        require(d, off[0], width);
+        long v = 0;
+        for (int j = 0; j < width; j++) {
+            v = (v << 8) | u(d, off[0] + j);
+        }
+        off[0] += width;
+        return v;
     }
+    // An int, length or count argument. Strict-canonical (D2): an argument that a
+    // shorter form could hold is one the canonical encoder never writes. Floats are
+    // exempt and use readRaw.
+    private static long readArg(byte[] d, int[] off, int info) {
+        long v = readRaw(d, off, info);
+        boolean fitsShorter = switch (info) {
+            case 24 -> v < 24;
+            case 25 -> v <= 0xFFL;
+            case 26 -> v <= 0xFFFFL;
+            case 27 -> Long.compareUnsigned(v, 0xFFFFFFFFL) <= 0;
+            default -> false;
+        };
+        if (fitsShorter) {
+            throw DecodeError.nonCanonicalInt(v);
+        }
+        return v;
+    }
+    // A byte or text length: beyond the remaining bytes is Truncated, whatever its size.
     private static int readLength(byte[] d, int[] off, int info) {
         long n = readArg(d, off, info);
-        if (Long.compareUnsigned(n, Integer.MAX_VALUE) > 0) throw DecodeError.truncated();
+        if (Long.compareUnsigned(n, d.length - off[0]) > 0) {
+            throw DecodeError.truncated();
+        }
         return (int) n;
     }
     private static String unsignedStringPlusOne(long n) {
@@ -375,23 +476,28 @@ public final class Cbor {
             throw DecodeError.invalidUtf8();
         }
     }
+    // One item, left to right: its head, then its body; the first failing check wins.
     private static Cbor dec(byte[] d, int[] off) {
-        int initial = u(d, off[0]); off[0]++;
+        int initial = u(d, off[0]);
+        off[0]++;
         int major = initial >> 5, info = initial & 0x1f;
         switch (major) {
             case 0 -> {
                 long n = readArg(d, off, info);
-                if (n < 0) throw DecodeError.intOverflow(Long.toUnsignedString(n));
+                if (n < 0) {
+                    throw DecodeError.intOverflow(Long.toUnsignedString(n));
+                }
                 return int_(n);
             }
             case 1 -> {
                 long n = readArg(d, off, info);
-                if (n < 0) throw DecodeError.intOverflow("-" + unsignedStringPlusOne(n));
+                if (n < 0) {
+                    throw DecodeError.intOverflow("-" + unsignedStringPlusOne(n));
+                }
                 return int_(-1 - n);
             }
             case 2 -> {
                 int n = readLength(d, off, info);
-                require(d, off[0], n);
                 byte[] bb = new byte[n];
                 System.arraycopy(d, off[0], bb, 0, n);
                 off[0] += n;
@@ -399,37 +505,61 @@ public final class Cbor {
             }
             case 3 -> {
                 int n = readLength(d, off, info);
-                require(d, off[0], n);
                 String s = decodeUtf8(d, off[0], n);
                 off[0] += n;
                 return text(s);
             }
             case 4 -> {
-                int n = readLength(d, off, info);
+                // Items are read in order. Each takes at least one byte, so a count
+                // beyond the input ends in the error of the first item that fails.
+                long n = readArg(d, off, info);
                 List<Cbor> a = new ArrayList<>();
-                for (int j = 0; j < n; j++) a.add(dec(d, off));
+                for (long j = 0; Long.compareUnsigned(j, n) < 0; j++) {
+                    a.add(dec(d, off));
+                }
                 return arr(a);
             }
             case 5 -> {
-                int n = readLength(d, off, info);
+                long n = readArg(d, off, info);
                 List<KV> m = new ArrayList<>();
                 Set<Long> seen = new HashSet<>();
-                for (int j = 0; j < n; j++) {
+                for (long j = 0; Long.compareUnsigned(j, n) < 0; j++) {
+                    // The key first: its item, then NonIntegerMapKey, NegativeMapKey and
+                    // DuplicateMapKey, and only then the value.
                     Cbor k = dec(d, off);
-                    if (k.kind != INT) throw DecodeError.nonIntegerMapKey();
-                    if (!seen.add(k.i)) throw DecodeError.duplicateMapKey(k.i);
+                    if (k.kind != INT) {
+                        throw DecodeError.nonIntegerMapKey();
+                    }
+                    if (k.i < 0) {
+                        throw DecodeError.negativeMapKey(k.i);
+                    }
+                    if (!seen.add(k.i)) {
+                        throw DecodeError.duplicateMapKey(k.i);
+                    }
                     Cbor v = dec(d, off);
                     m.add(new KV(k.i, v));
                 }
                 return map(m);
             }
             case 7 -> {
-                if (info == 20) return bool(false);
-                if (info == 21) return bool(true);
-                if (info == 22) return NUL;
-                if (info == 25) return float_(halfToDouble((int) readArg(d, off, info)));
-                if (info == 26) return float_((double) Float.intBitsToFloat((int) readArg(d, off, info)));
-                if (info == 27) return float_(Double.longBitsToDouble(readArg(d, off, info)));
+                if (info == 20) {
+                    return bool(false);
+                }
+                if (info == 21) {
+                    return bool(true);
+                }
+                if (info == 22) {
+                    return NUL;
+                }
+                if (info == 25) {
+                    return float_(halfToDouble((int) readRaw(d, off, info)));
+                }
+                if (info == 26) {
+                    return float_((double) Float.intBitsToFloat((int) readRaw(d, off, info)));
+                }
+                if (info == 27) {
+                    return float_(Double.longBitsToDouble(readRaw(d, off, info)));
+                }
                 throw DecodeError.unsupportedInfo(info);
             }
             default -> throw DecodeError.unsupportedMajor(major);

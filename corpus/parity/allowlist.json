@@ -8,12 +8,6 @@
       "phase": "Phase 4",
       "owner": "codec-parity",
       "reason": "Wave-2: not replayed by the `tautc parity` gate yet. A per-language byte-parity smoke test runs separately (test_go.py); the shared malformed/strict replay harness lands in Phase 4."
-    },
-    {
-      "target": "java",
-      "phase": "Phase 4",
-      "owner": "codec-parity",
-      "reason": "Wave-2: not replayed by the `tautc parity` gate yet. A per-language byte-parity smoke test runs separately (test_java.py); the shared malformed/strict replay harness lands in Phase 4."
     }
   ]
 }
