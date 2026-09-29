@@ -24,7 +24,7 @@ from . import __version__
 from .corpus import kit, parity, synth
 from .gen import scaffold
 from .ir.load import load_schema, schema_from_json
-from .ir.validate import validate_or_raise
+from .ir.validate import lint, validate_or_raise
 from .wire import jsoncodec
 
 
@@ -35,13 +35,21 @@ def _load(path: Path):
     return load_schema(path)
 
 
+def _validate(schema, cmd: str) -> None:
+    """Refuse an invalid schema, then print lint's warnings to stderr; a warning never fails a
+    command (TautOptions.md OPT-L4)."""
+    validate_or_raise(schema)
+    for warning in lint(schema):
+        print(f"tautc {cmd}: warning: {warning}", file=sys.stderr)
+
+
 def _split(arg: str | None) -> list[str] | None:
     return [p.strip() for p in arg.split(",") if p.strip()] if arg else None
 
 
 def _cmd_gen(args: argparse.Namespace) -> int:
     schema = _load(Path(args.ir))
-    validate_or_raise(schema)  # never generate from incoherent IR
+    _validate(schema, "gen")  # never generate from incoherent IR
     if args.api_only:
         services: list[str] | None = []
     else:
@@ -86,7 +94,7 @@ def _emit_or_check(path: Path, content: str, check: bool, stale: list[str]) -> N
 
 def _cmd_corpus(args: argparse.Namespace) -> int:
     schema = _load(Path(args.ir))
-    validate_or_raise(schema)
+    _validate(schema, "corpus")
     corpus = kit.build_corpus(schema, synth.synth_values(schema))  # auto-synth coverage values
     out = Path(args.out)
     stale: list[str] = []
@@ -107,7 +115,7 @@ def _cmd_corpus(args: argparse.Namespace) -> int:
 
 def _cmd_json(args: argparse.Namespace) -> int:
     schema = _load(Path(args.ir))
-    validate_or_raise(schema)
+    _validate(schema, "json")
     if args.from_json:  # JSON text -> CBOR bytes
         text = Path(args.input).read_text() if args.input else sys.stdin.read()
         data = jsoncodec.json_to_cbor(schema, args.message, text)

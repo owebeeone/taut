@@ -6,12 +6,32 @@ delivery-shape set. Returns a list of human-readable errors (empty == valid).
 
 This is the gate the build prompt calls for: reject incoherent shape/axis
 combinations and anything outside the closed set, before any mechanism is derived.
+
+Options (TautOptions.md OPT-L4): every declared option is registered, sits at one of
+its levels and has a value its constructor would take, and every root's effective
+bounds lie between its floors and the ceilings. `lint` returns the warnings tautc
+SHOULD print (OPT-D4, OPT-D5), which never make a schema invalid.
 """
 
 from __future__ import annotations
 
 from .model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef, is_presence
+from .options import (
+    LEVELS,
+    MAX_DEPTH_CEILING,
+    OPTIONS,
+    check_value,
+    effective,
+    nesting,
+    root_effective,
+    roots,
+    smallest_encoding,
+)
 from .shapes import BAND_START, ROLES, SHAPES
+
+# The options a decode call takes from its root (OPT-D4): lint follows one a message declares
+# into the roots that embed that message.
+_BOUNDS = ("max_depth", "max_encoded_len")
 
 
 def validate(schema: Schema) -> list[str]:
@@ -128,6 +148,10 @@ def validate(schema: Schema) -> list[str]:
                     bound.add(slot)
                     check_ref(t, f"{ctx} out[{slot}]")
 
+    # --- options (OPT-L4) ---
+    errors.extend(_declaration_errors(schema))
+    errors.extend(_root_errors(schema))
+
     return errors
 
 
@@ -135,3 +159,150 @@ def validate_or_raise(schema: Schema) -> None:
     errors = validate(schema)
     if errors:
         raise ValueError("invalid IR:\n  " + "\n  ".join(errors))
+
+
+def _declared(schema: Schema) -> list[tuple[str, str, dict[str, object]]]:
+    """Each level's declared options (OPT-L3): where they sit, the level, and the values."""
+    found = [("file", "file", schema.options)]
+    for m in schema.messages.values():
+        found.append((m.name, "message", m.options))
+        found.extend((f"{m.name}.{f.name}", "field", f.options) for f in m.fields)
+    found.extend((f"enum {e.name}", "enum", e.options) for e in schema.enums.values())
+    return found
+
+
+def _declaration_errors(schema: Schema) -> list[str]:
+    """Every declared option is registered (OPT-F1), sits at one of its definition's levels, and
+    has a value its constructor would take: a model loaded from JSON or built by hand never ran
+    one. Each check stands alone."""
+    errors: list[str] = []
+    for where, level, options in _declared(schema):
+        for name, value in options.items():
+            defn = OPTIONS.get(name)
+            if defn is None:
+                errors.append(f"{where}: unknown option {name!r} (known: {', '.join(OPTIONS)})")
+                continue
+            if level not in defn.levels:
+                allowed = ", ".join(lv for lv in LEVELS if lv in defn.levels)
+                errors.append(f"{where}: option {name} is not allowed at {level} level "
+                              f"(allowed: {allowed})")
+            try:
+                check_value(name, value)
+            except (TypeError, ValueError) as exc:
+                errors.append(f"{where}: {exc}")
+    return errors
+
+
+def _valid(name: str, value: object) -> bool:
+    try:
+        check_value(name, value)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _source(schema: Schema, name: str, root: TypeRef) -> str:
+    """Where a root's effective value of option `name` comes from (OPT-D3, OPT-D4)."""
+    if isinstance(root, MsgRef) and name in schema.messages[root.name].options:
+        return "declared here"
+    if name in schema.options:
+        return "the file's"
+    return "the default"
+
+
+def _root_errors(schema: Schema) -> list[str]:
+    """Every root's effective bounds lie between its floors and the ceilings (OPT-D5, OPT-D6).
+
+    A root's `max_depth` covers its non-recursive nesting, and no root nests past the ceiling.
+    A declared `max_encoded_len` holds the root's smallest encoding. A root with no finite value
+    (a required field recursing without end) admits no declared length; with none declared, no
+    length floor applies to any root. A value refused where it is declared is not compared, nor is
+    a root whose types do not resolve: both are errors already."""
+    errors: list[str] = []
+    for label, root in roots(schema):
+        try:
+            floor = nesting(schema, root)
+            shortest = smallest_encoding(schema, root)
+            depth = root_effective(schema, "max_depth", root)
+            limit = root_effective(schema, "max_encoded_len", root)
+        except (KeyError, TypeError):   # a dangling ref, an unknown type or scalar: refused above
+            continue
+        if floor > MAX_DEPTH_CEILING:
+            errors.append(f"{label}: nests {floor} deep, above the max_depth ceiling "
+                          f"{MAX_DEPTH_CEILING}")
+        elif isinstance(depth, int) and _valid("max_depth", depth) and depth < floor:
+            errors.append(f"{label}: max_depth {depth} ({_source(schema, 'max_depth', root)}) "
+                          f"is below its non-recursive nesting {floor}")
+        if not (isinstance(limit, int) and _valid("max_encoded_len", limit)):
+            continue   # none declared: no length floor
+        source = _source(schema, "max_encoded_len", root)
+        if shortest is None:
+            errors.append(f"{label}: max_encoded_len {limit} ({source}) admits no value: none has "
+                          "a finite encoding (a required field recurses without end or is an "
+                          "enum without members)")
+        elif limit < shortest:
+            errors.append(f"{label}: max_encoded_len {limit} ({source}) is below its smallest "
+                          f"encoding, {shortest} bytes")
+    return errors
+
+
+def _held(schema: Schema, tref: TypeRef) -> tuple[TypeRef, ...]:
+    """The types directly inside a value of `tref`, through wire fields, lists and maps."""
+    if isinstance(tref, ListOf):
+        return (tref.elem,)
+    if isinstance(tref, MapOf):
+        return (tref.key, tref.value)
+    if isinstance(tref, MsgRef) and tref.name in schema.messages:
+        return tuple(f.type for f in schema.messages[tref.name].wire_fields())
+    return ()
+
+
+def _embedded(schema: Schema, root: TypeRef) -> set[str]:
+    """The messages a value of `root` may hold at any depth: a message root's own name only if
+    it recurs. Extensions ride messages at run time, not through the schema's fields, and are
+    not followed."""
+    found: set[str] = set()
+    pending = list(_held(schema, root))
+    while pending:
+        tref = pending.pop()
+        if isinstance(tref, MsgRef):
+            if tref.name in found:
+                continue
+            found.add(tref.name)
+        pending.extend(_held(schema, tref))
+    return found
+
+
+def lint(schema: Schema) -> list[str]:
+    """The warnings tautc SHOULD print, which never make a schema invalid (OPT-L4):
+
+    - a recursive message, one whose wire fields reach it again, that declares no `max_depth`:
+      the file's value or the default limits it, and its data may outgrow that (OPT-D5);
+    - a bound a message declares that cannot take effect inside another root that embeds it at
+      any depth, a message or a method's slot, because that root's effective value differs and
+      bounds the whole call (OPT-D4).
+
+    What validate refuses, an invalid value or a dangling reference, adds no warning here."""
+    warnings: list[str] = []
+    for m in schema.messages.values():
+        if "max_depth" not in m.options and m.name in _embedded(schema, MsgRef(m.name)):
+            value = effective(schema, "max_depth", message=m.name)
+            warnings.append(f"{m.name}: recursive but declares no max_depth; a decode rooted at "
+                            f"it applies {_source(schema, 'max_depth', MsgRef(m.name))} {value}, "
+                            "which its data may outgrow")
+    embedders = [(label, root, _embedded(schema, root)) for label, root in roots(schema)]
+    for m in schema.messages.values():
+        for name in _BOUNDS:
+            if name not in m.options or not _valid(name, m.options[name]):
+                continue
+            declared = m.options[name]
+            for label, root, inside in embedders:
+                if root == MsgRef(m.name) or m.name not in inside:
+                    continue
+                outer = root_effective(schema, name, root)
+                if outer == declared or not (outer is None or _valid(name, outer)):
+                    continue
+                shown = "no bound" if outer is None else outer
+                warnings.append(f"{m.name}: its {name} {declared} cannot take effect inside "
+                                f"{label}, which embeds it; a decode rooted there applies {shown}")
+    return warnings

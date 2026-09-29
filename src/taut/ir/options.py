@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .model import Schema
+from .model import EnumRef, ListOf, MapOf, MessageDef, MsgRef, Scalar, Schema, TypeRef
 
 # Where an option may be declared: file, message, field and enum; enum_value, service and method
 # are reserved, so that their first option needs no new IR version (OPT-I2).
@@ -153,3 +153,162 @@ def effective_map(schema: Schema, *, message: str | None = None) -> dict[str, ob
         for name, defn in OPTIONS.items()
         if defn.klass in ("wire", "codegen") and level in defn.levels
     }
+
+
+# --- roots and the two floors (OPT-D4, OPT-D5, OPT-D6) ------------------------------------------
+
+def roots(schema: Schema) -> list[tuple[str, TypeRef]]:
+    """Every type a decode call may be rooted at (OPT-D4, OPT-D5), each once, with a label: every
+    message, by its name, then each type a method binds as a param or out slot that is not listed
+    yet, labelled as `validate` labels the slot (`Svc.method param p`, `Svc.method out[slot]`). A
+    slot typed as a message is that message's root."""
+    found: list[tuple[str, TypeRef]] = [(name, MsgRef(name)) for name in schema.messages]
+    for svc in schema.services.values():
+        for meth in svc.methods:
+            ctx = f"{svc.name}.{meth.name}"
+            slots = [(f"{ctx} param {pn}", pt) for pn, pt in meth.params]
+            slots += [(f"{ctx} out[{slot}]", t) for slot, t in meth.out]
+            for label, tref in slots:
+                if all(tref != seen for _, seen in found):
+                    found.append((label, tref))
+    return found
+
+
+def root_effective(schema: Schema, name: str, root: TypeRef) -> object:
+    """Option `name`'s effective value for a decode call rooted at `root` (OPT-D4): a message's
+    own, as `effective` resolves it; for a root that is not a message, such as an RPC slot typed
+    `list<Tree>`, the file's, else the default."""
+    if isinstance(root, MsgRef):
+        return effective(schema, name, message=root.name)
+    return effective(schema, name)
+
+
+def _message(schema: Schema, name: str) -> MessageDef:
+    msg = schema.messages.get(name)
+    if msg is None:
+        raise KeyError(f"unknown message {name!r}")
+    return msg
+
+
+def nesting(schema: Schema, root: TypeRef) -> int:
+    """The root's non-recursive nesting, the floor of its `max_depth` (OPT-D5): the deepest a value
+    reaches, counted in arrays and maps as decode counts depth (a top-level container is 1),
+    without a message repeating on the path. 0 for a scalar or enum; 1 + T's for `list<T>`;
+    2 + V's for `map<K,V>`, whose wire is an array of `{1: key, 2: value}` maps; for a message,
+    1 + the largest among its wire fields and the schema's extensions, which may ride any message,
+    extension messages included; a message already on the path counts 0. So `Tree { kids:
+    list<Tree> }` needs 2. An unknown message raises `KeyError`."""
+    riders = tuple(MsgRef(ext.message) for ext in schema.extensions)
+    reach: dict[str, frozenset[str]] = {}
+    memo: dict[tuple[str, frozenset[str]], int] = {}
+
+    def inside(name: str) -> tuple[TypeRef, ...]:
+        return tuple(f.type for f in _message(schema, name).wire_fields()) + riders
+
+    def reachable(name: str) -> frozenset[str]:
+        """The messages a value of message `name` may hold, at any depth."""
+        if name not in reach:
+            found: set[str] = set()
+            pending = list(inside(name))
+            while pending:
+                tref = pending.pop()
+                if isinstance(tref, ListOf):
+                    pending.append(tref.elem)
+                elif isinstance(tref, MapOf):
+                    pending.append(tref.value)
+                elif isinstance(tref, MsgRef) and tref.name not in found:
+                    found.add(tref.name)
+                    pending.extend(inside(tref.name))
+            reach[name] = frozenset(found)
+        return reach[name]
+
+    def depth(tref: TypeRef, path: frozenset[str]) -> int:
+        if isinstance(tref, (Scalar, EnumRef)):
+            return 0
+        if isinstance(tref, ListOf):
+            return 1 + depth(tref.elem, path)
+        if isinstance(tref, MapOf):
+            return 2 + depth(tref.value, path)
+        if isinstance(tref, MsgRef):
+            if tref.name in path:
+                return 0
+            # Only the messages on the path that this one can reach change its depth, so the
+            # memo is keyed by those: without recursion, by the message alone.
+            key = (tref.name, path & reachable(tref.name))
+            if key not in memo:
+                inner = path | {tref.name}
+                memo[key] = 1 + max((depth(t, inner) for t in inside(tref.name)), default=0)
+            return memo[key]
+        raise TypeError(f"unknown type ref {tref!r}")
+
+    return depth(root, frozenset())
+
+
+# A scalar's shortest canonical encoding: 0, "", b"" and false take one byte; a float's
+# shortest form is a half, f9 and two bytes.
+_SHORTEST_SCALAR = {"int": 1, "str": 1, "bytes": 1, "bool": 1, "float": 3}
+
+
+def _head_length(n: int) -> int:
+    """The bytes of a canonical CBOR head (initial byte and shortest argument) for n >= 0."""
+    if n < 24:
+        return 1
+    if n < 0x100:
+        return 2
+    if n < 0x10000:
+        return 3
+    if n < 0x100000000:
+        return 5
+    return 9
+
+
+def _int_length(value: int) -> int:
+    return _head_length(value if value >= 0 else -1 - value)
+
+
+def smallest_encoding(schema: Schema, root: TypeRef) -> int | None:
+    """The length in bytes of the root's smallest canonical encoding, the floor of a declared
+    `max_encoded_len` (OPT-D6): every field at its shortest canonical value, which is zero (for a
+    float, a 3-byte half), an empty string, byte string, list or map, an enum's member with the
+    shortest encoding, or null for an optional field, whose key the encoder writes all the same,
+    `MISSING_OK` included. Extensions and unknown fields are never required, so they add nothing.
+
+    None when no value has a finite encoding: a required field whose type recurses without end,
+    as in `Loop { next: Loop }` or a cycle of such fields, or an enum without members. An unknown
+    message, enum or scalar kind raises `KeyError`."""
+    memo: dict[str, int | None] = {}
+    path: set[str] = set()
+
+    def length(tref: TypeRef) -> int | None:
+        if isinstance(tref, Scalar):
+            if tref.kind not in _SHORTEST_SCALAR:
+                raise KeyError(f"unknown scalar kind {tref.kind!r}")
+            return _SHORTEST_SCALAR[tref.kind]
+        if isinstance(tref, EnumRef):
+            enum = schema.enums.get(tref.name)
+            if enum is None:
+                raise KeyError(f"unknown enum {tref.name!r}")
+            return min((_int_length(v) for v in enum.members.values()), default=None)
+        if isinstance(tref, (ListOf, MapOf)):
+            return 1   # the empty array
+        if isinstance(tref, MsgRef):
+            if tref.name in path:
+                return None   # a required field recursing without end: no finite value
+            if tref.name not in memo:
+                path.add(tref.name)
+                memo[tref.name] = message_length(_message(schema, tref.name))
+                path.discard(tref.name)
+            return memo[tref.name]
+        raise TypeError(f"unknown type ref {tref!r}")
+
+    def message_length(msg: MessageDef) -> int | None:
+        fields = msg.wire_fields()
+        total = _head_length(len(fields))
+        for f in fields:
+            value = 1 if f.optional else length(f.type)   # an optional field's null is one byte
+            if value is None:
+                return None
+            total += _head_length(f.tag) + value
+        return total
+
+    return length(root)

@@ -2,16 +2,33 @@
 useful messages. This is the gate that lets mechanism be derived from the IR
 without review."""
 
+from pathlib import Path
+
 import pytest
 
 from taut.corpus.build import IR_PATH
-from taut.ir.dsl import BOOL, INT, STR, Enum, F, Msg, Ref, method, schema, service
+from taut.ir.dsl import BOOL, INT, STR, Enum, F, List, Msg, Ref, method, option, schema, service
 from taut.ir.load import load_schema
-from taut.ir.validate import validate, validate_or_raise
+from taut.ir.validate import lint, validate, validate_or_raise
+
+IR_FILES = sorted((Path(__file__).resolve().parents[2] / "ir").glob("*.taut.py"))
 
 
 def test_griplab_ir_is_valid():
     assert validate(load_schema(IR_PATH)) == []
+
+
+def test_the_committed_ir_files_are_found():
+    assert {"glade.taut.py", "griplab.taut.py", "parity_int.taut.py", "razel.taut.py",
+            "resext.taut.py"} <= {p.name for p in IR_FILES}
+
+
+@pytest.mark.parametrize("path", IR_FILES, ids=lambda p: p.name)
+def test_every_committed_ir_file_is_valid(path):
+    # Every root's bounds included (TautOptions.md OPT-L4); lint runs over each too.
+    s = load_schema(path)
+    assert validate(s) == []
+    assert all(isinstance(warning, str) for warning in lint(s))
 
 
 def test_dangling_message_ref():
@@ -69,3 +86,11 @@ def test_kind_is_derived_not_storable():
 def test_validate_or_raise():
     with pytest.raises(ValueError):
         validate_or_raise(schema(Msg("A", F("x", 1, Ref("Nope")))))
+
+
+def test_validate_or_raise_raises_on_a_bound_below_its_floor_but_never_on_a_warning():
+    with pytest.raises(ValueError, match="Tree: max_depth 1 .* nesting 2"):
+        validate_or_raise(schema(Msg("Tree", option.max_depth(1), F("kids", 1, List(Ref("Tree"))))))
+    tree = schema(Msg("Tree", F("kids", 1, List(Ref("Tree")))))
+    assert lint(tree) != []
+    validate_or_raise(tree)   # lint's warnings are not validate's errors
