@@ -2,7 +2,17 @@
 // Same tiny subset (int, bytes, text, array, int-keyed map, bool, null, float)
 // in core-deterministic encoding (definite length, shortest-form ints/floats,
 // ascending map keys). Hand-rolled, stdlib only.
+//
+// Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one more than
+// the arrays and maps around it, and one deeper than the call's depth bound is TooDeep(limit);
+// with a length bound, longer input is TooLarge(len, limit) before a byte is read. For any
+// input bytes `decode` returns a value or throws DecodeError, nothing else.
 package taut
+
+// The depth bound a raw decode applies where its caller passes none, and the deepest bound any
+// decode applies (TautCheckedDecode.md CD-B1, CD-B3). The parity corpus pins both to taut's.
+const val DEFAULT_MAX_DEPTH: Int = 32
+const val MAX_DEPTH_CEILING: Int = 128
 
 sealed class DecodeError(message: String) : RuntimeException(message) {
     class Truncated : DecodeError("truncated CBOR input")
@@ -25,6 +35,10 @@ sealed class DecodeError(message: String) : RuntimeException(message) {
     // raw argument), and a map key below zero.
     class NonCanonicalInt(val value: Long) : DecodeError("non-canonical integer encoding of $value")
     class NegativeMapKey(val key: Long) : DecodeError("negative map key $key")
+    // The bounds (CD-E1): an array or map deeper than the depth bound `limit`, the bound
+    // applied; and input of `len` bytes, longer than the length bound `limit`.
+    class TooDeep(val limit: Int) : DecodeError("an array or map deeper than $limit")
+    class TooLarge(val len: Int, val limit: Int) : DecodeError("$len bytes of input, more than $limit")
 }
 
 class Cbor(
@@ -264,10 +278,35 @@ private fun ensure(data: ByteArray, off: Int, n: Int) {
     if (off < 0 || n < 0 || off > data.size || data.size - off < n) throw DecodeError.Truncated()
 }
 
-fun decode(data: ByteArray): Cbor {
-    val (v, off) = dec(data, 0)
-    if (off != data.size) throw DecodeError.TrailingBytes()
+// One item that fills `data`, or DecodeError at the first fault (CD-E5). `maxDepth` bounds
+// nesting: a top-level array or map has depth 1, and one at depth maxDepth + 1 is TooDeep once
+// its head is read. A value above MAX_DEPTH_CEILING applies the ceiling, and TooDeep.limit
+// names the bound applied. `maxEncodedLen`, when given, bounds the input's length, checked
+// before any byte is read. A depth below 1 or a negative length is the caller's error,
+// IllegalArgumentException, not a DecodeError. A message's own `decode(bytes)` passes its
+// bounds here; a raw caller passes the ones it means to apply.
+fun decode(data: ByteArray, maxDepth: Int = DEFAULT_MAX_DEPTH, maxEncodedLen: Int? = null): Cbor {
+    require(maxDepth >= 1) { "maxDepth must be at least 1, not $maxDepth" }
+    if (maxEncodedLen != null) {
+        require(maxEncodedLen >= 0) { "maxEncodedLen must not be negative, not $maxEncodedLen" }
+        if (data.size > maxEncodedLen) {
+            throw DecodeError.TooLarge(data.size, maxEncodedLen)
+        }
+    }
+    val (v, off) = dec(data, 0, 0, minOf(maxDepth, MAX_DEPTH_CEILING))
+    if (off != data.size) {
+        throw DecodeError.TrailingBytes()
+    }
     return v
+}
+
+// A container whose head is complete, inside `depth` others: refused before its first item
+// when it would sit deeper than `limit` (CD-B2). Checked before `dec` recurses, it also bounds
+// the recursion, so no input reaches the stack's limit.
+private fun enter(depth: Int, limit: Int) {
+    if (depth >= limit) {
+        throw DecodeError.TooDeep(limit)
+    }
 }
 
 // A head's argument, as the raw unsigned 64 bits. Info 28-31 is UnsupportedInfo, missing
@@ -346,7 +385,8 @@ private fun utf8(data: ByteArray, off: Int, len: Int): String {
     }
 }
 
-private fun dec(data: ByteArray, off0: Int): Pair<Cbor, Int> {
+// The item at `off0`, inside `depth` arrays and maps, under the depth bound `limit`.
+private fun dec(data: ByteArray, off0: Int, depth: Int, limit: Int): Pair<Cbor, Int> {
     ensure(data, off0, 1)
     val initial = u(data, off0)
     val major = initial shr 5
@@ -367,13 +407,15 @@ private fun dec(data: ByteArray, off0: Int): Pair<Cbor, Int> {
         }
         // A count (unsigned) is not checked against the bytes left: items are read in
         // order, so the first fault is reported, and every item takes at least one byte.
+        // Once the head is read, a container one level too deep is TooDeep (enter).
         4 -> {
             val (n, o0) = readArg(data, off, info)
+            enter(depth, limit)
             var o = o0
             val a = ArrayList<Cbor>()
             var j = 0L
             while (java.lang.Long.compareUnsigned(j, n) < 0) {
-                val (v, o2) = dec(data, o)
+                val (v, o2) = dec(data, o, depth + 1, limit)
                 a.add(v)
                 o = o2
                 j += 1
@@ -382,6 +424,7 @@ private fun dec(data: ByteArray, off0: Int): Pair<Cbor, Int> {
         }
         5 -> {
             val (n, o0) = readArg(data, off, info)
+            enter(depth, limit)
             var o = o0
             val m = ArrayList<Pair<Long, Cbor>>()
             val seen = HashSet<Long>()
@@ -389,7 +432,7 @@ private fun dec(data: ByteArray, off0: Int): Pair<Cbor, Int> {
             while (java.lang.Long.compareUnsigned(j, n) < 0) {
                 // The key first: its item, then NonIntegerMapKey, NegativeMapKey and
                 // DuplicateMapKey, and only then the value.
-                val (kc, o2) = dec(data, o)
+                val (kc, o2) = dec(data, o, depth + 1, limit)
                 if (kc.kind != Cbor.INT) {
                     throw DecodeError.NonIntegerMapKey()
                 }
@@ -400,7 +443,7 @@ private fun dec(data: ByteArray, off0: Int): Pair<Cbor, Int> {
                 if (!seen.add(key)) {
                     throw DecodeError.DuplicateMapKey(key)
                 }
-                val (vc, o3) = dec(data, o2)
+                val (vc, o3) = dec(data, o2, depth + 1, limit)
                 m.add(Pair(key, vc))
                 o = o3
                 j += 1
@@ -418,13 +461,17 @@ private fun dec(data: ByteArray, off0: Int): Pair<Cbor, Int> {
             26 -> {
                 ensure(data, off, 4)
                 var bits = 0
-                for (j in 0 until 4) bits = (bits shl 8) or u(data, off + j)
+                for (j in 0 until 4) {
+                    bits = (bits shl 8) or u(data, off + j)
+                }
                 Pair(Cbor.float(java.lang.Float.intBitsToFloat(bits).toDouble()), off + 4)
             }
             27 -> {
                 ensure(data, off, 8)
                 var bits = 0L
-                for (j in 0 until 8) bits = (bits shl 8) or u(data, off + j).toLong()
+                for (j in 0 until 8) {
+                    bits = (bits shl 8) or u(data, off + j).toLong()
+                }
                 Pair(Cbor.float(java.lang.Double.longBitsToDouble(bits)), off + 8)
             }
             else -> throw DecodeError.UnsupportedInfo(info)

@@ -12,13 +12,11 @@ private fun checkExtTag(tag: Long) {
     require(tag >= BAND_START) { "extension tag $tag is below the band (< $BAND_START)" }
 }
 
-// The host's top-level map. Not knowing the host's root, the helpers leave its own bounds to
-// its reader (TautOptions.md G3).
-// TODO(D1): read the host at the depth ceiling (128) with no length bound, the only bounds
-// every valid host meets, once D1 gives decode its depth parameter. Until then this decode
-// bounds no depth.
+// The host's top-level map. Not knowing the host's root, the helpers read it at the depth
+// ceiling with no length bound, the only bounds every valid host meets, and leave the host's
+// own bounds to its reader (TautOptions.md G3).
 private fun hostMap(host: ByteArray): Cbor {
-    val c = decode(host)
+    val c = decode(host, maxDepth = MAX_DEPTH_CEILING)
     if (c.kind != Cbor.MAP) {
         throw DecodeError.WrongType("map")
     }

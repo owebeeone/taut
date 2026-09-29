@@ -8,11 +8,19 @@ are nullable `T?`: an absent key is `MissingKey`, except under `optional=MISSING
 which reads it as null; enums are `enum class` carrying the wire value; Kotlin keywords
 get backtick-escaped. Kotlin's `encode` sorts map keys, so forward-compat residual
 just rides along (no merge).
+
+Decode is bounded per root (D26, TautCheckedDecode.md CD-B3; TautOptions.md OPT-L6): each
+message's companion holds `MAX_DEPTH` and `MAX_ENCODED_LEN`, its effective values as
+`options.effective` resolves them here, and `decode(bytes)`, which applies both through the
+runtime's raw `decode`. `fromCbor` reads a tree its caller decoded and applies none (G1).
 """
 
 from __future__ import annotations
 
+from typing import cast
+
 from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.options import effective
 
 _KT_KEYWORDS = frozenset("""
 as as? break class continue do else false for fun if in in? interface is is! null
@@ -105,7 +113,15 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     return out
 
 
-def _emit_message(msg, forward_compat: bool = False) -> list[str]:
+def _bounds(schema: Schema, message: str) -> tuple[int, int | None]:
+    """`(max_depth, max_encoded_len)` of a decode rooted at `message`: its effective values
+    (TautOptions.md OPT-D3, OPT-D4), resolved once, here, at generation. None is no length
+    bound."""
+    return (cast(int, effective(schema, "max_depth", message=message)),
+            cast("int | None", effective(schema, "max_encoded_len", message=message)))
+
+
+def _emit_message(msg, bounds: tuple[int, int | None], forward_compat: bool = False) -> list[str]:
     # Kotlin refuses a `data class` without constructor parameters, so a message
     # with no fields is a plain class that keeps value equality.
     fieldless = not msg.fields and not forward_compat
@@ -139,7 +155,14 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     body = ("listOf<Pair<Long, Cbor>>(" if forward_compat else "listOf(") + ", ".join(entries) + ")"
     out.append(f"        return Cbor.map({body}{' + wireResidual' if forward_compat else ''})")
     out.append("    }")
+    # The bounds of a decode rooted here and the typed entry point that applies them (CD-B3,
+    # OPT-L6). The raw decode is named by its package: inside the companion, `decode` is this one.
+    max_depth, max_encoded_len = bounds
     out.append("    companion object {")
+    out.append(f"        const val MAX_DEPTH: Int = {max_depth}")
+    out.append(f"        val MAX_ENCODED_LEN: Int? = {'null' if max_encoded_len is None else max_encoded_len}")
+    out.append(f"        fun decode(bytes: ByteArray): {msg.name} = "
+               "fromCbor(taut.decode(bytes, MAX_DEPTH, MAX_ENCODED_LEN))")
     out.append(f"        fun fromCbor(c: Cbor): {msg.name} {{")
     if not msg.wire_fields():
         # No field reads the input, and a message must still be a map (CD-E5).
@@ -176,5 +199,5 @@ def emit_types(schema: Schema, forward_compat: bool = False) -> str:
     for e in schema.enums.values():
         out += _emit_enum(e.name, e.members) + [""]
     for m in schema.messages.values():
-        out += _emit_message(m, forward_compat) + [""]
+        out += _emit_message(m, _bounds(schema, m.name), forward_compat) + [""]
     return "\n".join(out) + "\n"

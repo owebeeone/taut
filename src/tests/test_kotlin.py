@@ -6,6 +6,7 @@ import functools
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -18,7 +19,10 @@ from taut.corpus import parity, parity_kotlin
 from taut.corpus import resext_build as rb
 from taut.gen import kotlin
 from taut.gen import scaffold
-from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, extension, schema as mk
+from taut.ir import options
+from taut.ir.dsl import (
+    BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, Ref, extension, option, schema as mk,
+)
 from taut.ir.load import load_schema
 from taut.ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar
 from taut.ir.shapes import BAND_START
@@ -33,13 +37,16 @@ ANDROID_STUDIO_KOTLINC = Path(
 RESEXT_TAG = BAND_START + 1
 RESEXT_FUZZ_SEED = 0x5EED55_04
 INT_MIN, INT_MAX = -(1 << 63), (1 << 63) - 1
+INT32_MAX = (1 << 31) - 1   # Kotlin's Int.MAX_VALUE, the largest bound a Kotlin caller can pass
 # The messages with no wire field, which forward-compat must still build: none at all, and
 # only a transient one. The resext harness round-trips them from BARE_WIRES.
 BARE = mk(Msg("Bare"), Msg("Cache", F("hits", 1, INT, transient=True)))
 BARE_WIRES = ["a0", "a10100", "a2010002f6", "a11a0010000182f4f5", "01", "80"]
 # The hosts the extension helpers read beyond the resext corpus: every kind of item that is
-# not a map, malformed input, and (with BAD_HOST_SEED) random and mutated hosts.
+# not a map, malformed input, hosts at the depth ceiling and one beyond it, and (with
+# BAD_HOST_SEED) random and mutated hosts. The harness also reads a host DEEP_HOST_ARRAYS deep.
 BAD_HOST_SEED = 0xBAD_4057
+DEEP_HOST_ARRAYS = 100_000
 NON_MAP_HOSTS = ["01", "20", "40", "6161", "80", "8101", "f4", "f5", "f6", "f93c00", "fb3ff0000000000000"]
 MALFORMED_HOSTS = ["", "ff", "a1", "a101", "a10100ff", "1c", "c0", "a2010001", "a1617800", "a120",
                    "a1190001", "a11a00100001", "a11a0010000161ff"]
@@ -261,13 +268,19 @@ def _python_ext(op, host):
         return "err " + parity.format_error(exc.tag, exc.payload)
 
 
+def _deep_host(arrays):
+    """A host map whose unknown field 7 holds `arrays` nested arrays: 1 + `arrays` deep."""
+    return bytes.fromhex("a107" + "81" * (arrays - 1) + "80")
+
+
 @functools.cache
 def _bad_host_rows(count=60, seed=BAD_HOST_SEED):
     """(op, host hex, what ext.py makes of it) for each op on NON_MAP_HOSTS, MALFORMED_HOSTS,
-    ODD_HOSTS, `count` random byte strings and `count` mutations of strapped hosts. Kept shallow:
-    Kotlin reads a host at the depth ceiling only once D1 lands."""
+    ODD_HOSTS, a host at the depth ceiling (128 deep) and one beyond it, `count` random byte
+    strings and `count` mutations of strapped hosts."""
     rng = random.Random(seed)
     hosts = [bytes.fromhex(h) for h in NON_MAP_HOSTS + MALFORMED_HOSTS] + [cbor.dumps(h) for h in ODD_HOSTS]
+    hosts += [_deep_host(127), _deep_host(128)]  # read at the ceiling (TautOptions.md G3)
     hosts += [bytes(rng.randrange(256) for _ in range(rng.randrange(1, 12))) for _ in range(count)]
     strapped = [bytes.fromhex(row[2]) for row in _resext_fuzz_rows(count=8, seed=seed)]
     for i in range(count):
@@ -289,7 +302,9 @@ def _bare_rows():
     return rows
 
 
-def _kotlin_resext_harness_source(residual_rows, ext_rows, fuzz_rows, bad_host_rows, bare_rows):
+def _kotlin_resext_harness_source(residual_rows, ext_rows, fuzz_rows, bad_host_rows, bare_rows,
+                                  deep_host_expect):
+    deep_host_src = ",\n".join(f"    {_kt_string(op)} to {_kt_string(want)}" for op, want in deep_host_expect.items())
     residual_src = ",\n".join(
         f"    ResidualRow({_kt_string(r['note'])}, {_kt_string(r['wire'])})"
         for r in residual_rows
@@ -333,6 +348,11 @@ private val bareRows = listOf(
 private val fuzzRowsText = {fuzz_src}
 
 private val badHostRowsText = {bad_host_src}
+
+// What ext.py, the reference, makes of each op on a host DEEP_HOST_ARRAYS deep.
+private val deepHostExpect = listOf(
+{deep_host_src}
+)
 
 private val hexChars = "0123456789abcdef".toCharArray()
 private const val EXT_TAG: Long = {RESEXT_TAG}L
@@ -391,7 +411,40 @@ private fun describe(e: DecodeError): String = when (e) {{
     is DecodeError.UnknownEnum -> "UnknownEnum;enum=" + e.enumName + ";value=" + e.value
     is DecodeError.NonCanonicalInt -> "NonCanonicalInt;value=" + e.value
     is DecodeError.NegativeMapKey -> "NegativeMapKey;key=" + e.key
+    is DecodeError.TooDeep -> "TooDeep;limit=" + e.limit
+    is DecodeError.TooLarge -> "TooLarge;len=" + e.len + ";limit=" + e.limit
     else -> e.javaClass.simpleName
+}}
+
+// A host map whose unknown field 7 holds `arrays` nested arrays: 1 + `arrays` deep.
+private fun deepHost(arrays: Int): ByteArray {{
+    val out = ByteArray(arrays + 2) {{ 0x81.toByte() }}
+    out[0] = 0xa1.toByte()
+    out[1] = 0x07
+    out[arrays + 1] = 0x80.toByte()
+    return out
+}}
+
+// The raw decode's bounds are its caller's arguments (TautOptions.md OPT-P3): a depth below 1 or
+// a negative length is the caller's error, IllegalArgumentException, found before any byte is
+// read and never a DecodeError.
+private val badBounds: List<Pair<String, (ByteArray) -> Cbor>> = listOf(
+    "maxDepth=0" to {{ data: ByteArray -> decode(data, maxDepth = 0) }},
+    "maxDepth=-1" to {{ data: ByteArray -> decode(data, maxDepth = -1) }},
+    "maxDepth=Int.MIN_VALUE" to {{ data: ByteArray -> decode(data, maxDepth = Int.MIN_VALUE) }},
+    "maxEncodedLen=-1" to {{ data: ByteArray -> decode(data, maxEncodedLen = -1) }},
+    "maxEncodedLen=Int.MIN_VALUE" to {{ data: ByteArray -> decode(data, maxEncodedLen = Int.MIN_VALUE) }},
+)
+
+private fun refusesArgument(data: ByteArray, read: (ByteArray) -> Cbor): Boolean {{
+    try {{
+        read(data)
+    }} catch (e: IllegalArgumentException) {{
+        return true
+    }} catch (e: DecodeError) {{
+        return false
+    }}
+    return false
 }}
 
 // What an extension helper makes of `op` at `tag` on `host`: a value or a DecodeError (CD-E4).
@@ -517,6 +570,33 @@ fun main() {{
         badHostMismatches += mismatch("bad host " + row.op + " " + row.host, got, row.expect)
     }}
 
+    // A host is read at the depth ceiling with no length bound (TautOptions.md G3): one
+    // {DEEP_HOST_ARRAYS} arrays deep is what ext.py says, TooDeep{{128}}, not a StackOverflowError,
+    // and one of 100,000 bytes is read whole.
+    var boundMismatches = 0
+    val deep = deepHost({DEEP_HOST_ARRAYS})
+    for ((op, want) in deepHostExpect) {{
+        boundMismatches += mismatch("deep host " + op, extOutcome(op, deep, EXT_TAG), want)
+    }}
+    val big = encode(Cbor.map(listOf(1L to Cbor.int(1L), 7L to Cbor.bytes(ByteArray(100_000) {{ 0x78.toByte() }}))))
+    boundMismatches += mismatch("big host get", extOutcome("get", big, EXT_TAG), "null")
+    val bigStrapped = extSet(big, EXT_TAG, BAD_HOST_DECISION.toCbor())
+    boundMismatches += mismatch("big host strapped get", extOutcome("get", bigStrapped, EXT_TAG),
+        "ok " + encode(BAD_HOST_DECISION.toCbor()).hex())
+    boundMismatches += mismatch("big host clear", extClear(bigStrapped, EXT_TAG).hex(), big.hex())
+
+    var argumentCases = 0
+    for (hex in listOf("", "00", "c0c0c0c0")) {{
+        for ((label, read) in badBounds) {{
+            if (refusesArgument(hexToBytes(hex), read)) {{
+                argumentCases += 1
+            }} else {{
+                println("decode " + label + " of '" + hex + "' was not refused as the caller's error")
+                corpusMismatches += 1
+            }}
+        }}
+    }}
+
     var bareMismatches = 0
     for (row in bareRows) {{
         val got = bareOutcome(row.message, hexToBytes(row.wire))
@@ -546,15 +626,19 @@ fun main() {{
 
     println("kotlin resext corpus_mismatches=" + corpusMismatches +
         " invalid_cases=" + invalidCases +
+        " argument_cases=" + argumentCases +
         " bad_host_rows=" + badHostRows.size +
         " bad_host_mismatches=" + badHostMismatches +
+        " bound_mismatches=" + boundMismatches +
         " bare_mismatches=" + bareMismatches +
         " fuzz_seed=" + FUZZ_SEED +
         " fuzz_rows=" + fuzzRows.size +
         " fuzz_mismatches=" + fuzzMismatches)
     check(corpusMismatches == 0) {{ "corpus mismatches=" + corpusMismatches }}
     check(invalidCases == 12) {{ "invalid cases=" + invalidCases }}
+    check(argumentCases == 15) {{ "argument cases=" + argumentCases }}
     check(badHostMismatches == 0) {{ "bad host mismatches=" + badHostMismatches }}
+    check(boundMismatches == 0) {{ "bound mismatches=" + boundMismatches }}
     check(bareMismatches == 0) {{ "bare mismatches=" + bareMismatches }}
     check(fuzzRows.size >= 1000) {{ "fuzz rows=" + fuzzRows.size }}
     check(fuzzMismatches == 0) {{ "fuzz mismatches=" + fuzzMismatches + " seed=" + FUZZ_SEED }}
@@ -642,6 +726,65 @@ def test_float_scalar_codegen_shape():
     assert "it.get(1).intVal to it.get(2).floatVal" in s
 
 
+# --- the bounds (D26, TautCheckedDecode.md §3; D27, TautOptions.md OPT-D3, OPT-L6) ------------
+
+# A file that declares both bounds; messages that override its depth, inherit both, override its
+# length at the ceiling on declared values, and have no field.
+FILED = mk(
+    option.max_depth(3), option.max_encoded_len(16),
+    Msg("Tree", F("kids", 1, List(Ref("Tree"))), option.max_depth(64)),
+    Msg("Plain", F("v", 1, List(INT))),
+    Msg("Blob", F("b", 1, BYTES), option.max_encoded_len(INT32_MAX)),
+    Msg("Nothing"),
+)
+
+
+def _companion(source, message):
+    """The lines inside `message`'s companion object in generated `source`."""
+    lines = source.splitlines()
+    start = next(i for i, line in enumerate(lines) if re.fullmatch(rf"(data )?class {message}\(", line))
+    opening = lines.index("    companion object {", start)
+    return lines[opening + 1:lines.index("    }", opening)]
+
+
+def test_each_message_carries_its_bounds_and_a_decode_from_bytes():
+    """CD-B3, OPT-L6: a message's companion holds MAX_DEPTH and MAX_ENCODED_LEN, the effective
+    values `options.effective` resolves when the code is generated (the message's, else the
+    file's, else 32 and none), and `decode(bytes)`, the typed entry point, which takes no bound
+    and passes both to the raw decode. `fromCbor` reads a tree its caller decoded (G1)."""
+    fixture = parity.parity_schema()
+    spot = [
+        (FILED, {"Tree": (64, 16), "Plain": (3, 16), "Blob": (3, INT32_MAX), "Nothing": (3, 16)}),
+        (fixture, {"IntBox": (32, None), "Tree64": (64, None), "Tree128": (128, None), "Flat2": (2, None),
+                   "Sized8": (32, 8), "Holds64": (32, None), "HoldsSized8": (32, None)}),
+    ]
+    for schema_, want in spot:
+        resolved = {name: (options.effective(schema_, "max_depth", message=name),
+                           options.effective(schema_, "max_encoded_len", message=name))
+                    for name in schema_.messages}
+        assert {name: resolved[name] for name in want} == want
+        for forward_compat in (False, True):
+            source = kotlin.emit_types(schema_, forward_compat=forward_compat)
+            for name, (depth, length) in resolved.items():
+                assert _companion(source, name)[:3] == [
+                    f"        const val MAX_DEPTH: Int = {depth}",
+                    f"        val MAX_ENCODED_LEN: Int? = {'null' if length is None else length}",
+                    f"        fun decode(bytes: ByteArray): {name} = "
+                    "fromCbor(taut.decode(bytes, MAX_DEPTH, MAX_ENCODED_LEN))",
+                ], (name, forward_compat)
+
+
+def test_the_runtime_exports_the_depth_numbers_and_a_bounded_raw_decode():
+    """CD-B3: the vendored cbor.kt holds taut's two depth numbers as compile-time constants, and
+    its raw decode takes an optional depth, 32 unless passed, and an optional length. The gate
+    compares the numbers its runner prints from them (#constants) with the corpus header."""
+    lines = (ROOT / "src/taut/gen/runtime/cbor.kt").read_text().splitlines()
+    assert f"const val DEFAULT_MAX_DEPTH: Int = {options.DEFAULT_MAX_DEPTH}" in lines
+    assert f"const val MAX_DEPTH_CEILING: Int = {options.MAX_DEPTH_CEILING}" in lines
+    assert ("fun decode(data: ByteArray, maxDepth: Int = DEFAULT_MAX_DEPTH, maxEncodedLen: Int? = null)"
+            ": Cbor {") in lines
+
+
 def test_kotlin_float_parity_harness_if_kotlinc(tmp_path):
     kotlinc = _find_kotlinc()
     java = _find_java(kotlinc)
@@ -678,6 +821,10 @@ def test_kotlin_passes_the_parity_gate():
 
 
 def test_kotlin_resext_corpus_and_fuzz_harness_if_kotlinc(tmp_path):
+    """The runtime's extension helpers and residual against ext.py, the reference, in one kotlinc
+    build that also holds the runtime's caller errors: a below-band tag (invalid_cases) and an
+    out-of-range bound passed to the raw decode (argument_cases, TautOptions.md OPT-P3). A host
+    is read at the depth ceiling with no length bound (bound_mismatches, G3)."""
     kotlinc = _find_kotlinc()
     java = _find_java(kotlinc)
     api = tmp_path / "api.kt"
@@ -689,10 +836,12 @@ def test_kotlin_resext_corpus_and_fuzz_harness_if_kotlinc(tmp_path):
     ext_rows = json.loads(rb.EXT_PATH.read_text())
     fuzz_rows = _resext_fuzz_rows()
     bad_host_rows = _bad_host_rows()
+    deep_host = _deep_host(DEEP_HOST_ARRAYS)
+    deep_host_expect = {op: _python_ext(op, deep_host) for op in ("set", "get", "clear")}
     api.write_text(kotlin.emit_types(RESEXT, forward_compat=True))
     bare.write_text(kotlin.emit_types(BARE, forward_compat=True))
     harness.write_text(_kotlin_resext_harness_source(residual_rows, ext_rows, fuzz_rows, bad_host_rows,
-                                                     _bare_rows()))
+                                                     _bare_rows(), deep_host_expect))
 
     subprocess.run(
         [
@@ -722,7 +871,9 @@ def test_kotlin_resext_corpus_and_fuzz_harness_if_kotlinc(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     assert "corpus_mismatches=0" in result.stdout
     assert "invalid_cases=12" in result.stdout      # each op refuses four below-band tags
+    assert "argument_cases=15" in result.stdout     # five bad bounds, on three inputs each
     assert f"bad_host_rows={len(bad_host_rows)} bad_host_mismatches=0" in result.stdout
+    assert "bound_mismatches=0" in result.stdout
     assert "bare_mismatches=0" in result.stdout
     assert f"fuzz_seed={RESEXT_FUZZ_SEED}" in result.stdout
     assert "fuzz_rows=1000" in result.stdout
@@ -731,7 +882,8 @@ def test_kotlin_resext_corpus_and_fuzz_harness_if_kotlinc(tmp_path):
 
 def test_the_bad_hosts_state_what_ext_py_the_reference_does():
     """CD-E4 in the reference: a host that is not a map is WrongType{map} for every op, a
-    malformed one its DecodeError, and the rows the Kotlin harness replays hold every outcome."""
+    malformed one its DecodeError, one deeper than the ceiling TooDeep{128} (G3), and the rows
+    the Kotlin harness replays hold every outcome."""
     rows = _bad_host_rows()
     by_host = {}
     for op, host, outcome in rows:
@@ -756,9 +908,16 @@ def test_the_bad_hosts_state_what_ext_py_the_reference_does():
     assert [by_host[cbor.dumps(h).hex()]["get"] for h in ODD_HOSTS] == [
         "null", "null", "err MissingKey;key=2", "err WrongType;expected=map", "err WrongType;expected=text",
         "ok a3016262370201036178"]
+    at_ceiling = _deep_host(127).hex()                            # 128 deep: read
+    assert by_host[at_ceiling]["get"] == "null" and by_host[at_ceiling]["clear"] == "ok " + at_ceiling
+    assert by_host[at_ceiling]["set"].startswith("ok a2")         # the host's field 7 and the extension
+    too_deep = dict.fromkeys(("set", "get", "clear"), "err TooDeep;limit=128")
+    assert by_host[_deep_host(128).hex()] == too_deep
+    assert {op: _python_ext(op, _deep_host(DEEP_HOST_ARRAYS)) for op in too_deep} == too_deep
     kinds = {outcome.split(";")[0] if outcome.startswith("err ") else outcome.split(" ")[0]
              for _, _, outcome in rows}
-    assert {"ok", "null", "err WrongType", "err MissingKey", "err Truncated", "err InvalidUtf8"} <= kinds
+    assert {"ok", "null", "err WrongType", "err MissingKey", "err Truncated", "err InvalidUtf8",
+            "err TooDeep"} <= kinds
 
 
 def test_a_message_without_wire_fields_still_requires_a_map():
@@ -955,6 +1114,24 @@ RAW_EDGES = [
 # An enum's wire value that is not a member, or not an int.
 ENUM_EDGES = ["02", "20", "1b7fffffffffffffff", "3b7fffffffffffffff", "6161", "f5", "f6", "80", "a0",
               "fa3f800000", "1817"]
+# The bounds a raw call passes (TautCheckedDecode.md CD-B3, CD-B5): depth arguments, each applied
+# as given up to the ceiling and as the ceiling above it, up to Int's largest, which a Kotlin
+# caller can pass; and (hex, limits) at the edges: a map key is an item of its map, and a length
+# bound, at, below and far above the input's length, is checked first.
+DEPTH_ARGUMENTS = [1, 2, 5, 31, 33, 64, 127, 128, 129, 1000, INT32_MAX]
+LIMIT_EDGES = [
+    ("a18000", {"max_depth": 1}), ("a18000", {"max_depth": 2}),
+    ("83010203", {"max_encoded_len": 4}), ("83010203", {"max_encoded_len": 3}),
+    ("83010203", {"max_encoded_len": INT32_MAX}), ("00", {"max_encoded_len": 0}),
+    ("0000", {"max_encoded_len": 1}),
+    ("81" * 40 + "80", {"max_depth": 64, "max_encoded_len": 10}),
+    ("81" * 40 + "80", {"max_depth": 40, "max_encoded_len": 41}),
+    ("81" * 40 + "80", {"max_depth": 41, "max_encoded_len": 41}),
+]
+# A typed decode of 100,000-deep input under its root's own depth bound (B9 and B10 are raw):
+# (message, the opener repeated, the bound).
+DEEP_ROOTS = [("Tree64", "a10181", 64), ("Tree128", "a10181", 128), ("Holds64", "a10181", 32),
+              ("IntBox", "81", 32)]
 BEYOND_SEED = 0xB3_70_4D
 _SAMPLES = {
     "int": [0, 1, -1, 23, 24, -25, 256, 1 << 40, INT_MIN, INT_MAX],
@@ -969,19 +1146,28 @@ _REPLACEMENTS = [0, 7, -1, "x", b"", True, None, 1.5, [], {}, [0], ["x"], [{}], 
                  {1: 0}, {1: "x", 2: 0}, [{1: 0, 2: 0}, {1: 0, 2: 1}]]
 
 
-def _native(schema, t, rng):
-    """A random native value of type `t`, as `taut.wire.codec` takes one."""
+# A recursive message (Tree64, Tree128) nests through a list of itself. A list inside this many
+# messages is left empty, so a random tree is at most 8 containers deep, inside every bound in
+# the fixture that it can meet; no other fixture message nests a list that deep.
+_NATIVE_NESTING = 4
+
+
+def _native(schema, t, rng, nesting=0):
+    """A random native value of type `t`, as `taut.wire.codec` takes one, inside `nesting`
+    messages."""
     if isinstance(t, Scalar):
         return rng.choice(_SAMPLES[t.kind])
     if isinstance(t, EnumRef):
         return rng.choice(list(schema.enums[t.name].members))
     if isinstance(t, MsgRef):
-        return {f.name: None if f.optional and rng.randrange(3) == 0 else _native(schema, f.type, rng)
+        return {f.name: None if f.optional and rng.randrange(3) == 0 else _native(schema, f.type, rng, nesting + 1)
                 for f in schema.messages[t.name].wire_fields()}
     if isinstance(t, ListOf):
-        return [_native(schema, t.elem, rng) for _ in range(rng.randrange(3))]
+        count = rng.randrange(3) if nesting < _NATIVE_NESTING else 0
+        return [_native(schema, t.elem, rng, nesting) for _ in range(count)]
     assert isinstance(t, MapOf)
-    return {_native(schema, t.key, rng): _native(schema, t.value, rng) for _ in range(rng.randrange(3))}
+    return {_native(schema, t.key, rng, nesting): _native(schema, t.value, rng, nesting)
+            for _ in range(rng.randrange(3))}
 
 
 def _nodes(node, parent=None, key=None):
@@ -1047,23 +1233,26 @@ def _drop_unknown(schema, t, value):
     return value
 
 
-def _beyond_row(fixture, name, stage, schema_name, data):
+def _beyond_row(fixture, name, stage, schema_name, data, **fields):
     """A malformed row expecting what Python, the reference, observes (`expect_dropping` when a
-    codec that drops unknown fields re-encodes it otherwise); None for a bound's tag, whose rows
-    are D1's, and for an accepted enum, which the gate never expects."""
-    row = {"name": name, "stage": stage, "schema": schema_name, "bytes": data.hex()}
+    codec that drops unknown fields re-encodes it otherwise), a bound's tag included; None for an
+    accepted enum, which the gate never expects. `data` is the row's bytes, or its segments
+    (CD-C2), which then carry their expanded `len`; `fields` adds a raw row's `limits`."""
+    segmented = isinstance(data, list)
+    row = {"name": name, "stage": stage, "schema": schema_name, "bytes": data if segmented else data.hex(),
+           **fields}
+    if segmented:
+        row["len"] = len(parity.row_bytes(row))
     outcome, detail = parity._observe_python(fixture, row)
     assert outcome in (parity.OK, parity.ERR), (name, detail)
     if outcome == parity.ERR:
         tag, payload = parity.parse_error(detail)
-        if tag in ("TooDeep", "TooLarge"):
-            return None
         return {**row, "expect": {"tag": tag, **payload}}
     if stage == "from_wire":
         return None
     row["expect"] = {"accept": True, "reencode": detail}
     if stage == "from_cbor":
-        kept = codec.decode(fixture, schema_name, data)
+        kept = codec.decode(fixture, schema_name, parity.row_bytes(row))
         dropped = codec.encode(fixture, schema_name, _drop_unknown(fixture, MsgRef(schema_name), kept)).hex()
         if dropped != detail:
             row["expect_dropping"] = {"accept": True, "reencode": dropped}
@@ -1080,17 +1269,14 @@ def _with_repeated_key(fixture, message, tag, key, rng):
     return cbor.dumps(tree)
 
 
-# The bounds fixture (TautCheckedDecode.md CD-C1): recursive or bounded messages whose rows are
-# bounds.vectors.json's, where depth and length are judged; kept out of the random rows until D1.
-BOUNDS_MESSAGES = frozenset({"Tree64", "Tree128", "Flat2", "Sized8", "Holds64", "HoldsSized8"})
-
-
 @functools.cache
 def _beyond_rows(per_message=36, randoms=60, seed=BEYOND_SEED):
     """Malformed rows beyond the shared corpus, for the gate's own runner and judge: question 9's
-    repeated keys, CD-E5's raw edges, random bytes, `per_message` random encodings of each
-    fixture message (a third as they are, a third with a byte mutated, a third with a node) and
-    bad enum values. Kept shallow: depth is D1's."""
+    repeated keys, CD-E5's raw edges, random bytes, the bounds a raw call passes, `per_message`
+    random encodings of each fixture message (a third as they are, a third with a byte mutated,
+    a third with a node), typed decodes of 100,000-deep input and bad enum values. The bounds
+    fixture's random values are inside its bounds (`_native`); a mutation may cross one, and
+    its row expects the bound's tag."""
     fixture = parity.parity_schema()
     rng = random.Random(seed)
     rows = []
@@ -1105,14 +1291,24 @@ def _beyond_rows(per_message=36, randoms=60, seed=BEYOND_SEED):
     randoms_ = [bytes(rng.randrange(256) for _ in range(rng.randrange(1, 10))) for _ in range(randoms)]
     for i, data in enumerate([bytes.fromhex(h) for h in RAW_EDGES] + randoms_):
         rows.append(_beyond_row(fixture, f"beyond-raw-{i}", "raw_decode", "", data))
+    for depth in DEPTH_ARGUMENTS:  # at the bound applied, and one beyond it
+        applied = min(depth, cbor.MAX_DEPTH_CEILING)
+        for beyond in (0, 1):
+            data = bytes.fromhex("81" * (applied - 1 + beyond) + "80")
+            rows.append(_beyond_row(fixture, f"beyond-depth-{depth}-{beyond}", "raw_decode", "", data,
+                                    limits={"max_depth": depth}))
+    for i, (hexed, limits) in enumerate(LIMIT_EDGES):
+        rows.append(_beyond_row(fixture, f"beyond-limits-{i}", "raw_decode", "", bytes.fromhex(hexed),
+                                limits=limits))
     for message in fixture.messages:
-        if message in BOUNDS_MESSAGES:
-            continue  # the bounds fixture is bounds.vectors.json's; D1.kotlin brings it here
         for i in range(per_message):
             data = codec.encode(fixture, message, _native(fixture, MsgRef(message), rng))
             if i % 3:
                 data = (_mutate_tree if i % 3 == 1 else _mutate_bytes)(data, rng)
             rows.append(_beyond_row(fixture, f"beyond-{message}-{i}", "from_cbor", message, data))
+    for message, opener, _ in DEEP_ROOTS:
+        rows.append(_beyond_row(fixture, f"beyond-deep-{message}", "from_cbor", message,
+                                [{"repeat": opener, "count": 100_000}, "80"]))
     for enum in fixture.enums:
         for i, data in enumerate(bytes.fromhex(h) for h in ENUM_EDGES):
             rows.append(_beyond_row(fixture, f"beyond-{enum}-{i}", "from_wire", enum, data))
@@ -1130,31 +1326,40 @@ def test_the_rows_beyond_the_corpus_state_what_python_the_reference_does():
     # a mix: every fixture message accepted and refused at the schema stage, rows that a codec
     # dropping unknown fields re-encodes otherwise, and each decode tag
     typed = [row for row in rows if row["stage"] == "from_cbor"]
-    assert {row["schema"] for row in typed if row["expect"].get("accept")} == set(fixture.messages) - BOUNDS_MESSAGES
+    assert {row["schema"] for row in typed if row["expect"].get("accept")} == set(fixture.messages)
     assert any("expect_dropping" in row for row in typed)
     tags = {row["expect"].get("tag") for row in rows}
     assert {"Truncated", "TrailingBytes", "InvalidUtf8", "UnsupportedInfo", "UnsupportedMajor",
             "NonIntegerMapKey", "NegativeMapKey", "DuplicateMapKey", "NonCanonicalInt", "IntOverflow",
-            "WrongType", "MissingKey", "UnknownEnum"} <= tags
+            "WrongType", "MissingKey", "UnknownEnum", "TooDeep", "TooLarge"} <= tags
     refused = {row["schema"] for row in typed if row["expect"].get("tag") in ("WrongType", "MissingKey")}
-    assert refused == set(fixture.messages) - BOUNDS_MESSAGES
+    assert refused == set(fixture.messages)
+    # the bounds: each depth argument applied as given up to the ceiling, the ceiling above it,
+    # and a typed decode of deep input refused at its root's own bound
+    applied = [(row["limits"]["max_depth"], row["expect"].get("tag", "accept"), row["expect"].get("limit"))
+               for row in rows if row["name"].startswith("beyond-depth-")]
+    assert applied == [(depth, tag, limit) for depth in DEPTH_ARGUMENTS
+                       for tag, limit in (("accept", None), ("TooDeep", str(min(depth, 128))))]
+    deep = {row["schema"]: row["expect"] for row in rows if row["name"].startswith("beyond-deep-")}
+    assert deep == {message: {"tag": "TooDeep", "limit": str(bound)} for message, _, bound in DEEP_ROOTS}
 
 
 def test_kotlin_matches_python_beyond_the_corpus(monkeypatch):
-    """Every public decode entry point (raw `decode`, each fixture message's `fromCbor` and the
-    enum's `fromWire`) returns a value or throws DecodeError, with Python's tag and payload,
-    on the rows beyond the corpus, question 9's repeated keys among them: through the gate's
-    own Kotlin runner and judge, as kotlin and as kotlin/fc. A runner reports anything else
-    escaping as `untyped`, which fails its row. The JVM's own stdout here is ASCII, as on a
-    host whose locale is: the runner still reports a str key such as `naïve` as itself."""
+    """Every public decode entry point (raw `decode` with a raw row's limits, each fixture
+    message's typed `decode` from bytes and the enum's `fromWire`) returns a value or throws
+    DecodeError, with Python's tag and payload, on the rows beyond the corpus, question 9's
+    repeated keys and the bounds among them: through the gate's own Kotlin runner and judge, as
+    kotlin and as kotlin/fc. A runner reports anything else escaping as `untyped`, which fails
+    its row. The JVM's own stdout here is ASCII, as on a host whose locale is: the runner still
+    reports a str key such as `naïve` as itself."""
     allowlisted = parity.allowlisted_targets()
     if {"kotlin", "kotlin/fc"} & allowlisted:
-        pytest.skip("kotlin is allowlisted until D1.kotlin (corpus/parity/allowlist.json): its runner "
-                    "prints no #constants line yet")
+        pytest.skip("kotlin is allowlisted (corpus/parity/allowlist.json): its runner is not held "
+                    "to the rows")
     rows = list(_beyond_rows())
     monkeypatch.setattr(parity, "malformed_rows", lambda: rows)
-    options = os.environ.get("JAVA_TOOL_OPTIONS", "")
-    monkeypatch.setenv("JAVA_TOOL_OPTIONS", f"{options} -Dstdout.encoding=US-ASCII".strip())
+    tool_options = os.environ.get("JAVA_TOOL_OPTIONS", "")
+    monkeypatch.setenv("JAVA_TOOL_OPTIONS", f"{tool_options} -Dstdout.encoding=US-ASCII".strip())
     for forward_compat in (False, True):
         report = parity_kotlin.run(forward_compat=forward_compat)
         if not report.available:
