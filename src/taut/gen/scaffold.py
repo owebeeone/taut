@@ -629,7 +629,7 @@ def emit(
         for f in m.fields
         if f.optional == MISSING_OK
     ]
-    unsupported_missing_ok = set(lang_keys) - {"python", "rust", "js", "swift"}
+    unsupported_missing_ok = set(lang_keys) - {"python", "rust", "js", "swift", "typescript"}
     if missing_ok_fields and unsupported_missing_ok:
         raise ValueError(
             "optional=MISSING_OK fields are supported only by Python and Rust generation; "

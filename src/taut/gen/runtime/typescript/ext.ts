@@ -4,7 +4,7 @@
 // in the extension band. The value is the nested extension message as CborValue,
 // not pre-serialized bytes.
 
-import { type CborValue, decode as cborDecode, encode as cborEncode } from "./cbor.ts";
+import { type CborValue, type MapKey, decode as cborDecode, encode as cborEncode } from "./cbor.ts";
 
 export const BAND_START = 2 ** 20;
 
@@ -14,7 +14,7 @@ function checkTag(tag: number): void {
   }
 }
 
-function decodeHostMap(host: Uint8Array): Map<number, CborValue> {
+function decodeHostMap(host: Uint8Array): Map<MapKey, CborValue> {
   const top = cborDecode(host);
   if (!(top instanceof Map)) {
     throw new Error("extension host must decode to a top-level CBOR map");
@@ -25,9 +25,11 @@ function decodeHostMap(host: Uint8Array): Map<number, CborValue> {
 export function extSet(host: Uint8Array, tag: number, value: CborValue): Uint8Array {
   checkTag(tag);
   const top = decodeHostMap(host);
-  const out = new Map<number, CborValue>();
+  const out = new Map<MapKey, CborValue>();
   for (const [k, v] of top) {
-    if (k !== tag) out.set(k, v);
+    if (k !== tag) {
+      out.set(k, v);
+    }
   }
   out.set(tag, value);
   return cborEncode(out);
@@ -42,9 +44,11 @@ export function extGet(host: Uint8Array, tag: number): CborValue | null {
 export function extClear(host: Uint8Array, tag: number): Uint8Array {
   checkTag(tag);
   const top = decodeHostMap(host);
-  const out = new Map<number, CborValue>();
+  const out = new Map<MapKey, CborValue>();
   for (const [k, v] of top) {
-    if (k !== tag) out.set(k, v);
+    if (k !== tag) {
+      out.set(k, v);
+    }
   }
   return cborEncode(out);
 }

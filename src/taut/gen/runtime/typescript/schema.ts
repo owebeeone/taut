@@ -9,11 +9,15 @@ export type TypeRef =
   | { k: "list"; elem: TypeRef }
   | { k: "map"; key: TypeRef; value: TypeRef };
 
+// The IR's `optional`: false is required and true may be null; MISSING_OK may be
+// null or absent, and reads an absent key as null (TautCheckedDecode.md CD-E5).
+export const MISSING_OK = "missing_ok";
+
 export interface FieldDef {
   name: string;
   tag: number;
   type: TypeRef;
-  optional: boolean;
+  optional: boolean | typeof MISSING_OK;
   transient: boolean;
 }
 

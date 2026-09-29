@@ -12,6 +12,11 @@ export class CborFloat {
   }
 }
 
+// A map key is a non-negative int in one form: a number up to 2^53 - 1, and an
+// exact bigint above it, up to 2^63 - 1 (TautCheckedDecode.md CD-E5). So a map
+// decodes without losing a key and re-encodes as it was read.
+export type MapKey = number | bigint;
+
 export type CborValue =
   | bigint
   | number
@@ -21,7 +26,7 @@ export type CborValue =
   | null
   | Uint8Array
   | CborValue[]
-  | Map<number, CborValue>;
+  | Map<MapKey, CborValue>;
 
 export type DecodeErrorTag =
   | "Truncated"
@@ -80,6 +85,7 @@ export const I64_MIN = -(1n << 63n);
 export const I64_MAX = (1n << 63n) - 1n;
 
 const U32_LIMIT = 0x100000000n;
+const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 const textDecoder = new TextDecoder("utf-8", { fatal: true });
 const floatScratch = new DataView(new ArrayBuffer(8));
 const F64_FRAC_MASK = (1n << 52n) - 1n;
@@ -239,6 +245,21 @@ function pushHead(out: number[], major: number, n: bigint | number): void {
   }
 }
 
+// A key in its one form (MapKey); anything else is refused.
+function isMapKey(k: MapKey): boolean {
+  if (typeof k === "number") {
+    return Number.isSafeInteger(k) && k >= 0;
+  }
+  return typeof k === "bigint" && k > MAX_SAFE && k <= I64_MAX;
+}
+
+function compareMapKeys(a: MapKey, b: MapKey): number {
+  if (a < b) {
+    return -1;
+  }
+  return a > b ? 1 : 0;
+}
+
 function enc(value: CborValue, out: number[]): void {
   if (value === null) { out.push(0xf6); return; }
   if (value === true) { out.push(0xf5); return; }
@@ -249,31 +270,42 @@ function enc(value: CborValue, out: number[]): void {
   }
   if (typeof value === "bigint" || typeof value === "number") {
     const n = checkedInt(value);
-    if (n >= 0n) pushHead(out, 0, n);
-    else pushHead(out, 1, -1n - n);
+    if (n >= 0n) {
+      pushHead(out, 0, n);
+    } else {
+      pushHead(out, 1, -1n - n);
+    }
     return;
   }
   if (value instanceof Uint8Array) {
     pushHead(out, 2, value.length);
-    for (const b of value) out.push(b);
+    for (const b of value) {
+      out.push(b);
+    }
     return;
   }
   if (typeof value === "string") {
     const e = new TextEncoder().encode(value);
     pushHead(out, 3, e.length);
-    for (const b of e) out.push(b);
+    for (const b of e) {
+      out.push(b);
+    }
     return;
   }
   if (Array.isArray(value)) {
     pushHead(out, 4, value.length);
-    for (const v of value) enc(v, out);
+    for (const v of value) {
+      enc(v, out);
+    }
     return;
   }
   if (value instanceof Map) {
-    const keys = [...value.keys()].sort((a, b) => a - b); // deterministic
+    const keys = [...value.keys()].sort(compareMapKeys); // deterministic
     pushHead(out, 5, keys.length);
     for (const k of keys) {
-      if (!Number.isSafeInteger(k) || k < 0) throw new Error(`invalid CBOR map key ${k}`);
+      if (!isMapKey(k)) {
+        throw new Error(`invalid CBOR map key ${k}`);
+      }
       pushHead(out, 0, k);
       enc(value.get(k) as CborValue, out);
     }
@@ -330,10 +362,24 @@ function readArg(data: Uint8Array, off: number, info: number): [bigint, number] 
   return [value, next];
 }
 
+// A byte or text length beyond the remaining input is Truncated, whatever its size
+// (TautCheckedDecode.md CD-E5, M1): the check is exact on the bigint argument.
 function readLength(data: Uint8Array, off: number, info: number): [number, number] {
   const [n, o] = readArg(data, off, info);
-  if (n > BigInt(Number.MAX_SAFE_INTEGER)) throw new DecodeError("IntOverflow", { value: n.toString() });
+  if (n > BigInt(data.length - o)) {
+    throw new DecodeError("Truncated");
+  }
   return [Number(n), o];
+}
+
+// An array or map count is not checked up front: its items are read in order and
+// the first to fail decides (CD-E5, M2, M3). Each item takes at least one byte, so
+// a count beyond the remaining input has failed by then; capping it there keeps it
+// a number and changes no outcome.
+function readCount(data: Uint8Array, off: number, info: number): [number, number] {
+  const [n, o] = readArg(data, off, info);
+  const cap = BigInt(data.length - o) + 1n;
+  return [Number(n < cap ? n : cap), o];
 }
 
 function dec(data: Uint8Array, off: number): [CborValue, number] {
@@ -344,22 +390,24 @@ function dec(data: Uint8Array, off: number): [CborValue, number] {
   off++;
   if (major === 0) {
     const [n, o] = readArg(data, off, info);
-    if (n > I64_MAX) throw new DecodeError("IntOverflow", { value: n.toString() });
+    if (n > I64_MAX) {
+      throw new DecodeError("IntOverflow", { value: n.toString() });
+    }
     return [n, o];
   }
   if (major === 1) {
     const [n, o] = readArg(data, off, info);
-    if (n > I64_MAX) throw new DecodeError("IntOverflow", { value: (-1n - n).toString() });
+    if (n > I64_MAX) {
+      throw new DecodeError("IntOverflow", { value: (-1n - n).toString() });
+    }
     return [-1n - n, o];
   }
   if (major === 2) {
     const [n, o] = readLength(data, off, info);
-    requireBytes(data, o, n);
     return [data.slice(o, o + n), o + n];
   }
   if (major === 3) {
     const [n, o] = readLength(data, off, info);
-    requireBytes(data, o, n);
     try {
       return [textDecoder.decode(data.slice(o, o + n)), o + n];
     } catch {
@@ -367,7 +415,7 @@ function dec(data: Uint8Array, off: number): [CborValue, number] {
     }
   }
   if (major === 4) {
-    let [n, o] = readLength(data, off, info);
+    let [n, o] = readCount(data, off, info);
     const arr: CborValue[] = [];
     for (let i = 0; i < n; i++) {
       const [v, o2] = dec(data, o);
@@ -377,29 +425,41 @@ function dec(data: Uint8Array, off: number): [CborValue, number] {
     return [arr, o];
   }
   if (major === 5) {
-    let [n, o] = readLength(data, off, info);
-    const m = new Map<number, CborValue>();
-    const seen = new Set<string>();
+    let [n, o] = readCount(data, off, info);
+    const m = new Map<MapKey, CborValue>();
     for (let i = 0; i < n; i++) {
+      // The key first: its item, then NonIntegerMapKey, NegativeMapKey and
+      // DuplicateMapKey, and only then the value (CD-E5).
       const [k, o2] = dec(data, o);
-      if (typeof k !== "bigint") throw new DecodeError("NonIntegerMapKey");
-      if (k < 0n) throw new DecodeError("NegativeMapKey", { key: k });
-      if (k > BigInt(Number.MAX_SAFE_INTEGER)) throw new DecodeError("NonIntegerMapKey");
-      const key = Number(k);
-      const token = k.toString();
-      if (seen.has(token)) throw new DecodeError("DuplicateMapKey", { key });
-      seen.add(token);
+      if (typeof k !== "bigint") {
+        throw new DecodeError("NonIntegerMapKey");
+      }
+      if (k < 0n) {
+        throw new DecodeError("NegativeMapKey", { key: k });
+      }
+      const key: MapKey = k > MAX_SAFE ? k : Number(k);
+      if (m.has(key)) {
+        throw new DecodeError("DuplicateMapKey", { key });
+      }
       const [v, o3] = dec(data, o2);
       m.set(key, v);
       o = o3;
     }
     return [m, o];
   }
-  if (major === 6) throw new DecodeError("UnsupportedMajor", { major });
+  if (major === 6) {
+    throw new DecodeError("UnsupportedMajor", { major });
+  }
   if (major === 7) {
-    if (info === 20) return [false, off];
-    if (info === 21) return [true, off];
-    if (info === 22) return [null, off];
+    if (info === 20) {
+      return [false, off];
+    }
+    if (info === 21) {
+      return [true, off];
+    }
+    if (info === 22) {
+      return [null, off];
+    }
     if (info === 25) {
       requireBytes(data, off, 2);
       return [new CborFloat(halfToNumber((data[off] << 8) | data[off + 1])), off + 2];
