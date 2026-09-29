@@ -10,11 +10,22 @@ as members of a `Cbor` value (`tryGet`, `tryDictionary`, ...), never as free fun
 which a field of the same name would hide. A field still cannot be named like a type
 the code names (`Cbor`, its message, or the message or enum of a field) or like the
 member `toCbor`. Decode is fail-closed: `fromCbor` returns or throws `CborError`.
+
+Each message is also a decode root (TautCheckedDecode.md CD-B3; TautOptions.md OPT-L6): its
+effective bounds, as `taut.ir.options.effective` resolves them when the code is generated,
+are the static constants `maxDepth` and `maxEncodedLen` (nil: no length bound), and its
+`decode(_:)` reads bytes through the runtime's `Cbor.tryDecode` under both, then `fromCbor`.
+A message nested inside does not change the bounds of the call (OPT-D4): `fromCbor` reads a
+decoded tree and applies none. `decode` names its own members through `Self`, so an instance
+field of the same name (a Swift type may have both) hides none of them.
 """
 
 from __future__ import annotations
 
-from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import (
+    MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MessageDef, MsgRef, Scalar, Schema, TypeRef,
+)
+from ..ir.options import effective
 
 # Swift reserved words — field names / enum cases that collide get backtick-escaped
 # (e.g. razel's `VersionInfo.protocol`).
@@ -31,6 +42,7 @@ _C = "wire_c"          # a fromCbor's parameter, the item it decodes
 _V = "wire_v"          # a nullable field's item
 _RAW = "wire_raw"      # an enum's wire value
 _VALUE = "wire_value"  # the member that value names
+_BYTES = "wire_bytes"  # a decode's parameter, the bytes it reads
 
 
 def _id(name: str) -> str:
@@ -194,8 +206,23 @@ def _emit_message(msg, schema: Schema, forward_compat: bool = False) -> list[str
     out.append("            " + ",\n            ".join(args))
     out.append("        )")
     out.append("    }")
+    out += _emit_decode(msg, schema)
     out.append("}")
     return out
+
+
+def _emit_decode(msg: MessageDef, schema: Schema) -> list[str]:
+    """The message as a decode root: its effective bounds, and `decode` from bytes under them."""
+    depth = effective(schema, "max_depth", message=msg.name)
+    length = effective(schema, "max_encoded_len", message=msg.name)
+    return [
+        f"    public static let maxDepth: Int = {depth}",
+        f"    public static let maxEncodedLen: Int? = {'nil' if length is None else length}",
+        f"    public static func decode(_ {_BYTES}: [UInt8]) throws -> {msg.name} {{",
+        f"        return try Self.fromCbor(Cbor.tryDecode({_BYTES}, maxDepth: Self.maxDepth, "
+        "maxEncodedLen: Self.maxEncodedLen))",
+        "    }",
+    ]
 
 
 def emit_types(schema: Schema, forward_compat: bool = False) -> str:

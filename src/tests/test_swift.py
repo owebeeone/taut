@@ -6,7 +6,14 @@ shared parity corpus is replayed through the gate's runner (`tautc parity -t swi
 Checked decode (TautCheckedDecode.md, D26): no field named like a parameter, local or
 runtime helper of the generated code breaks it, a repeated map key is reported as text
 (question 9), and every public decode entry point, the extension helpers included,
-returns or throws `CborError` (CD-E4, question 5)."""
+returns or throws `CborError` (CD-E4, question 5).
+
+Bounds (D26 §3, step D1): the raw decode counts depth and takes the caller's `maxDepth`,
+capped at the ceiling, and `maxEncodedLen`, and agrees with Python's `cbor.loads`, the
+reference, case by case; an argument out of range traps (TautOptions.md OPT-P3). Each
+message carries its effective bounds as constants and a typed `decode` from bytes that
+applies them (CD-B3, OPT-L6); the extension helpers read a host at the ceiling with no
+length bound (G3); input nested 100,000 deep is `tooDeep`, never a crash."""
 
 import json
 import os
@@ -23,8 +30,9 @@ from taut.corpus.build import IR_PATH
 from taut.corpus import parity, parity_swift
 from taut.corpus import resext_build as rb
 from taut.gen import scaffold, swift
+from taut.ir import options
 from taut.ir.dsl import (
-    BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, schema as mk,
+    BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, option, schema as mk,
 )
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
@@ -51,8 +59,10 @@ MISSING_OK_SCHEMA = mk(
 # Fields named like what the generated Swift binds or calls, beyond the shared Names
 # fixture: the decoders' parameter `c` and locals `v`, `raw` and `value`; the runtime's
 # old free helper `decodeDictionary`, the members the code calls on a Cbor value and the
-# runtime's free functions. Kind's members are named like the enum decoder's locals, and
-# Level, which has no member 0, types a transient field, whose default applies on decode.
+# runtime's free functions; each message's own bounds and typed decode (a static member
+# beside an instance field of the same name). Kind's members are named like the enum
+# decoder's locals, and Level, which has no member 0, types a transient field, whose
+# default applies on decode.
 CLASH_SCHEMA = mk(
     Enum("Kind", raw=0, value=1, c=2),
     Enum("Level", high=2, low=1),
@@ -71,13 +81,27 @@ CLASH_SCHEMA = mk(
         F("tryDecode", 11, FLOAT),
         F("tryArray", 12, List(List(STR))),
         F("level", 13, Ref("Level"), transient=True),
-        next_id=14),
+        F("maxDepth", 14, INT),
+        F("maxEncodedLen", 15, INT, optional=True),
+        F("decode", 16, STR),
+        F("defaultMaxDepth", 17, INT),
+        F("maxDepthCeiling", 18, INT),
+        next_id=19),
 )
 CLASH_VALUE = {
     "c": 1, "v": None, "raw": "value", "value": "x", "decodeDictionary": {"a": 1},
     "tryDictionary": {True: "c"}, "tryGet": [{"v": 5}], "isNull": {3: {"v": 4}},
     "mapEntries": True, "encode": b"\x01\x02", "tryDecode": 1.5, "tryArray": [["p"]],
+    "maxDepth": 7, "maxEncodedLen": None, "decode": "d", "defaultMaxDepth": 8,
+    "maxDepthCeiling": 9,
 }
+# A file that declares both bounds, a message that overrides one and one that inherits both
+# (test_bounds.py's FILED, without its enum): the constants are each message's effective values.
+FILED = mk(
+    option.max_depth(3), option.max_encoded_len(16),
+    Msg("Tree", F("kids", 1, List(Ref("Tree"))), option.max_depth(64), next_id=2),
+    Msg("Plain", F("v", 1, List(INT)), next_id=2),
+)
 # One map<K,V> per key kind, for question 9's payload.
 KEYS_SCHEMA = mk(Msg("Keys",
                      F("by_text", 1, Map(STR, INT)),
@@ -144,7 +168,74 @@ def _swift_support() -> str:
                 $0.split(separator: "|", omittingEmptySubsequences: false)
             }
         }
+
+        func expand(_ segments: [(String, Int)]) -> [UInt8] {
+            var out: [UInt8] = []
+            for (unit, count) in segments {
+                let piece = bytes(fromHex: unit)
+                for _ in 0..<count {
+                    out.append(contentsOf: piece)
+                }
+            }
+            return out
+        }
         """)
+
+
+Segments = list[tuple[str, int]]
+
+
+def _nest(opener: str, count: int, leaf: str) -> Segments:
+    """`count` openers around a leaf, as `(hex, count)` segments that `expand` rebuilds, so
+    that input 100,000 deep stays a short line of Swift."""
+    return [(opener, count), (leaf, 1)]
+
+
+def _swift_segments(segments: Segments) -> str:
+    return "[" + ", ".join(f'("{unit}", {count})' for unit, count in segments) + "]"
+
+
+def _expanded(segments: Segments) -> bytes:
+    return b"".join(bytes.fromhex(unit) * count for unit, count in segments)
+
+
+def _swift_error(exc: cbor.DecodeError) -> str:
+    """A DecodeError as the Swift runtime describes its CborError: `Tag(field: value, ...)`."""
+    if not exc.payload:
+        return exc.tag
+    return exc.tag + "(" + ", ".join(f"{name}: {value}" for name, value in exc.payload.items()) + ")"
+
+
+def _reference(data: bytes, decode, encode) -> str:
+    """Python's outcome, as the harnesses print theirs: `ok same` when the value re-encodes to
+    the input (D2's law), `ok <hex>` otherwise, or `err <description>`."""
+    try:
+        again = encode(decode(data))
+    except cbor.DecodeError as exc:
+        return "err " + _swift_error(exc)
+    return "ok same" if again == data else f"ok {again.hex()}"
+
+
+_SWIFT_OUTCOME = textwrap.dedent("""
+    func outcome(_ data: [UInt8], _ work: () throws -> [UInt8]) -> String {
+        do {
+            let again = try work()
+            return again == data ? "ok same" : "ok \\(hex(again))"
+        } catch let error as CborError {
+            return "err \\(error)"
+        } catch {
+            return "untyped \\(type(of: error)) \\(error)"
+        }
+    }
+    """)
+
+
+def _first_difference(got: list[str], want: list[str]) -> str:
+    """Where two outcome listings part, each line cut short (some are 200 KB of hex)."""
+    for index, (left, right) in enumerate(zip(got, want)):
+        if left != right:
+            return f"line {index}: got {left[:200]!r}, want {right[:200]!r}"
+    return f"{len(got)} lines, want {len(want)}"
 
 
 def _random_text(rng: random.Random) -> str:
@@ -237,11 +328,57 @@ def test_generated_bindings_take_the_reserved_wire_prefix():
     function, which a field of the same name would hide (the Names fixture)."""
     for forward_compat in (False, True):
         s = swift.emit_types(parity.parity_schema(), forward_compat=forward_compat)
-        bound = re.findall(r"static func \w+\(_ (\w+): Cbor\)", s) + re.findall(r"\blet (\w+) = ", s)
-        assert {"wire_c", "wire_v", "wire_raw", "wire_value"} <= set(bound)
+        bound = (re.findall(r"static func \w+\(_ (\w+): (?:Cbor|\[UInt8\])\)", s)
+                 + re.findall(r"\blet (\w+) = ", s))
+        assert {"wire_c", "wire_v", "wire_raw", "wire_value", "wire_bytes"} <= set(bound)
         assert [name for name in bound if not name.startswith("wire_")] == []
-        assert re.findall(r"(?<![\w.])(?:encode|decode|tryDecode|decodeDictionary)\(", s) == []
+        # a call, not the declaration of a message's own `decode`
+        assert re.findall(r"(?<![\w.])(?<!func )(?:encode|decode|tryDecode|decodeDictionary)\(", s) == []
         assert "try wire_c.tryGet(14).tryDictionary(key: { try $0.tryText() }, " in s
+        # the runtime's raw decode and the message's own members, qualified: no field hides them
+        # (a name before `:` is a declaration or an argument label, not a reference)
+        assert "Cbor.tryDecode(wire_bytes, maxDepth: Self.maxDepth, maxEncodedLen: Self.maxEncodedLen)" in s
+        assert re.findall(r"(?<![\w.])(?<!func )(?:maxDepth|maxEncodedLen|fromCbor|defaultMaxDepth"
+                          r"|maxDepthCeiling)\b(?!:)", s) == []
+
+
+def _struct(source: str, name: str) -> str:
+    """The generated struct `name`, up to the next top-level declaration."""
+    start = source.index(f"public struct {name} {{")
+    end = source.find("\npublic ", start)
+    return source[start:] if end < 0 else source[start:end]
+
+
+def test_each_message_carries_its_effective_bounds_and_a_typed_decode():
+    """CD-B3, OPT-L6: each message has its effective `max_depth` and `max_encoded_len`, as
+    `taut.ir.options.effective` resolves them when the code is generated, as the static
+    constants `maxDepth` and `maxEncodedLen` (nil: no length bound), and a throwing `decode`
+    from bytes that applies both through the runtime's raw decode, then `fromCbor`."""
+    declared = {("fixture", "Tree64"): (64, None), ("fixture", "Tree128"): (128, None),
+                ("fixture", "Flat2"): (2, None), ("fixture", "Sized8"): (32, 8),
+                ("fixture", "Holds64"): (32, None), ("fixture", "HoldsSized8"): (32, None),
+                ("fixture", "IntBox"): (32, None), ("filed", "Tree"): (64, 16),
+                ("filed", "Plain"): (3, 16)}
+    seen = {}
+    for label, schema in (("fixture", parity.parity_schema()), ("filed", FILED)):
+        for forward_compat in (False, True):
+            source = swift.emit_types(schema, forward_compat=forward_compat)
+            for name in schema.messages:
+                depth = options.effective(schema, "max_depth", message=name)
+                length = options.effective(schema, "max_encoded_len", message=name)
+                seen[(label, name)] = (depth, length)
+                struct = _struct(source, name)
+                assert f"\n    public static let maxDepth: Int = {depth}\n" in struct, name
+                assert (f"\n    public static let maxEncodedLen: Int? = "
+                        f"{'nil' if length is None else length}\n") in struct, name
+                assert (f"\n    public static func decode(_ wire_bytes: [UInt8]) throws -> {name} {{\n"
+                        "        return try Self.fromCbor(Cbor.tryDecode(wire_bytes, maxDepth: Self.maxDepth, "
+                        "maxEncodedLen: Self.maxEncodedLen))\n    }\n") in struct, name
+    assert {key: seen[key] for key in declared} == declared
+    # the generated targets add both per message (TautV010Plan.md §0); an enum has neither
+    enum = swift.emit_types(parity.parity_schema())
+    enum = enum[enum.index("public enum Mode"):enum.index("public struct")]
+    assert "maxDepth" not in enum and "func decode(" not in enum
 
 
 def test_transient_enum_default_is_a_member_not_a_force_unwrap():
@@ -329,6 +466,21 @@ def test_swift_parity_gate_is_green():
     assert violations == [], "\n".join(violations)
 
 
+def test_the_runner_speaks_the_bounds_protocol():
+    """The runner's side of C3's protocol (parity.py's docstring): the #constants line from the
+    runtime's own constants; every decode row, bounds rows included, as segments the runner
+    expands and checks against `len`, so a 100,000-deep row stays a short line; and every
+    message's typed decode and constants, through which each from_cbor row decodes and
+    reports the bounds it resolved (the gate judges the rest: test_swift_parity_gate_is_green)."""
+    source = parity_swift._source()
+    assert '"#constants\\tdefault_max_depth=\\(defaultMaxDepth);max_depth_ceiling=\\(maxDepthCeiling)"' in source
+    assert len(source) < 100_000
+    for row in parity.decode_rows():
+        assert f'name: "{row["name"]}"' in source, row["name"]
+    for name in parity.fixture_dispatch().messages:
+        assert f"try {name}.decode(data)" in source and f"{name}.maxEncodedLen" in source, name
+
+
 def test_missing_ok_generates_for_swift(tmp_path):
     scaffold.emit(MISSING_OK_SCHEMA, tmp_path, langs=["swift"], services=[])
     api = (tmp_path / "swift" / "api.swift").read_text()
@@ -412,14 +564,18 @@ def test_swift_fields_named_like_generated_code_compile(tmp_path, forward_compat
         let built = Clash(c: 1, v: nil, raw: .value, value: "x", decodeDictionary: ["a": 1],
                           tryDictionary: [true: .c], tryGet: [Inner(v: 5)],
                           isNull: [3: Inner(v: 4)], mapEntries: true, encode: [1, 2],
-                          tryDecode: 1.5, tryArray: [["p"]])
+                          tryDecode: 1.5, tryArray: [["p"]], maxDepth: 7, maxEncodedLen: nil,
+                          decode: "d", defaultMaxDepth: 8, maxDepthCeiling: 9)
         print(hex(encode(built.toCbor())))
+        let typed = try Clash.decode(bytes(fromHex: "{wire}"))
+        print(hex(encode(typed.toCbor())))
+        print(Clash.maxDepth, Clash.maxEncodedLen == nil, typed.maxDepth, typed.decode)
         """))
     exe = _compile_swift(tmp_path, [generated / "cbor.swift", generated / "api.swift", harness],
                          "swift-clash")
     run = subprocess.run([str(exe)], text=True, capture_output=True)
     assert run.returncode == 0, run.stderr + run.stdout
-    assert run.stdout.splitlines() == [wire, "true", wire]
+    assert run.stdout.splitlines() == [wire, "true", wire, wire, "32 true 7 d"]
 
 
 def _keys_wire(text=(), flag=(), ids=()) -> str:
@@ -488,12 +644,13 @@ def test_swift_runtime_has_no_trapping_decode_path():
 
 
 def _fail_closed_inputs() -> list[str]:
-    """Every parity row's bytes, the heads that claim the largest lengths and counts, and
-    fixed-seed mutations of each: a byte changed, the tail cut, a byte inserted or a run
-    of bytes repeated (which repeats keys and entries)."""
+    """Every parity row's bytes (a bounds row's where it is short), the heads that claim the
+    largest lengths and counts, and fixed-seed mutations of each: a byte changed, the tail
+    cut, a byte inserted or a run of bytes repeated (which repeats keys and entries)."""
     rng = random.Random(FAIL_CLOSED_SEED)
     seeds = [bytes.fromhex(row["bytes"]) for row in parity.malformed_rows()]
     seeds += [bytes.fromhex(row["cbor"]) for row in parity.int_rows() if "cbor" in row]
+    seeds += [parity.row_bytes(row) for row in parity.bounds_rows() if row["len"] <= 200]
     seeds += [bytes.fromhex(head) for head in (
         "", "ff", "1bffffffffffffffff", "3bffffffffffffffff", "5bffffffffffffffff",
         "7bffffffffffffffff", "9bffffffffffffffff", "bbffffffffffffffff", "c0", "f8", "fc",
@@ -521,13 +678,16 @@ def _fail_closed_inputs() -> list[str]:
 @pytest.mark.parametrize("forward_compat", [False, True], ids=["plain", "fc"])
 def test_swift_decode_entry_points_fail_closed_on_mutated_input(tmp_path, forward_compat):
     """CD-E4: on each input, every public decode entry point returns or throws CborError:
-    the raw decode, each accessor, each fixture message's and enum's fromCbor (and the
-    decoded message's re-encoding) and the three ext helpers. A trap fails the run; any
-    other error is counted as escaped. (Nesting deep enough to exhaust the stack is D1's
-    depth bound.)"""
+    the raw decode (a free function and a member of Cbor), each accessor, each fixture
+    message's typed decode from bytes and fromCbor (and the decoded message's re-encoding),
+    each enum's fromCbor and the three ext helpers. A trap fails the run; any other error
+    is counted as escaped. (Deep nesting, which would exhaust the stack without the depth
+    bound, is `test_swift_deep_input_is_too_deep_not_a_crash`.)"""
     _require_swiftc()
     generated = _emit_swift(parity.parity_schema(), tmp_path / "gen", forward_compat)
     dispatch = parity.fixture_dispatch()
+    from_bytes = [f'    observe("{name}.decode", wire) {{ _ = encode(try {name}.decode(data).toCbor()) }}'
+                  for name in dispatch.messages]
     typed = [f'    observe("{name}", wire) {{ _ = encode(try {name}.fromCbor(c).toCbor()) }}'
              for name in dispatch.messages]
     typed += [f'    observe("{name}", wire) {{ _ = try {name}.fromCbor(c) }}' for name in dispatch.enums]
@@ -555,6 +715,8 @@ def test_swift_decode_entry_points_fail_closed_on_mutated_input(tmp_path, forwar
             observe("extGet", wire) { _ = try extGet(data, tag: band) }
             observe("extSet", wire) { _ = try extSet(data, tag: band, value: .null) }
             observe("extClear", wire) { _ = try extClear(data, tag: band) }
+        """) + "\n".join(from_bytes) + textwrap.dedent("""
+            observe("Cbor.tryDecode", wire) { _ = try Cbor.tryDecode(data, maxDepth: 1, maxEncodedLen: 64) }
             var decoded: Cbor? = nil
             observe("tryDecode", wire) { decoded = try tryDecode(data) }
             guard let c = decoded else {
@@ -578,6 +740,340 @@ def test_swift_decode_entry_points_fail_closed_on_mutated_input(tmp_path, forwar
     run = subprocess.run([str(exe)], text=True, capture_output=True)
     assert run.returncode == 0, run.stderr[-1500:] + run.stdout[-1500:]
     assert run.stdout.splitlines()[-1] == f"fail-closed inputs={len(inputs)} escaped=0", run.stdout
+
+
+# --- bounds (D26 §3): the raw decode, the typed decode, the extension helpers -----------------
+
+BIG_BYTES = cbor.dumps(b"x" * 100_000)            # a byte string of 100,005 bytes in all
+BIG_SEGMENTS = [(BIG_BYTES[:5].hex(), 1), ("78", 100_000)]
+
+
+def _raw_cases() -> list[tuple[Segments, int | None, int | None]]:
+    """test_cbor.py's cases for the bounds, as (input, maxDepth, maxEncodedLen), None where
+    the call leaves the argument to its default: 32 and no length bound."""
+    cases: list[tuple[Segments, int | None, int | None]] = []
+    for opener, leaf in (("81", "80"), ("a100", "a0"), ("81", "a0"), ("a100", "80")):
+        cases += [(_nest(opener, 31, leaf), None, None), (_nest(opener, 32, "00"), None, None),
+                  (_nest(opener, 32, leaf), None, None)]        # 32 containers, a scalar, the 33rd
+    cases += [(_nest("81a100", 16, leaf), None, None) for leaf in ("00", "80", "a0")]
+    for wire in ("00", "6161", "80", "a0", "8100", "a10000", "820102",      # depth 1 at bound 1
+                 "8180", "81a0", "a10080", "a100a0", "820180"):             # depth 2
+        cases.append(([(wire, 1)], 1, None))
+    cases += [([("a18000", 1)], 1, None), ([("a18000", 1)], 2, None)]      # a key is an item
+    for depth in (1, 2, 5, 31, 33, 64, 127, 128):                           # as given
+        cases += [(_nest("81", depth - 1, "80"), depth, None), (_nest("81", depth, "80"), depth, None)]
+    for depth in (129, 1000, 2**31, 2**63 - 1):                             # above the ceiling
+        cases += [(_nest("81", 127, "80"), depth, None), (_nest("81", 128, "80"), depth, None)]
+    # once the head is complete, items missing or not; a torn head, and its own faults, first
+    for leaf in ("", "9bffffffffffffffff", "bbffffffffffffffff", "98", "9900", "9a000000", "9b00",
+                 "b8", "bb00000000000000", "9800", "9c", "bf"):
+        cases.append((_nest("81", 32, leaf), None, None))
+    cases += [(_nest("81", 33, ""), None, None), (_nest("a100", 32, "a1"), None, None)]
+    for opener, leaf in (("81", "80"), ("a100", "a0"), ("81a100", "80")):   # 100,000 deep
+        cases += [(_nest(opener, 100_000, leaf), depth, None) for depth in (None, 128, 10**9)]
+    # the length bound: at it and beyond it, before any byte is read, and zero
+    cases += [([("83010203", 1)], None, length) for length in (4, 2**40, 3)]
+    cases += [(BIG_SEGMENTS, None, length) for length in (None, len(BIG_BYTES), len(BIG_BYTES) - 1)]
+    cases += [([("c0c0c0c0", 1)], None, 3), (_nest("81", 40, "80"), None, 10), ([("0000", 1)], None, 1),
+              ([("", 1)], None, 0), ([("00", 1)], None, 0)]
+    # both: the length first, then the depth, and within both
+    cases += [(_nest("81", 40, "80"), 64, 10), (_nest("81", 40, "80"), 8, 41), (_nest("81", 3, "80"), 4, 4)]
+    return cases
+
+
+def _loads(depth: int | None, length: int | None):
+    limits = {name: value for name, value in (("max_depth", depth), ("max_encoded_len", length))
+              if value is not None}
+    return lambda data: cbor.loads(data, **limits)
+
+
+def test_swift_raw_decode_bounds_match_the_reference(tmp_path):
+    """CD-B1-B5, CD-E5, question 1: the raw decode, `tryDecode` and the `Cbor.tryDecode`
+    member generated code calls, counts depth (a top-level container has depth 1, one at
+    maxDepth + 1 is tooDeep once its head is complete), takes maxDepth (32 by default, above
+    128 the ceiling) and maxEncodedLen (none by default, checked before any byte), and agrees
+    with Python's `cbor.loads` on every case; the runtime's two constants are taut's."""
+    _require_swiftc()
+    cases = _raw_cases()
+    table = ",\n".join(
+        f"    Case(input: {_swift_segments(segments)}, maxDepth: {'nil' if depth is None else depth}, "
+        f"maxEncodedLen: {'nil' if length is None else length})" for segments, depth, length in cases)
+    harness = tmp_path / "main.swift"
+    harness.write_text(_swift_support() + _SWIFT_OUTCOME + textwrap.dedent("""
+        struct Case {
+            let input: [(String, Int)]
+            let maxDepth: Int?
+            let maxEncodedLen: Int?
+        }
+
+        /// The free function, each argument given or left to its default.
+        func viaFunction(_ data: [UInt8], _ c: Case) throws -> Cbor {
+            switch (c.maxDepth, c.maxEncodedLen) {
+            case (nil, nil):
+                return try tryDecode(data)
+            case let (depth?, nil):
+                return try tryDecode(data, maxDepth: depth)
+            case let (nil, length?):
+                return try tryDecode(data, maxEncodedLen: length)
+            case let (depth?, length?):
+                return try tryDecode(data, maxDepth: depth, maxEncodedLen: length)
+            }
+        }
+
+        /// The member of Cbor that generated code calls, the same way.
+        func viaMember(_ data: [UInt8], _ c: Case) throws -> Cbor {
+            switch (c.maxDepth, c.maxEncodedLen) {
+            case (nil, nil):
+                return try Cbor.tryDecode(data)
+            case let (depth?, nil):
+                return try Cbor.tryDecode(data, maxDepth: depth)
+            case let (nil, length?):
+                return try Cbor.tryDecode(data, maxEncodedLen: length)
+            case let (depth?, length?):
+                return try Cbor.tryDecode(data, maxDepth: depth, maxEncodedLen: length)
+            }
+        }
+
+        print("constants \\(defaultMaxDepth) \\(maxDepthCeiling)")
+        """) + "let cases: [Case] = [\n" + table + "\n]\n" + textwrap.dedent("""
+        for c in cases {
+            let data = expand(c.input)
+            print(outcome(data) { encode(try viaFunction(data, c)) })
+            print(outcome(data) { encode(try viaMember(data, c)) })
+        }
+        """))
+    exe = _compile_swift(tmp_path, [SWIFT_CBOR, harness], "swift-raw-bounds")
+    run = subprocess.run([str(exe)], text=True, capture_output=True)
+    assert run.returncode == 0, run.stderr[-1500:]
+    want = [f"constants {cbor.DEFAULT_MAX_DEPTH} {cbor.MAX_DEPTH_CEILING}"]
+    for segments, depth, length in cases:
+        want += [_reference(_expanded(segments), _loads(depth, length), cbor.dumps)] * 2
+    got = run.stdout.splitlines()
+    assert got == want, _first_difference(got, want)
+    assert (cbor.DEFAULT_MAX_DEPTH, cbor.MAX_DEPTH_CEILING) == (options.DEFAULT_MAX_DEPTH,
+                                                                options.MAX_DEPTH_CEILING)
+
+
+def test_swift_raw_decode_argument_out_of_range_traps(tmp_path):
+    """OPT-P3: a maxDepth below 1 or a negative maxEncodedLen is the caller's error, not the
+    input's (Python's ValueError): it traps, before any byte is read, and names the argument,
+    through either entry point. In range, the input decides."""
+    _require_swiftc()
+    harness = tmp_path / "main.swift"
+    harness.write_text(_swift_support() + textwrap.dedent("""
+        let arguments = CommandLine.arguments
+        let depth = Int(arguments[2])!
+        let length: Int? = arguments[3] == "none" ? nil : Int(arguments[3])!
+        let data = bytes(fromHex: arguments[4])
+        do {
+            let value: Cbor
+            if arguments[1] == "member" {
+                value = try Cbor.tryDecode(data, maxDepth: depth, maxEncodedLen: length)
+            } else {
+                value = try tryDecode(data, maxDepth: depth, maxEncodedLen: length)
+            }
+            print("ok \\(hex(encode(value)))")
+        } catch {
+            print("err \\(error)")
+        }
+        """))
+    exe = _compile_swift(tmp_path, [SWIFT_CBOR, harness], "swift-raw-arguments")
+    int_min = str(-(2**63))
+    for entry in ("function", "member"):
+        for depth, length, wire, named in [
+            ("0", "none", "", "maxDepth"), ("-1", "none", "00", "maxDepth"),
+            (int_min, "none", "c0c0c0c0", "maxDepth"), ("0", "-1", "00", "maxDepth"),
+            ("32", "-1", "", "maxEncodedLen"), ("32", int_min, "c0c0c0c0", "maxEncodedLen"),
+        ]:
+            run = subprocess.run([str(exe), entry, depth, length, wire], text=True, capture_output=True)
+            assert run.returncode != 0 and run.stdout == "", (entry, depth, length, run.stdout)
+            assert named in run.stderr, (entry, depth, length, run.stderr)
+        for depth, length, wire, want in [("1", "0", "", "err Truncated"), ("1", "none", "00", "ok 00"),
+                                          ("1", "0", "00", "err TooLarge(len: 1, limit: 0)")]:
+            run = subprocess.run([str(exe), entry, depth, length, wire], text=True, capture_output=True)
+            assert (run.returncode, run.stdout.strip()) == (0, want), (entry, depth, length, run.stderr)
+
+
+def test_swift_typed_decode_applies_its_roots_bounds(tmp_path):
+    """CD-B3, OPT-D4: a message's `decode` applies its own effective bounds to the whole call,
+    whatever the messages nested inside declare, as Python's `codec.decode` does: the fixture's
+    declared, inherited and default bounds, and a file's bounds (FILED) where a message declares
+    none. 100,000-deep input is tooDeep at the root's bound."""
+    _require_swiftc()
+    fixture = parity.parity_schema()
+    cases = [
+        (fixture, "Tree64", [("a10181", 100_000), ("a10180", 1)]),
+        (fixture, "Tree128", [("a10181", 100_000), ("a10180", 1)]),
+        (fixture, "Holds64", [("a10181", 100_000), ("a10180", 1)]),
+        (fixture, "IntBox", [("81", 100_000), ("80", 1)]),
+        (fixture, "Tree64", [("a10181", 63), ("a10180", 1)]),             # 128 deep, over 64
+        (fixture, "Holds64", [("a101", 1), ("a10181", 15), ("a10180", 1)]),  # 33 deep, over 32
+        (fixture, "Flat2", [("a1018100", 1)]), (fixture, "Flat2", [("a1018180", 1)]),
+        (fixture, "Sized8", [("a101450102030405", 1)]), (fixture, "Sized8", [("a10146010203040506", 1)]),
+        (fixture, "HoldsSized8", [("a101a1014a00010203040506070809", 1)]),
+        (FILED, "Tree", [("a10181a10180", 1)]), (FILED, "Plain", [("a10181818100", 1)]),
+        (FILED, "Plain", [("a1018d", 1), ("00", 13)]), (FILED, "Plain", [("a1018e", 1), ("00", 14)]),
+        (FILED, "Tree", [("a1018e", 1), ("00", 14)]),
+    ]
+    generated = _emit_swift(fixture, tmp_path / "gen")
+    filed = tmp_path / "filed.swift"
+    filed.write_text(swift.emit_types(FILED))
+    names = [*fixture.messages, *FILED.messages]
+    arms = "\n".join(f'    case "{name}":\n        return encode(try {name}.decode(data).toCbor())'
+                     for name in names)
+    constants = "\n".join(f'print("{name} \\({name}.maxDepth) \\({name}.maxEncodedLen.map {{ String($0) }} '
+                          f'?? "nil")")' for name in names)
+    table = ",\n".join(f'    ("{message}", {_swift_segments(segments)})' for _, message, segments in cases)
+    harness = tmp_path / "main.swift"
+    harness.write_text(_swift_support() + _SWIFT_OUTCOME
+                       + "func typed(_ message: String, _ data: [UInt8]) throws -> [UInt8] {\n"
+                       + "    switch message {\n" + arms + "\n    default:\n"
+                       + '        fatalError("no message \\(message)")\n    }\n}\n' + constants + "\n"
+                       + "let cases: [(String, [(String, Int)])] = [\n" + table + "\n]\n"
+                       + textwrap.dedent("""
+        for (message, input) in cases {
+            let data = expand(input)
+            print(outcome(data) { try typed(message, data) })
+        }
+        """))
+    exe = _compile_swift(tmp_path, [generated / "cbor.swift", generated / "api.swift", filed, harness],
+                         "swift-typed-bounds")
+    run = subprocess.run([str(exe)], text=True, capture_output=True)
+    assert run.returncode == 0, run.stderr[-1500:]
+    want = []
+    for schema in (fixture, FILED):
+        for name in schema.messages:
+            length = options.effective(schema, "max_encoded_len", message=name)
+            want.append(f"{name} {options.effective(schema, 'max_depth', message=name)} "
+                        f"{'nil' if length is None else length}")
+    for schema, message, segments in cases:
+        want.append(_reference(_expanded(segments),
+                               lambda data, s=schema, m=message: codec.decode(s, m, data),
+                               lambda value, s=schema, m=message: codec.encode(s, m, value)))
+    got = run.stdout.splitlines()
+    assert got == want, _first_difference(got, want)
+    assert "err TooDeep(limit: 64)" in got and "err TooLarge(len: 17, limit: 16)" in got
+
+
+def test_swift_deep_input_is_too_deep_not_a_crash(tmp_path):
+    """CD-E4, B9-B10: input nested 100,000 deep is tooDeep at the bound each entry point
+    applies, with no stack overflow and no trap: the raw decode at 32, at the ceiling and
+    capped there, each message's typed decode at its own bound, and the ext helpers at 128."""
+    _require_swiftc()
+    generated = _emit_swift(parity.parity_schema(), tmp_path / "gen", forward_compat=True)
+    harness = tmp_path / "main.swift"
+    harness.write_text(_swift_support() + textwrap.dedent("""
+        func observe(_ what: String, _ work: () throws -> Void) {
+            do {
+                try work()
+                print("\\(what) ok")
+            } catch let error as CborError {
+                print("\\(what) \\(error)")
+            } catch {
+                print("\\(what) untyped \\(error)")
+            }
+        }
+
+        let tag: Int64 = 1 << 20
+        for (name, opener, leaf) in [("arrays", "81", "80"), ("maps", "a100", "a0")] {
+            let data = expand([(opener, 99_999), (leaf, 1)])
+            observe("\\(name) tryDecode") { _ = try tryDecode(data) }
+            observe("\\(name) ceiling") { _ = try Cbor.tryDecode(data, maxDepth: maxDepthCeiling) }
+            observe("\\(name) capped") { _ = try tryDecode(data, maxDepth: Int.max) }
+            observe("\\(name) IntBox") { _ = try IntBox.decode(data) }
+            observe("\\(name) extGet") { _ = try extGet(data, tag: tag) }
+            observe("\\(name) extSet") { _ = try extSet(data, tag: tag, value: .null) }
+            observe("\\(name) extClear") { _ = try extClear(data, tag: tag) }
+        }
+        let trees = expand([("a10181", 99_999), ("a10180", 1)])
+        observe("trees Tree64") { _ = try Tree64.decode(trees) }
+        observe("trees Tree128") { _ = try Tree128.decode(trees) }
+        observe("trees Holds64") { _ = try Holds64.decode(trees) }
+        """))
+    exe = _compile_swift(tmp_path, [generated / "cbor.swift", generated / "ext.swift",
+                                    generated / "api.swift", harness], "swift-deep")
+    run = subprocess.run([str(exe)], text=True, capture_output=True)
+    assert run.returncode == 0, run.stderr[-1500:]
+    want = []
+    for name in ("arrays", "maps"):
+        want += [f"{name} {entry} TooDeep(limit: {limit})" for entry, limit in (
+            ("tryDecode", 32), ("ceiling", 128), ("capped", 128), ("IntBox", 32),
+            ("extGet", 128), ("extSet", 128), ("extClear", 128))]
+    want += ["trees Tree64 TooDeep(limit: 64)", "trees Tree128 TooDeep(limit: 128)",
+             "trees Holds64 TooDeep(limit: 32)"]
+    assert run.stdout.splitlines() == want
+
+
+def test_swift_ext_helpers_read_the_host_at_the_ceiling_with_no_length_bound(tmp_path):
+    """TautOptions.md G3, CD-E4: not knowing the host's root (they take no schema), the
+    helpers read a host at the depth ceiling with no length bound, the only bounds every
+    valid host meets, as Python's do: a host 128 deep works, one 129 deep or far deeper is
+    tooDeep(128), and a host of 100,000 bytes needs no length bound."""
+    _require_swiftc()
+    decision = {"backend": "b7", "hops": 1}
+    hosts = [
+        ("ceiling", [("a107", 1), ("81", 126), ("80", 1)]),       # a map around 127 arrays: 128
+        ("beyond", [("a107", 1), ("81", 127), ("80", 1)]),        # 129
+        ("deep", [("a107", 1), ("81", 99_999), ("80", 1)]),
+        ("big", [(cbor.dumps({1: 1, 7: b""})[:-1].hex(), 1), *BIG_SEGMENTS]),
+    ]
+    model = _write_resext_model(tmp_path)
+    table = ",\n".join(f'    ("{name}", {_swift_segments(segments)})' for name, segments in hosts)
+    harness = tmp_path / "main.swift"
+    harness.write_text(_swift_support() + textwrap.dedent("""
+        let tag: Int64 = 1 << 20
+        let decision = Decision(backend: "b7", hops: 1)
+
+        func observe(_ what: String, _ work: () throws -> String) {
+            do {
+                print("\\(what) ok \\(try work())")
+            } catch let error as CborError {
+                print("\\(what) err \\(error)")
+            } catch {
+                print("\\(what) untyped \\(error)")
+            }
+        }
+
+        """) + "let hosts: [(String, [(String, Int)])] = [\n" + table + "\n]\n" + textwrap.dedent("""
+        for (name, segments) in hosts {
+            let host = expand(segments)
+            observe("set \\(name)") { hex(try extSet(host, tag: tag, value: decision.toCbor())) }
+            observe("get \\(name)") { try extGet(host, tag: tag).map { hex(encode($0)) } ?? "null" }
+            observe("clear \\(name)") { hex(try extClear(host, tag: tag)) }
+            observe("strapped \\(name)") {
+                let strapped = try extSet(host, tag: tag, value: decision.toCbor())
+                return try extGet(strapped, tag: tag).map { hex(encode($0)) } ?? "null"
+            }
+        }
+        """))
+    exe = _compile_swift(tmp_path, [SWIFT_CBOR, SWIFT_EXT, model, harness], "swift-ext-bounds")
+    run = subprocess.run([str(exe)], text=True, capture_output=True)
+    assert run.returncode == 0, run.stderr[-1500:]
+
+    def reference(call) -> str:
+        try:
+            return "ok " + call()
+        except cbor.DecodeError as exc:
+            return "err " + _swift_error(exc)
+
+    def got_decision(host: bytes) -> str:
+        value = ext.ext_get(RESEXT, host, "Decision", BAND_START)
+        return "null" if value is None else codec.encode(RESEXT, "Decision", value).hex()
+
+    want = []
+    for name, segments in hosts:
+        host = _expanded(segments)
+        want += [
+            f"set {name} " + reference(lambda: ext.ext_set(RESEXT, host, "Decision", BAND_START, decision).hex()),
+            f"get {name} " + reference(lambda: got_decision(host)),
+            f"clear {name} " + reference(lambda: ext.ext_clear(host, BAND_START).hex()),
+            f"strapped {name} " + reference(lambda: got_decision(
+                ext.ext_set(RESEXT, host, "Decision", BAND_START, decision))),
+        ]
+    got = run.stdout.splitlines()
+    assert got == want, _first_difference(got, want)
+    assert got[4:8] == [f"{op} beyond err TooDeep(limit: 128)" for op in ("set", "get", "clear", "strapped")]
+    assert got[3] == "strapped ceiling ok " + codec.encode(RESEXT, "Decision", decision).hex()
 
 
 def test_swift_resext_corpus_vectors(tmp_path):

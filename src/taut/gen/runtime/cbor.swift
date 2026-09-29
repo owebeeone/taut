@@ -5,9 +5,19 @@
 // ints/floats, ascending map keys). Hand-rolled, no dependencies.
 //
 // Decode is fail-closed: every public decode entry point (`tryDecode`, the `try*`
-// accessors and the generated `fromCbor`) returns a value or throws `CborError`,
-// and nothing else escapes or traps (TautCheckedDecode.md CD-E4).
-// TODO(D1): count depth in `dec`, so that deep nesting is TooDeep, not a stack overflow.
+// accessors and the generated `fromCbor` and `decode`) returns a value or throws
+// `CborError`, and nothing else escapes or traps (TautCheckedDecode.md CD-E4).
+//
+// Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one more
+// than the arrays and maps around it, and one deeper than the call's depth bound is
+// `tooDeep(limit:)`, refused before its first item is read, so the recursion is never
+// deeper than the bound; with a length bound, longer input is `tooLarge(len:limit:)`
+// before a byte is read.
+
+/// The depth bound a raw decode applies where its caller passes none (CD-B1).
+public let defaultMaxDepth: Int = 32
+/// No decode applies a deeper bound: a larger `maxDepth` applies this one (CD-B3).
+public let maxDepthCeiling: Int = 128
 
 public enum CborError: Error, Equatable, CustomStringConvertible {
     case truncated
@@ -24,6 +34,10 @@ public enum CborError: Error, Equatable, CustomStringConvertible {
     case unknownEnum(String, Int64)
     case nonCanonicalInt(UInt64)
     case negativeMapKey(Int64)
+    /// An array or map deeper than the depth bound; `limit` is the bound applied.
+    case tooDeep(limit: Int)
+    /// Input of `len` bytes, longer than the length bound `limit`.
+    case tooLarge(len: Int, limit: Int)
 
     public var parityTag: String {
         switch self {
@@ -40,6 +54,8 @@ public enum CborError: Error, Equatable, CustomStringConvertible {
         case .unknownEnum: return "UnknownEnum"
         case .nonCanonicalInt: return "NonCanonicalInt"
         case .negativeMapKey: return "NegativeMapKey"
+        case .tooDeep: return "TooDeep"
+        case .tooLarge: return "TooLarge"
         }
     }
 
@@ -71,6 +87,10 @@ public enum CborError: Error, Equatable, CustomStringConvertible {
             return "NonCanonicalInt(value: \(value))"
         case let .negativeMapKey(key):
             return "NegativeMapKey(key: \(key))"
+        case let .tooDeep(limit):
+            return "TooDeep(limit: \(limit))"
+        case let .tooLarge(len, limit):
+            return "TooLarge(len: \(len), limit: \(limit))"
         }
     }
 }
@@ -257,12 +277,38 @@ private func enc(_ v: Cbor, _ out: inout [UInt8]) {
     }
 }
 
-public func tryDecode(_ data: [UInt8]) throws -> Cbor {
-    let (v, off) = try dec(data, 0)
-    guard off == data.count else {
-        throw CborError.trailingBytes
+public extension Cbor {
+    /// Decode one item that fills `data`, or throw `CborError` (CD-E5). `maxDepth` bounds
+    /// nesting: a top-level array or map has depth 1, and one at depth `maxDepth` + 1 is
+    /// `tooDeep` once its head is read. A value above `maxDepthCeiling` applies the ceiling,
+    /// and `limit` names the bound applied. `maxEncodedLen`, when given, bounds the input's
+    /// length, checked before any byte is read. A `maxDepth` below 1 or a negative
+    /// `maxEncodedLen` is the caller's error, not the input's, and traps.
+    /// A member, so that generated code reaches it whatever its fields are named.
+    static func tryDecode(
+        _ data: [UInt8], maxDepth: Int = defaultMaxDepth, maxEncodedLen: Int? = nil
+    ) throws -> Cbor {
+        precondition(maxDepth >= 1, "maxDepth must be at least 1, not \(maxDepth)")
+        let limit = Swift.min(maxDepth, maxDepthCeiling)
+        if let bound = maxEncodedLen {
+            precondition(bound >= 0, "maxEncodedLen must not be negative, not \(bound)")
+            guard data.count <= bound else {
+                throw CborError.tooLarge(len: data.count, limit: bound)
+            }
+        }
+        let (v, off) = try dec(data, 0, 0, limit)
+        guard off == data.count else {
+            throw CborError.trailingBytes
+        }
+        return v
     }
-    return v
+}
+
+/// The raw decode, `Cbor.tryDecode`, as a free function.
+public func tryDecode(
+    _ data: [UInt8], maxDepth: Int = defaultMaxDepth, maxEncodedLen: Int? = nil
+) throws -> Cbor {
+    return try Cbor.tryDecode(data, maxDepth: maxDepth, maxEncodedLen: maxEncodedLen)
 }
 
 private func requireBytes(_ data: [UInt8], _ off: Int, _ count: Int) throws {
@@ -340,7 +386,16 @@ private func decodeUtf8(_ bytes: ArraySlice<UInt8>) throws -> String {
     }
 }
 
-private func dec(_ data: [UInt8], _ off0: Int) throws -> (Cbor, Int) {
+/// A container whose head is read, inside `depth` others: refuse it before its first item
+/// if it would sit deeper than `limit` (CD-B2), which bounds `dec`'s recursion.
+private func enter(_ depth: Int, _ limit: Int) throws {
+    guard depth < limit else {
+        throw CborError.tooDeep(limit: limit)
+    }
+}
+
+/// The item at `off0`, inside `depth` arrays and maps, under depth bound `limit`.
+private func dec(_ data: [UInt8], _ off0: Int, _ depth: Int, _ limit: Int) throws -> (Cbor, Int) {
     try requireBytes(data, off0, 1)
     let initial = data[off0]
     let major = initial >> 5
@@ -371,11 +426,13 @@ private func dec(_ data: [UInt8], _ off0: Int) throws -> (Cbor, Int) {
     case 4:
         // No up-front count check: items are read in order, so the first bad item
         // is reported, and each consumes a byte, so a huge count ends at Truncated.
+        // The depth is checked once the head is complete, before the first item.
         let (n, o0) = try readArg(data, off, info)
+        try enter(depth, limit)
         var o = o0
         var a = [Cbor]()
         for _ in 0..<n {
-            let (v, o2) = try dec(data, o)
+            let (v, o2) = try dec(data, o, depth + 1, limit)
             a.append(v)
             o = o2
         }
@@ -383,11 +440,12 @@ private func dec(_ data: [UInt8], _ off0: Int) throws -> (Cbor, Int) {
     case 5:
         // As for arrays: entries are read in order, each key before its value.
         let (n, o0) = try readArg(data, off, info)
+        try enter(depth, limit)
         var o = o0
         var m = [(Int64, Cbor)]()
         var seen = Set<Int64>()
         for _ in 0..<n {
-            let (rawKey, o2) = try dec(data, o)
+            let (rawKey, o2) = try dec(data, o, depth + 1, limit)
             guard case let .int(key) = rawKey else {
                 throw CborError.nonIntegerMapKey
             }
@@ -398,7 +456,7 @@ private func dec(_ data: [UInt8], _ off0: Int) throws -> (Cbor, Int) {
                 throw CborError.duplicateMapKey(String(key))
             }
             seen.insert(key)
-            let (v, o3) = try dec(data, o2)
+            let (v, o3) = try dec(data, o2, depth + 1, limit)
             m.append((key, v))
             o = o3
         }

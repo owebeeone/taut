@@ -5,8 +5,10 @@
 //
 // They fail closed (TautCheckedDecode.md CD-E4): for any host bytes each returns
 // or throws `CborError`, nothing else. A host that is not a map is
-// `wrongType("map")`. A tag below the band is the caller's error, not the
-// input's, and traps.
+// `wrongType("map")`. Not knowing the host's root, they read it at the depth
+// ceiling with no length bound, the only bounds every valid host meets, and leave
+// the host's own bounds to its reader (TautOptions.md G3). A tag below the band is
+// the caller's error, not the input's, and traps.
 
 private let extensionBandStart: Int64 = 1 << 20
 
@@ -14,11 +16,10 @@ private func checkExtensionTag(_ tag: Int64) {
     precondition(tag >= extensionBandStart, "extension tag \(tag) is below the band (< \(extensionBandStart))")
 }
 
-/// The host's top-level map; a host that is not a map is `wrongType("map")`.
+/// The host's top-level map, read at the depth ceiling with no length bound; a host that
+/// is not a map is `wrongType("map")`.
 private func hostMap(_ host: [UInt8]) throws -> [(Int64, Cbor)] {
-    // TODO(D1): read the host at the depth ceiling (128) with no length bound, the only
-    // bounds every valid host meets (TautOptions.md G3), once D1 gives tryDecode its depth.
-    guard case let .map(entries) = try tryDecode(host) else {
+    guard case let .map(entries) = try tryDecode(host, maxDepth: maxDepthCeiling) else {
         throw CborError.wrongType("map")
     }
     return entries

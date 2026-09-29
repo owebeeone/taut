@@ -7,15 +7,27 @@ The gate finds it by module name (`parity._RUNNERS`) and calls `run()`, and
   2. generate the fixture's Swift with its vendored runtime (`parity.generate`, with
      forward_compat for `swift/fc`); a refusal is RED;
   3. write `main.swift`, whose row tables come from `parity.int_rows()` and
-     `parity.malformed_rows()` and whose dispatch comes from
-     `parity.fixture_dispatch()`, never from hard-coded message names;
+     `parity.decode_rows()` (the malformed rows, then the bounds rows) and whose
+     dispatch comes from `parity.fixture_dispatch()`, never from hard-coded message names;
   4. build it with swiftc (`parity.build`); a failure is RED;
   5. run it (`parity.run_runner`), which parses and judges its report.
 
-The runner prints `name<TAB>outcome<TAB>detail` per row. It checks int rows
-itself; for a malformed row it only reports what happened (`ok` with the hex of the
-re-encoding; `err` with the tag and payload; `untyped` for any other thrown error)
-and the gate judges it.
+The runner speaks the gate's protocol (`parity`'s docstring), C3's bounds included. It
+prints `#constants<TAB>default_max_depth=<n>;max_depth_ceiling=<n>` once, from the
+runtime's own `defaultMaxDepth` and `maxDepthCeiling`, then `name<TAB>outcome<TAB>detail`
+per row. It checks int rows itself; for a decode row it only reports what happened (`ok`
+with the hex of the re-encoding; `err` with the tag and payload; `untyped` for any other
+thrown error) and the gate judges it:
+  - a row's bytes are embedded as their segments (`parity.segments`), which the runner
+    expands and checks against the row's `len`, a mismatch being `untyped`, so a
+    100,000-deep row stays one short line;
+  - a raw_decode row calls `tryDecode` with its `limits`, each one it lacks left at the
+    runtime's default;
+  - a from_cbor row decodes from bytes through its message's typed `decode`, which applies
+    the message's bounds, and its line adds a fourth column, the bounds that entry point
+    resolved, the message's `maxDepth` and `maxEncodedLen`;
+  - a from_wire row names an enum, which the raw decode reads with its defaults before the
+    enum's `fromCbor`.
 Swift cannot catch a trap, so the runner flushes each line: a trap leaves the rows
 before it reported and fails the target through the runner's exit status.
 """
@@ -44,11 +56,16 @@ struct EncFail {
     let ints: [String]
 }
 
-struct Mal {
+/// A malformed or bounds row: its input as `(hex, count)` segments, the expanded length
+/// where the row states one, and a raw row's limits (nil: left at the call's default).
+struct DecodeRow {
     let name: String
     let stage: String
     let schema: String
-    let bytes: String
+    let segments: [(String, Int)]
+    let len: Int?
+    let maxDepth: Int?
+    let maxEncodedLen: Int?
 }
 
 enum RunnerError: Error, CustomStringConvertible {
@@ -71,8 +88,8 @@ let roundTrip: [IntRow] = [
 let encodeFail: [EncFail] = [
 @ENCODE_FAIL@
 ]
-let malformed: [Mal] = [
-@MALFORMED@
+let decodeRows: [DecodeRow] = [
+@DECODE_ROWS@
 ]
 
 func nibble(_ c: UInt8) -> UInt8? {
@@ -117,26 +134,62 @@ func hexOf(_ bytes: [UInt8]) -> String {
     return String(decoding: out, as: UTF8.self)
 }
 
-func emit(_ name: String, _ outcome: String, _ detail: String) {
-    var clean = String.UnicodeScalarView()
-    for scalar in detail.unicodeScalars {
-        if scalar == "\t" || scalar == "\n" || scalar == "\r" {
-            clean.append(" ")
-        } else {
-            clean.append(scalar)
+/// One report line: the columns joined by tabs, a tab or line break inside one a space.
+func emit(_ columns: [String]) {
+    var cleaned: [String] = []
+    for column in columns {
+        var clean = String.UnicodeScalarView()
+        for scalar in column.unicodeScalars {
+            if scalar == "\t" || scalar == "\n" || scalar == "\r" {
+                clean.append(" ")
+            } else {
+                clean.append(scalar)
+            }
         }
+        cleaned.append(String(clean))
     }
-    print("\(name)\t\(outcome)\t\(String(clean))")
+    print(cleaned.joined(separator: "\t"))
     fflush(stdout)
 }
 
-/// A from_cbor row's typed entry point, by message name (from the fixture schema):
-/// the decoded value's own encoding.
-func fromCbor(_ message: String, _ c: Cbor) throws -> [UInt8] {
+/// A row's input: its segments expanded, and checked against its `len` where it has one.
+func expand(_ row: DecodeRow) throws -> [UInt8] {
+    var out: [UInt8] = []
+    for (hex, count) in row.segments {
+        let unit = try unhex(hex)
+        for _ in 0..<count {
+            out.append(contentsOf: unit)
+        }
+    }
+    if let want = row.len {
+        guard out.count == want else {
+            throw RunnerError.badRow("bytes expand to \(out.count) bytes, len is \(want)")
+        }
+    }
+    return out
+}
+
+/// A from_cbor row's typed entry point, by message name (from the fixture schema): the
+/// message's `decode` from bytes, which applies its bounds, and the value's own encoding.
+func fromBytes(_ message: String, _ data: [UInt8]) throws -> [UInt8] {
     switch message {
-@FROM_CBOR@
+@FROM_BYTES@
     default:
         throw RunnerError.noEntryPoint("no from_cbor entry point for \(message)")
+    }
+}
+
+/// A bounds column: `max_depth=<n>;max_encoded_len=<n>`, the length empty for none.
+func boundsColumn(_ maxDepth: Int, _ maxEncodedLen: Int?) -> String {
+    return "max_depth=\(maxDepth);max_encoded_len=\(maxEncodedLen.map { String($0) } ?? "")"
+}
+
+/// The bounds a from_cbor row's typed entry point applies: its message's constants.
+func resolved(_ message: String) -> String {
+    switch message {
+@RESOLVED@
+    default:
+        return "no bounds for \(message)"
     }
 }
 
@@ -151,15 +204,16 @@ func fromWire(_ name: String, _ c: Cbor) throws {
 
 /// A decoded row's re-encoding: the tree for raw_decode, the typed value for
 /// from_cbor, and nothing for from_wire (an enum row never accepts).
-func decodeRow(_ row: Mal) throws -> [UInt8] {
-    let c = try tryDecode(try unhex(row.bytes))
+func decodeRow(_ row: DecodeRow) throws -> [UInt8] {
+    let data = try expand(row)
     switch row.stage {
     case "raw_decode":
-        return encode(c)
+        return encode(try tryDecode(data, maxDepth: row.maxDepth ?? defaultMaxDepth,
+                                    maxEncodedLen: row.maxEncodedLen))
     case "from_cbor":
-        return try fromCbor(row.schema, c)
+        return try fromBytes(row.schema, data)
     case "from_wire":
-        try fromWire(row.schema, c)
+        try fromWire(row.schema, try tryDecode(data))
         return []
     default:
         throw RunnerError.badRow("unknown stage \(row.stage)")
@@ -191,6 +245,10 @@ func describe(_ e: CborError) -> String {
         payload = ";expected=\(expected)"
     case let .unknownEnum(name, value):
         payload = ";enum=\(name);value=\(value)"
+    case let .tooDeep(limit):
+        payload = ";limit=\(limit)"
+    case let .tooLarge(len, limit):
+        payload = ";len=\(len);limit=\(limit)"
     }
     return e.parityTag + payload
 }
@@ -202,6 +260,9 @@ func i64(_ s: String) throws -> Int64 {
     return v
 }
 
+print("#constants\tdefault_max_depth=\(defaultMaxDepth);max_depth_ceiling=\(maxDepthCeiling)")
+fflush(stdout)
+
 for row in roundTrip {
     do {
         let n = try i64(row.n)
@@ -212,18 +273,18 @@ for row in roundTrip {
         let built = IntBox(n: n, by_id: byId)
         let enc = hexOf(encode(built.toCbor()))
         if enc != row.cbor {
-            emit(row.name, "fail", "encode \(enc) != \(row.cbor)")
+            emit([row.name, "fail", "encode \(enc) != \(row.cbor)"])
             continue
         }
-        let d = try IntBox.fromCbor(try tryDecode(try unhex(row.cbor)))
+        let d = try IntBox.decode(try unhex(row.cbor))
         let re = hexOf(encode(d.toCbor()))
         if d.n == n && d.by_id == byId && re == row.cbor {
-            emit(row.name, "pass", "")
+            emit([row.name, "pass", ""])
         } else {
-            emit(row.name, "fail", "reencode \(re)")
+            emit([row.name, "fail", "reencode \(re)"])
         }
     } catch {
-        emit(row.name, "fail", "\(type(of: error)): \(error)")
+        emit([row.name, "fail", "\(type(of: error)): \(error)"])
     }
 }
 
@@ -231,21 +292,25 @@ for row in encodeFail {
     // Int64 is the encode-side subset guard: an out-of-subset value is
     // unrepresentable, so the type system satisfies the row.
     if row.ints.contains(where: { Int64($0) == nil }) {
-        emit(row.name, "type-satisfied", "unrepresentable in Int64")
+        emit([row.name, "type-satisfied", "unrepresentable in Int64"])
     } else {
-        emit(row.name, "fail", "value fits Int64 but expected out-of-subset")
+        emit([row.name, "fail", "value fits Int64 but expected out-of-subset"])
     }
 }
 
-for row in malformed {
+for row in decodeRows {
+    var columns: [String]
     do {
-        let again = try decodeRow(row)
-        emit(row.name, "ok", hexOf(again))
+        columns = [row.name, "ok", hexOf(try decodeRow(row))]
     } catch let e as CborError {
-        emit(row.name, "err", describe(e))
+        columns = [row.name, "err", describe(e)]
     } catch {
-        emit(row.name, "untyped", "\(type(of: error)): \(error)")
+        columns = [row.name, "untyped", "\(type(of: error)): \(error)"]
     }
+    if row.stage == "from_cbor" {
+        columns.append(resolved(row.schema))
+    }
+    emit(columns)
 }
 '''
 
@@ -264,8 +329,13 @@ def _sw(value: str) -> str:
     return '"' + "".join(out) + '"'
 
 
+def _optional(value: int | None) -> str:
+    """A Swift `Int?` literal."""
+    return "nil" if value is None else str(value)
+
+
 def _tables() -> tuple[str, str, str]:
-    round_trip, encode_fail, malformed = [], [], []
+    round_trip, encode_fail, decode_rows = [], [], []
     for row in parity.int_rows():
         value = row["value"]
         if row["kind"] == "round_trip":
@@ -276,30 +346,39 @@ def _tables() -> tuple[str, str, str]:
             ints = [str(value["n"]), *(str(item) for pair in value["by_id"] for item in pair)]
             encode_fail.append(f"    EncFail(name: {_sw(row['name'])}, "
                                f"ints: [{', '.join(_sw(item) for item in ints)}]),")
-    for row in parity.malformed_rows():
-        malformed.append(f"    Mal(name: {_sw(row['name'])}, stage: {_sw(row['stage'])}, "
-                         f"schema: {_sw(row.get('schema', ''))}, bytes: {_sw(row['bytes'])}),")
-    return "\n".join(round_trip), "\n".join(encode_fail), "\n".join(malformed)
+    for row in parity.decode_rows():
+        limits = row.get("limits", {})
+        segments = ", ".join(f"({_sw(hexed)}, {count})" for hexed, count in parity.segments(row))
+        decode_rows.append(
+            f"    DecodeRow(name: {_sw(row['name'])}, stage: {_sw(row['stage'])}, "
+            f"schema: {_sw(row.get('schema', ''))}, segments: [{segments}], "
+            f"len: {_optional(row.get('len'))}, maxDepth: {_optional(limits.get('max_depth'))}, "
+            f"maxEncodedLen: {_optional(limits.get('max_encoded_len'))}),")
+    return "\n".join(round_trip), "\n".join(encode_fail), "\n".join(decode_rows)
 
 
-def _dispatch() -> tuple[str, str]:
-    """The `switch` arms for every message (`from_cbor`) and enum (`from_wire`) in the fixture."""
+def _dispatch() -> tuple[str, str, str]:
+    """The `switch` arms for every message (its typed `decode` and the bounds it applies,
+    for `from_cbor`) and enum (`from_wire`) in the fixture."""
     dispatch = parity.fixture_dispatch()
-    from_cbor = [f"    case {_sw(name)}:\n        return encode(try {name}.fromCbor(c).toCbor())"
-                 for name in dispatch.messages]
+    from_bytes = [f"    case {_sw(name)}:\n        return encode(try {name}.decode(data).toCbor())"
+                  for name in dispatch.messages]
+    resolved = [f"    case {_sw(name)}:\n        return boundsColumn({name}.maxDepth, {name}.maxEncodedLen)"
+                for name in dispatch.messages]
     from_wire = [f"    case {_sw(name)}:\n        _ = try {name}.fromCbor(c)"
                  for name in dispatch.enums]
-    return "\n".join(from_cbor), "\n".join(from_wire)
+    return "\n".join(from_bytes), "\n".join(resolved), "\n".join(from_wire)
 
 
 def _source() -> str:
-    round_trip, encode_fail, malformed = _tables()
-    from_cbor, from_wire = _dispatch()
+    round_trip, encode_fail, decode_rows = _tables()
+    from_bytes, resolved, from_wire = _dispatch()
     return (_MAIN
             .replace("@ROUND_TRIP@", round_trip)
             .replace("@ENCODE_FAIL@", encode_fail)
-            .replace("@MALFORMED@", malformed)
-            .replace("@FROM_CBOR@", from_cbor)
+            .replace("@DECODE_ROWS@", decode_rows)
+            .replace("@FROM_BYTES@", from_bytes)
+            .replace("@RESOLVED@", resolved)
             .replace("@FROM_WIRE@", from_wire))
 
 
