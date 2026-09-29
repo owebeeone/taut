@@ -2,6 +2,14 @@
 the Rust/C++ generators. Pairs with the vendored `cbor.swift` runtime (emitted by
 `tautc gen --with-runtime`). Swift's `encode` sorts map keys, so forward-compat
 residual just rides along (no merge needed, unlike C++).
+
+No field can clash with a parameter, local or helper of the generated code (the Names
+fixture): the parameters and locals it binds take the `wire_` prefix, which taut
+reserves (no field may take it, ir/validate.py), and it reaches the runtime's helpers
+as members of a `Cbor` value (`tryGet`, `tryDictionary`, ...), never as free functions,
+which a field of the same name would hide. A field still cannot be named like a type
+the code names (`Cbor`, its message, or the message or enum of a field) or like the
+member `toCbor`. Decode is fail-closed: `fromCbor` returns or throws `CborError`.
 """
 
 from __future__ import annotations
@@ -17,6 +25,12 @@ subscript typealias var break case continue default defer do else fallthrough
 for guard if in repeat return switch where while as catch false is nil super
 self Self throw throws true try _ Any Protocol Type
 """.split())
+
+# The parameters and locals the generated code binds: `wire_` and a role.
+_C = "wire_c"          # a fromCbor's parameter, the item it decodes
+_V = "wire_v"          # a nullable field's item
+_RAW = "wire_raw"      # an enum's wire value
+_VALUE = "wire_value"  # the member that value names
 
 
 def _id(name: str) -> str:
@@ -40,13 +54,19 @@ def _field_type(f: FieldDef) -> str:
     return f"{base}?" if f.optional else base
 
 
-def _default(t: TypeRef) -> str:
+def _default(t: TypeRef, schema: Schema) -> str:
     if isinstance(t, Scalar):
         return {"int": "0", "str": '""', "bytes": "[]", "bool": "false", "float": "0.0"}[t.kind]
     if isinstance(t, ListOf):
         return "[]"
     if isinstance(t, EnumRef):
-        return f"{t.name}(rawValue: 0)!"
+        # The default applies on every decode, so it is a member, never a `(rawValue: 0)!`
+        # that traps for an enum without a 0: the member with wire value 0, else the first.
+        members = schema.enums[t.name].members
+        member = next((m for m, v in members.items() if v == 0), next(iter(members), None))
+        if member is None:
+            raise TypeError(f"no Swift default for transient field of the empty enum {t.name}")
+        return f".{_id(member)}"
     raise TypeError(f"no Swift default for transient field of type {t!r}")
 
 
@@ -89,7 +109,7 @@ def _decode(t: TypeRef, expr: str) -> str:
     if isinstance(t, ListOf):
         return f"try {expr}.tryArray().map {{ {_decode(t.elem, '$0')} }}"
     if isinstance(t, MapOf):
-        return (f"try decodeDictionary({expr}, "
+        return (f"try {expr}.tryDictionary("
                 f"key: {{ {_decode(t.key, '$0')} }}, "
                 f"value: {{ {_decode(t.value, '$0')} }})")
     raise TypeError(t)
@@ -100,18 +120,18 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     for m, v in members.items():
         out.append(f"    case {_id(m)} = {v}")
     out.append("")
-    out.append(f"    public static func fromCbor(_ c: Cbor) throws -> {name} {{")
-    out.append("        let raw = try c.tryInt()")
-    out.append(f"        guard let value = {name}(rawValue: raw) else {{")
-    out.append(f"            throw CborError.unknownEnum(\"{name}\", raw)")
+    out.append(f"    public static func fromCbor(_ {_C}: Cbor) throws -> {name} {{")
+    out.append(f"        let {_RAW} = try {_C}.tryInt()")
+    out.append(f"        guard let {_VALUE} = {name}(rawValue: {_RAW}) else {{")
+    out.append(f"            throw CborError.unknownEnum(\"{name}\", {_RAW})")
     out.append("        }")
-    out.append("        return value")
+    out.append(f"        return {_VALUE}")
     out.append("    }")
     out.append("}")
     return out
 
 
-def _emit_message(msg, forward_compat: bool = False) -> list[str]:
+def _emit_message(msg, schema: Schema, forward_compat: bool = False) -> list[str]:
     out = [f"public struct {msg.name} {{"]
     for f in msg.fields:
         out.append(f"    public var {_id(f.name)}: {_field_type(f)}")
@@ -123,7 +143,7 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     for f in msg.fields:
         ft = _field_type(f)
         if f.transient:
-            params.append(f"{_id(f.name)}: {ft} = {'nil' if f.optional else _default(f.type)}")
+            params.append(f"{_id(f.name)}: {ft} = {'nil' if f.optional else _default(f.type, schema)}")
         elif f.optional:
             params.append(f"{_id(f.name)}: {ft} = nil")
         else:
@@ -150,10 +170,10 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     out.append(f"        return Cbor.map({arr}{' + wire_residual' if forward_compat else ''})")
     out.append("    }")
     # fromCbor
-    out.append(f"    public static func fromCbor(_ c: Cbor) throws -> {msg.name} {{")
+    out.append(f"    public static func fromCbor(_ {_C}: Cbor) throws -> {msg.name} {{")
     if not msg.wire_fields():
         # no field lookup refuses a non-map here, so check it (CD-E5: even an empty message)
-        out.append("        guard case .map = c else {")
+        out.append(f"        guard case .map = {_C} else {{")
         out.append('            throw CborError.wrongType("map")')
         out.append("        }")
     args = []
@@ -162,14 +182,14 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
             continue  # native-only; init default applies
         if f.optional == MISSING_OK:
             # an absent key reads as null, like a present null; a non-map still fails
-            args.append(f"{_id(f.name)}: try {{ guard let v = try c.tryGetOpt({f.tag}) else {{ return nil }}; if v.isNull {{ return nil }}; return {_decode(f.type, 'v')} }}()")
+            args.append(f"{_id(f.name)}: try {{ guard let {_V} = try {_C}.tryGetOpt({f.tag}) else {{ return nil }}; if {_V}.isNull {{ return nil }}; return {_decode(f.type, _V)} }}()")
         elif f.optional:
-            args.append(f"{_id(f.name)}: try {{ let v = try c.tryGet({f.tag}); if v.isNull {{ return nil }}; return {_decode(f.type, 'v')} }}()")
+            args.append(f"{_id(f.name)}: try {{ let {_V} = try {_C}.tryGet({f.tag}); if {_V}.isNull {{ return nil }}; return {_decode(f.type, _V)} }}()")
         else:
-            args.append(f"{_id(f.name)}: {_decode(f.type, f'c.tryGet({f.tag})')}")
+            args.append(f"{_id(f.name)}: {_decode(f.type, f'{_C}.tryGet({f.tag})')}")
     if forward_compat:
         known = ", ".join(str(f.tag) for f in msg.wire_fields())
-        args.append(f"wire_residual: c.mapEntries.filter {{ ![{known}].contains($0.0) }}")
+        args.append(f"wire_residual: {_C}.mapEntries.filter {{ ![{known}].contains($0.0) }}")
     out.append(f"        return {msg.name}(")
     out.append("            " + ",\n            ".join(args))
     out.append("        )")
@@ -184,5 +204,5 @@ def emit_types(schema: Schema, forward_compat: bool = False) -> str:
     for e in schema.enums.values():
         out += _emit_enum(e.name, e.members) + [""]
     for m in schema.messages.values():
-        out += _emit_message(m, forward_compat) + [""]
+        out += _emit_message(m, schema, forward_compat) + [""]
     return "\n".join(out) + "\n"

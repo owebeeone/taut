@@ -16,18 +16,6 @@
       "reason": "build failed (exit 1): as cpp (the Names field `b`), and the Names field `encode_value` hides the runtime's encode_value, which the forward-compat to_cbor calls unqualified (called object type 'long long' is not a function), so no row runs, names-round-trip among them. With both renamed in a scratch run, map-bool-key-duplicate reports key=1, not `true`"
     },
     {
-      "target": "swift",
-      "phase": "C2",
-      "owner": "codec-parity",
-      "reason": "build failed (exit 1): the Names field `decodeDictionary` hides the runtime's decodeDictionary, which the static fromCbor calls unqualified for each map field (instance member 'decodeDictionary' cannot be used on type 'Names'), so no row runs, names-round-trip among them. With it renamed in a scratch run, map-str-key-duplicate and map-bool-key-duplicate report key=0, not `a` and `true`"
-    },
-    {
-      "target": "swift/fc",
-      "phase": "C2",
-      "owner": "codec-parity",
-      "reason": "build failed (exit 1): as swift, the Names field `decodeDictionary` hides the runtime's decodeDictionary in the static fromCbor, so no row runs, names-round-trip among them. With it renamed in a scratch run, map-str-key-duplicate and map-bool-key-duplicate report key=0, not `a` and `true`"
-    },
-    {
       "target": "kotlin/fc",
       "phase": "C2",
       "owner": "codec-parity",

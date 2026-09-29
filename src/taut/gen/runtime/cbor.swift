@@ -3,6 +3,11 @@
 // runtimes: the same tiny subset (int, float, bytes, text, array, int-keyed map,
 // bool, null) in core-deterministic encoding (definite length, shortest-form
 // ints/floats, ascending map keys). Hand-rolled, no dependencies.
+//
+// Decode is fail-closed: every public decode entry point (`tryDecode`, the `try*`
+// accessors and the generated `fromCbor`) returns a value or throws `CborError`,
+// and nothing else escapes or traps (TautCheckedDecode.md CD-E4).
+// TODO(D1): count depth in `dec`, so that deep nesting is TooDeep, not a stack overflow.
 
 public enum CborError: Error, Equatable, CustomStringConvertible {
     case truncated
@@ -12,7 +17,8 @@ public enum CborError: Error, Equatable, CustomStringConvertible {
     case unsupportedMajor(UInt8)
     case nonIntegerMapKey
     case intOverflow(String)
-    case duplicateMapKey(Int64)
+    /// The repeated key as text: an int in decimal, a str as itself, a bool as `true` or `false`.
+    case duplicateMapKey(String)
     case missingKey(Int64)
     case wrongType(String)
     case unknownEnum(String, Int64)
@@ -80,14 +86,6 @@ public indirect enum Cbor {
     case null
 }
 
-private func force<T>(_ work: () throws -> T) -> T {
-    do {
-        return try work()
-    } catch {
-        fatalError(String(describing: error))
-    }
-}
-
 public extension Cbor {
     func tryGet(_ key: Int64) throws -> Cbor {
         guard case let .map(m) = self else {
@@ -152,36 +150,32 @@ public extension Cbor {
         return a
     }
 
-    func get(_ key: Int64) -> Cbor { force { try tryGet(key) } }
-    var intVal: Int64 { force { try tryInt() } }
-    var floatVal: Double { force { try tryFloat() } }
-    var textVal: String { force { try tryText() } }
-    var bytesVal: [UInt8] { force { try tryBytes() } }
-    var boolVal: Bool { force { try tryBool() } }
-    var arrayVal: [Cbor] { force { try tryArray() } }
+    /// A `map<K,V>` field: an array of `{1: key, 2: value}` entries. Each entry must hold
+    /// keys 1 and 2 before either is decoded, and a repeated key is `duplicateMapKey` with
+    /// the key as text. A member, not a free function, so that no field of a generated
+    /// message, whatever its name, can hide it from that message's `fromCbor`.
+    func tryDictionary<K: Hashable, V>(
+        key decodeKey: (Cbor) throws -> K,
+        value decodeValue: (Cbor) throws -> V
+    ) throws -> [K: V] {
+        var out: [K: V] = [:]
+        for entry in try tryArray() {
+            let rawKey = try entry.tryGet(1)
+            let rawValue = try entry.tryGet(2)
+            let keyValue = try decodeKey(rawKey)
+            if out[keyValue] != nil {
+                // K is Int64, String or Bool: decimal, the text itself, `true` or `false`.
+                throw CborError.duplicateMapKey(String(describing: keyValue))
+            }
+            out[keyValue] = try decodeValue(rawValue)
+        }
+        return out
+    }
+
     var isNull: Bool { if case .null = self { return true }; return false }
 
     /// All (key, value) pairs of a map (empty if not a map) - for forward-compat residual.
     var mapEntries: [(Int64, Cbor)] { if case let .map(m) = self { return m }; return [] }
-}
-
-public func decodeDictionary<K: Hashable, V>(
-    _ c: Cbor,
-    key decodeKey: (Cbor) throws -> K,
-    value decodeValue: (Cbor) throws -> V
-) throws -> [K: V] {
-    var out: [K: V] = [:]
-    for entry in try c.tryArray() {
-        // Keys 1 and 2 must both be present before either is decoded.
-        let rawKey = try entry.tryGet(1)
-        let rawValue = try entry.tryGet(2)
-        let keyValue = try decodeKey(rawKey)
-        if out[keyValue] != nil {
-            throw CborError.duplicateMapKey((keyValue as? Int64) ?? 0)
-        }
-        out[keyValue] = try decodeValue(rawValue)
-    }
-    return out
 }
 
 private func head(_ out: inout [UInt8], _ major: UInt8, _ n: UInt64) {
@@ -261,10 +255,6 @@ private func enc(_ v: Cbor, _ out: inout [UInt8]) {
     case let .bool(b): out.append(b ? 0xf5 : 0xf4)
     case .null: out.append(0xf6)
     }
-}
-
-public func decode(_ data: [UInt8]) -> Cbor {
-    force { try tryDecode(data) }
 }
 
 public func tryDecode(_ data: [UInt8]) throws -> Cbor {
@@ -405,7 +395,7 @@ private func dec(_ data: [UInt8], _ off0: Int) throws -> (Cbor, Int) {
                 throw CborError.negativeMapKey(key)
             }
             guard !seen.contains(key) else {
-                throw CborError.duplicateMapKey(key)
+                throw CborError.duplicateMapKey(String(key))
             }
             seen.insert(key)
             let (v, o3) = try dec(data, o2)
