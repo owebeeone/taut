@@ -24,6 +24,11 @@
 > **Follow-ups (out of scope, separate pins):** re-vendor `taut-shape-rs/…/cbor.rs` (drifted at rev `70e17b7`,
 > pre-`DuplicateMapKey`); retarget `glade/wire-rs` onto the fail-closed runtime (no documented regen command;
 > its generated codec + `lib.rs` tests assume the panicking runtime).
+>
+> **rev8 (2026-09-30): "just bring all languages to parity" (owner).** §8 is the execution plan: all nine
+> codecs replay the same rows in `tautc parity`, compared on tag and payload, and the allowlist ends
+> empty. The rows are today's 27 plus TautCheckedDecode.md's M1-M17; `optional=MISSING_OK` is generated
+> for all nine. The bounds and the options framework wait for the twelve open questions.
 
 ## 0. North star + scope + decisions to ratify
 
@@ -205,6 +210,7 @@ run after the 4.0 Go spike. Phase 5 closes. Parity-gate-leads.
   not touch float encode paths.
 
 ## 7. Change log
+**rev8 (owner: "just bring all languages to parity"):** §8 added, the execution plan for all nine.
 **rev5 (i64 simplification — Gianni):** frozen subset `[-2^64,2^64-1]` → **`i64` `[-2^63,2^63-1]`**. Deletes the
 `i128`/`BigInteger` carrier churn; the int work becomes an **out-of-`i64` range check** folded into fail-closed.
 Phase 4's carrier ADR **removed**. TS/js still require `bigint` for exact full-`i64` codec parity because
@@ -217,3 +223,50 @@ tags; Phase-4 carrier ADR (now moot under rev5); split 0.1 assertions; `--fail-c
 explicit; allowlist governance; corpus coexistence; named sunset; Go spike; C++ constexpr-vs-runtime.
 **rev3:** all nine codec targets in scope (codec≠shape). **rev2:** Review25+55 (encode hole, dup-key, malformed
 schema, Phase-0 realizability, gwz migration, TS surface).
+
+## 8. Execution: all nine to parity (rev8, 2026-09-30)
+
+**Scope.** Parity is one corpus, one gate and no allowlist:
+- every codec (rust, python, typescript, js, cpp, swift, go, kotlin, java) passes every row of
+  `int.vectors.json` and `malformed.vectors.json` in `tautc parity`, lead rows included;
+- the gate compares tag and payload (TautCheckedDecode.md CD-C4), counts a row that never reports
+  as a failure, and fails a target whose runner exits non-zero or whose generated code does not build;
+  a missing toolchain still skips, with its reason;
+- the malformed rows gain M1-M17 (TautCheckedDecode.md §4.4), so the nine agree on inputs with more
+  than one fault (CD-E5's order of checks) and on payload words (CD-E6);
+- `optional=MISSING_OK` is generated for all nine, and `scaffold.emit` stops refusing it.
+
+**Not in this pass.** These wait for the twelve open questions: the bounds (`max_depth`,
+`max_encoded_len`, `TooDeep`, `TooLarge`, rows B1-B30), the options framework and IR version 2,
+removing `--legacy-codec` and the panicking accessors (question 5), fallible extension helpers
+(CD-E4), and the clients' adoption (CD-V3).
+
+**Phase P1: the gate and the rows** (foundational; one agent).
+- **P1.1 Gate.** Runners report what they observed, `ok` or `err` with the tag and payload, and the
+  gate compares that with the row. Payload fields compare as strings (CD-C4; Rust's `IntOverflow`
+  carries no value). A row may expect `{"accept": true}`. Runners register per target
+  (`taut.corpus.parity_<target>`), so each Wave-2 step adds a module and edits no shared code; one
+  toolchain finder (`taut/corpus/toolchains.py`) serves them all.
+- **P1.2 Rows.** The fixture gains `OptBox` and `Empty`, and M1-M15 enter `malformed.vectors.json`
+  as lead rows. A target that fails them is allowlisted, naming the rows, so every commit keeps the
+  gate clean.
+
+**Phase P2: one step per language** (parallel). Each step makes its target GREEN and de-lists it.
+
+| Step | Target | Work |
+|---|---|---|
+| P2.rs | rust | read a map entry's key before its value (M4-M6); `map<K,V>` refuses a repeated key and checks keys 1 and 2 first (M13, M14) |
+| P2.ts | typescript | a length beyond the input is `Truncated` (M1, M2); a raw map key above 2^53 decodes (M8); `text` and `array` (M9, M10); an absent optional field is `MissingKey` (M11); `MISSING_OK` read from the IR |
+| P2.js | js | M1, M2, M7, M9 and M12-M14; `MISSING_OK` generated |
+| P2.cpp, P2.swift, P2.go, P2.kt, P2.java | the Wave-2 five | `NonCanonicalInt` and `NegativeMapKey` (D2); whatever M1-M15 find; `MISSING_OK` generated; a gate runner module (C++ adds a runtime binary beside its constexpr goldens) |
+
+Python is expected GREEN at P1; if it is not, it gets a step.
+
+**Phase P3: close** (one step). The fixture gains `Late` (`note=F(1, STR, optional=MISSING_OK)`)
+with rows M16 and M17; `scaffold.emit`'s refusal goes; the allowlist is empty and the gate runs all
+nine by default; Reference.md, this plan and the two notes record it.
+
+**How it lands.** Each step works in a scratch export of taut and hands back a patch. The lane owner
+applies them one at a time, runs the gate and the full suite with every toolchain (Java and Kotlin
+from Android Studio), and commits each step. Encode is untouched, so every golden corpus stays
+byte-identical.
