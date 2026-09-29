@@ -3,9 +3,16 @@
 The generated classes in `api.java` are package-private in package `taut`, so the
 runner is a class of that package too: javac compiles it with `api.java` and the
 vendored `Cbor.java` and `Ext.java`, and a compile error is RED. The runner checks
-the int rows itself and reports what each malformed row did, a decoded one with the
-hex of its re-encoding (`Cbor.encode` of the tree for a raw row, of the typed
+the int rows itself and reports what each malformed or bounds row did, a decoded one
+with the hex of its re-encoding (`Cbor.encode` of the tree for a raw row, of the typed
 value's `toCbor()` for a from_cbor row); the gate judges it.
+
+It speaks the bounds protocol (`parity.py`'s docstring): a `#constants` line from
+`Cbor.DEFAULT_MAX_DEPTH` and `Cbor.MAX_DEPTH_CEILING`; a raw row's call passes its
+`limits` to `Cbor.decode(data, maxDepth, maxEncodedLen)`; a from_cbor row decodes
+through its message's typed `decode(byte[])`, and its line's fourth column is the
+bounds that decode applies, the message's MAX_DEPTH and MAX_ENCODED_LEN. A row's bytes
+are embedded as segments, which the runner expands and checks against the row's `len`.
 """
 
 from __future__ import annotations
@@ -24,12 +31,20 @@ _JAVA_FIELD = {"enum": "enumName"}
 _RUNNER = r'''
 package taut;
 
+import java.io.ByteArrayOutputStream;
 import java.util.LinkedHashMap;
 
 public final class ParityRunner {
     private record IntRow(String name, String cbor, String n, String[] byId) {}
     private record EncFail(String name, String[] ints) {}
-    private record Mal(String name, String stage, String schema, String bytes) {}
+    // A run of a row's bytes: `hex` repeated `count` times.
+    private record Seg(String hex, int count) {}
+    // A malformed or bounds row: its bytes as segments, which the runner expands (a
+    // 100,000-deep row is beyond a Java string literal), and its `len`, the expanded length,
+    // null where the row gives none. A raw row's call passes `maxDepth` and `maxEncodedLen`,
+    // its `limits`, each null where it passes none.
+    private record DecodeRow(String name, String stage, String schema, Seg[] bytes, Integer len,
+                             Integer maxDepth, Integer maxEncodedLen) {}
 
     // byId holds each by_id pair as two items, key then value.
     private static final IntRow[] ROUND_TRIP = {
@@ -39,13 +54,15 @@ public final class ParityRunner {
     private static final EncFail[] ENCODE_FAIL = {
 @ENCODE_FAIL@
     };
-    private static final Mal[] MALFORMED = {
-@MALFORMED@
+    private static final DecodeRow[] DECODE = {
+@DECODE@
     };
 
     private ParityRunner() {}
 
     public static void main(String[] args) {
+        emit("#constants", "default_max_depth=" + Cbor.DEFAULT_MAX_DEPTH
+                + ";max_depth_ceiling=" + Cbor.MAX_DEPTH_CEILING);
         for (IntRow row : ROUND_TRIP) {
             try {
                 roundTrip(row);
@@ -56,17 +73,43 @@ public final class ParityRunner {
         for (EncFail row : ENCODE_FAIL) {
             encodeFail(row);
         }
-        for (Mal row : MALFORMED) {
-            try {
-                byte[] again = decodeRow(row);
-                emit(row.name(), "ok", hex(again));
-            } catch (Cbor.DecodeError e) {
-                emit(row.name(), "err", describe(e));
-            } catch (Throwable t) {
-                emit(row.name(), "untyped", untyped(t));
+        for (DecodeRow row : DECODE) {
+            String[] seen = observe(row);
+            if (row.stage().equals("from_cbor")) {
+                emit(row.name(), seen[0], seen[1], resolved(row.schema()));
+            } else {
+                emit(row.name(), seen[0], seen[1]);
             }
         }
         System.out.flush();
+    }
+
+    // What decoding a row did, as an outcome and its detail: `ok` and the hex of its
+    // re-encoding, `err` and its DecodeError, or `untyped` and anything else, an expansion
+    // whose length is not the row's `len` among them.
+    private static String[] observe(DecodeRow row) {
+        byte[] data = expand(row.bytes());
+        if (row.len() != null && data.length != row.len()) {
+            return new String[] {"untyped", "bytes expand to " + data.length + " bytes, len is " + row.len()};
+        }
+        try {
+            return new String[] {"ok", hex(decodeRow(row, data))};
+        } catch (Cbor.DecodeError e) {
+            return new String[] {"err", describe(e)};
+        } catch (Throwable t) {
+            return new String[] {"untyped", untyped(t)};
+        }
+    }
+
+    private static byte[] expand(Seg[] segs) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (Seg seg : segs) {
+            byte[] run = unhex(seg.hex());
+            for (int i = 0; i < seg.count(); i++) {
+                out.write(run, 0, run.length);
+            }
+        }
+        return out.toByteArray();
     }
 
     private static void roundTrip(IntRow row) {
@@ -83,7 +126,7 @@ public final class ParityRunner {
         }
         IntBox decoded;
         try {
-            decoded = IntBox.fromCbor(Cbor.decode(unhex(row.cbor())));
+            decoded = IntBox.decode(unhex(row.cbor()));
         } catch (Cbor.DecodeError e) {
             emit(row.name(), "fail", "decode " + describe(e));
             return;
@@ -112,30 +155,52 @@ public final class ParityRunner {
 
     // A decoded row's re-encoding: the tree for raw_decode, the typed value for
     // from_cbor, and nothing for from_wire (an enum row never accepts).
-    private static byte[] decodeRow(Mal row) {
-        Cbor c = Cbor.decode(unhex(row.bytes()));
+    private static byte[] decodeRow(DecodeRow row, byte[] data) {
         switch (row.stage()) {
             case "raw_decode" -> {
-                return Cbor.encode(c);
+                return Cbor.encode(raw(row, data));
             }
             case "from_cbor" -> {
-                return fromCbor(row.schema(), c);
+                return typed(row.schema(), data);
             }
             case "from_wire" -> {
-                fromWire(row.schema(), c.asInt());
+                fromWire(row.schema(), Cbor.decode(data).asInt());
                 return new byte[0];
             }
             default -> throw new IllegalStateException("unknown stage " + row.stage());
         }
     }
 
-    // A from_cbor row's typed entry point, by message name (from the fixture schema):
-    // the decoded value's own encoding.
-    private static byte[] fromCbor(String message, Cbor c) {
-        switch (message) {
-@FROM_CBOR@
-            default -> throw new IllegalStateException("no from_cbor entry point for " + message);
+    // A raw row's call: the default overload when it passes no limits, else the raw decode
+    // with them, at the default depth where it passes none.
+    private static Cbor raw(DecodeRow row, byte[] data) {
+        if (row.maxDepth() == null && row.maxEncodedLen() == null) {
+            return Cbor.decode(data);
         }
+        int maxDepth = row.maxDepth() == null ? Cbor.DEFAULT_MAX_DEPTH : row.maxDepth();
+        return Cbor.decode(data, maxDepth, row.maxEncodedLen());
+    }
+
+    // A from_cbor row's typed entry point, by message name (from the fixture schema): the
+    // message's decode from bytes, under its bounds, and the decoded value's own encoding.
+    private static byte[] typed(String message, byte[] data) {
+        switch (message) {
+@TYPED@
+            default -> throw new IllegalStateException("no typed entry point for " + message);
+        }
+    }
+
+    // A from_cbor row's fourth column, by message name: the bounds its typed entry point
+    // applies, the message's generated constants.
+    private static String resolved(String message) {
+        switch (message) {
+@RESOLVED@
+            default -> throw new IllegalStateException("no typed entry point for " + message);
+        }
+    }
+
+    private static String bounds(int maxDepth, Integer maxEncodedLen) {
+        return "max_depth=" + maxDepth + ";max_encoded_len=" + (maxEncodedLen == null ? "" : maxEncodedLen);
     }
 
     // A from_wire row's typed entry point, by enum name (from the fixture schema).
@@ -163,9 +228,17 @@ public final class ParityRunner {
         return t.getClass().getName() + ": " + t.getMessage();
     }
 
-    private static void emit(String name, String outcome, String detail) {
-        String clean = detail.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ');
-        System.out.println(name + "\t" + outcome + "\t" + clean);
+    // One report line: its columns, tab-separated, with any tab or line break inside a
+    // column made a space.
+    private static void emit(String... columns) {
+        StringBuilder line = new StringBuilder();
+        for (int i = 0; i < columns.length; i++) {
+            if (i > 0) {
+                line.append('\t');
+            }
+            line.append(columns[i].replace('\t', ' ').replace('\n', ' ').replace('\r', ' '));
+        }
+        System.out.println(line);
     }
 
     private static byte[] unhex(String text) {
@@ -198,8 +271,20 @@ def _strings(values: list[object]) -> str:
     return "new String[] {" + ", ".join(_java_str(v) for v in values) + "}"
 
 
+def _segments(row: dict) -> str:
+    """A row's bytes as the runner embeds them, a `Seg` per segment (the bounds protocol,
+    item 5): the runner expands them, so no literal holds a 100,000-deep row."""
+    return "new Seg[] {" + ", ".join(f"new Seg({_java_str(hexed)}, {count})"
+                                     for hexed, count in parity.segments(row)) + "}"
+
+
+def _nullable(value: int | None) -> str:
+    """An `Integer` argument: the int, or null for none."""
+    return "null" if value is None else str(value)
+
+
 def _tables() -> tuple[str, str, str]:
-    round_trip, encode_fail, malformed = [], [], []
+    round_trip, encode_fail, decode = [], [], []
     for row in parity.int_rows():
         value = row["value"]
         by_id = [item for pair in value["by_id"] for item in pair]
@@ -209,19 +294,28 @@ def _tables() -> tuple[str, str, str]:
         else:
             encode_fail.append(f"        new EncFail({_java_str(row['name'])}, "
                                f"{_strings([value['n'], *by_id])}),")
-    for row in parity.malformed_rows():
-        malformed.append(f"        new Mal({_java_str(row['name'])}, {_java_str(row['stage'])}, "
-                         f"{_java_str(row.get('schema', ''))}, {_java_str(row['bytes'])}),")
-    return "\n".join(round_trip), "\n".join(encode_fail), "\n".join(malformed)
+    for row in parity.decode_rows():
+        limits = row.get("limits", {})
+        decode.append(f"        new DecodeRow({_java_str(row['name'])}, {_java_str(row['stage'])}, "
+                      f"{_java_str(row.get('schema', ''))}, {_segments(row)}, "
+                      f"{_nullable(row.get('len'))}, {_nullable(limits.get('max_depth'))}, "
+                      f"{_nullable(limits.get('max_encoded_len'))}),")
+    return "\n".join(round_trip), "\n".join(encode_fail), "\n".join(decode)
 
 
-def _dispatch() -> tuple[str, str]:
-    """The `case` arms for every message (`from_cbor`) and enum (`from_wire`) in the fixture."""
+def _dispatch() -> tuple[str, str, str]:
+    """The `case` arms for every message and enum in the fixture: each message's typed entry
+    point, `decode` from bytes (from_cbor), and the bounds it applies, and each enum's
+    `fromWire` (from_wire)."""
     dispatch = parity.fixture_dispatch()
-    from_cbor = [f"            case {_java_str(name)} -> {{\n                return Cbor.encode({name}.fromCbor(c).toCbor());\n            }}"
-                 for name in dispatch.messages]
+    typed = [f"            case {_java_str(name)} -> {{\n"
+             f"                return Cbor.encode({name}.decode(data).toCbor());\n"
+             "            }" for name in dispatch.messages]
+    resolved = [f"            case {_java_str(name)} -> {{\n"
+                f"                return bounds({name}.MAX_DEPTH, {name}.MAX_ENCODED_LEN);\n"
+                "            }" for name in dispatch.messages]
     from_wire = [f"            case {_java_str(name)} -> {name}.fromWire(v);" for name in dispatch.enums]
-    return "\n".join(from_cbor), "\n".join(from_wire)
+    return "\n".join(typed), "\n".join(resolved), "\n".join(from_wire)
 
 
 def _payload() -> str:
@@ -232,13 +326,14 @@ def _payload() -> str:
 
 
 def _source() -> str:
-    round_trip, encode_fail, malformed = _tables()
-    from_cbor, from_wire = _dispatch()
+    round_trip, encode_fail, decode = _tables()
+    typed, resolved, from_wire = _dispatch()
     return (_RUNNER.lstrip("\n")
             .replace("@ROUND_TRIP@", round_trip)
             .replace("@ENCODE_FAIL@", encode_fail)
-            .replace("@MALFORMED@", malformed)
-            .replace("@FROM_CBOR@", from_cbor)
+            .replace("@DECODE@", decode)
+            .replace("@TYPED@", typed)
+            .replace("@RESOLVED@", resolved)
             .replace("@FROM_WIRE@", from_wire)
             .replace("@PAYLOAD@", _payload()))
 

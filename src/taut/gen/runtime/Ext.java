@@ -2,7 +2,8 @@
 // Operates schema-free on the host's top-level CBOR map.
 // Fail-closed (TautCheckedDecode.md CD-E4): for any host bytes each helper returns or
 // throws Cbor.DecodeError, and a host that is not a map is WrongType{map}. A tag below
-// the band is the caller's error, IllegalArgumentException, checked before the host.
+// the band is the caller's error, IllegalArgumentException, checked before the host. A
+// host is read at the depth ceiling, with no length bound (TautOptions.md G3).
 package taut;
 
 import java.util.ArrayList;
@@ -44,10 +45,11 @@ public final class Ext {
         }
     }
 
-    // The host's top-level map. TODO(D1): read the host at the depth ceiling, with no
-    // length bound (TautOptions.md G3), once D1 gives Cbor.decode its depth parameter.
+    // The host's top-level map, read at the depth ceiling with no length bound
+    // (TautOptions.md G3): a helper cannot name the host's root, and these are the only
+    // bounds every valid host meets. The host's own bounds are its reader's.
     private static Cbor decodeHostMap(byte[] host) {
-        Cbor root = Cbor.decode(host);
+        Cbor root = Cbor.decode(host, Cbor.MAX_DEPTH_CEILING, null);
         if (root.kind != Cbor.MAP) {
             throw Cbor.DecodeError.wrongType("map");
         }

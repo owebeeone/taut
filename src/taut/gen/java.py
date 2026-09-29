@@ -22,11 +22,20 @@ its class's code calls through that name: a field `m` hid toCbor's local `m`, an
 - nothing is imported, since an import clashes with a message of its name: the codec spells
   java.util's classes in full.
 Enums keep their code: their constants are upper case, so none shares a name it uses.
+
+Bounds (TautCheckedDecode.md CD-B3; TautOptions.md OPT-D4, OPT-L6). Each message's class
+holds MAX_DEPTH and MAX_ENCODED_LEN, its effective `max_depth` and `max_encoded_len` as
+`taut.ir.options.effective` resolves them at generation (null for no length bound), and a
+static `decode(byte[])` from bytes that its codec runs: `Cbor.decode` under both, then
+`fromCbor`. So a call's bounds are its root's, whatever the messages inside declare, and no
+caller passes any. `fromCbor` reads a tree its caller decoded, under whatever bounds that
+call applied (TautOptions.md G1).
 """
 
 from __future__ import annotations
 
 from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.options import effective
 
 
 def _java_ty(t: TypeRef, boxed: bool = False) -> str:
@@ -119,15 +128,22 @@ def _codec(msg) -> str:
     return f"{msg.name}$Codec"
 
 
-def _emit_message(msg, forward_compat: bool = False) -> list[str]:
-    """The message's class: its fields, and a toCbor and fromCbor that call its codec."""
+def _emit_message(schema: Schema, msg, forward_compat: bool = False) -> list[str]:
+    """The message's class: its fields, its bounds, and a toCbor, fromCbor and decode that
+    call its codec. The bounds' values are literals, so they name nothing a field can hide."""
+    max_depth = effective(schema, "max_depth", message=msg.name)
+    max_encoded_len = effective(schema, "max_encoded_len", message=msg.name)
     out = [f"class {msg.name} {{"]
     for f in msg.fields:
         out.append(f"    public {_field_type(f)} {f.name};")
     if forward_compat:
         out.append("    public java.util.List<KV> wireResidual = new java.util.ArrayList<>();")
+    out.append(f"    static final int MAX_DEPTH = {max_depth};")
+    out.append(f"    static final Integer MAX_ENCODED_LEN = "
+               f"{'null' if max_encoded_len is None else max_encoded_len};")
     out.append(f"    Cbor toCbor() {{ return {_codec(msg)}.toCbor(this); }}")
     out.append(f"    static {msg.name} fromCbor(Cbor $c) {{ return {_codec(msg)}.fromCbor($c); }}")
+    out.append(f"    static {msg.name} decode(byte[] $bytes) {{ return {_codec(msg)}.decode($bytes); }}")
     out.append("}")
     return out
 
@@ -177,6 +193,10 @@ def _emit_codec(msg, forward_compat: bool = False) -> list[str]:
         out.append("        }")
     out.append("        return $v;")
     out.append("    }")
+    # Bytes rooted at the message, under its bounds (CD-B3): the raw decode, then fromCbor.
+    out.append(f"    static {msg.name} decode(byte[] $bytes) {{")
+    out.append(f"        return fromCbor(Cbor.decode($bytes, {msg.name}.MAX_DEPTH, {msg.name}.MAX_ENCODED_LEN));")
+    out.append("    }")
     out.append("}")
     return out
 
@@ -188,6 +208,6 @@ def emit_types(schema: Schema, forward_compat: bool = False) -> str:
     for e in schema.enums.values():
         out += _emit_enum(e.name, e.members) + [""]
     for m in schema.messages.values():
-        out += _emit_message(m, forward_compat) + [""]
+        out += _emit_message(schema, m, forward_compat) + [""]
         out += _emit_codec(m, forward_compat) + [""]
     return "\n".join(out) + "\n"

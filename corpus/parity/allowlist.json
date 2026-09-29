@@ -38,18 +38,6 @@
       "phase": "D1",
       "owner": "codec-parity",
       "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.kotlin builds kotlin's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
-    },
-    {
-      "target": "java",
-      "phase": "D1",
-      "owner": "codec-parity",
-      "reason": "build failed (exit 1): the runner reads DecodeError's len and limit, which step D1 adds with TooDeep and TooLarge. Step D1.java builds java's bounds and de-lists it."
-    },
-    {
-      "target": "java/fc",
-      "phase": "D1",
-      "owner": "codec-parity",
-      "reason": "build failed (exit 1): the runner reads DecodeError's len and limit, which step D1 adds with TooDeep and TooLarge. Step D1.java builds java's bounds and de-lists it."
     }
   ]
 }

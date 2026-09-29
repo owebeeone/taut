@@ -2,6 +2,12 @@
 // Same tiny subset (int, float, bytes, text, array, int-keyed map, bool, null),
 // core-deterministic (definite length, shortest-form ints, ascending map keys).
 // Hand-rolled, JDK only.
+//
+// Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one more
+// than the arrays and maps around it, and one deeper than the call's depth bound is
+// TooDeep{limit} once its head is read; with a length bound, longer input is
+// TooLarge{len, limit} before a byte is read. For any input bytes decode returns a value
+// or throws DecodeError, nothing else, and it recurses no deeper than MAX_DEPTH_CEILING.
 package taut;
 
 import java.math.BigInteger;
@@ -22,6 +28,9 @@ import java.util.function.Function;
 
 public final class Cbor {
     public static final int INT = 0, BYTES = 1, TEXT = 2, ARR = 3, MAP = 4, BOOL = 5, NULL = 6, FLOAT = 7;
+    // The depth bound where none is given (CD-B1), and the deepest any call applies (CD-B3).
+    public static final int DEFAULT_MAX_DEPTH = 32;
+    public static final int MAX_DEPTH_CEILING = 128;
     public final int kind;
     public final long i;
     public final double d;
@@ -43,7 +52,9 @@ public final class Cbor {
         WrongType,
         UnknownEnum,
         NonCanonicalInt,
-        NegativeMapKey
+        NegativeMapKey,
+        TooDeep,
+        TooLarge
     }
 
     public static final class DecodeError extends RuntimeException {
@@ -55,6 +66,9 @@ public final class Cbor {
         public final String value;
         public final Integer info;
         public final Integer major;
+        // TooLarge's input length, and the bound TooDeep or TooLarge applied.
+        public final Integer len;
+        public final Integer limit;
 
         private DecodeError(
                 DecodeTag tag,
@@ -65,6 +79,20 @@ public final class Cbor {
                 String value,
                 Integer info,
                 Integer major) {
+            this(tag, message, key, expected, enumName, value, info, major, null, null);
+        }
+
+        private DecodeError(
+                DecodeTag tag,
+                String message,
+                String key,
+                String expected,
+                String enumName,
+                String value,
+                Integer info,
+                Integer major,
+                Integer len,
+                Integer limit) {
             super(message);
             this.tag = tag;
             this.key = key;
@@ -73,6 +101,8 @@ public final class Cbor {
             this.value = value;
             this.info = info;
             this.major = major;
+            this.len = len;
+            this.limit = limit;
         }
 
         public static DecodeError truncated() {
@@ -199,6 +229,36 @@ public final class Cbor {
                     null,
                     null,
                     null);
+        }
+
+        // An array or map one level deeper than `limit`, the depth bound applied.
+        public static DecodeError tooDeep(int limit) {
+            return new DecodeError(
+                    DecodeTag.TooDeep,
+                    "CBOR nested deeper than " + limit,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    limit);
+        }
+
+        // Input of `len` bytes, longer than `limit`, the length bound applied.
+        public static DecodeError tooLarge(int len, int limit) {
+            return new DecodeError(
+                    DecodeTag.TooLarge,
+                    "CBOR input of " + len + " bytes is longer than " + limit,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    len,
+                    limit);
         }
 
         // A repeated `map<K,V>` key: a Long, String or Boolean, whose text String.valueOf
@@ -418,10 +478,31 @@ public final class Cbor {
             default -> throw new IllegalArgumentException("unknown CBOR kind " + c.kind);
         }
     }
+    // One item that fills `data`, under the default depth bound and no length bound.
     public static Cbor decode(byte[] data) {
+        return decode(data, DEFAULT_MAX_DEPTH, null);
+    }
+
+    // One item that fills `data` (CD-E5). `maxDepth` bounds nesting: a top-level array or
+    // map has depth 1, and one at depth maxDepth + 1 is TooDeep once its head is read; above
+    // MAX_DEPTH_CEILING the ceiling applies, and `limit` names the bound applied.
+    // `maxEncodedLen`, unless null, bounds the input's length, checked first. A depth below
+    // 1 or a negative length is the caller's error, IllegalArgumentException.
+    public static Cbor decode(byte[] data, int maxDepth, Integer maxEncodedLen) {
+        if (maxDepth < 1) {
+            throw new IllegalArgumentException("maxDepth must be at least 1, not " + maxDepth);
+        }
+        if (maxEncodedLen != null && maxEncodedLen < 0) {
+            throw new IllegalArgumentException("maxEncodedLen must not be negative, not " + maxEncodedLen);
+        }
+        if (maxEncodedLen != null && data.length > maxEncodedLen) {
+            throw DecodeError.tooLarge(data.length, maxEncodedLen);
+        }
         int[] off = {0};
-        Cbor v = dec(data, off);
-        if (off[0] != data.length) throw DecodeError.trailingBytes();
+        Cbor v = dec(data, off, 0, Math.min(maxDepth, MAX_DEPTH_CEILING));
+        if (off[0] != data.length) {
+            throw DecodeError.trailingBytes();
+        }
         return v;
     }
     private static int u(byte[] d, int i) {
@@ -496,8 +577,16 @@ public final class Cbor {
             throw DecodeError.invalidUtf8();
         }
     }
-    // One item, left to right: its head, then its body; the first failing check wins.
-    private static Cbor dec(byte[] d, int[] off) {
+    // An array or map whose head is read, inside `depth` others: refused before its first
+    // item if it would sit deeper than `limit` (CD-B2).
+    private static void enter(int depth, int limit) {
+        if (depth >= limit) {
+            throw DecodeError.tooDeep(limit);
+        }
+    }
+    // One item, inside `depth` arrays and maps, under the depth bound `limit`, left to right:
+    // its head, then its body; the first failing check wins.
+    private static Cbor dec(byte[] d, int[] off, int depth, int limit) {
         int initial = u(d, off[0]);
         off[0]++;
         int major = initial >> 5, info = initial & 0x1f;
@@ -533,20 +622,22 @@ public final class Cbor {
                 // Items are read in order. Each takes at least one byte, so a count
                 // beyond the input ends in the error of the first item that fails.
                 long n = readArg(d, off, info);
+                enter(depth, limit);
                 List<Cbor> a = new ArrayList<>();
                 for (long j = 0; Long.compareUnsigned(j, n) < 0; j++) {
-                    a.add(dec(d, off));
+                    a.add(dec(d, off, depth + 1, limit));
                 }
                 return arr(a);
             }
             case 5 -> {
                 long n = readArg(d, off, info);
+                enter(depth, limit);
                 List<KV> m = new ArrayList<>();
                 Set<Long> seen = new HashSet<>();
                 for (long j = 0; Long.compareUnsigned(j, n) < 0; j++) {
                     // The key first: its item, then NonIntegerMapKey, NegativeMapKey and
                     // DuplicateMapKey, and only then the value.
-                    Cbor k = dec(d, off);
+                    Cbor k = dec(d, off, depth + 1, limit);
                     if (k.kind != INT) {
                         throw DecodeError.nonIntegerMapKey();
                     }
@@ -556,7 +647,7 @@ public final class Cbor {
                     if (!seen.add(k.i)) {
                         throw DecodeError.duplicateMapKey(k.i);
                     }
-                    Cbor v = dec(d, off);
+                    Cbor v = dec(d, off, depth + 1, limit);
                     m.add(new KV(k.i, v));
                 }
                 return map(m);
