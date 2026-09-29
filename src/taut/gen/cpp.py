@@ -7,11 +7,18 @@ Two generated headers (trial/cpp/generated/):
                  (idiomatic struct/enum, transient fields present-but-off-the-wire).
   - corpus.hpp : per vector, a `consteval` that constructs the *typed value* and
                  encodes it, plus `static_assert(eq_hex(value.to_cbor(), golden))`,
-                 and a `consteval` that decodes the golden bytes back through
-                 `try_decode` and `try_from_cbor` and re-encodes them.
+                 and a `consteval` that decodes the golden bytes back through the
+                 message's `try_decode` from bytes and re-encodes them.
 
 So the static_assert oracle runs through the native types, at compile time, with
 zero runtime cost — the C++ form of the conformance corpus (build prompt §5a).
+
+Bounds (D26, TautCheckedDecode.md CD-B3; TautOptions.md OPT-L6). Each struct carries its
+effective bounds as a decode root, resolved here by `options.effective` (the message's,
+else the file's, else the defaults): `max_depth` and `max_encoded_len`, none being
+`std::nullopt`. Its `try_decode(std::string_view)` from bytes hands both to the runtime's
+raw `try_decode`, then reads the tree with `try_from_cbor`; it takes no bound of its own,
+so no call can raise or lower its root's.
 
 Names. A message's code compiles whatever its fields are called (TautV010Plan.md §0; the
 parity fixture's `Names`), because no name the generator chooses can meet a field:
@@ -22,8 +29,8 @@ parity fixture's `Names`), because no name the generator chooses can meet a fiel
     from the global namespace, `::taut::`, so no member can hide it. `std::` needs no
     such care: the name before a `::` is looked up as a namespace or a type, never as a
     data member.
-A field still cannot take a member function's name (`to_cbor`, `try_from_cbor`), and the
-`wire_` prefix is taut's (`ir/validate.py`).
+A field still cannot take a member's name (`to_cbor`, `try_from_cbor`, `try_decode`,
+`max_depth`, `max_encoded_len`), and the `wire_` prefix is taut's (`ir/validate.py`).
 
 `emit(schema, references)` is given the reference values by the caller (importing
 corpus.build here would be a cycle).
@@ -35,6 +42,7 @@ import struct
 from pathlib import Path
 
 from ..ir.model import MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.options import effective
 from ..wire import codec
 
 _TAUT = Path(__file__).resolve().parents[3]      # .../glial-dev/taut
@@ -326,6 +334,32 @@ def _emit_try_from_cbor(msg, forward_compat: bool = False, literal: bool = False
     return lines
 
 
+def _emit_bounds(schema: Schema, msg) -> list[str]:
+    """The message's effective bounds as a decode root (TautOptions.md OPT-D3, OPT-D4)."""
+    depth = effective(schema, "max_depth", message=msg.name)
+    length = effective(schema, "max_encoded_len", message=msg.name)
+    return [
+        f"  static constexpr std::size_t max_depth = {depth};",
+        "  static constexpr std::optional<std::size_t> max_encoded_len = "
+        f"{'std::nullopt' if length is None else length};",
+    ]
+
+
+def _emit_try_decode(msg, literal: bool = False) -> list[str]:
+    """The typed decode from bytes (TautCheckedDecode.md CD-B3): the raw decode under the
+    message's bounds, then `try_from_cbor`. Constexpr when the struct is a literal type."""
+    qual = "constexpr " if literal else ""
+    result = _result_type(msg.name)
+    own = f"{_NS}{msg.name}"
+    return [
+        f"  static {qual}{result} try_decode(std::string_view __data) {{",
+        f"    auto __tree = {_NS}try_decode(__data, {own}::max_depth, {own}::max_encoded_len);",
+        f"    if (!__tree) {{ return {result}::fail(__tree.error); }}",
+        f"    return {own}::try_from_cbor(__tree.value);",
+        "  }",
+    ]
+
+
 def _emit_to_cbor(msg, forward_compat: bool = False, literal: bool = False) -> list[str]:
     wire = sorted(msg.wire_fields(), key=lambda f: f.tag)
     qual = "constexpr " if literal else ""
@@ -356,6 +390,7 @@ def _emit_types(schema: Schema, forward_compat: bool = False) -> str:
     lines = [
         "// GENERATED native C++ types by taut/src/taut/gen/cpp.py — do not edit.",
         "#pragma once",
+        "#include <cstddef>",
         *(["#include <map>"] if has_map else []),
         "#include <optional>",
         "#include <string_view>",
@@ -387,8 +422,10 @@ def _emit_types(schema: Schema, forward_compat: bool = False) -> str:
         if forward_compat:
             lines.append(f"  std::vector<std::pair<long long, {_NS}Cbor>> wire_residual;")
         literal = _literal(schema, m)
+        lines.extend(_emit_bounds(schema, m))
         lines.extend(_emit_to_cbor(m, forward_compat, literal))
         lines.extend(_emit_try_from_cbor(m, forward_compat, literal))
+        lines.extend(_emit_try_decode(m, literal))
         lines.append("};")
         lines.append("")
     lines.append("} // namespace taut")
@@ -459,13 +496,13 @@ def _emit_corpus(schema: Schema, references: dict[str, tuple[str, dict]]) -> str
         lines.append("  taut::Buf b; v.to_cbor(b); return b;")
         lines.append("}")
         lines.append(f'static_assert(taut::eq_hex(encode_{fn}(), "{encoded.hex()}"), "{name} encode");')
-        # round-trip: golden -> try_decode -> try_from_cbor -> to_cbor, prove == golden; a
-        # refused golden leaves the Buf empty, so the static_assert names it
+        # round-trip: golden -> the message's try_decode from bytes, under its bounds ->
+        # to_cbor, prove == golden; a refused golden leaves the Buf empty, so the
+        # static_assert names it
         lines.append(f"consteval taut::Buf roundtrip_{fn}() {{")
-        lines.append(f"  auto c = taut::try_decode({_lit(encoded)});")
-        lines.append(f"  auto v = taut::{message}::try_from_cbor(c.value);")
+        lines.append(f"  auto v = taut::{message}::try_decode({_lit(encoded)});")
         lines.append("  taut::Buf b;")
-        lines.append("  if (c && v) {")
+        lines.append("  if (v) {")
         lines.append("    v.value.to_cbor(b);")
         lines.append("  }")
         lines.append("  return b;")

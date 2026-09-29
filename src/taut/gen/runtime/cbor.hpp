@@ -5,12 +5,19 @@
 // codecs (int, bytes, text, array, int-keyed map, bool, null), core-deterministic
 // (shortest ints; maps are emitted in ascending key order by the generator).
 // Encode writes into a fixed Buf, with no heap; host-testable.
+//
+// Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one more
+// than the arrays and maps around it, and one deeper than the call's depth bound is
+// TooDeep{limit}; with a length bound, longer input is TooLarge{len, limit} before a byte
+// is read. So recursion never runs deeper than the bound, at most max_depth_ceiling.
 #pragma once
 
 #include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
+#include <stdexcept>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -227,6 +234,12 @@ constexpr bool eq(const Buf& b, std::string_view bytes) {
 // Every decode entry point returns a DecodeResult: a value, or a DecodeError carrying
 // its tag and payload (TautCheckedDecode.md CD-E1, CD-E4). Nothing else escapes.
 
+// The depth bound where none is given, and the deepest bound any call applies
+// (TautCheckedDecode.md CD-B1, CD-B3). The parity corpus pins both to taut's own numbers
+// (`taut.ir.options`).
+inline constexpr std::size_t default_max_depth = 32;
+inline constexpr std::size_t max_depth_ceiling = 128;
+
 enum class DecodeErrorTag {
     Truncated,
     TrailingBytes,
@@ -241,6 +254,8 @@ enum class DecodeErrorTag {
     UnknownEnum,
     NonCanonicalInt,
     NegativeMapKey,
+    TooDeep,
+    TooLarge,
 };
 
 struct DecodeError {
@@ -258,6 +273,10 @@ struct DecodeError {
     // `false`. An int key is `key`.
     std::string_view key_text{};
     bool key_is_text{false};
+    // TooDeep's and TooLarge's `limit`, the bound the call applied, and TooLarge's `len`, the
+    // input's length.
+    std::size_t limit{0};
+    std::size_t len{0};
 
     static constexpr DecodeError truncated() { return {DecodeErrorTag::Truncated}; }
     static constexpr DecodeError trailing_bytes() { return {DecodeErrorTag::TrailingBytes}; }
@@ -318,6 +337,17 @@ struct DecodeError {
     static constexpr DecodeError negative_map_key(long long key) {
         DecodeError e{DecodeErrorTag::NegativeMapKey};
         e.key = key;
+        return e;
+    }
+    static constexpr DecodeError too_deep(std::size_t limit) {
+        DecodeError e{DecodeErrorTag::TooDeep};
+        e.limit = limit;
+        return e;
+    }
+    static constexpr DecodeError too_large(std::size_t len, std::size_t limit) {
+        DecodeError e{DecodeErrorTag::TooLarge};
+        e.len = len;
+        e.limit = limit;
         return e;
     }
 };
@@ -532,8 +562,11 @@ constexpr bool valid_utf8(std::string_view s) {
 
 // One item (CD-E5 steps 1-2): its head, then its body, items in order. A map entry
 // reads its key item first, then checks NonIntegerMapKey, NegativeMapKey and
-// DuplicateMapKey, and only then reads its value.
-constexpr DecodeResult<Cbor> checked_decode_at(std::string_view d, std::size_t& off) {
+// DuplicateMapKey, and only then reads its value. `depth` counts the arrays and maps
+// around the item; an array or map with `limit` around it is TooDeep once its head is
+// read, before its first item (CD-B2), so the recursion stops at `limit`.
+constexpr DecodeResult<Cbor> checked_decode_at(std::string_view d, std::size_t& off, std::size_t depth,
+                                               std::size_t limit) {
     auto init_r = checked_byte_at(d, off);
     if (!init_r) {
         return DecodeResult<Cbor>::fail(init_r.error);
@@ -593,9 +626,12 @@ constexpr DecodeResult<Cbor> checked_decode_at(std::string_view d, std::size_t& 
         if (!n) {
             return DecodeResult<Cbor>::fail(n.error);
         }
+        if (depth >= limit) {
+            return DecodeResult<Cbor>::fail(DecodeError::too_deep(limit));
+        }
         c.k = Cbor::K::Arr;
         for (unsigned long long j = 0; j < n.value; ++j) {
-            auto e = checked_decode_at(d, off);
+            auto e = checked_decode_at(d, off, depth + 1, limit);
             if (!e) {
                 return DecodeResult<Cbor>::fail(e.error);
             }
@@ -608,9 +644,12 @@ constexpr DecodeResult<Cbor> checked_decode_at(std::string_view d, std::size_t& 
         if (!n) {
             return DecodeResult<Cbor>::fail(n.error);
         }
+        if (depth >= limit) {
+            return DecodeResult<Cbor>::fail(DecodeError::too_deep(limit));
+        }
         c.k = Cbor::K::Map;
         for (unsigned long long j = 0; j < n.value; ++j) {
-            auto key = checked_decode_at(d, off);
+            auto key = checked_decode_at(d, off, depth + 1, limit);
             if (!key) {
                 return DecodeResult<Cbor>::fail(key.error);
             }
@@ -625,7 +664,7 @@ constexpr DecodeResult<Cbor> checked_decode_at(std::string_view d, std::size_t& 
                     return DecodeResult<Cbor>::fail(DecodeError::duplicate_map_key(key.value.i));
                 }
             }
-            auto val = checked_decode_at(d, off);
+            auto val = checked_decode_at(d, off, depth + 1, limit);
             if (!val) {
                 return DecodeResult<Cbor>::fail(val.error);
             }
@@ -686,10 +725,24 @@ constexpr DecodeResult<Cbor> checked_decode_at(std::string_view d, std::size_t& 
 
 } // namespace cbor_detail
 
-// Decode one top-level item (CD-E5 steps 1-3); bytes after it are TrailingBytes.
-constexpr DecodeResult<Cbor> try_decode(std::string_view data) {
+// Decode one top-level item that fills `data` (CD-E5 steps 1-4): the raw decode, which
+// knows no schema. `max_depth` bounds nesting, a top-level array or map being at depth 1;
+// one above the ceiling applies the ceiling, and TooDeep's `limit` names the bound applied
+// (question 1). `max_encoded_len`, when given, bounds the input's length, checked before
+// any byte is read. A typed reader passes neither: its message's `try_decode` passes its
+// root's bounds (CD-B3). A depth below 1 is the caller's error, std::invalid_argument, not
+// a DecodeError.
+constexpr DecodeResult<Cbor> try_decode(std::string_view data, std::size_t max_depth = default_max_depth,
+                                        std::optional<std::size_t> max_encoded_len = std::nullopt) {
+    if (max_depth < 1) {
+        throw std::invalid_argument("taut::try_decode: max_depth must be at least 1");
+    }
+    const std::size_t limit = max_depth < max_depth_ceiling ? max_depth : max_depth_ceiling;
+    if (max_encoded_len.has_value() && data.size() > *max_encoded_len) {
+        return DecodeResult<Cbor>::fail(DecodeError::too_large(data.size(), *max_encoded_len));
+    }
     std::size_t off = 0;
-    auto decoded = cbor_detail::checked_decode_at(data, off);
+    auto decoded = cbor_detail::checked_decode_at(data, off, 0, limit);
     if (!decoded) {
         return decoded;
     }

@@ -4,7 +4,10 @@
 // (TautCheckedDecode.md CD-E4): for any host bytes each returns its result or a
 // DecodeError through DecodeResult, nothing else. The strict runtime decode reads the
 // host, so it reserves nothing from a count the bytes declare, and a host that is not
-// a map is WrongType{map}. Two things are the caller's errors, std::invalid_argument:
+// a map is WrongType{map}. Not knowing the host's root, they read it at the depth
+// ceiling with no length bound, the only bounds every valid host meets, and leave the
+// host's own bounds to its reader (TautOptions.md G3). Two things are the caller's
+// errors, std::invalid_argument:
 // a tag below the extension band, checked before the host is read, and a value that
 // holds a negative map key, which the frozen subset cannot encode.
 //
@@ -130,12 +133,10 @@ inline void encode_value(std::vector<unsigned char>& out, const Cbor& c) {
 
 namespace detail {
 
-// The host's top-level map, read by the strict runtime: its DecodeError, or
-// WrongType{map} for a host that is not a map.
-// TODO(D1): read the host at the depth ceiling with no length bound (TautOptions.md G3),
-// as Python's ext.py does, once D1 gives try_decode its depth parameter.
+// The host's top-level map, read by the strict runtime at the depth ceiling with no length
+// bound (TautOptions.md G3): its DecodeError, or WrongType{map} for a host that is not a map.
 inline DecodeResult<Cbor> ext_host(std::string_view host) {
-    auto top = try_decode(host);
+    auto top = try_decode(host, max_depth_ceiling);
     if (top && top.value.k != Cbor::K::Map) {
         return DecodeResult<Cbor>::fail(DecodeError::wrong_type("map"));
     }

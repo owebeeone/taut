@@ -7,10 +7,17 @@ built with the compiler and flags `src/tests/test_cpp.py` uses. A build failure 
 RED; a runner that dies before reporting every row fails its target.
 
 The runner prints `name<TAB>outcome<TAB>detail` per row. It checks int rows itself;
-for a malformed row it reports `ok` with the hex of the re-encoding (`encode_value`
-of the tree for a raw row, the typed value's `to_cbor` for a from_cbor row), `err`
-with the tag and payload, or `untyped` when a C++ exception escapes, and the gate
-judges it.
+for a malformed or bounds row it reports `ok` with the hex of the re-encoding
+(`encode_value` of the tree for a raw row, the typed value's `to_cbor` for a from_cbor
+row), `err` with the tag and payload, or `untyped` when a C++ exception escapes, and the
+gate judges it.
+
+It speaks C3's bounds protocol (`parity.py`'s docstring): one `#constants` line from the
+runtime's `taut::default_max_depth` and `taut::max_depth_ceiling`; a raw row's call
+passes its `limits`; every from_cbor row decodes through its message's `try_decode` from
+bytes, which applies the message's bounds, and adds the fourth column from the message's
+`max_depth` and `max_encoded_len`; and the runner expands a row's segments itself,
+reporting an expansion whose length is not the row's `len` as `untyped`.
 """
 
 from __future__ import annotations
@@ -49,7 +56,19 @@ struct IntRow {
     std::vector<std::pair<const char*, const char*>> by_id;
 };
 struct EncFail { const char* name; const char* value; };
-struct Mal { const char* name; const char* stage; const char* schema; const char* bytes; };
+// A row's bytes, `count` times `hex` per segment (the bounds protocol, item 5).
+struct Segment { const char* hex; std::size_t count; };
+// A malformed or bounds row: its expanded length when it states one, and a raw row's limits,
+// what its call passes.
+struct Row {
+    const char* name;
+    const char* stage;
+    const char* schema;
+    std::vector<Segment> bytes;
+    std::optional<std::size_t> len;
+    std::optional<std::size_t> max_depth;
+    std::optional<std::size_t> max_encoded_len;
+};
 
 const std::vector<IntRow> ROUND_TRIP = {
 @ROUND_TRIP@
@@ -57,15 +76,17 @@ const std::vector<IntRow> ROUND_TRIP = {
 const std::vector<EncFail> ENCODE_FAIL = {
 @ENCODE_FAIL@
 };
-const std::vector<Mal> MALFORMED = {
-@MALFORMED@
+const std::vector<Row> DECODE_ROWS = {
+@DECODE_ROWS@
 };
 
-// A malformed row's outcome: its DecodeError described, or none when it decoded, with the
-// hex of the re-encoding (empty for a from_wire row: an enum row never accepts).
+// A decode row's outcome: `ok` with the hex of the re-encoding (empty for a from_wire row:
+// an enum row never accepts), `err` with its DecodeError described, or `untyped`; and a
+// from_cbor row's fourth column, the bounds its typed entry point resolved.
 struct Outcome {
-    std::optional<std::string> error;
-    std::string again;
+    std::string outcome;
+    std::string detail;
+    std::optional<std::string> bounds;
 };
 
 int nibble(char c) {
@@ -120,13 +141,25 @@ long long pi(std::string_view s) {
     return *v;
 }
 
-void emit(std::string_view name, std::string_view outcome, std::string detail) {
-    for (char& ch : detail) {
+std::string flat(std::string column) {
+    for (char& ch : column) {
         if (ch == '\t' || ch == '\n' || ch == '\r') {
             ch = ' ';
         }
     }
-    std::cout << name << '\t' << outcome << '\t' << detail << '\n';
+    return column;
+}
+
+void emit(std::string_view name, std::string_view outcome, std::string detail) {
+    std::cout << name << '\t' << outcome << '\t' << flat(std::move(detail)) << '\n';
+}
+
+void emit(std::string_view name, const Outcome& seen) {
+    std::cout << name << '\t' << seen.outcome << '\t' << flat(seen.detail);
+    if (seen.bounds) {
+        std::cout << '\t' << *seen.bounds;
+    }
+    std::cout << '\n';
 }
 
 // IntOverflow's value: the decimal integer the bytes denote, `-1 - raw` for major 1.
@@ -174,8 +207,18 @@ std::string describe(const taut::DecodeError& e) {
             return "NonCanonicalInt;value=" + std::to_string(e.unsigned_value);
         case T::NegativeMapKey:
             return "NegativeMapKey;key=" + std::to_string(e.key);
+        case T::TooDeep:
+            return "TooDeep;limit=" + std::to_string(e.limit);
+        case T::TooLarge:
+            return "TooLarge;len=" + std::to_string(e.len) + ";limit=" + std::to_string(e.limit);
     }
     throw std::logic_error("a DecodeError tag this runner does not report");
+}
+
+// The bounds column: `max_depth=<n>;max_encoded_len=<n>`, the length empty where none applies.
+std::string bounds_column(std::size_t max_depth, std::optional<std::size_t> max_encoded_len) {
+    return "max_depth=" + std::to_string(max_depth) + ";max_encoded_len="
+        + (max_encoded_len ? std::to_string(*max_encoded_len) : std::string());
 }
 
 // taut::Buf holds 512 bytes and does not check its bound. A re-encoding is never much
@@ -185,22 +228,32 @@ constexpr std::size_t REENCODE_INPUT_MAX = sizeof(taut::Buf::d) / 2;
 
 // Described here, while the row's input is alive: a DuplicateMapKey's text key views it.
 Outcome failed(const taut::DecodeError& e) {
-    return Outcome{describe(e), {}};
+    return Outcome{"err", describe(e), std::nullopt};
 }
 
-Outcome decoded(const taut::Buf& again) {
-    return Outcome{std::nullopt, hexof(again)};
+Outcome untyped(std::string what) {
+    return Outcome{"untyped", std::move(what), std::nullopt};
+}
+
+// A decoded input: the hex of its re-encoding, which `encode` writes, unless the input is
+// longer than a taut::Buf allows.
+template <class Encode>
+Outcome decoded(std::size_t input_size, Encode encode) {
+    if (input_size > REENCODE_INPUT_MAX) {
+        return Outcome{"ok", "not re-encoded: input longer than a taut::Buf allows", std::nullopt};
+    }
+    taut::Buf again;
+    encode(again);
+    return Outcome{"ok", hexof(again), std::nullopt};
 }
 
 // A typed value: its error, or its own to_cbor.
 template <class Result>
-Outcome reencoded(const Result& r) {
+Outcome reencoded(const Result& r, std::size_t input_size) {
     if (!r) {
         return failed(r.error);
     }
-    taut::Buf again;
-    r.value.to_cbor(again);
-    return decoded(again);
+    return decoded(input_size, [&](taut::Buf& again) { r.value.to_cbor(again); });
 }
 
 // An enum: its error, or decoded with no re-encoding.
@@ -209,11 +262,33 @@ Outcome checked(const Result& r) {
     if (!r) {
         return failed(r.error);
     }
-    return Outcome{};
+    return Outcome{"ok", "", std::nullopt};
+}
+
+// One decode: anything but a DecodeError that escapes it is `untyped`.
+template <class Decode>
+Outcome guarded(Decode decode) {
+    try {
+        return decode();
+    } catch (const std::exception& e) {
+        return untyped(std::string("exception: ") + e.what());
+    } catch (...) {
+        return untyped("a non-standard exception");
+    }
+}
+
+// A from_cbor row's typed entry point from bytes, which applies M's bounds, and the fourth
+// column: the bounds it resolved, M's constants.
+template <class M>
+Outcome typed(std::string_view bytes, const std::optional<std::string>& misexpanded) {
+    Outcome seen = misexpanded ? untyped(*misexpanded)
+                               : guarded([&] { return reencoded(M::try_decode(bytes), bytes.size()); });
+    seen.bounds = bounds_column(M::max_depth, M::max_encoded_len);
+    return seen;
 }
 
 // A from_cbor row's typed entry point, by message name (from the fixture schema).
-Outcome from_cbor(std::string_view message, const taut::Cbor& c) {
+Outcome from_cbor(std::string_view message, std::string_view bytes, const std::optional<std::string>& misexpanded) {
 @FROM_CBOR@
     throw std::invalid_argument("no from_cbor entry point for " + std::string(message));
 }
@@ -224,30 +299,53 @@ Outcome from_wire(std::string_view name, long long v) {
     throw std::invalid_argument("no from_wire entry point for " + std::string(name));
 }
 
-Outcome decode_row(const Mal& row) {
-    std::string bytes = unhex(row.bytes);  // outlives the decoded value, whose text views it
-    auto c = taut::try_decode(std::string_view(bytes));
-    if (!c) {
-        return failed(c.error);
+// A row's input, its segments expanded by the runner (the bounds protocol, item 5).
+std::string expand(const Row& row) {
+    std::string out;
+    for (const auto& segment : row.bytes) {
+        const std::string once = unhex(segment.hex);
+        for (std::size_t i = 0; i < segment.count; ++i) {
+            out += once;
+        }
+    }
+    return out;
+}
+
+Outcome decode_row(const Row& row) {
+    const std::string bytes = expand(row);  // outlives the decoded value, whose text views it
+    std::optional<std::string> misexpanded;
+    if (row.len && bytes.size() != *row.len) {
+        misexpanded = "bytes expand to " + std::to_string(bytes.size()) + " bytes, len is "
+            + std::to_string(*row.len);
     }
     std::string_view stage(row.stage);
-    if (stage != "from_wire" && bytes.size() > REENCODE_INPUT_MAX) {
-        return Outcome{std::nullopt, "not re-encoded: input longer than a taut::Buf allows"};
+    if (stage == "from_cbor") {
+        return from_cbor(row.schema, bytes, misexpanded);
+    }
+    if (misexpanded) {
+        return untyped(*misexpanded);
     }
     if (stage == "raw_decode") {
-        taut::Buf again;
-        taut::encode_value(again, c.value);
-        return decoded(again);
-    }
-    if (stage == "from_cbor") {
-        return from_cbor(row.schema, c.value);
+        return guarded([&] {
+            auto c = taut::try_decode(bytes, row.max_depth.value_or(taut::default_max_depth), row.max_encoded_len);
+            if (!c) {
+                return failed(c.error);
+            }
+            return decoded(bytes.size(), [&](taut::Buf& again) { taut::encode_value(again, c.value); });
+        });
     }
     if (stage == "from_wire") {
-        auto v = c.value.try_int();
-        if (!v) {
-            return failed(v.error);
-        }
-        return from_wire(row.schema, v.value);
+        return guarded([&] {
+            auto c = taut::try_decode(bytes);
+            if (!c) {
+                return failed(c.error);
+            }
+            auto v = c.value.try_int();
+            if (!v) {
+                return failed(v.error);
+            }
+            return from_wire(row.schema, v.value);
+        });
     }
     throw std::invalid_argument("unknown stage " + std::string(stage));
 }
@@ -268,12 +366,7 @@ void round_trip(const IntRow& row) {
         return;
     }
     std::string wire = unhex(row.cbor);
-    auto c = taut::try_decode(std::string_view(wire));
-    if (!c) {
-        emit(row.name, "fail", "decode " + describe(c.error));
-        return;
-    }
-    auto d = taut::IntBox::try_from_cbor(c.value);
+    auto d = taut::IntBox::try_decode(wire);
     if (!d) {
         emit(row.name, "fail", "decode " + describe(d.error));
         return;
@@ -291,6 +384,8 @@ void round_trip(const IntRow& row) {
 }  // namespace
 
 int main() {
+    std::cout << "#constants\tdefault_max_depth=" << taut::default_max_depth
+              << ";max_depth_ceiling=" << taut::max_depth_ceiling << '\n';
     for (const auto& row : ROUND_TRIP) {
         try {
             round_trip(row);
@@ -313,19 +408,8 @@ int main() {
             emit(row.name, "fail", std::string("threw: ") + e.what());
         }
     }
-    for (const auto& row : MALFORMED) {
-        try {
-            Outcome seen = decode_row(row);
-            if (seen.error) {
-                emit(row.name, "err", *seen.error);
-            } else {
-                emit(row.name, "ok", seen.again);
-            }
-        } catch (const std::exception& e) {
-            emit(row.name, "untyped", std::string("exception: ") + e.what());
-        } catch (...) {
-            emit(row.name, "untyped", "a non-standard exception");
-        }
+    for (const auto& row : DECODE_ROWS) {
+        emit(row.name, guarded([&] { return decode_row(row); }));
     }
     return 0;
 }
@@ -343,8 +427,22 @@ def _cxx(value: str) -> str:
     return '"' + "".join(out) + '"'
 
 
+def _optional(value: int | None) -> str:
+    return "std::nullopt" if value is None else f"std::size_t{{{value}}}"
+
+
+def _decode_row(row: dict) -> str:
+    """A malformed or bounds row as the runner's `Row`: its segments, to expand itself, and
+    the `len` and `limits` it states."""
+    segments = ", ".join(f"{{{_cxx(hexed)}, {count}}}" for hexed, count in parity.segments(row))
+    limits = row.get("limits", {})
+    return (f"    {{{_cxx(row['name'])}, {_cxx(row['stage'])}, {_cxx(row.get('schema', ''))}, "
+            f"{{{segments}}}, {_optional(row.get('len'))}, {_optional(limits.get('max_depth'))}, "
+            f"{_optional(limits.get('max_encoded_len'))}}},")
+
+
 def _tables() -> tuple[str, str, str]:
-    round_trip, encode_fail, malformed = [], [], []
+    round_trip, encode_fail = [], []
     for row in parity.int_rows():
         if row["kind"] == "round_trip":
             pairs = ", ".join(f"{{{_cxx(k)}, {_cxx(v)}}}" for k, v in row["value"]["by_id"])
@@ -352,17 +450,15 @@ def _tables() -> tuple[str, str, str]:
                               f"{_cxx(row['value']['n'])}, {{{pairs}}}}},")
         else:
             encode_fail.append(f"    {{{_cxx(row['name'])}, {_cxx(row['value']['n'])}}},")
-    for row in parity.malformed_rows():
-        malformed.append(f"    {{{_cxx(row['name'])}, {_cxx(row['stage'])}, "
-                         f"{_cxx(row.get('schema', ''))}, {_cxx(row['bytes'])}}},")
-    return "\n".join(round_trip), "\n".join(encode_fail), "\n".join(malformed)
+    decode = [_decode_row(row) for row in parity.decode_rows()]
+    return "\n".join(round_trip), "\n".join(encode_fail), "\n".join(decode)
 
 
 def _dispatch() -> tuple[str, str]:
     """The arms for every message (`from_cbor`) and enum (`from_wire`) in the fixture."""
     dispatch = parity.fixture_dispatch()
     from_cbor = [f"    if (message == {_cxx(name)}) {{\n"
-                 f"        return reencoded(taut::{name}::try_from_cbor(c));\n"
+                 f"        return typed<taut::{name}>(bytes, misexpanded);\n"
                  f"    }}"
                  for name in dispatch.messages]
     from_wire = [f"    if (name == {_cxx(name)}) {{\n"
@@ -373,12 +469,12 @@ def _dispatch() -> tuple[str, str]:
 
 
 def _source() -> str:
-    round_trip, encode_fail, malformed = _tables()
+    round_trip, encode_fail, decode = _tables()
     from_cbor, from_wire = _dispatch()
     return (_MAIN
             .replace("@ROUND_TRIP@", round_trip)
             .replace("@ENCODE_FAIL@", encode_fail)
-            .replace("@MALFORMED@", malformed)
+            .replace("@DECODE_ROWS@", decode)
             .replace("@FROM_CBOR@", from_cbor)
             .replace("@FROM_WIRE@", from_wire))
 

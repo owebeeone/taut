@@ -13,9 +13,13 @@ from taut.corpus import build, parity, parity_cpp
 from taut.corpus import resext_build as resext
 from taut.gen import cpp as cpp_gen
 from taut.gen import scaffold
+from taut.ir import options
 from taut.ir.load import load_schema
+from taut.ir.model import MsgRef
 from taut.ir.shapes import BAND_START
-from taut.ir.dsl import BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, schema as mk
+from taut.ir.dsl import (
+    BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, option, schema as mk,
+)
 from taut.ir.validate import validate
 from taut.wire import cbor, codec
 
@@ -151,6 +155,39 @@ def test_cpp_codegen_emits_fallible_decode_path_for_i64_and_enums():
     assert "auto __decoded_2_v = (*__decoded_2_val_cbor.value).try_int();" in hpp
 
 
+def _struct_text(hpp: str, name: str) -> str:
+    """The generated `struct name { ... }`."""
+    start = hpp.index(f"struct {name} {{")
+    return hpp[start:hpp.index("\n};", start)]
+
+
+def test_cpp_codegen_emits_each_messages_bounds_and_typed_decode():
+    """Each struct carries its effective bounds as constants, resolved at generation, and a
+    `try_decode` from bytes that hands them to the raw decode and reads the tree with
+    `try_from_cbor` (TautOptions.md OPT-L6); both constexpr where the struct is a literal type."""
+    schema = parity.parity_schema()
+    for forward_compat in (False, True):
+        hpp = cpp_gen._emit_types(schema, forward_compat)
+        for name, msg in schema.messages.items():
+            text = _struct_text(hpp, name)
+            depth = options.effective(schema, "max_depth", message=name)
+            length = options.effective(schema, "max_encoded_len", message=name)
+            qual = "constexpr " if cpp_gen._literal(schema, msg) else ""
+            assert f"  static constexpr std::size_t max_depth = {depth};" in text
+            assert ("  static constexpr std::optional<std::size_t> max_encoded_len = "
+                    f"{'std::nullopt' if length is None else length};") in text
+            assert (f"  static {qual}::taut::DecodeResult<::taut::{name}> try_decode(std::string_view __data) {{"
+                    in text)
+            assert f"::taut::try_decode(__data, ::taut::{name}::max_depth, ::taut::{name}::max_encoded_len)" in text
+            assert f"return ::taut::{name}::try_from_cbor(__tree.value);" in text
+    # The fixture's bounds messages: CD-C1's declarations, and the defaults elsewhere.
+    hpp = cpp_gen._emit_types(schema)
+    assert "max_depth = 64;" in _struct_text(hpp, "Tree64")
+    assert "max_encoded_len = 8;" in _struct_text(hpp, "Sized8")
+    assert "max_encoded_len = std::nullopt;" in _struct_text(hpp, "HoldsSized8")
+    assert "static ::taut::DecodeResult<::taut::IntBox> try_decode(" in _struct_text(hpp, "IntBox")
+
+
 def test_cpp_passes_the_parity_gate():
     """Every row of the shared corpus through the gate's C++ runner (`tautc parity -t cpp`),
     as cpp and cpp/fc, each held to the gate's governance: GREEN, or RED and allowlisted."""
@@ -168,9 +205,11 @@ def test_cpp_passes_the_parity_gate():
 
 
 # Inputs beyond the shared corpus, each with the result Python (the reference) gives:
-# CD-E5's order of checks and D2's strictness where the corpus has a single row.
+# CD-E5's order of checks and D2's strictness where the corpus has a single row. A row's bytes
+# are hex or, as in bounds.vectors.json, a list of segments; a raw row may end with the limits
+# its call passes.
 BEYOND_THE_CORPUS = [
-    # name, stage, schema, hex, expected
+    # name, stage, schema, bytes, expected[, limits]
     ("map-key-is-a-tag", "raw_decode", "", "a1c000", "UnsupportedMajor;major=6"),
     ("map-key-reserved-info", "raw_decode", "", "a17f", "UnsupportedInfo;info=31"),
     ("map-key-invalid-utf8", "raw_decode", "", "a161ff00", "InvalidUtf8"),
@@ -211,27 +250,86 @@ BEYOND_THE_CORPUS = [
     # `unknown-field-*` rows pin it with `expect_dropping` (question 10).
     ("enum-wire-negative", "from_wire", "Mode", "20", "UnknownEnum;enum=Mode;value=-1"),
     ("enum-wire-not-an-int", "from_wire", "Mode", "f6", "WrongType;expected=int"),
+    # The bounds (TautCheckedDecode.md §3) beyond B1-B30. The raw decode with the limits its
+    # call passes: the least depth, a map's key and value each one deeper than the map, both
+    # limits in one call (length first), and the head's own checks before depth.
+    ("depth-1-flat-array", "raw_decode", "", "8100", "accept", {"max_depth": 1}),
+    ("depth-1-nested-array", "raw_decode", "", "8180", "TooDeep;limit=1", {"max_depth": 1}),
+    ("depth-1-map-in-an-array", "raw_decode", "", "81a0", "TooDeep;limit=1", {"max_depth": 1}),
+    ("depth-1-map-key-container", "raw_decode", "", "a18000", "TooDeep;limit=1", {"max_depth": 1}),
+    ("depth-2-map-value", "raw_decode", "", "a100a100a0", "TooDeep;limit=2", {"max_depth": 2}),
+    ("length-before-depth", "raw_decode", "", "81818180", "TooLarge;len=4;limit=3",
+     {"max_depth": 2, "max_encoded_len": 3}),
+    ("depth-within-length", "raw_decode", "", "818180", "TooDeep;limit=2",
+     {"max_depth": 2, "max_encoded_len": 3}),
+    ("length-0-one-byte", "raw_decode", "", "00", "TooLarge;len=1;limit=0", {"max_encoded_len": 0}),
+    ("non-canonical-count-before-depth", "raw_decode", "", [{"repeat": "81", "count": 32}, "9800"],
+     "NonCanonicalInt;value=0"),
+    ("raw-100000-deep-at-the-ceiling", "raw_decode", "", [{"repeat": "81", "count": 99999}, "80"],
+     "TooDeep;limit=128", {"max_depth": 128}),
+    # The typed decode from bytes, rooted at the bounds messages (and IntBox): each root's own
+    # bounds, raw faults before the schema's, and the schema stage within the bounds.
+    ("typed-100000-deep-unknown-field", "from_cbor", "IntBox",
+     ["a30100028009", {"repeat": "81", "count": 99999}, "80"], "TooDeep;limit=32"),
+    ("tree128-100000-deep", "from_cbor", "Tree128", [{"repeat": "a10181", "count": 99999}, "a10180"],
+     "TooDeep;limit=128"),
+    ("tree64-kid-not-a-map", "from_cbor", "Tree64", "a1018101", "WrongType;expected=map"),
+    ("tree64-kids-absent", "from_cbor", "Tree64", "a0", "MissingKey;key=1"),
+    ("flat2-item-not-an-int", "from_cbor", "Flat2", "a101816178", "WrongType;expected=int"),
+    ("flat2-too-deep-before-not-a-map", "from_cbor", "Flat2", "818180", "TooDeep;limit=2"),
+    ("sized8-length-before-parse", "from_cbor", "Sized8", "c0" * 9, "TooLarge;len=9;limit=8"),
+    ("sized8-at-its-length-not-bytes", "from_cbor", "Sized8", "a101656162636465", "WrongType;expected=bytes"),
+    ("holds64-tree-within-32", "from_cbor", "Holds64", ["a101", {"repeat": "a10181", "count": 14}, "a10180"],
+     "accept"),
+    ("holds-sized8-inner-not-bytes", "from_cbor", "HoldsSized8", "a101a10101", "WrongType;expected=bytes"),
 ]
 
 
-def test_cpp_decode_matches_python_beyond_the_corpus(monkeypatch):
-    """The gate's C++ runner, with the rows above appended to the corpus, stays green."""
-    schema = parity.parity_schema()
-    extra = []
-    for name, stage, message, hexed, expected in BEYOND_THE_CORPUS:
-        row = {"name": f"beyond-{name}", "stage": stage, "schema": message, "bytes": hexed,
+def _beyond_rows(schema) -> list[dict]:
+    """BEYOND_THE_CORPUS as corpus rows, each with its expanded `len` and, but for a from_wire
+    row, the `bounds` it is decoded under (`parity.decoded_under`), which the gate compares with
+    a from_cbor row's fourth column."""
+    rows = []
+    for name, stage, message, data, expected, *limits in BEYOND_THE_CORPUS:
+        row = {"name": f"beyond-{name}", "stage": stage, "schema": message, "bytes": data,
                "why": "C++ decodes as Python does"}
+        if limits:
+            row["limits"] = limits[0]
         tag, payload = parity.parse_error(expected)
         if tag == "accept":
             row["expect"] = {"accept": True, **payload}  # `;reencode=` where it is not the input
         else:
             row["expect"] = {"tag": tag, **payload}
-        extra.append(row)
+        row["len"] = len(parity.row_bytes(row))
+        if stage != "from_wire":
+            row["bounds"] = parity.decoded_under(schema, row)
+        rows.append(row)
+    return rows
+
+
+def _python_resolved(schema, row: dict) -> str | None:
+    """The fourth column Python's harness reports for `row`: a from_cbor row's bounds as
+    `codec.bounds` resolves its message, and nothing for any other row."""
+    if row["stage"] != "from_cbor":
+        return None
+    depth, length = codec.bounds(schema, MsgRef(row["schema"]))
+    return parity.format_bounds({"max_depth": depth, "max_encoded_len": length})
+
+
+def test_cpp_decode_matches_python_beyond_the_corpus(monkeypatch):
+    """The gate's C++ runner, with the rows above appended to the corpus, stays green: the
+    bounds rows run too, and each typed row beyond the corpus reports the bounds its root
+    resolved, which the gate compares with the reference's."""
+    schema = parity.parity_schema()
+    extra = _beyond_rows(schema)
     # The table is the reference's behaviour, not a guess.
     observed = [(row["name"], parity._observe_python(schema, row)) for row in extra]
     assert [(name, outcome) for name, (outcome, _) in observed if outcome == parity.UNTYPED] == []
-    assert [parity.judge("python", row, *seen) for row, (_, seen) in zip(extra, observed)] == \
-        [(parity.PASS, "")] * len(extra)
+    assert [parity.judge("python", row, *seen, resolved=_python_resolved(schema, row))
+            for row, (_, seen) in zip(extra, observed)] == [(parity.PASS, "")] * len(extra)
+    # Every bounds message is a root here, beyond B17-B30.
+    assert {row["schema"] for row in extra if row["stage"] == "from_cbor"} >= \
+        {row["schema"] for row in parity.bounds_rows() if row["stage"] == "from_cbor"}
 
     listed = {s.target: s for s in parity.target_statuses() if s.status == "allowlisted"}
     if "cpp" in listed:  # the whole fixture must build and pass before the rows beyond it can
@@ -242,9 +340,255 @@ def test_cpp_decode_matches_python_beyond_the_corpus(monkeypatch):
     report = parity_cpp.run()
     if not report.available:
         pytest.skip(report.skip_reason)
-    assert len(report.results) == len(parity.int_rows()) + len(corpus) + len(extra)
+    assert len(report.results) == \
+        len(parity.int_rows()) + len(corpus) + len(extra) + len(parity.bounds_rows())
     failures = [f"{r.name}: {r.detail}" for r in report.failures]
     assert report.green, "\n".join([report.fault, *failures])
+
+
+def test_cpp_runner_reports_a_row_whose_bytes_do_not_expand_to_its_len_as_untyped(monkeypatch):
+    """The bounds protocol, item 5: the runner expands a row's segments itself and reports an
+    expansion whose length is not the row's `len` as `untyped`, a typed row still with the
+    bounds its entry point resolved; it prints its `#constants` line once."""
+    rows = {row["name"]: row for row in parity.bounds_rows()}
+    raw = {**rows["depth-33-arrays"], "len": 34}
+    typed = {**rows["depth-64-declared"], "len": 1}
+    monkeypatch.setattr(parity, "int_rows", lambda: [])
+    monkeypatch.setattr(parity, "malformed_rows", lambda: [])
+    monkeypatch.setattr(parity, "bounds_rows", lambda: [raw, typed])
+    report = parity_cpp.run()
+    if not report.available:
+        pytest.skip(report.skip_reason)
+    assert report.fault == ""
+    assert [(r.name, r.status) for r in report.results] == [(raw["name"], parity.FAIL),
+                                                             (typed["name"], parity.FAIL)]
+    assert report.results[0].detail.startswith("untyped bytes expand to 33 bytes, len is 34")
+    assert report.results[1].detail.startswith("untyped bytes expand to 96 bytes, len is 1")
+
+
+# --- the bounds (D26: TautCheckedDecode.md §3; TautOptions.md OPT-D4, OPT-L6) ---------------
+
+def _arrays(depth: int) -> bytes:
+    """`depth` nested arrays, the innermost empty."""
+    return b"\x81" * (depth - 1) + b"\x80"
+
+
+def test_cpp_raw_decode_applies_its_bounds_at_compile_time(tmp_path):
+    """The runtime's two depth numbers are taut's. Its raw decode counts depth from the top-level
+    container, applies 32 or its caller's depth capped at 128, and checks a length bound before
+    it reads a byte, all constexpr (CD-B1-B5, question 1). A depth below 1 is the caller's error,
+    std::invalid_argument, not a DecodeError."""
+    compiler = _cpp_compiler()
+    (tmp_path / "taut").mkdir()
+    (tmp_path / "taut" / "cbor.hpp").write_text((RUNTIME / "cbor.hpp").read_text())
+    counted = _cpp_bytes(bytes.fromhex("83010203"))
+    source = tmp_path / "raw_bounds.cpp"
+    source.write_text(f"""
+#include "taut/cbor.hpp"
+
+#include <iostream>
+#include <stdexcept>
+#include <string_view>
+
+using Tag = taut::DecodeErrorTag;
+
+constexpr bool too_deep(const taut::DecodeResult<taut::Cbor>& r, std::size_t limit) {{
+    return !r && r.error.tag == Tag::TooDeep && r.error.limit == limit;
+}}
+
+constexpr bool too_large(const taut::DecodeResult<taut::Cbor>& r, std::size_t len, std::size_t limit) {{
+    return !r && r.error.tag == Tag::TooLarge && r.error.len == len && r.error.limit == limit;
+}}
+
+static_assert(taut::default_max_depth == {options.DEFAULT_MAX_DEPTH});
+static_assert(taut::max_depth_ceiling == {options.MAX_DEPTH_CEILING});
+// Depth: the default, a caller's, and a caller's above the ceiling, which applies the ceiling.
+static_assert(taut::try_decode({_cpp_bytes(_arrays(32))}).ok);
+static_assert(too_deep(taut::try_decode({_cpp_bytes(_arrays(33))}), 32));
+static_assert(taut::try_decode({_cpp_bytes(_arrays(1))}, 1).ok);
+static_assert(too_deep(taut::try_decode({_cpp_bytes(_arrays(2))}, 1), 1));
+static_assert(too_deep(taut::try_decode({_cpp_bytes(_arrays(129))}, 1000), 128));
+// Length: exactly at the bound, one byte over, before any byte is read, and nothing at 0.
+static_assert(taut::try_decode({counted}, taut::default_max_depth, 4).ok);
+static_assert(too_large(taut::try_decode({counted}, taut::default_max_depth, 3), 4, 3));
+static_assert(too_large(taut::try_decode({_cpp_bytes(bytes.fromhex("c0c0c0c0"))}, 1, 3), 4, 3));
+static_assert(taut::try_decode(std::string_view(), 1, 0).error.tag == Tag::Truncated);
+
+int main() {{
+    auto capped = taut::try_decode({_cpp_bytes(_arrays(128))}, 1000);
+    std::cout << "depth-128-capped\\t" << (capped ? "ok" : "refused") << "\\n";
+    try {{
+        auto r = taut::try_decode({_cpp_bytes(_arrays(1))}, 0);
+        std::cout << "depth-0\\t" << (r ? "ok" : "refused") << "\\n";
+    }} catch (const std::invalid_argument&) {{
+        std::cout << "depth-0\\tcaller-error\\n";
+    }}
+    return 0;
+}}
+""")
+    exe = tmp_path / "raw_bounds"
+    result = subprocess.run([compiler, "-std=c++20", "-I", str(tmp_path), str(source), "-o", str(exe)],
+                            text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    run = subprocess.run([str(exe)], text=True, capture_output=True)
+    assert run.returncode == 0, run.stderr
+    assert run.stdout.splitlines() == ["depth-128-capped\tok", "depth-0\tcaller-error"]
+    # The reference agrees: a depth below 1 is its caller's error too.
+    with pytest.raises(ValueError, match="at least 1"):
+        cbor.loads(_arrays(1), max_depth=0)
+
+
+# A file that declares both bounds, a message that declares its own, and a tree at the ceiling.
+S_BOUNDS = mk(option.max_depth(16), option.max_encoded_len(4096),
+              Msg("Inherits", F("n", 1, INT)),
+              Msg("Own", F("xs", 1, List(INT)), option.max_depth(3), option.max_encoded_len(64)),
+              Msg("Deeper", F("kids", 1, List(Ref("Deeper"))), option.max_depth(128)))
+
+# Inputs to each root's typed decode from bytes: message, hex.
+S_BOUNDS_INPUTS = [
+    ("Own", "a101820102"),                          # within both bounds
+    ("Own", "a101818100"),                          # 3 deep, Own's bound: the schema refuses it
+    ("Own", "a101818180"),                          # 4 deep: TooDeep{3}
+    ("Own", "a101983c" + "00" * 60),                # 64 bytes, Own's length
+    ("Own", "a101983d" + "00" * 61),                # 65 bytes: TooLarge{65, 64}
+    ("Own", "c0" * 65),                             # length before a byte is read
+    ("Own", "81818180"),                            # depth before the schema stage
+    ("Inherits", "a101" + "81" * 14 + "80"),        # 16 deep, the file's bound: the schema refuses it
+    ("Inherits", "a102" + "81" * 15 + "80"),        # 17 deep, an unknown field: TooDeep{16}
+    ("Deeper", "a10181" * 63 + "a10180"),           # 128 deep, the ceiling
+    ("Deeper", "a10181" * 64 + "a10180"),           # 129 deep: TooDeep{128}
+]
+
+
+def _literal_of(value) -> str:
+    return "std::nullopt" if value is None else f"std::optional<std::size_t>({value})"
+
+
+def test_cpp_messages_carry_their_effective_bounds_and_decode_under_them(tmp_path):
+    """Each struct's `max_depth` and `max_encoded_len` are its effective values, resolved at
+    generation by `options.effective` (the message's, else the file's, else the defaults), and
+    its `try_decode` from bytes applies both (CD-B3, OPT-L6): as the reference does, and at
+    compile time where the struct is a literal type."""
+    assert validate(S_BOUNDS) == []
+    constants = []
+    for name in S_BOUNDS.messages:
+        depth = options.effective(S_BOUNDS, "max_depth", message=name)
+        length = options.effective(S_BOUNDS, "max_encoded_len", message=name)
+        constants.append(f"static_assert(taut::{name}::max_depth == {depth});")
+        constants.append(f"static_assert(taut::{name}::max_encoded_len == {_literal_of(length)});")
+    assert "static_assert(taut::Inherits::max_depth == 16);" in constants  # the file's
+    assert "static_assert(taut::Own::max_encoded_len == std::optional<std::size_t>(64));" in constants
+    prints = [f'    std::cout << "{message} {hexed}\\t" << checked<taut::{message}>("{hexed}") << "\\n";'
+              for message, hexed in S_BOUNDS_INPUTS]
+    observed = _observe(tmp_path, S_BOUNDS, "\n".join([
+        "#include <optional>",
+        "#include <type_traits>",
+        "",
+        "static_assert(std::is_same_v<decltype(taut::Own::max_depth), const std::size_t>);",
+        "static_assert(std::is_same_v<decltype(taut::Own::max_encoded_len), const std::optional<std::size_t>>);",
+        *constants,
+        "// Own holds no map, so its typed decode runs at compile time too.",
+        "static_assert(taut::Own::try_decode(std::string_view(\"\\xa1\\x01\\x82\\x01\\x02\", 5)).ok);",
+        "static_assert(taut::Own::try_decode(std::string_view(\"\\xa1\\x01\\x81\\x81\\x80\", 5)).error.tag",
+        "              == taut::DecodeErrorTag::TooDeep);",
+        "static_assert(taut::Own::try_decode(std::string_view(\"\\xa1\\x01\\x81\\x81\\x80\", 5)).error.limit == 3);",
+        "",
+        "int main() {",
+        *prints,
+        "    return 0;",
+        "}",
+    ]))
+    expected = {f"{message} {hexed}": _reference_outcome(S_BOUNDS, message, bytes.fromhex(hexed))
+                for message, hexed in S_BOUNDS_INPUTS}
+    assert [expected[f"{message} {hexed}"].split(";")[0] for message, hexed in S_BOUNDS_INPUTS] == [
+        f"ok {S_BOUNDS_INPUTS[0][1]}", "err WrongType", "err TooDeep", f"ok {S_BOUNDS_INPUTS[3][1]}",
+        "err TooLarge", "err TooLarge", "err TooDeep", "err WrongType", "err TooDeep",
+        f"ok {S_BOUNDS_INPUTS[9][1]}", "err TooDeep"]
+    assert observed == expected
+
+
+def _raw_reference(call) -> str:
+    """A call's outcome as the C++ harness reports it: `ok`, or its DecodeError as
+    `Tag;field=value` (`parity.format_error`)."""
+    try:
+        call()
+    except cbor.DecodeError as exc:
+        return parity.format_error(exc.tag, exc.payload)
+    return "ok"
+
+
+def test_cpp_nothing_escapes_a_100000_deep_input(tmp_path):
+    """Input 100,000 deep is TooDeep, never a stack overflow, from every decode entry point
+    (TautCheckedDecode.md CD-E4): the raw decode at its default bound, 32, and at the ceiling;
+    a typed decode at its root's bound, unknown fields included; and the extension helpers,
+    which read a host at the ceiling. Each outcome is the reference's."""
+    s = parity.parity_schema()
+    depth = 100_000
+    arrays = _arrays(depth)
+    trees = bytes.fromhex("a10181") * (depth - 1) + bytes.fromhex("a10180")
+    unknown = bytes.fromhex("a30100028009") + arrays
+    host = bytes.fromhex("a101") + arrays
+    tag = BAND_START + 1
+    reference = {
+        "raw": _raw_reference(lambda: cbor.loads(arrays)),
+        "raw-maps": _raw_reference(lambda: cbor.loads(bytes.fromhex("a100") * (depth - 1) + b"\xa0")),
+        "raw-capped": _raw_reference(lambda: cbor.loads(arrays, max_depth=depth)),
+        "IntBox": _raw_reference(lambda: codec.decode(s, "IntBox", unknown)),
+        "Tree64": _raw_reference(lambda: codec.decode(s, "Tree64", trees)),
+        "Tree128": _raw_reference(lambda: codec.decode(s, "Tree128", trees)),
+        "ext_set": _raw_reference(lambda: ext.ext_set(s, host, "IntBox", tag, {"n": 0, "by_id": {}})),
+        "ext_get": _raw_reference(lambda: ext.ext_get(s, host, "IntBox", tag)),
+        "ext_clear": _raw_reference(lambda: ext.ext_clear(host, tag)),
+    }
+    assert reference == {"raw": "TooDeep;limit=32", "raw-maps": "TooDeep;limit=32",
+                         "raw-capped": "TooDeep;limit=128", "IntBox": "TooDeep;limit=32",
+                         "Tree64": "TooDeep;limit=64", "Tree128": "TooDeep;limit=128",
+                         "ext_set": "TooDeep;limit=128", "ext_get": "TooDeep;limit=128",
+                         "ext_clear": "TooDeep;limit=128"}
+    observed = _observe(tmp_path, s, rf"""
+#include "taut/ext.hpp"
+
+template <class R>
+std::string refusal(const R& r) {{
+    if (r) {{
+        return "ok";
+    }}
+    if (r.error.tag == taut::DecodeErrorTag::TooDeep) {{
+        return "TooDeep;limit=" + std::to_string(r.error.limit);
+    }}
+    return describe(r.error);
+}}
+
+std::string repeat(std::string_view unit, std::size_t count, std::string_view last) {{
+    std::string out;
+    for (std::size_t i = 0; i < count; ++i) {{
+        out += unit;
+    }}
+    out += last;
+    return out;
+}}
+
+int main() {{
+    const std::size_t depth = {depth};
+    const std::string arrays = repeat("\x81", depth - 1, "\x80");
+    const std::string maps = repeat(std::string_view("\xa1\x00", 2), depth - 1, "\xa0");
+    const std::string trees = repeat("\xa1\x01\x81", depth - 1, "\xa1\x01\x80");
+    const std::string unknown = std::string("\xa3\x01\x00\x02\x80\x09", 6) + arrays;
+    const std::string host = "\xa1\x01" + arrays;
+    const auto value = taut::try_decode(std::string_view("\xa1\x01\x82\x00\x80", 5));
+    std::cout << "raw\t" << refusal(taut::try_decode(arrays)) << "\n";
+    std::cout << "raw-maps\t" << refusal(taut::try_decode(maps)) << "\n";
+    std::cout << "raw-capped\t" << refusal(taut::try_decode(arrays, depth)) << "\n";
+    std::cout << "IntBox\t" << refusal(taut::IntBox::try_decode(unknown)) << "\n";
+    std::cout << "Tree64\t" << refusal(taut::Tree64::try_decode(trees)) << "\n";
+    std::cout << "Tree128\t" << refusal(taut::Tree128::try_decode(trees)) << "\n";
+    std::cout << "ext_set\t" << refusal(taut::ext_set(host, {tag}, value.value)) << "\n";
+    std::cout << "ext_get\t" << refusal(taut::ext_get(host, {tag})) << "\n";
+    std::cout << "ext_clear\t" << refusal(taut::ext_clear(host, {tag})) << "\n";
+    return 0;
+}}
+""")
+    assert observed == reference
 
 
 # Decode observations over one generated schema: `name<TAB>value` per line.
@@ -288,18 +632,19 @@ std::string describe(const taut::DecodeError& e) {
             return "MissingKey;key=" + std::to_string(e.key);
         case T::DuplicateMapKey:
             return "DuplicateMapKey;key=" + (e.key_is_text ? std::string(e.key_text) : std::to_string(e.key));
+        case T::TooDeep:
+            return "TooDeep;limit=" + std::to_string(e.limit);
+        case T::TooLarge:
+            return "TooLarge;len=" + std::to_string(e.len) + ";limit=" + std::to_string(e.limit);
         default:
             return "tag#" + std::to_string(static_cast<int>(e.tag));
     }
 }
 
+// The typed decode from bytes, which applies M's bounds (TautCheckedDecode.md CD-B3).
 template <class M>
 taut::DecodeResult<M> decode(std::string_view hex) {
-    auto raw = taut::try_decode(bytes_of(hex));
-    if (!raw) {
-        return taut::DecodeResult<M>::fail(raw.error);
-    }
-    return M::try_from_cbor(raw.value);
+    return M::try_decode(bytes_of(hex));
 }
 
 template <class M>
@@ -644,7 +989,8 @@ def test_cpp_generated_scalar_list_float_static_asserts_cxx20(tmp_path):
 def test_cpp_constexpr_corpus_proves_the_golden_corpus(tmp_path):
     """The constexpr oracle over the golden corpus, as `corpus/build.py` writes it: at compile
     time each vector's native value encodes to its golden bytes, and those bytes decode back
-    through the fail-closed decode and re-encode to themselves."""
+    through its message's typed decode from bytes, under its bounds, and re-encode to
+    themselves."""
     compiler = _cpp_compiler()
     schema = load_schema(build.IR_PATH)
     refs = build.reference_values()
@@ -652,6 +998,7 @@ def test_cpp_constexpr_corpus_proves_the_golden_corpus(tmp_path):
     corpus = cpp_gen._emit_corpus(schema, refs)
     assert sorted(re.findall(r'eq_hex\(encode_\w+\(\), "([0-9a-f]+)"\)', corpus)) == \
         sorted(golden[name]["cbor"] for name in refs)
+    assert sorted(re.findall(r"taut::(\w+)::try_decode\(", corpus)) == sorted(message for message, _ in refs.values())
     (tmp_path / "taut").mkdir()
     (tmp_path / "taut" / "cbor.hpp").write_text((RUNTIME / "cbor.hpp").read_text())
     (tmp_path / "types.hpp").write_text(cpp_gen._emit_types(schema))
@@ -749,9 +1096,10 @@ def test_cpp_runtime_float_vectors_static_assert(tmp_path):
     """)
 
 
-# Host bytes the extension helpers refuse, each with the tag the three are called with. The
-# reference (`taut/ext.py`) decides each outcome: a tag below the band is the caller's error,
-# raised before the host is read, and any fault in the host is a DecodeError.
+# Host bytes the extension helpers refuse, and the deepest host they read, each with the tag the
+# three are called with. The reference (`taut/ext.py`) decides each outcome: a tag below the band
+# is the caller's error, raised before the host is read, and any fault in the host is a
+# DecodeError.
 _EXT_TAG = BAND_START + 1
 EXT_NEGATIVES = [
     # note, host hex, tag
@@ -774,6 +1122,10 @@ EXT_NEGATIVES = [
     # Truncated (the lax decoder reserved them, and std::length_error escaped).
     ("map-count-u64-max", "bbffffffffffffffff", _EXT_TAG),
     ("array-count-u64-max", "a1019bffffffffffffffff", _EXT_TAG),
+    # Not knowing the host's root, the helpers read it at the depth ceiling with no length bound
+    # (TautOptions.md G3): a host 128 deep is read, one 129 deep is TooDeep{128}.
+    ("host-at-the-depth-ceiling", "a101" + "81" * 126 + "80", _EXT_TAG),
+    ("host-beyond-the-depth-ceiling", "a101" + "81" * 127 + "80", _EXT_TAG),
 ]
 EXT_NEGATIVE_DECISION = {"backend": "b", "hops": 1}
 
@@ -816,6 +1168,8 @@ def test_cpp_ext_negatives_are_the_references():
         "unsupported-additional-info": {"UnsupportedInfo;info=31"},
         "map-count-u64-max": {"Truncated"},
         "array-count-u64-max": {"Truncated"},
+        "host-at-the-depth-ceiling": {"ok"},
+        "host-beyond-the-depth-ceiling": {"TooDeep;limit=128"},
     }
 
 
@@ -1024,6 +1378,8 @@ def test_cpp_resext_runtime_corpus_negatives_and_fuzz(tmp_path):
                     return "NonCanonicalInt;value=" + std::to_string(e.unsigned_value);
                 case T::WrongType:
                     return std::string("WrongType;expected=") + e.expected;
+                case T::TooDeep:
+                    return "TooDeep;limit=" + std::to_string(e.limit);
                 default:
                     return "tag#" + std::to_string(static_cast<int>(e.tag));
             }}
