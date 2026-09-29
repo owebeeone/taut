@@ -182,10 +182,11 @@ def main(argv: list[str] | None = None) -> int:
 
     pr = sub.add_parser(
         "parity",
-        help="run the leading cross-language codec-parity gate (Wave-1 replay + allowlist governance). "
-             "SUPPLEMENTS `tautc corpus` — never replaces the message golden corpora.")
+        help="run the leading cross-language codec-parity gate (every target with a runner + "
+             "allowlist governance). SUPPLEMENTS `tautc corpus` — never replaces the message golden corpora.")
     pr.add_argument("-t", "--target", choices=parity.TARGETS,
-                    help="replay only this target's harness (default: all Wave-1 — rust,python,typescript,js)")
+                    help="replay only this target's runner (default: every target that has one — python "
+                         "in-process, any other through its taut.corpus.parity_<target> module)")
     pr.add_argument("--no-compile", action="store_true",
                     help="skip the compiled/subprocess targets; run only the direct Python harness")
     pr.set_defaults(func=_cmd_parity)

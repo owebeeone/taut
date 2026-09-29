@@ -15,11 +15,16 @@ adds the boundary, adversarial, and fail-closed vectors the kit cannot host.
 
 Rows added beyond the reviewed cac5e62 baseline carry `"lead": true`. Those are
 the **leading** rows: the strict-canonical D2 requirements (`NonCanonicalInt`,
-`NegativeMapKey`) that no codec satisfies yet, a nested-truncation vector, and
-`2^53+1`. Per-language *baseline* smoke tests pin the reviewed set and skip the
-`lead` rows; the governed `tautc parity` gate replays **every** row. This is how
-the gate LEADS (it demands not-yet-built behaviour) without breaking the existing
-green per-language smoke tests.
+`NegativeMapKey`) that no codec satisfies yet, a nested-truncation vector,
+`2^53+1`, and rows M1-M15 of TautCheckedDecode.md §4.4 (one order of checks,
+payload words, and inputs that must decode). Per-language *baseline* smoke tests
+pin the reviewed set and skip the `lead` rows; the governed `tautc parity` gate
+replays **every** row. This is how the gate LEADS (it demands not-yet-built
+behaviour) without breaking the existing green per-language smoke tests.
+
+A malformed row's `expect` is either `{"tag": ..., <payload>}`, whose payload
+fields the gate compares as strings, or `{"accept": true}` for an input that must
+decode without error (CD-C2, CD-C4).
 """
 
 from __future__ import annotations
@@ -111,8 +116,8 @@ def _mal(name, stage, bytes_hex, expect, why, *, schema=None, lead=False) -> dic
 
 # --- malformed-input vectors (hand-authored hex) ------------------------------
 # Every canonical decode tag from the contract (§2b), one nested failure, plus
-# the ratified D2-strict rows. Baseline rows are byte-for-byte stable; the four
-# leading rows (NonCanonicalInt x2, NegativeMapKey, nested truncation) are last.
+# the ratified D2-strict rows. Baseline rows are byte-for-byte stable; the leading
+# rows (NonCanonicalInt x2, NegativeMapKey, nested truncation, then M1-M15) are last.
 MALFORMED_VECTORS = [
     _mal("truncated-u64-argument", "raw_decode", "1b0000",
          {"tag": "Truncated"},
@@ -166,6 +171,80 @@ MALFORMED_VECTORS = [
     _mal("nested-truncated-string", "raw_decode", "a100636162",
          {"tag": "Truncated"},
          "text string nested inside a map claims 3 bytes but only 2 are present",
+         lead=True),
+    # --- leading: TautCheckedDecode.md §4.4 M1-M15 (CD-E5 order of checks, CD-E6 words) ---
+    _mal("bytes-length-over-2^53", "raw_decode", "5b0020000000000000",
+         {"tag": "Truncated"},
+         "M1: a byte string (major 2) claims 2^53 bytes and none follow; a length beyond "
+         "the remaining bytes is Truncated whatever its size, not IntOverflow",
+         lead=True),
+    _mal("array-count-u64-max", "raw_decode", "9bffffffffffffffff",
+         {"tag": "Truncated"},
+         "M2: an array claims 2^64-1 items and none follow; the first item's missing head "
+         "is Truncated, not IntOverflow",
+         lead=True),
+    _mal("items-read-in-order", "raw_decode", "85c0",
+         {"tag": "UnsupportedMajor", "major": 6},
+         "M3: items are read in order, so the first item's tag head (major 6) fails "
+         "before the four missing items are reached",
+         lead=True),
+    _mal("key-first-duplicate", "raw_decode", "a2010001",
+         {"tag": "DuplicateMapKey", "key": 1},
+         "M4: a map entry's key is checked before its value is read; key 1 repeats and "
+         "its value is missing",
+         lead=True),
+    _mal("key-first-text", "raw_decode", "a16178",
+         {"tag": "NonIntegerMapKey"},
+         "M5: a map entry's key is checked before its value is read; the key is text and "
+         "its value is missing",
+         lead=True),
+    _mal("key-first-negative", "raw_decode", "a120",
+         {"tag": "NegativeMapKey", "key": "-1"},
+         "M6: a map entry's key is checked before its value is read; the key is -1 and "
+         "its value is missing",
+         lead=True),
+    _mal("major-6-info-28", "raw_decode", "dc",
+         {"tag": "UnsupportedMajor", "major": 6},
+         "M7: the major type is checked before the additional info; 0xdc is major 6 "
+         "with the reserved info 28",
+         lead=True),
+    _mal("map-key-2^53", "raw_decode", "a11b002000000000000000",
+         {"accept": True},
+         "M8: a raw map key of 2^53 is an i64 like any other and decodes; 2^53 is no "
+         "limit on keys",
+         lead=True),
+    _mal("wrong-type-text", "from_cbor", "a201010280",
+         {"tag": "WrongType", "expected": "text"}, schema="OptBox",
+         why="M9: OptBox.note wants text and holds an int; the payload word is `text` "
+             "(CD-E6), not `str`",
+         lead=True),
+    _mal("wrong-type-array", "from_cbor", "a201f60200",
+         {"tag": "WrongType", "expected": "array"}, schema="OptBox",
+         why="M10: OptBox.tags wants an array and holds an int; the payload word is "
+             "`array` (CD-E6), not `list`",
+         lead=True),
+    _mal("optional-absent", "from_cbor", "a10280",
+         {"tag": "MissingKey", "key": 1}, schema="OptBox",
+         why="M11: an absent optional field is MissingKey; the canonical encoder always "
+             "writes it, as null when unset",
+         lead=True),
+    _mal("empty-message-not-map", "from_cbor", "00",
+         {"tag": "WrongType", "expected": "map"}, schema="Empty",
+         why="M12: a message with no fields must still be a map",
+         lead=True),
+    _mal("map-field-duplicate", "from_cbor", "a201000282a201050201a201050202",
+         {"tag": "DuplicateMapKey", "key": 5}, schema="IntBox",
+         why="M13: two IntBox.by_id entries share the key 5; a map<K,V> refuses a "
+             "repeated key rather than keeping the last",
+         lead=True),
+    _mal("map-entry-keys-first", "from_cbor", "a201000281a1016178",
+         {"tag": "MissingKey", "key": 2}, schema="IntBox",
+         why="M14: a map<K,V> entry checks for keys 1 and 2 before decoding either; this "
+             "entry lacks key 2 and its key 1 holds text",
+         lead=True),
+    _mal("optional-present-null", "from_cbor", "a201f60280",
+         {"accept": True}, schema="OptBox",
+         why="M15: an optional field present as null decodes, to null",
          lead=True),
 ]
 

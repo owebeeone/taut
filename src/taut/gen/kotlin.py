@@ -104,7 +104,10 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
 
 
 def _emit_message(msg, forward_compat: bool = False) -> list[str]:
-    out = [f"data class {msg.name}("]
+    # Kotlin refuses a `data class` without constructor parameters, so a message
+    # with no fields is a plain class that keeps value equality.
+    fieldless = not msg.fields and not forward_compat
+    out = [f"{'class' if fieldless else 'data class'} {msg.name}("]
     for f in msg.fields:
         n, ft = _id(f.name), _field_type(f)
         if f.transient:
@@ -116,6 +119,9 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     if forward_compat:
         out.append("    var wireResidual: List<Pair<Long, Cbor>> = emptyList(),")
     out.append(") {")
+    if fieldless:
+        out.append(f"    override fun equals(other: Any?): Boolean = other is {msg.name}")
+        out.append("    override fun hashCode(): Int = 0")
     # toCbor
     out.append("    fun toCbor(): Cbor {")
     entries = []

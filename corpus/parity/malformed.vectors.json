@@ -121,6 +121,133 @@
       "expect": {"tag": "Truncated"},
       "why": "text string nested inside a map claims 3 bytes but only 2 are present",
       "lead": true
+    },
+    {
+      "name": "bytes-length-over-2^53",
+      "stage": "raw_decode",
+      "bytes": "5b0020000000000000",
+      "expect": {"tag": "Truncated"},
+      "why": "M1: a byte string (major 2) claims 2^53 bytes and none follow; a length beyond the remaining bytes is Truncated whatever its size, not IntOverflow",
+      "lead": true
+    },
+    {
+      "name": "array-count-u64-max",
+      "stage": "raw_decode",
+      "bytes": "9bffffffffffffffff",
+      "expect": {"tag": "Truncated"},
+      "why": "M2: an array claims 2^64-1 items and none follow; the first item's missing head is Truncated, not IntOverflow",
+      "lead": true
+    },
+    {
+      "name": "items-read-in-order",
+      "stage": "raw_decode",
+      "bytes": "85c0",
+      "expect": {"tag": "UnsupportedMajor", "major": 6},
+      "why": "M3: items are read in order, so the first item's tag head (major 6) fails before the four missing items are reached",
+      "lead": true
+    },
+    {
+      "name": "key-first-duplicate",
+      "stage": "raw_decode",
+      "bytes": "a2010001",
+      "expect": {"tag": "DuplicateMapKey", "key": 1},
+      "why": "M4: a map entry's key is checked before its value is read; key 1 repeats and its value is missing",
+      "lead": true
+    },
+    {
+      "name": "key-first-text",
+      "stage": "raw_decode",
+      "bytes": "a16178",
+      "expect": {"tag": "NonIntegerMapKey"},
+      "why": "M5: a map entry's key is checked before its value is read; the key is text and its value is missing",
+      "lead": true
+    },
+    {
+      "name": "key-first-negative",
+      "stage": "raw_decode",
+      "bytes": "a120",
+      "expect": {"tag": "NegativeMapKey", "key": "-1"},
+      "why": "M6: a map entry's key is checked before its value is read; the key is -1 and its value is missing",
+      "lead": true
+    },
+    {
+      "name": "major-6-info-28",
+      "stage": "raw_decode",
+      "bytes": "dc",
+      "expect": {"tag": "UnsupportedMajor", "major": 6},
+      "why": "M7: the major type is checked before the additional info; 0xdc is major 6 with the reserved info 28",
+      "lead": true
+    },
+    {
+      "name": "map-key-2^53",
+      "stage": "raw_decode",
+      "bytes": "a11b002000000000000000",
+      "expect": {"accept": true},
+      "why": "M8: a raw map key of 2^53 is an i64 like any other and decodes; 2^53 is no limit on keys",
+      "lead": true
+    },
+    {
+      "name": "wrong-type-text",
+      "stage": "from_cbor",
+      "schema": "OptBox",
+      "bytes": "a201010280",
+      "expect": {"tag": "WrongType", "expected": "text"},
+      "why": "M9: OptBox.note wants text and holds an int; the payload word is `text` (CD-E6), not `str`",
+      "lead": true
+    },
+    {
+      "name": "wrong-type-array",
+      "stage": "from_cbor",
+      "schema": "OptBox",
+      "bytes": "a201f60200",
+      "expect": {"tag": "WrongType", "expected": "array"},
+      "why": "M10: OptBox.tags wants an array and holds an int; the payload word is `array` (CD-E6), not `list`",
+      "lead": true
+    },
+    {
+      "name": "optional-absent",
+      "stage": "from_cbor",
+      "schema": "OptBox",
+      "bytes": "a10280",
+      "expect": {"tag": "MissingKey", "key": 1},
+      "why": "M11: an absent optional field is MissingKey; the canonical encoder always writes it, as null when unset",
+      "lead": true
+    },
+    {
+      "name": "empty-message-not-map",
+      "stage": "from_cbor",
+      "schema": "Empty",
+      "bytes": "00",
+      "expect": {"tag": "WrongType", "expected": "map"},
+      "why": "M12: a message with no fields must still be a map",
+      "lead": true
+    },
+    {
+      "name": "map-field-duplicate",
+      "stage": "from_cbor",
+      "schema": "IntBox",
+      "bytes": "a201000282a201050201a201050202",
+      "expect": {"tag": "DuplicateMapKey", "key": 5},
+      "why": "M13: two IntBox.by_id entries share the key 5; a map<K,V> refuses a repeated key rather than keeping the last",
+      "lead": true
+    },
+    {
+      "name": "map-entry-keys-first",
+      "stage": "from_cbor",
+      "schema": "IntBox",
+      "bytes": "a201000281a1016178",
+      "expect": {"tag": "MissingKey", "key": 2},
+      "why": "M14: a map<K,V> entry checks for keys 1 and 2 before decoding either; this entry lacks key 2 and its key 1 holds text",
+      "lead": true
+    },
+    {
+      "name": "optional-present-null",
+      "stage": "from_cbor",
+      "schema": "OptBox",
+      "bytes": "a201f60280",
+      "expect": {"accept": true},
+      "why": "M15: an optional field present as null decodes, to null",
+      "lead": true
     }
   ]
 }
