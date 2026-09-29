@@ -3,6 +3,10 @@
 Carries enums, messages (fields: name, tag, type, optional, transient), and
 nothing imperative. Type refs are a closed set: scalars, enum refs, message refs,
 and lists. This is deliberately tiny enough to read whole.
+
+The file, each message, field and enum also carry `options`: the option values
+declared at that level (TautOptions.md OPT-L3). Effective values are computed by
+`options.effective()`, never stored.
 """
 
 from __future__ import annotations
@@ -49,6 +53,7 @@ TypeRef = Scalar | EnumRef | MsgRef | ListOf | MapOf
 class EnumDef:
     name: str
     members: dict[str, int]   # native member name -> integer wire value
+    options: dict[str, object] = field(default_factory=dict)   # declared here (OPT-L3)
 
 
 # Presence, a field's `optional`: False (the default) requires the key and a non-null value; True
@@ -72,6 +77,7 @@ class FieldDef:
     transient: bool = False    # present in the native type, never on the wire
     merge: str | None = None   # CRDT merge type for this field: "lww" | "counter"
                                # (design metadata; does not affect the wire encoding)
+    options: dict[str, object] = field(default_factory=dict)   # declared here (OPT-L3)
 
 
 @dataclass(frozen=True)
@@ -81,6 +87,7 @@ class MessageDef:
     reserved_tags: tuple[int, ...] = ()    # retired tags — never reusable
     reserved_names: tuple[str, ...] = ()   # retired field names — never reusable
     next_id: int | None = None             # declared next tag to allocate (> every used/reserved tag)
+    options: dict[str, object] = field(default_factory=dict)   # declared here (OPT-L3)
 
     def wire_fields(self) -> tuple[FieldDef, ...]:
         return tuple(f for f in self.fields if not f.transient)
@@ -150,3 +157,4 @@ class Schema:
     messages: dict[str, MessageDef]
     services: dict[str, ServiceDef] = field(default_factory=dict)
     extensions: tuple[ExtensionDef, ...] = ()
+    options: dict[str, object] = field(default_factory=dict)   # file level (OPT-L3)
