@@ -3,24 +3,25 @@
 // Generic extension accessors over the frozen CBOR runtime. These know only the
 // host wire bytes and the extension band tag; callers provide typed extension
 // values as nested Cbor maps via the generated message's instance toCbor().
+//
+// They fail closed (TautCheckedDecode.md CD-E4): for any host bytes each returns or
+// throws DecodeError, nothing else, and a host that is not a map is WrongType{map}.
+// A tag below the band is the caller's error, a RangeError thrown before the host
+// is read.
 
-const { CMap, decode, encode } = require("./cbor.js");
+const { CMap, decode, encode, expectMap } = require("./cbor.js");
 
 const BAND_START = 2 ** 20;
 
 function checkTag(tag) {
   if (!Number.isSafeInteger(tag) || tag < BAND_START) {
-    throw new Error(`extension tag ${tag} is below the band (< ${BAND_START})`);
+    throw new RangeError(`extension tag ${tag} is below the band (< ${BAND_START})`);
   }
 }
 
 function hostMap(hostBytes, tag) {
   checkTag(tag);
-  const host = decode(hostBytes);
-  if (!host || !Array.isArray(host.map)) {
-    throw new Error("extension host must be a top-level CBOR map");
-  }
-  return host.map;
+  return expectMap(decode(hostBytes));
 }
 
 function extSet(hostBytes, tag, value) {

@@ -16,7 +16,9 @@ import pytest
 from taut import cli, ext
 from taut.corpus import resext_build as rb
 from taut.gen import scaffold
-from taut.ir.dsl import BOOL, BYTES, INT, MISSING_OK, STR, F, List, Map, Msg, Ref, option, schema
+from taut.ir.dsl import (
+    BOOL, BYTES, INT, MISSING_OK, STR, F, List, Map, Msg, Params, Ref, method, option, schema, service,
+)
 from taut.ir.export import export_to
 from taut.ir.load import load_schema
 from taut.ir.options import effective_map
@@ -181,20 +183,27 @@ test("ResExt extension corpus matches the Python oracle", () => {
   }
 });
 
+// A tag below the band is the caller's error, a RangeError thrown before the host is read
+// (TautCheckedDecode.md CD-E4).
 test("extension accessors reject below-band tags before host decode", () => {
   const invalidHost = hexToBytes("ff");
   const nested = new Map();
-  assert.throws(() => extSet(invalidHost, BAND_START - 1, nested), /below the band/);
-  assert.throws(() => extGet(invalidHost, BAND_START - 1), /below the band/);
-  assert.throws(() => extClear(invalidHost, BAND_START - 1), /below the band/);
+  const belowBand = { name: "RangeError", message: /below the band/ };
+  assert.throws(() => extSet(invalidHost, BAND_START - 1, nested), belowBand);
+  assert.throws(() => extGet(invalidHost, BAND_START - 1), belowBand);
+  assert.throws(() => extClear(invalidHost, BAND_START - 1), belowBand);
 });
 
-test("extension accessors reject non-map hosts", () => {
-  const scalarHost = hexToBytes("01");
+// A host that is not a map is WrongType{map}, a DecodeError like any bad host (CD-E4).
+test("extension accessors reject non-map hosts with WrongType{map}", () => {
   const nested = new Map();
-  assert.throws(() => extSet(scalarHost, BAND_START + 1, nested), /top-level CBOR map/);
-  assert.throws(() => extGet(scalarHost, BAND_START + 1), /top-level CBOR map/);
-  assert.throws(() => extClear(scalarHost, BAND_START + 1), /top-level CBOR map/);
+  const notAMap = { name: "DecodeError", tag: "WrongType", expected: "map" };
+  for (const hex of ["01", "20", "80", "6161", "41ff", "f5", "f6", "f93e00"]) {
+    const host = hexToBytes(hex);
+    assert.throws(() => extSet(host, BAND_START + 1, nested), notAMap, hex);
+    assert.throws(() => extGet(host, BAND_START + 1), notAMap, hex);
+    assert.throws(() => extClear(host, BAND_START + 1), notAMap, hex);
+  }
 });
 
 test("fixed-seed ResExt fuzz matches the Python oracle", () => {
@@ -962,6 +971,138 @@ test("loadSchema refuses a version, or an effective value, that it cannot honour
   }
   assert.throws(() => loadSchema(null), /a taut IR is a JSON object/);
   assert.throws(() => loadSchema([]), /a taut IR is a JSON object/);
+});
+""".lstrip()
+    )
+    _run_node_tests(node, ts_dir, harness)
+
+
+# taut_client.ts (TautCheckedDecode.md CD-E3): a response that does not decode fails its call,
+# and an event that does not decode fails its stream. The DecodeError reaches the caller
+# itself, never escapes the socket's message handler, and is never made a plain Error.
+def _service_schema():
+    """`Item` behind a unary `get`, and a `watch` that streams it as a log's `append` events."""
+    return schema(
+        Msg("Item", F("n", 1, INT), next_id=2),
+        service("Svc",
+                method("get", role="out", params=Params(id=INT), out=Ref("Item")),
+                method("watch", role="out", shape="log", params=Params(id=INT), out=Ref("Item"))),
+    )
+
+
+def test_typescript_client_fails_a_call_or_stream_whose_payload_does_not_decode_if_node(tmp_path):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+
+    s = _service_schema()
+    ts_dir = _emit_ts(s, tmp_path, "svc.ir.json")
+    assert codec.encode(s, "Item", {"n": 5}).hex() == "a10105"
+    with pytest.raises(codec.DecodeError) as err:
+        codec.decode(s, "Item", bytes.fromhex("a1016178"))  # n is text: the payload used below
+    assert (err.value.tag, err.value.payload) == ("WrongType", {"expected": "int"})
+
+    harness = ts_dir / "client.test.ts"
+    harness.write_text(
+        """
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { loadSchema } from "./schema.ts";
+import { tautClient } from "./taut_client.ts";
+
+const schema = loadSchema(JSON.parse(readFileSync("svc.ir.json", "utf8")));
+const GOOD = Buffer.from("a10105", "hex").toString("base64"); // { n: 5 }
+const BAD = Buffer.from("a1016178", "hex").toString("base64"); // n is text: WrongType{int}
+
+// A WebSocket stand-in: it opens at once, keeps what the client sends, and delivers a frame
+// through the client's onmessage, which must return whatever the frame holds.
+class FakeSocket {
+  static last: FakeSocket;
+  sent: any[] = [];
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onmessage: ((e: { data: string }) => void) | null = null;
+
+  constructor(_url: string) {
+    FakeSocket.last = this;
+    queueMicrotask(() => this.onopen?.());
+  }
+
+  send(data: string): void {
+    this.sent.push(JSON.parse(data));
+  }
+
+  close(): void {}
+
+  deliver(env: Record<string, unknown>): void {
+    assert.doesNotThrow(() => this.onmessage!({ data: JSON.stringify(env) }), JSON.stringify(env));
+  }
+}
+(globalThis as any).WebSocket = FakeSocket;
+
+async function connect() {
+  const client = await tautClient.connect("ws://test", schema);
+  return { client, ws: FakeSocket.last };
+}
+
+// How `p` stands once pending work has run: resolved, rejected or still pending.
+function settled(p: Promise<unknown>): Promise<any> {
+  return Promise.race([
+    p.then((value) => ({ state: "resolved", value }), (error) => ({ state: "rejected", error })),
+    new Promise((resolve) => setTimeout(() => resolve({ state: "pending" }), 20)),
+  ]);
+}
+
+test("a response that does not decode rejects its call with the DecodeError itself", async () => {
+  const { client, ws } = await connect();
+  const call = client.call("get", { id: 1n });
+  ws.deliver({ messageId: ws.sent[0].messageId, kind: "response", payload: { value: BAD } });
+  const out = await settled(call);
+  assert.equal(out.state, "rejected");
+  assert.equal(out.error.name, "DecodeError");
+  assert.equal(out.error.tag, "WrongType");
+  assert.equal(out.error.expected, "int");
+});
+
+test("a response that decodes still resolves its call, and a server error still rejects it", async () => {
+  const { client, ws } = await connect();
+  const ok = client.call("get", { id: 1n });
+  const failed = client.call("get", { id: 2n });
+  ws.deliver({ messageId: ws.sent[0].messageId, kind: "response", payload: { value: GOOD } });
+  ws.deliver({ messageId: ws.sent[1].messageId, kind: "error", error: { code: "gone", message: "no such item" } });
+  assert.deepEqual(await ok, { n: 5n });
+  await assert.rejects(failed, { name: "Error", message: "no such item" });
+});
+
+test("an event that does not decode ends its stream, as unsubscribing does, and goes to onError", async () => {
+  const { client, ws } = await connect();
+  const events: unknown[] = [];
+  const errors: any[] = [];
+  const stop = client.subscribe("watch", { id: 1n }, (event, value) => events.push([event, value]),
+    (error) => errors.push(error));
+  const { streamId } = ws.sent[0];
+  const event = (value: string) => ({ messageId: "e", kind: "stream-event", streamId, event: "append", payload: { value } });
+  ws.deliver(event(GOOD));
+  ws.deliver(event(BAD));
+  ws.deliver(event(GOOD)); // after the end: not delivered
+  stop(); // already ended: the server is not told twice
+  assert.deepEqual(events, [["append", { n: 5n }]]);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].name, "DecodeError");
+  assert.equal(errors[0].tag, "WrongType");
+  assert.deepEqual(ws.sent.slice(1).map((m: any) => [m.method, m.streamId]), [["$unsubscribe", streamId]]);
+});
+
+test("without onError, an event that does not decode still ends its stream and escapes nowhere", async () => {
+  const { client, ws } = await connect();
+  const events: unknown[] = [];
+  client.subscribe("watch", { id: 1n }, (event, value) => events.push([event, value]));
+  const { streamId } = ws.sent[0];
+  ws.deliver({ messageId: "e", kind: "stream-event", streamId, event: "append", payload: { value: BAD } });
+  ws.deliver({ messageId: "e", kind: "stream-event", streamId, event: "append", payload: { value: GOOD } });
+  assert.deepEqual(events, []);
+  assert.deepEqual(ws.sent.slice(1).map((m: any) => m.method), ["$unsubscribe"]);
 });
 """.lstrip()
     )

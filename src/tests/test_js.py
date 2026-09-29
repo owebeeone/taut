@@ -478,13 +478,15 @@ def test_js_resext_residual_and_extension_parity(tmp_path):
           if (got !== want) throw new Error(`${{note}}: got ${{got}}, want ${{want}}`);
         }}
 
-        function expectThrows(fn, fragment, note) {{
+        function expectThrows(fn, name, fragment, note) {{
           try {{
             fn();
           }} catch (err) {{
             const message = String(err && err.message ? err.message : err);
-            if (message.includes(fragment)) return;
-            throw new Error(`${{note}}: wrong error ${{message}}`);
+            if (err && err.name === name && message.includes(fragment)) {{
+              return err;
+            }}
+            throw new Error(`${{note}}: wrong error ${{err && err.name}} ${{message}}`);
           }}
           throw new Error(`${{note}}: did not throw`);
         }}
@@ -518,16 +520,25 @@ def test_js_resext_residual_and_extension_parity(tmp_path):
           }}
         }}
 
+        // A tag below the band is the caller's error, a RangeError thrown before the host
+        // is read. A host that is not a map is WrongType{{map}}, a DecodeError like any bad
+        // host (TautCheckedDecode.md CD-E4).
         expectThrows(
           () => extGet(new Uint8Array([0xff]), 1),
+          "RangeError",
           "below the band",
           "below-band validation happens before host decode",
         );
-        expectThrows(
-          () => extSet(encode(CInt(7)), 1048577, CMap([])),
-          "top-level CBOR map",
-          "non-map host rejection",
-        );
+        for (const [op, call] of [
+          ["extGet", (host) => extGet(host, 1048577)],
+          ["extSet", (host) => extSet(host, 1048577, CMap([]))],
+          ["extClear", (host) => extClear(host, 1048577)],
+        ]) {{
+          const err = expectThrows(() => call(encode(CInt(7))), "DecodeError", "expected map", `${{op}}: non-map host rejection`);
+          if (err.tag !== "WrongType" || err.expected !== "map") {{
+            throw new Error(`${{op}}: a non-map host is ${{err.tag}} ${{err.expected}}, not WrongType map`);
+          }}
+        }}
 
         let mismatches = 0;
         for (const row of fuzzRows) {{

@@ -3,6 +3,11 @@
 // encodes args and decodes results via the CBOR/IR codec. The envelope rides as
 // JSON; payload values are base64(CBOR). No per-method code is hand-written here
 // beyond the generic call/subscribe — the contract drives everything.
+//
+// A payload that does not decode fails what it belongs to (TautCheckedDecode.md
+// CD-E3): a call's promise rejects with the DecodeError itself, and a stream ends,
+// as unsubscribing does, and hands the DecodeError to its onError. Neither escapes
+// the socket's message handler.
 
 import { type SchemaIndex, type TypeRef, methodEvents, methodOutput } from "./schema.ts";
 import { decodeRef, encodeRef } from "./codec.ts";
@@ -23,11 +28,13 @@ interface Envelope {
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void; output: TypeRef | null };
 type StreamHandler = (event: string, value: unknown) => void;
+type StreamErrorHandler = (error: Error) => void;
+type Stream = { handler: StreamHandler; onError?: StreamErrorHandler; events: Map<string, TypeRef> };
 
 export class tautClient {
   private nextId = 0;
   private pending = new Map<string, Pending>();
-  private streams = new Map<string, { handler: StreamHandler; events: Map<string, TypeRef> }>();
+  private streams = new Map<string, Stream>();
   private ws: WebSocket;
   private schema: SchemaIndex;
 
@@ -66,11 +73,17 @@ export class tautClient {
     });
   }
 
-  subscribe(method: string, args: Record<string, unknown>, onEvent: StreamHandler): () => void {
+  // `onError` hears why a stream ended early: an event whose payload does not decode.
+  subscribe(
+    method: string,
+    args: Record<string, unknown>,
+    onEvent: StreamHandler,
+    onError?: StreamErrorHandler,
+  ): () => void {
     const m = this.schema.method(method);
     const streamId = this.id("s");
     const events = new Map<string, TypeRef>(methodEvents(m));
-    this.streams.set(streamId, { handler: onEvent, events });
+    this.streams.set(streamId, { handler: onEvent, onError, events });
     const env: Envelope = {
       messageId: this.id("c"),
       kind: "request",
@@ -79,10 +92,15 @@ export class tautClient {
       payload: this.encodeArgs(method, args),
     };
     this.ws.send(JSON.stringify(env));
-    return () => {
-      this.streams.delete(streamId);
-      this.ws.send(JSON.stringify({ messageId: this.id("c"), kind: "request", method: "$unsubscribe", streamId }));
-    };
+    return () => this.unsubscribe(streamId);
+  }
+
+  // Ends a stream once: it is forgotten and the server told, however often it is called.
+  private unsubscribe(streamId: string): void {
+    if (!this.streams.delete(streamId)) {
+      return;
+    }
+    this.ws.send(JSON.stringify({ messageId: this.id("c"), kind: "request", method: "$unsubscribe", streamId }));
   }
 
   private onMessage(data: string): void {
@@ -91,18 +109,40 @@ export class tautClient {
       t && env.payload?.value !== undefined ? decodeRef(this.schema, t, unb64(env.payload.value)) : undefined;
 
     if (env.kind === "stream-event") {
-      const stream = this.streams.get(env.streamId ?? "");
+      const streamId = env.streamId ?? "";
+      const stream = this.streams.get(streamId);
       if (stream && env.event) {
         const t = stream.events.get(env.event);
-        stream.handler(env.event, t ? value(t) : undefined);
+        let event: unknown;
+        try {
+          event = t ? value(t) : undefined;
+        } catch (e) {
+          // Fail closed: later events may build on this one, so the stream ends here.
+          this.unsubscribe(streamId);
+          stream.onError?.(e as Error);
+          return;
+        }
+        stream.handler(env.event, event);
       }
       return;
     }
     const p = this.pending.get(env.messageId);
-    if (!p) return;
+    if (!p) {
+      return;
+    }
     this.pending.delete(env.messageId);
-    if (env.kind === "error") p.reject(new Error(env.error?.message ?? "error"));
-    else p.resolve(value(p.output));
+    if (env.kind === "error") {
+      p.reject(new Error(env.error?.message ?? "error"));
+      return;
+    }
+    let result: unknown;
+    try {
+      result = value(p.output);
+    } catch (e) {
+      p.reject(e as Error); // the DecodeError itself, the call's failure
+      return;
+    }
+    p.resolve(result);
   }
 
   close(): void {

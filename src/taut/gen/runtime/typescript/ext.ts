@@ -3,21 +3,32 @@
 // Extensions ride on a host message as a top-level CBOR map entry whose tag is
 // in the extension band. The value is the nested extension message as CborValue,
 // not pre-serialized bytes.
+//
+// They fail closed (TautCheckedDecode.md CD-E4): for any host bytes each returns or
+// throws DecodeError, nothing else, and a host that is not a map is WrongType{map}.
+// A tag below the band is the caller's error, a RangeError thrown before the host
+// is read.
 
-import { type CborValue, type MapKey, decode as cborDecode, encode as cborEncode } from "./cbor.ts";
+import {
+  type CborValue,
+  DecodeError,
+  type MapKey,
+  decode as cborDecode,
+  encode as cborEncode,
+} from "./cbor.ts";
 
 export const BAND_START = 2 ** 20;
 
 function checkTag(tag: number): void {
   if (!Number.isSafeInteger(tag) || tag < BAND_START) {
-    throw new Error(`extension tag ${tag} is below the band (< ${BAND_START})`);
+    throw new RangeError(`extension tag ${tag} is below the band (< ${BAND_START})`);
   }
 }
 
 function decodeHostMap(host: Uint8Array): Map<MapKey, CborValue> {
   const top = cborDecode(host);
   if (!(top instanceof Map)) {
-    throw new Error("extension host must decode to a top-level CBOR map");
+    throw new DecodeError("WrongType", { expected: "map" });
   }
   return top;
 }
