@@ -46,6 +46,10 @@ class Cbor(
         fun arr(a: List<Cbor>) = Cbor(ARR, arr = a)
         fun map(m: List<Pair<Long, Cbor>>) = Cbor(MAP, map = m)
         val nul = Cbor(NULL)
+        // The order of a map<str,V> field's keys: by Unicode code point, which is the order
+        // of their UTF-8 bytes. String.compareTo, and so toSortedMap(), compares UTF-16 code
+        // units, which puts U+10000 (d800 dc00) before U+FFFF.
+        val codePointOrder: Comparator<String> = Comparator { a, b -> compareCodePoints(a, b) }
     }
 
     fun get(key: Long): Cbor {
@@ -114,6 +118,20 @@ class Cbor(
         if (kind != MAP) throw DecodeError.WrongType("map")
         return map
     }  // forward-compat residual
+}
+
+private fun compareCodePoints(a: String, b: String): Int {
+    val n = minOf(a.length, b.length)
+    var i = 0
+    while (i < n) {
+        val x = a.codePointAt(i)
+        val y = b.codePointAt(i)
+        if (x != y) {
+            return x.compareTo(y)
+        }
+        i += Character.charCount(x)
+    }
+    return a.length.compareTo(b.length)
 }
 
 private fun head(out: MutableList<Byte>, major: Int, n: Long) {

@@ -12,8 +12,9 @@ and calls its `run() -> TargetReport` (see `parity._RUNNERS`). The steps:
   5. run it (`parity.run_runner`), which parses and judges its report.
 
 The runner prints `name<TAB>outcome<TAB>detail` per row. It checks int rows
-itself; for a malformed row it only reports what happened (`ok`; `err` with the
-tag and payload; `untyped` for a panic) and the gate judges it.
+itself; for a malformed row it only reports what happened (`ok` with the hex of the
+re-encoding; `err` with the tag and payload; `untyped` for a panic) and the gate
+judges it.
 """
 
 from __future__ import annotations
@@ -67,8 +68,9 @@ fn emit(name: &str, outcome: &str, detail: &str) {
     println!("{name}\t{outcome}\t{}", detail.replace(&['\t', '\n', '\r'][..], " "));
 }
 
-/// A from_cbor row's typed entry point, by message name (from the fixture schema).
-fn from_cbor(message: &str, c: &Cbor) -> Result<(), DecodeError> {
+/// A from_cbor row's typed entry point, by message name (from the fixture schema):
+/// the decoded value's own encoding.
+fn from_cbor(message: &str, c: &Cbor) -> Result<Vec<u8>, DecodeError> {
     match message {
 @FROM_CBOR@
         _ => panic!("no from_cbor entry point for {message}"),
@@ -83,12 +85,14 @@ fn from_wire(name: &str, v: i64) -> Result<(), DecodeError> {
     }
 }
 
-fn decode_row(row: &Mal) -> Result<(), DecodeError> {
+/// A decoded row's re-encoding: the tree for raw_decode, the typed value for
+/// from_cbor, and nothing for from_wire (an enum row never accepts).
+fn decode_row(row: &Mal) -> Result<Vec<u8>, DecodeError> {
     let c = try_decode(&unhex(row.bytes))?;
     match row.stage {
-        "raw_decode" => Ok(()),
+        "raw_decode" => Ok(encode(&c)),
         "from_cbor" => from_cbor(row.schema, &c),
-        "from_wire" => from_wire(row.schema, c.try_int()?),
+        "from_wire" => from_wire(row.schema, c.try_int()?).map(|_| Vec::new()),
         other => panic!("unknown stage {other}"),
     }
 }
@@ -155,7 +159,7 @@ fn main() {
     }
     for row in MALFORMED {
         match std::panic::catch_unwind(|| decode_row(row)) {
-            Ok(Ok(())) => emit(row.name, "ok", ""),
+            Ok(Ok(again)) => emit(row.name, "ok", &hexof(&again)),
             Ok(Err(e)) => emit(row.name, "err", &describe(&e)),
             Err(payload) => emit(row.name, "untyped", &format!("panic: {}", panic_text(payload.as_ref()))),
         }
@@ -187,7 +191,7 @@ def _tables() -> tuple[str, str, str]:
 def _dispatch() -> tuple[str, str]:
     """The `match` arms for every message (`from_cbor`) and enum (`from_wire`) in the fixture."""
     dispatch = parity.fixture_dispatch()
-    from_cbor = [f"        {_rs(name)} => api::{name}::from_cbor(c).map(|_| ()),"
+    from_cbor = [f"        {_rs(name)} => api::{name}::from_cbor(c).map(|v| encode(&v.to_cbor())),"
                  for name in dispatch.messages]
     from_wire = [f"        {_rs(name)} => api::{name}::from_wire(v).map(|_| ()),"
                  for name in dispatch.enums]

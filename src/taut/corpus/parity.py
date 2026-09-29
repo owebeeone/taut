@@ -21,15 +21,23 @@ Runner protocol (TautCheckedDecode.md CD-C4). A runner prints one line per row,
 `name<TAB>outcome<TAB>detail`:
   - an int row: `pass`, `fail` or `type-satisfied`; the runner checks the round
     trip itself;
-  - a malformed row: `ok` when it decoded without error; `err` with the detail
-    `Tag;field=value...`, one `;field=value` for each payload field its DecodeError
-    carries (`PAYLOAD_FIELDS`); or `untyped`, with a description, when anything
-    other than the language's DecodeError escapes.
-The gate, not the runner, judges a malformed row (`judge`): an `{"accept": true}`
-row passes only on `ok`; a `{"tag": ...}` row passes when the tag matches and every
-payload field it names matches when compared as a string (`PAYLOAD_EXEMPT` lists
-the fields a runtime does not carry). A row never reported fails, and a runner that
-exits non-zero fails its target (`parse_report`).
+  - a malformed row: `ok` when it decoded without error, with the detail the hex
+    of its re-encoding: for a `raw_decode` row the decoded tree encoded again, for
+    a `from_cbor` row the typed value's own encode (`to_cbor` or the language's
+    equivalent) encoded, and for a `from_wire` row (an enum, never an accept row)
+    an empty detail; `err` with the detail `Tag;field=value...`, one
+    `;field=value` for each payload field its DecodeError carries
+    (`PAYLOAD_FIELDS`); or `untyped`, with a description, when anything other than
+    the language's DecodeError escapes.
+The gate, not the runner, judges a malformed row (`judge`). An accept row,
+`{"accept": true}` or `{"accept": true, "reencode": "<hex>"}`, passes only on `ok`
+whose detail equals its expected re-encoding: `reencode` when given, else the row's
+own bytes. That is D2's law, decode ok => encode(decode(bytes)) == bytes, and
+`reencode` states a declared exception to it (an absent `MISSING_OK` key re-encodes
+as null). A `{"tag": ...}` row passes when the tag matches and every payload field
+it names matches when compared as a string (`PAYLOAD_EXEMPT` lists the fields a
+runtime does not carry). A row never reported fails, and a runner that exits
+non-zero fails its target (`parse_report`).
 
 This corpus **SUPPLEMENTS** `tautc corpus` / the message golden corpora; it never
 replaces them. Entry point: `tautc parity`.
@@ -151,12 +159,16 @@ def _native_intbox(value: dict[str, Any], where: str) -> dict[str, Any]:
 
 
 def _check_expect(expect: Any, where: str) -> None:
-    """`{"accept": true}`, or a known decode tag with known payload fields (CD-C2)."""
+    """`{"accept": true}`, optionally with the expected re-encoding as
+    `"reencode": "<hex>"`, or a known decode tag with known payload fields (CD-C2)."""
     if not isinstance(expect, dict):
         raise ParityValidationError(f"{where}: expect must be an object")
     if "accept" in expect:
-        if expect != {"accept": True}:
-            raise ParityValidationError(f"{where}: an accept row expects exactly {{\"accept\": true}}")
+        if expect.get("accept") is not True or set(expect) - {"accept", "reencode"}:
+            raise ParityValidationError(
+                f"{where}: an accept row expects {{\"accept\": true}}, optionally with \"reencode\"")
+        if "reencode" in expect:
+            _hex(expect["reencode"], f"{where}.reencode")
         return
     tag = expect.get("tag")
     if tag not in DECODE_TAGS:
@@ -223,6 +235,8 @@ def validate_malformed_vectors(path: Path = MALFORMED_VECTORS) -> int:
             raise ParityValidationError(f"{path}:{name}: unknown message {entrypoint!r}")
         if stage == "from_wire" and entrypoint not in schema.enums:
             raise ParityValidationError(f"{path}:{name}: unknown enum {entrypoint!r}")
+        if stage == "from_wire" and "accept" in row["expect"]:
+            raise ParityValidationError(f"{path}:{name}: a from_wire row is an enum and never accepts")
         if not row.get("why"):
             raise ParityValidationError(f"{path}:{name}: missing why")
         count += 1
@@ -352,12 +366,25 @@ def parse_error(detail: str) -> tuple[str, dict[str, str]]:
     return tag, payload
 
 
+def expected_reencoding(row: Mapping[str, Any]) -> str:
+    """An accept row's expected re-encoding, as hex: its `reencode`, else its own bytes."""
+    return row["expect"].get("reencode", row["bytes"])
+
+
 def judge(target: str, row: Mapping[str, Any], outcome: str, detail: str) -> tuple[str, str]:
-    """The comparator: (PASS or FAIL, why) for one malformed row's observation."""
+    """The comparator: (PASS or FAIL, why) for one malformed row's observation. An
+    accept row's `ok` must carry its expected re-encoding (D2's law)."""
     expect = row["expect"]
     want = "accept" if expect.get("accept") else format_error(expect["tag"], expect)
     if outcome == OK:
-        return (PASS, "") if want == "accept" else (FAIL, f"decoded ok, expected {want}")
+        if want != "accept":
+            return FAIL, f"decoded ok, expected {want}"
+        reencoding = expected_reencoding(row)
+        if not detail:
+            return FAIL, "no re-encoding reported"
+        if detail != reencoding:
+            return FAIL, f"re-encoded {detail}, expected {reencoding}"
+        return PASS, ""
     if outcome == UNTYPED:
         return FAIL, f"untyped {detail}, expected {want}"
     if outcome != ERR:
@@ -493,22 +520,24 @@ def run_runner(target: str, argv: Sequence[str], *, cwd: Path, env: Mapping[str,
 # --- Python harness (in-process, no subprocess) -----------------------------------
 
 def _observe_python(schema: Any, row: Mapping[str, Any]) -> tuple[str, str]:
-    """One malformed row through wire.cbor/wire.codec: (outcome, detail) as a runner reports it."""
+    """One malformed row through wire.cbor/wire.codec: (outcome, detail) as a runner
+    reports it, `ok` with the hex of the re-encoding (empty for a `from_wire` row)."""
     from ..ir.model import EnumRef
 
     data = bytes.fromhex(row["bytes"])
     try:
         if row["stage"] == "raw_decode":
-            cbor.loads(data)
+            again = cbor.dumps(cbor.loads(data))
         elif row["stage"] == "from_cbor":
-            codec.decode(schema, row["schema"], data)
-        else:  # from_wire
+            again = codec.encode(schema, row["schema"], codec.decode(schema, row["schema"], data))
+        else:  # from_wire: an enum, never an accept row
             codec._from_wire(schema, EnumRef(row["schema"]), cbor.loads(data), strict=True)
+            again = b""
     except cbor.DecodeError as exc:
         return ERR, format_error(exc.tag, exc.payload)
     except Exception as exc:  # noqa: BLE001 — anything but DecodeError is untyped
         return UNTYPED, f"{type(exc).__name__}: {exc}"
-    return OK, ""
+    return OK, again.hex()
 
 
 def run_python() -> TargetReport:

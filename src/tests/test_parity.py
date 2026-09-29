@@ -2,10 +2,10 @@
 
 Which targets are gated and which allowlisted is data, in corpus/parity/allowlist.json;
 no test here pins a target's status. The tests check that the artifacts validate,
-that the comparator and the report parser enforce the runner protocol (an accept row,
-payloads compared as strings, a row never reported, a runner exiting non-zero, a
-build that fails), that a target's runner is found by module, and, end-to-end with
-whatever toolchains are present, that the gate's governance is clean.
+that the comparator and the report parser enforce the runner protocol (an accept row
+and its re-encoding, payloads compared as strings, a row never reported, a runner
+exiting non-zero, a build that fails), that a target's runner is found by module, and,
+end-to-end with whatever toolchains are present, that the gate's governance is clean.
 """
 
 import importlib.util
@@ -19,9 +19,12 @@ import pytest
 import taut.corpus
 from taut.cli import main
 from taut.corpus import parity, toolchains
+from taut.gen import scaffold
+from taut.ir.dsl import STR, F, Msg, schema as mk
+from taut.ir.model import MISSING_OK, EnumRef, ListOf, MapOf, Scalar
 
 INT_ROWS = 11
-MALFORMED_ROWS = 31
+MALFORMED_ROWS = 44
 
 
 def _row(name):
@@ -34,7 +37,7 @@ def _passing_lines():
     for row in parity.malformed_rows():
         expect = row["expect"]
         if expect.get("accept"):
-            lines.append(f"{row['name']}\t{parity.OK}\t")
+            lines.append(f"{row['name']}\t{parity.OK}\t{parity.expected_reencoding(row)}")
         else:
             lines.append(f"{row['name']}\t{parity.ERR}\t{parity.format_error(expect['tag'], expect)}")
     return lines
@@ -50,14 +53,31 @@ def test_int_and_malformed_artifacts_validate():
 def test_malformed_rows_expect_a_known_tag_or_accept(tmp_path):
     data = json.loads(parity.MALFORMED_VECTORS.read_text())
     accept = {r["name"] for r in data["vectors"] if "accept" in r["expect"]}
-    assert {"map-key-2^53", "optional-present-null"} <= accept      # M8, M15
+    assert {"map-key-2^53", "optional-present-null", "missing-ok-absent", "text-leading-bom",
+            "shapes-filled", "shapes-sparse", "shapes-missing-ok-absent",
+            "map-str-key-order"} <= accept                                          # M8, M15, M16
+    path = tmp_path / "malformed.vectors.json"
+    data["vectors"][0]["expect"] = {"accept": True, "reencode": "a0"}  # a re-encoding may be named
+    path.write_text(json.dumps(data))
+    assert parity.validate_malformed_vectors(path) == MALFORMED_ROWS
     for bad in ({"accept": False}, {"accept": True, "tag": "Truncated"},
-                {"tag": "Malformed"}, {"tag": "MissingKey", "field": 1}):
+                {"accept": True, "reencode": "zz"}, {"accept": True, "reencode": 160},
+                {"tag": "Malformed"}, {"tag": "MissingKey", "field": 1},
+                {"tag": "Truncated", "reencode": "a0"}):
         data["vectors"][0]["expect"] = bad
-        path = tmp_path / "malformed.vectors.json"
         path.write_text(json.dumps(data))
         with pytest.raises(parity.ParityValidationError):
             parity.validate_malformed_vectors(path)
+
+
+def test_a_from_wire_row_never_accepts(tmp_path):
+    data = json.loads(parity.MALFORMED_VECTORS.read_text())
+    row = next(r for r in data["vectors"] if r["stage"] == "from_wire")
+    row["expect"] = {"accept": True}
+    path = tmp_path / "malformed.vectors.json"
+    path.write_text(json.dumps(data))
+    with pytest.raises(parity.ParityValidationError, match="never accepts"):
+        parity.validate_malformed_vectors(path)
 
 
 def test_malformed_rows_name_the_fixture_messages():
@@ -67,7 +87,27 @@ def test_malformed_rows_name_the_fixture_messages():
             assert row["schema"] in schema.messages, row["name"]
         if row["stage"] == "from_wire":
             assert row["schema"] in schema.enums, row["name"]
-    assert {"OptBox", "Empty"} <= set(schema.messages)
+    assert {"OptBox", "Empty", "Late", "Shapes"} <= set(schema.messages)
+
+
+def _shape(t):
+    if isinstance(t, ListOf):
+        return f"list<{_shape(t.elem)}>"
+    if isinstance(t, MapOf):
+        return f"map<{_shape(t.key)},{_shape(t.value)}>"
+    return t.kind if isinstance(t, Scalar) else "enum" if isinstance(t, EnumRef) else "message"
+
+
+def test_shapes_holds_every_legal_field_shape():
+    """Each generator must generate and compile every shape `ir/validate.py` allows."""
+    fields = parity.parity_schema().messages["Shapes"].fields
+    assert [f.tag for f in fields] == list(range(1, len(fields) + 1))
+    held = {(_shape(f.type), f.optional) for f in fields}
+    required = [(kind, False) for kind in ("int", "float", "str", "bytes", "bool", "enum", "message")]
+    optional = [(kind, True) for kind in ("int", "enum", "message", "list<int>", "map<str,int>")]
+    collections = [(kind, False) for kind in ("list<int>", "list<message>", "list<list<int>>",
+                                              "map<str,int>", "map<bool,enum>", "map<int,message>")]
+    assert {*required, *optional, *collections, ("str", MISSING_OK)} <= held
 
 
 def test_committed_vectors_match_generator():
@@ -144,9 +184,35 @@ def test_skipped_target_is_not_a_violation():
 
 def test_an_accept_row_passes_only_on_ok():
     row = _row("map-key-2^53")
-    assert parity.judge("js", row, parity.OK, "")[0] == parity.PASS
+    assert parity.judge("js", row, parity.OK, row["bytes"])[0] == parity.PASS
     assert parity.judge("js", row, parity.ERR, "NonIntegerMapKey")[0] == parity.FAIL
     assert parity.judge("js", row, parity.UNTYPED, "RangeError: x")[0] == parity.FAIL
+
+
+def test_an_accept_row_passes_only_when_it_re_encodes_to_its_bytes():
+    # D2's law: decode ok => encode(decode(bytes)) == bytes.
+    row = _row("text-leading-bom")                           # 64efbbbf61, "\ufeffa"
+    assert parity.judge("ts", row, parity.OK, "64efbbbf61") == (parity.PASS, "")
+    assert parity.judge("ts", row, parity.OK, "6161") == \
+        (parity.FAIL, "re-encoded 6161, expected 64efbbbf61")
+    assert parity.judge("ts", row, parity.OK, "") == (parity.FAIL, "no re-encoding reported")
+
+
+def test_an_accept_row_honours_its_named_re_encoding():
+    row = _row("missing-ok-absent")                          # M16: a0, re-encoded as a101f6
+    assert row["bytes"] == "a0" and parity.expected_reencoding(row) == "a101f6"
+    assert parity.judge("go", row, parity.OK, "a101f6") == (parity.PASS, "")
+    assert parity.judge("go", row, parity.OK, "a0") == (parity.FAIL, "re-encoded a0, expected a101f6")
+    assert parity.judge("go", row, parity.OK, "")[0] == parity.FAIL
+    sparse = _row("shapes-sparse")["bytes"]
+    assert parity.expected_reencoding(_row("shapes-missing-ok-absent")) == sparse
+    assert parity.expected_reencoding(_row("shapes-sparse")) == sparse
+
+
+def test_a_tag_row_that_decodes_fails_whatever_it_re_encodes_to():
+    row = _row("simple-one-byte-torn")                       # f8: UnsupportedInfo{24}
+    assert parity.judge("js", row, parity.OK, "f8") == \
+        (parity.FAIL, "decoded ok, expected UnsupportedInfo;info=24")
 
 
 def test_a_tag_row_compares_the_tag_and_every_named_payload_field_as_a_string():
@@ -224,6 +290,16 @@ def test_a_generator_refusal_is_red(tmp_path):
     assert red.fault.startswith("generation failed")
 
 
+def test_every_target_generates_missing_ok(tmp_path):
+    """`scaffold.emit` no longer refuses `optional=MISSING_OK` for any target; an
+    unknown target is refused as unknown."""
+    late = mk(Msg("Late", F("note", 1, STR, optional=MISSING_OK)))
+    written = scaffold.emit(late, tmp_path, langs=list(parity.TARGETS), services=[])
+    assert {path.relative_to(tmp_path).parts[0] for path in written} == set(parity.TARGETS)
+    with pytest.raises(ValueError, match=r"unknown lang\(s\) \['no-such-language'\]"):
+        scaffold.emit(late, tmp_path, langs=["no-such-language"], services=[])
+
+
 def test_run_runner_judges_the_report_and_the_exit_status(tmp_path):
     (tmp_path / "report.txt").write_text("\n".join(_passing_lines()) + "\n")
     emit = "import sys; sys.stdout.write(open('report.txt').read()); sys.exit({})"
@@ -267,9 +343,10 @@ def test_a_target_has_a_runner_exactly_when_its_module_exists():
 
 
 def test_adding_a_runner_module_adds_a_target_to_the_gate(tmp_path, monkeypatch):
-    target = next((t for t in parity.TARGETS if t not in parity._RUNNERS), None)
-    if target is None:
-        pytest.skip("every target already has a runner module")
+    # Every real target has a runner module, so a stand-in target joins TARGETS.
+    target = "standin"
+    monkeypatch.setattr(parity, "TARGETS", (*parity.TARGETS, target))
+    assert target not in parity._RUNNERS                          # no module yet, no runner
     module = f"taut.corpus.parity_{target}"
     (tmp_path / f"parity_{target}.py").write_text(textwrap.dedent(f"""
         from taut.corpus import parity
@@ -283,16 +360,16 @@ def test_adding_a_runner_module_adds_a_target_to_the_gate(tmp_path, monkeypatch)
     importlib.invalidate_caches()
     try:
         assert target in parity._RUNNERS
+        assert target not in parity.allowlisted_targets()             # a new target is gated
         runner = importlib.import_module(module)
-        listed = target in parity.allowlisted_targets()
         runner.STDOUT = "\n".join(_passing_lines())                  # green
         outcome = parity.run_gate(target=target)
-        assert outcome.reports[target].green
-        assert bool(outcome.violations) == listed                     # a green target must be de-listed
+        assert outcome.reports[target].green and outcome.violations == []
+        assert any(line.startswith(target) and line.endswith("GREEN") for line in outcome.lines)
         runner.STDOUT = ""                                           # red: no row reported
         outcome = parity.run_gate(target=target)
         assert not outcome.reports[target].green
-        assert bool(outcome.violations) == (not listed)
+        assert len(outcome.violations) == 1 and outcome.violations[0].startswith(f"{target}: RED")
     finally:
         sys.modules.pop(module, None)
 
@@ -333,17 +410,23 @@ def test_full_gate_governance_clean():
     """End-to-end: every target that has a runner, through `tautc parity`. A missing
     toolchain skips with its reason (not a violation), so this holds whichever
     toolchains are present; a target that ran is green exactly when it is not
-    allowlisted, and an allowlisted target's reason names every row it fails."""
+    allowlisted, and an allowlisted target's reason names every row it fails or, when
+    its code did not generate or build, that fault."""
     outcome = parity.run_gate(run_compiled=True)
     assert outcome.violations == [], "\n".join(outcome.violations)
     assert set(outcome.reports) == set(parity._RUNNERS)
     assert outcome.reports["python"].available
     reasons = {s.target: s.reason for s in parity.target_statuses() if s.status == "allowlisted"}
     for target, report in outcome.reports.items():
-        if report.available and target in reasons:
-            unnamed = [r.name for r in report.failures if r.name not in reasons[target]]
-            assert unnamed == [], (target, unnamed)
-            assert not report.fault, (target, report.fault)
+        if not report.available or target not in reasons:
+            continue
+        if report.fault:
+            label = report.fault.splitlines()[0]
+            assert label.startswith(("generation failed", "build failed")), (target, report.fault)
+            assert reasons[target].startswith(label), (target, label)
+            continue
+        unnamed = [r.name for r in report.failures if r.name not in reasons[target]]
+        assert unnamed == [], (target, unnamed)
 
 
 # --- toolchain finders ------------------------------------------------------------------

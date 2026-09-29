@@ -1,6 +1,7 @@
 """JS generator: ES classes + frozen enum objects + CBOR codec (CommonJS),
 forward-compat residual."""
 
+import itertools
 import json
 from pathlib import Path
 import random
@@ -13,7 +14,7 @@ from taut import cli, ext
 from taut.corpus.build import IR_PATH
 from taut.corpus import resext_build as rb
 from taut.gen import js, scaffold
-from taut.ir.dsl import FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, schema as mk
+from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, schema as mk
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec
@@ -28,6 +29,12 @@ FLOATY = mk(Msg("Floaty",
 LATE = mk(Msg("Late", F("note", 1, STR, optional=MISSING_OK)),
           Msg("Opt", F("note", 1, STR, optional=True)))
 PAIRS = mk(Msg("Pairs", F("by_name", 1, Map(STR, INT))))
+# `Note` holds a str field, and `Keyed` a map of each key type D24 allows.
+TEXT_AND_KEYS = mk(Msg("Note", F("text", 1, STR)),
+                   Msg("Keyed",
+                       F("by_name", 1, Map(STR, INT)),
+                       F("by_id", 2, Map(INT, INT)),
+                       F("by_flag", 3, Map(BOOL, INT))))
 PARITY_IR = ROOT / "ir" / "parity_int.taut.py"
 PARITY_INT_VECTORS = ROOT / "corpus" / "parity" / "int.vectors.json"
 PARITY_MALFORMED_VECTORS = ROOT / "corpus" / "parity" / "malformed.vectors.json"
@@ -284,6 +291,95 @@ def test_js_map_field_checks_an_entry_before_decoding_it(tmp_path):
             codec.decode(PAIRS, "Pairs", cbor.dumps(value))
         payload = [f"{k}={v}" for k, v in err.value.payload.items()]
         assert ";".join([err.value.tag, *payload]) == got[name], name
+
+
+# U+FEFF opening a text string is ordinary text (the parity row text-leading-bom): a
+# UTF-8 decoder must not strip it as a byte-order mark. One after the start, or a
+# second one, is the contrast: no decoder strips those.
+_BOM_TEXTS = ["﻿a", "﻿", "﻿﻿a", "a﻿"]
+
+
+def test_js_text_keeps_a_leading_bom(tmp_path):
+    """Decode keeps a leading U+FEFF and re-encoding writes it back, raw and in a str
+    field, as in Python. The decoder is still fatal: invalid UTF-8 after a U+FEFF is
+    InvalidUtf8."""
+    raw = [cbor.dumps(t).hex() for t in _BOM_TEXTS]
+    typed = [codec.encode(TEXT_AND_KEYS, "Note", {"text": t}).hex() for t in _BOM_TEXTS]
+    invalid = "a10164efbbbfff"  # a Note whose text is a U+FEFF, then a byte never in UTF-8
+    got = _run_js(tmp_path, TEXT_AND_KEYS, f"""
+        const raw = {json.dumps(raw)};
+        const typed = {json.dumps(typed)};
+        console.log(JSON.stringify({{
+          raw: raw.map((hex) => {{
+            const c = decode(fromHex(hex));
+            return [c.s, toHex(encode(c))];
+          }}),
+          typed: typed.map((hex) => decodeAs("Note", hex, (m) => [m.text, toHex(encode(m.toCbor()))])),
+          invalid: decodeAs("Note", "{invalid}", (m) => m.text),
+        }}));
+    """)
+    assert got == {
+        "raw": [[t, h] for t, h in zip(_BOM_TEXTS, raw)],
+        "typed": [[t, h] for t, h in zip(_BOM_TEXTS, typed)],
+        "invalid": "InvalidUtf8",
+    }
+    with pytest.raises(codec.DecodeError) as err:
+        codec.decode(TEXT_AND_KEYS, "Note", bytes.fromhex(invalid))
+    assert err.value.tag == "InvalidUtf8"
+
+
+# A map<K,V> field's entries are sorted by key (D24), in the order Python's `sorted`
+# gives. A str key sorts by code point, which is its UTF-8 byte order. UTF-16 code unit
+# order differs only where U+E000..U+FFFF meets a character above U+FFFF, a surrogate
+# pair (d800-dfff). `row` holds the parity row map-str-key-order's keys; `d7ff`,
+# `same-lead` and `prefix` are orders both agree on; int and bool keys keep their order.
+_KEY_SETS = {
+    "row": ("by_name", ["￿", "\U00010000", "a"]),
+    "e000": ("by_name", ["\U00010000", ""]),
+    "top": ("by_name", ["\U0010ffff", "￿"]),
+    "after-a-prefix": ("by_name", ["a\U00010000", "a￿"]),
+    "d7ff": ("by_name", ["\U00010000", "퟿"]),
+    "same-lead": ("by_name", ["\U00010001", "\U00010000"]),
+    "prefix": ("by_name", ["ab", "a", ""]),
+    "int": ("by_id", [10, 9, -1, 0, 2 ** 53, -(2 ** 63), 2 ** 63 - 1]),
+    "bool": ("by_flag", [True, False]),
+}
+
+
+def _keyed_cases():
+    """Each key set inserted in every order (forwards and backwards, above three keys),
+    each key valued by its place in the set, with the bytes Python encodes: the same
+    for every order. An int key travels as a string, exact above 2^53."""
+    cases = []
+    for name, (field, keys) in _KEY_SETS.items():
+        value = {k: i + 1 for i, k in enumerate(keys)}
+        orders = list(itertools.permutations(keys)) if len(keys) <= 3 else [keys, keys[::-1]]
+        wire = codec.encode(TEXT_AND_KEYS, "Keyed",
+                            {"by_name": {}, "by_id": {}, "by_flag": {}, field: value}).hex()
+        for n, order in enumerate(orders):
+            entries = [[str(k) if field == "by_id" else k, value[k]] for k in order]
+            cases.append({"name": f"{name}/{n}", "field": field, "entries": entries, "hex": wire})
+    return cases
+
+
+def test_js_map_keys_encode_in_code_point_order(tmp_path):
+    """Map keys encode in Python's order, a str key by code point, whatever the
+    insertion order; each case's bytes also decode and re-encode to themselves (D2)."""
+    assert sorted(_KEY_SETS["row"][1]) == ["a", "￿", "\U00010000"]  # the reference order
+    cases = _keyed_cases()
+    got = _run_js(tmp_path, TEXT_AND_KEYS, f"""
+        const cases = {json.dumps(cases)};
+        const out = {{}};
+        for (const c of cases) {{
+          const value = new api.Keyed({{ by_name: new Map(), by_id: new Map(), by_flag: new Map() }});
+          for (const [k, v] of c.entries) {{
+            value[c.field].set(c.field === "by_id" ? BigInt(k) : k, BigInt(v));
+          }}
+          out[c.name] = [toHex(encode(value.toCbor())), decodeAs("Keyed", c.hex, (m) => toHex(encode(m.toCbor())))];
+        }}
+        console.log(JSON.stringify(out));
+    """)
+    assert got == {c["name"]: [c["hex"], c["hex"]] for c in cases}
 
 
 def _random_cbor_value(rng: random.Random):

@@ -22,7 +22,7 @@ from . import kotlin as _kotlin
 from . import rust as _rust
 from . import swift as _swift
 from ..ir.model import (
-    MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef,
+    EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef,
 )
 
 # Compiled targets whose generated code imports external runtime modules. Maps
@@ -623,19 +623,6 @@ def emit(
     `client.{ext}` for a lone service, `client_{svc}.{ext}` when several.
     """
     lang_keys = list(langs) if langs is not None else list(_LANGS)
-    missing_ok_fields = [
-        f"{m.name}.{f.name}"
-        for m in schema.messages.values()
-        for f in m.fields
-        if f.optional == MISSING_OK
-    ]
-    unsupported_missing_ok = set(lang_keys) - {"python", "rust", "js", "swift", "typescript", "kotlin", "cpp", "java", "go"}
-    if missing_ok_fields and unsupported_missing_ok:
-        raise ValueError(
-            "optional=MISSING_OK fields are supported only by Python and Rust generation; "
-            f"unsupported target(s): {sorted(unsupported_missing_ok)} "
-            f"for {missing_ok_fields}"
-        )
     if rust_external_types is not None:
         from .rust_external import imports
 

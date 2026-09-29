@@ -5,11 +5,37 @@ sorts map keys, so forward-compat residual just rides along (no merge).
 
 Field/enum names are PascalCased (Go requires capitalized identifiers to export)
 — which also means they can never collide with Go's (lowercase) keywords.
+
+Types. `int` is `int64`, `str` `string`, `bytes` `[]byte`, `bool` `bool` and `float`
+`float64`; an enum is a named `int64` and a message a struct. `list<T>` is `[]T` and
+`map<K,V>` is `map[K]V`, nested as deep as the IR nests them (`list<list<int>>` is
+`[][]int64`).
+
+Optional. An optional field of type `T` is `*T`, whatever `T` is: a nil pointer is
+null and any other pointer is the value. So an optional list is `*[]T` and an optional
+map `*map[K]V`, and a pointer to an empty or nil slice or map is the empty array, not
+null. A nil slice or map never means null: Go code treats nil and empty alike, and a
+non-optional list or map encodes nil as the empty array.
+
+Codec. One recursion over the type (`_emit_encode`, `_emit_decode`) generates every
+legal shape (`taut/ir/validate.py`) at any depth; a list or map names its temporaries
+after its depth, so an inner one never shadows an outer one. `ToCbor` appends each
+field in IR order. `TryXFromCbor` decodes the fields in IR order with the checks of
+`taut.wire.codec`, in its order (TautCheckedDecode.md CD-E5): a message is a map, a
+list an array, a map an array of entry maps each holding keys 1 and 2 before either
+is decoded, a repeated map key is `DuplicateMapKey`, and a wrong type is `WrongType`
+with its payload word. The output is gofmt-clean: every block is braced over its own
+lines, and struct fields and enum constants are aligned as gofmt aligns them.
 """
 
 from __future__ import annotations
 
-from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MessageDef, MsgRef, Scalar, Schema, TypeRef
+
+_SCALAR_TYPES = {"int": "int64", "str": "string", "bytes": "[]byte", "bool": "bool", "float": "float64"}
+_SCALAR_ENCODERS = {"int": "CInt", "str": "CText", "bytes": "CBytes", "bool": "CBool", "float": "CFloat"}
+_SCALAR_DECODERS = {"int": "TryInt", "str": "TryText", "bytes": "TryBytes", "bool": "TryBool", "float": "TryFloat"}
+_MAP_KEYS = ("int", "str", "bool")
 
 
 def _pascal(name: str) -> str:
@@ -18,7 +44,7 @@ def _pascal(name: str) -> str:
 
 def _go_ty(t: TypeRef) -> str:
     if isinstance(t, Scalar):
-        return {"int": "int64", "str": "string", "bytes": "[]byte", "bool": "bool", "float": "float64"}[t.kind]
+        return _SCALAR_TYPES[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -28,54 +54,249 @@ def _go_ty(t: TypeRef) -> str:
     raise TypeError(t)
 
 
-def _has_map(schema: Schema) -> bool:
-    return any(isinstance(f.type, MapOf) for m in schema.messages.values() for f in m.fields)
-
-
 def _field_type(f: FieldDef) -> str:
     base = _go_ty(f.type)
     return f"*{base}" if f.optional else base
 
 
-def _enc(t: TypeRef, expr: str) -> str:
-    """A Cbor expression encoding the (non-optional, non-list) value `expr`."""
+def _map_key(t: MapOf) -> Scalar:
+    """A map's key type: int, str or bool (validate allows no other)."""
+    if not (isinstance(t.key, Scalar) and t.key.kind in _MAP_KEYS):
+        raise TypeError(t)
+    return t.key
+
+
+def _sorts(t: TypeRef) -> bool:
+    """Whether encoding `t` sorts map keys (and so needs the `sort` import)."""
+    if isinstance(t, ListOf):
+        return _sorts(t.elem)
+    if isinstance(t, MapOf):
+        return True
+    return False
+
+
+def _depth(name: str, depth: int) -> str:
+    """A temporary's name at a nesting depth: `a`, then `a1`, `a2`..."""
+    return f"{name}{depth or ''}"
+
+
+def _operand(expr: str) -> str:
+    """`expr` as the operand of a selector or an index: a dereference is parenthesized."""
+    return f"({expr})" if expr.startswith("*") else expr
+
+
+def _aligned(rows: list[tuple[str, str]]) -> list[str]:
+    """`name rest` lines, one tab in, the names padded to one column as gofmt aligns them."""
+    width = max((len(name) for name, _ in rows), default=0)
+    return [f"\t{name.ljust(width)} {rest}" for name, rest in rows]
+
+
+def _emit_err_check(out: list[str], ind: str, result: str = "v") -> None:
+    out.append(f"{ind}if err != nil {{")
+    out.append(f"{ind}\treturn {result}, err")
+    out.append(f"{ind}}}")
+
+
+def _emit_panic_check(out: list[str]) -> None:
+    out.append("\tif err != nil {")
+    out.append("\t\tpanic(err)")
+    out.append("\t}")
+
+
+# --- encode ------------------------------------------------------------------------------
+
+def _enc_leaf(t: TypeRef, expr: str) -> str:
+    """The Cbor expression for `expr`, a scalar, enum or message value."""
     if isinstance(t, Scalar):
-        return {"int": f"CInt({expr})", "str": f"CText({expr})",
-                "bytes": f"CBytes({expr})", "bool": f"CBool({expr})",
-                "float": f"CFloat({expr})"}[t.kind]
+        return f"{_SCALAR_ENCODERS[t.kind]}({expr})"
     if isinstance(t, EnumRef):
         return f"CInt(int64({expr}))"
     if isinstance(t, MsgRef):
-        return f"{expr}.ToCbor()"
+        return f"{_operand(expr)}.ToCbor()"
     raise TypeError(t)
 
 
-def _try_dec(t: TypeRef, expr: str) -> str:
-    """A Go expression returning `(native_value, error)` for Cbor `expr`."""
+def _emit_encode(out: list[str], t: TypeRef, expr: str, ind: str, depth: int = 0) -> str:
+    """Emit at indent `ind` the statements that encode the Go value `expr` of type `t`, and
+    return the Cbor expression for it. A list is an array of its items; a map is an array
+    of `{1: key, 2: value}` entry maps in ascending key order (false before true)."""
+    if isinstance(t, ListOf):
+        a, e = _depth("a", depth), _depth("e", depth)
+        out.append(f"{ind}{a} := make([]Cbor, 0, len({expr}))")
+        out.append(f"{ind}for _, {e} := range {expr} {{")
+        item = _emit_encode(out, t.elem, e, ind + "\t", depth + 1)
+        out.append(f"{ind}\t{a} = append({a}, {item})")
+        out.append(f"{ind}}}")
+        return f"CArr({a})"
+    if isinstance(t, MapOf):
+        key = _map_key(t)
+        ks, k, a = _depth("ks", depth), _depth("k", depth), _depth("a", depth)
+        less = f"!{ks}[i] && {ks}[j]" if key.kind == "bool" else f"{ks}[i] < {ks}[j]"
+        out.append(f"{ind}{ks} := make([]{_go_ty(key)}, 0, len({expr}))")
+        out.append(f"{ind}for {k} := range {expr} {{")
+        out.append(f"{ind}\t{ks} = append({ks}, {k})")
+        out.append(f"{ind}}}")
+        out.append(f"{ind}sort.Slice({ks}, func(i, j int) bool {{ return {less} }})")
+        out.append(f"{ind}{a} := make([]Cbor, 0, len({ks}))")
+        out.append(f"{ind}for _, {k} := range {ks} {{")
+        value = _emit_encode(out, t.value, f"{_operand(expr)}[{k}]", ind + "\t", depth + 1)
+        out.append(f"{ind}\t{a} = append({a}, CMap([]KV{{{{K: 1, V: {_enc_leaf(key, k)}}}, {{K: 2, V: {value}}}}}))")
+        out.append(f"{ind}}}")
+        return f"CArr({a})"
+    return _enc_leaf(t, expr)
+
+
+def _emit_to_cbor(msg: MessageDef, forward_compat: bool) -> list[str]:
+    fields = msg.wire_fields()
+    out = [f"func (x {msg.name}) ToCbor() Cbor {{", f"\tm := make([]KV, 0, {len(fields)})"]
+    for f in fields:
+        value = f"x.{_pascal(f.name)}"
+        if f.optional:
+            # Always written: null when unset (the key is never omitted).
+            out.append(f"\tif {value} == nil {{")
+            out.append(f"\t\tm = append(m, KV{{K: {f.tag}, V: CNull()}})")
+            out.append("\t} else {")
+            item = _emit_encode(out, f.type, f"*{value}", "\t\t")
+            out.append(f"\t\tm = append(m, KV{{K: {f.tag}, V: {item}}})")
+            out.append("\t}")
+        elif isinstance(f.type, (ListOf, MapOf)):
+            out.append("\t{")
+            item = _emit_encode(out, f.type, value, "\t\t")
+            out.append(f"\t\tm = append(m, KV{{K: {f.tag}, V: {item}}})")
+            out.append("\t}")
+        else:
+            out.append(f"\tm = append(m, KV{{K: {f.tag}, V: {_enc_leaf(f.type, value)}}})")
+    if forward_compat:
+        out.append("\tm = append(m, x.WireResidual...)")  # Encode sorts -> canonical
+    out.append("\treturn CMap(m)")
+    out.append("}")
+    return out
+
+
+# --- decode ------------------------------------------------------------------------------
+
+def _try_dec_leaf(t: TypeRef, expr: str) -> str:
+    """A Go expression returning `(native_value, error)` for `expr`, the Cbor of a scalar,
+    enum or message."""
     if isinstance(t, Scalar):
-        return {"int": f"{expr}.TryInt()", "str": f"{expr}.TryText()",
-                "bytes": f"{expr}.TryBytes()", "bool": f"{expr}.TryBool()",
-                "float": f"{expr}.TryFloat()"}[t.kind]
-    if isinstance(t, EnumRef):
-        return f"Try{t.name}FromCbor({expr})"
-    if isinstance(t, MsgRef):
+        return f"{expr}.{_SCALAR_DECODERS[t.kind]}()"
+    if isinstance(t, (EnumRef, MsgRef)):
         return f"Try{t.name}FromCbor({expr})"
     raise TypeError(t)
 
 
-def _duplicate_key_error(key: TypeRef) -> str:
+def _duplicate_key_error(key: Scalar, k: str) -> str:
     """The error for a repeated `map<K,V>` entry key `k`. `DecodeError.Key` is an int64,
     so it carries an int key; a str or bool key is refused with the same tag and no key."""
-    if isinstance(key, Scalar) and key.kind == "int":
-        return "&DecodeError{Tag: DecodeErrDuplicateMapKey, Key: k}"
+    if key.kind == "int":
+        return f"&DecodeError{{Tag: DecodeErrDuplicateMapKey, Key: {k}}}"
     return "&DecodeError{Tag: DecodeErrDuplicateMapKey}"
 
 
+def _emit_decode(out: list[str], t: TypeRef, expr: str, ind: str, depth: int = 0) -> str:
+    """Emit at indent `ind` the statements that decode `expr`, a Cbor, as type `t` into a
+    new variable, and return its name (`x`, then `x1`, `x2`... by depth). Any error returns
+    `v, err` from the enclosing `TryXFromCbor`."""
+    x = _depth("x", depth)
+    if isinstance(t, ListOf):
+        arr, e = _depth("arr", depth), _depth("e", depth)
+        out.append(f"{ind}{arr}, err := {expr}.TryArray()")
+        _emit_err_check(out, ind)
+        out.append(f"{ind}var {x} {_go_ty(t)}")
+        out.append(f"{ind}for _, {e} := range {arr} {{")
+        item = _emit_decode(out, t.elem, e, ind + "\t", depth + 1)
+        out.append(f"{ind}\t{x} = append({x}, {item})")
+        out.append(f"{ind}}}")
+        return x
+    if isinstance(t, MapOf):
+        # An array of entry maps; each entry has keys 1 and 2 before either is decoded,
+        # and a repeated key is refused (the last one never wins).
+        key = _map_key(t)
+        arr, e = _depth("arr", depth), _depth("e", depth)
+        kc, vc, k = _depth("kc", depth), _depth("vc", depth), _depth("k", depth)
+        body = ind + "\t"
+        out.append(f"{ind}{arr}, err := {expr}.TryArray()")
+        _emit_err_check(out, ind)
+        out.append(f"{ind}{x} := {_go_ty(t)}{{}}")
+        out.append(f"{ind}for _, {e} := range {arr} {{")
+        out.append(f"{body}{kc}, err := {e}.Require(1)")
+        _emit_err_check(out, body)
+        out.append(f"{body}{vc}, err := {e}.Require(2)")
+        _emit_err_check(out, body)
+        out.append(f"{body}{k}, err := {_try_dec_leaf(key, kc)}")
+        _emit_err_check(out, body)
+        out.append(f"{body}if _, dup := {x}[{k}]; dup {{")
+        out.append(f"{body}\treturn v, {_duplicate_key_error(key, k)}")
+        out.append(f"{body}}}")
+        value = _emit_decode(out, t.value, vc, body, depth + 1)
+        out.append(f"{body}{x}[{k}] = {value}")
+        out.append(f"{ind}}}")
+        return x
+    out.append(f"{ind}{x}, err := {_try_dec_leaf(t, expr)}")
+    _emit_err_check(out, ind)
+    return x
+
+
+def _emit_from_cbor(msg: MessageDef, forward_compat: bool) -> list[str]:
+    # The schema stage (TautCheckedDecode.md CD-E5): the message must be a map, even one
+    # with no fields; then each field in IR order.
+    out = [f"func Try{msg.name}FromCbor(c Cbor) ({msg.name}, error) {{",
+           f"\tvar v {msg.name}",
+           "\tif _, err := c.TryMap(); err != nil {",
+           "\t\treturn v, err",
+           "\t}"]
+    for f in msg.wire_fields():  # a transient field is native-only: left as the Go zero value
+        dst = f"v.{_pascal(f.name)}"
+        out.append("\t{")
+        if f.optional == MISSING_OK:
+            # An absent key reads as null, like a present null; a wrong type still fails.
+            out.append(f"\t\tfv, ok, err := c.Lookup({f.tag})")
+            _emit_err_check(out, "\t\t")
+            out.append("\t\tif ok && !fv.IsNull() {")
+        elif f.optional:
+            # The key is required (the encoder always writes it); its value may be null.
+            out.append(f"\t\tfv, err := c.Require({f.tag})")
+            _emit_err_check(out, "\t\t")
+            out.append("\t\tif !fv.IsNull() {")
+        else:
+            out.append(f"\t\tfv, err := c.Require({f.tag})")
+            _emit_err_check(out, "\t\t")
+        if f.optional:
+            x = _emit_decode(out, f.type, "fv", "\t\t\t")
+            out.append(f"\t\t\t{dst} = &{x}")
+            out.append("\t\t}")
+        else:
+            x = _emit_decode(out, f.type, "fv", "\t\t")
+            out.append(f"\t\t{dst} = {x}")
+        out.append("\t}")
+    if forward_compat:
+        cond = " && ".join(f"kv.K != {f.tag}" for f in msg.wire_fields()) or "true"
+        out.append("\t{")
+        out.append("\t\tentries, err := c.TryMap()")
+        _emit_err_check(out, "\t\t")
+        out.append("\t\tfor _, kv := range entries {")
+        out.append(f"\t\t\tif {cond} {{")
+        out.append("\t\t\t\tv.WireResidual = append(v.WireResidual, kv)")
+        out.append("\t\t\t}")
+        out.append("\t\t}")
+        out.append("\t}")
+    out.append("\treturn v, nil")
+    out.append("}")
+    out.append("")
+    out.append(f"func {msg.name}FromCbor(c Cbor) {msg.name} {{")
+    out.append(f"\tv, err := Try{msg.name}FromCbor(c)")
+    _emit_panic_check(out)
+    out.append("\treturn v")
+    out.append("}")
+    return out
+
+
+# --- declarations ------------------------------------------------------------------------
+
 def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
-    out = [f"type {name} int64", "", "const ("]
-    for m, v in members.items():
-        out.append(f"\t{name}{_pascal(m)} {name} = {v}")
-    out.append(")")
+    consts = _aligned([(f"{name}{_pascal(m)}", f"{name} = {v}") for m, v in members.items()])
+    out = [f"type {name} int64", ""]
+    out += ["const (", *consts, ")"] if consts else ["const ()"]
     out.append("")
     out.append(f"func Try{name}FromWire(v int64) ({name}, error) {{")
     out.append("\tswitch v {")
@@ -89,163 +310,43 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     out.append("")
     out.append(f"func {name}FromWire(v int64) {name} {{")
     out.append(f"\tx, err := Try{name}FromWire(v)")
-    out.append("\tif err != nil { panic(err) }")
+    _emit_panic_check(out)
     out.append("\treturn x")
     out.append("}")
     out.append("")
     out.append(f"func Try{name}FromCbor(c Cbor) ({name}, error) {{")
     out.append("\tv, err := c.TryInt()")
-    out.append("\tif err != nil { return 0, err }")
+    _emit_err_check(out, "\t", result="0")
     out.append(f"\treturn Try{name}FromWire(v)")
     out.append("}")
     out.append("")
     out.append(f"func {name}FromCbor(c Cbor) {name} {{")
     out.append(f"\tx, err := Try{name}FromCbor(c)")
-    out.append("\tif err != nil { panic(err) }")
+    _emit_panic_check(out)
     out.append("\treturn x")
     out.append("}")
     return out
 
 
-def _emit_try_assign(out: list[str], dst: str, t: TypeRef, expr: str) -> None:
-    out.append(f"\t\tx, err := {_try_dec(t, expr)}")
-    out.append("\t\tif err != nil { return v, err }")
-    out.append(f"\t\t{dst} = x")
-
-
-def _emit_message(msg, forward_compat: bool = False) -> list[str]:
-    out = [f"type {msg.name} struct {{"]
-    for f in msg.fields:
-        out.append(f"\t{_pascal(f.name)} {_field_type(f)}")
+def _emit_message(msg: MessageDef, forward_compat: bool = False) -> list[str]:
+    fields = [(_pascal(f.name), _field_type(f)) for f in msg.fields]
     if forward_compat:
-        out.append("\tWireResidual []KV")
-    out.append("}")
+        fields.append(("WireResidual", "[]KV"))
+    out = [f"type {msg.name} struct {{", *_aligned(fields), "}", ""]
+    out += _emit_to_cbor(msg, forward_compat)
     out.append("")
-    # ToCbor
-    out.append(f"func (x {msg.name}) ToCbor() Cbor {{")
-    out.append("\tm := []KV{")
-    for f in msg.wire_fields():
-        fn = f"x.{_pascal(f.name)}"
-        if f.optional:
-            val = f"func() Cbor {{ if {fn} != nil {{ return {_enc(f.type, '(*' + fn + ')')} }}; return CNull() }}()"
-        elif isinstance(f.type, ListOf):
-            val = (f"func() Cbor {{ a := []Cbor{{}}; for _, e := range {fn} {{ a = append(a, {_enc(f.type.elem, 'e')}) }}; return CArr(a) }}()")
-        elif isinstance(f.type, MapOf):
-            kt = _go_ty(f.type.key)
-            less = ("!ks[i] && ks[j]" if isinstance(f.type.key, Scalar) and f.type.key.kind == "bool"
-                    else "ks[i] < ks[j]")
-            enck, encv = _enc(f.type.key, "k"), _enc(f.type.value, f"{fn}[k]")
-            val = (f"func() Cbor {{ ks := make([]{kt}, 0, len({fn})); for k := range {fn} {{ ks = append(ks, k) }}; "
-                   f"sort.Slice(ks, func(i, j int) bool {{ return {less} }}); a := []Cbor{{}}; "
-                   f"for _, k := range ks {{ a = append(a, CMap([]KV{{{{K: 1, V: {enck}}}, {{K: 2, V: {encv}}}}})) }}; "
-                   f"return CArr(a) }}()")
-        else:
-            val = _enc(f.type, fn)
-        out.append(f"\t\t{{K: {f.tag}, V: {val}}},")
-    out.append("\t}")
-    if forward_compat:
-        out.append("\tm = append(m, x.WireResidual...)") # Encode sorts -> canonical
-    out.append("\treturn CMap(m)")
-    out.append("}")
-    out.append("")
-    # FromCbor. The schema stage (TautCheckedDecode.md CD-E5): the message must be a map,
-    # even one with no fields; then each field in IR order.
-    out.append(f"func Try{msg.name}FromCbor(c Cbor) ({msg.name}, error) {{")
-    out.append(f"\tvar v {msg.name}")
-    out.append("\tif _, err := c.TryMap(); err != nil { return v, err }")
-    for f in msg.fields:
-        if f.transient:
-            continue  # native-only; left as the Go zero value
-        fn = f"v.{_pascal(f.name)}"
-        if f.optional == MISSING_OK:
-            # An absent key reads as null, like a present null; a wrong type still fails.
-            out.append("\t{")
-            out.append(f"\t\tfv, ok, err := c.Lookup({f.tag})")
-            out.append("\t\tif err != nil { return v, err }")
-            out.append("\t\tif ok && !fv.IsNull() {")
-            out.append(f"\t\t\tx, err := {_try_dec(f.type, 'fv')}")
-            out.append("\t\t\tif err != nil { return v, err }")
-            out.append(f"\t\t\t{fn} = &x")
-            out.append("\t\t}")
-            out.append("\t}")
-        elif f.optional:
-            # The key is required (the encoder always writes it); its value may be null.
-            out.append("\t{")
-            out.append(f"\t\tfv, err := c.Require({f.tag})")
-            out.append("\t\tif err != nil { return v, err }")
-            out.append("\t\tif !fv.IsNull() {")
-            out.append(f"\t\t\tx, err := {_try_dec(f.type, 'fv')}")
-            out.append("\t\t\tif err != nil { return v, err }")
-            out.append(f"\t\t\t{fn} = &x")
-            out.append("\t\t}")
-            out.append("\t}")
-        elif isinstance(f.type, ListOf):
-            out.append("\t{")
-            out.append(f"\t\tfv, err := c.Require({f.tag})")
-            out.append("\t\tif err != nil { return v, err }")
-            out.append("\t\tarr, err := fv.TryArray()")
-            out.append("\t\tif err != nil { return v, err }")
-            out.append("\t\tfor _, e := range arr {")
-            out.append(f"\t\t\tx, err := {_try_dec(f.type.elem, 'e')}")
-            out.append("\t\t\tif err != nil { return v, err }")
-            out.append(f"\t\t\t{fn} = append({fn}, x)")
-            out.append("\t\t}")
-            out.append("\t}")
-        elif isinstance(f.type, MapOf):
-            # An array of entry maps; each entry has keys 1 and 2 before either is
-            # decoded, and a repeated key is refused (the last one never wins).
-            kt, vt = _go_ty(f.type.key), _go_ty(f.type.value)
-            out.append("\t{")
-            out.append(f"\t\tfv, err := c.Require({f.tag})")
-            out.append("\t\tif err != nil { return v, err }")
-            out.append("\t\tarr, err := fv.TryArray()")
-            out.append("\t\tif err != nil { return v, err }")
-            out.append(f"\t\t{fn} = map[{kt}]{vt}{{}}")
-            out.append("\t\tfor _, e := range arr {")
-            out.append("\t\t\tkc, err := e.Require(1)")
-            out.append("\t\t\tif err != nil { return v, err }")
-            out.append("\t\t\tvc, err := e.Require(2)")
-            out.append("\t\t\tif err != nil { return v, err }")
-            out.append(f"\t\t\tk, err := {_try_dec(f.type.key, 'kc')}")
-            out.append("\t\t\tif err != nil { return v, err }")
-            out.append(f"\t\t\tif _, dup := {fn}[k]; dup {{ return v, {_duplicate_key_error(f.type.key)} }}")
-            out.append(f"\t\t\tval, err := {_try_dec(f.type.value, 'vc')}")
-            out.append("\t\t\tif err != nil { return v, err }")
-            out.append(f"\t\t\t{fn}[k] = val")
-            out.append("\t\t}")
-            out.append("\t}")
-        else:
-            out.append("\t{")
-            out.append(f"\t\tfv, err := c.Require({f.tag})")
-            out.append("\t\tif err != nil { return v, err }")
-            _emit_try_assign(out, fn, f.type, "fv")
-            out.append("\t}")
-    if forward_compat:
-        cond = " && ".join(f"kv.K != {f.tag}" for f in msg.wire_fields()) or "true"
-        out.append("\t{")
-        out.append("\t\tentries, err := c.TryMap()")
-        out.append("\t\tif err != nil { return v, err }")
-        out.append(f"\t\tfor _, kv := range entries {{ if {cond} {{ v.WireResidual = append(v.WireResidual, kv) }} }}")
-        out.append("\t}")
-    out.append("\treturn v, nil")
-    out.append("}")
-    out.append("")
-    out.append(f"func {msg.name}FromCbor(c Cbor) {msg.name} {{")
-    out.append(f"\tv, err := Try{msg.name}FromCbor(c)")
-    out.append("\tif err != nil { panic(err) }")
-    out.append("\treturn v")
-    out.append("}")
+    out += _emit_from_cbor(msg, forward_compat)
     return out
 
 
 def emit_types(schema: Schema, forward_compat: bool = False) -> str:
     out = ["// GENERATED native Go types + codec — do not edit.",
            "// Pairs with the vendored cbor.go runtime (same package).",
-           "package taut", ""]
-    if _has_map(schema):
-        out += ['import "sort"', ""]
+           "package taut"]
+    if any(_sorts(f.type) for m in schema.messages.values() for f in m.wire_fields()):
+        out += ["", 'import "sort"']
     for e in schema.enums.values():
-        out += _emit_enum(e.name, e.members) + [""]
+        out += ["", *_emit_enum(e.name, e.members)]
     for m in schema.messages.values():
-        out += _emit_message(m, forward_compat) + [""]
+        out += ["", *_emit_message(m, forward_compat)]
     return "\n".join(out) + "\n"

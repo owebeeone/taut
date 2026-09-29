@@ -5,9 +5,11 @@
 The round-trip integer bytes are produced by taut's OWN reference wire codec
 (`taut.wire.codec`), so the committed `.json` is at once **reviewable** (a human
 reads the value + the bytes) and **regenerable** (this script re-derives them from
-the frozen codec). Malformed vectors are **hand-authored hex** — each row is a
+the frozen codec). Raw malformed vectors are **hand-authored hex** — each row is a
 deliberate wire corruption carrying a one-line `why`; they are never mutated
-golden entries.
+golden entries. The `Late` and `Shapes` rows take their bytes from the same codec:
+a value encoded (`codec.encode`), or its wire structure (`codec.encode_struct`)
+altered and then encoded (`cbor.dumps`).
 
 This parity corpus **SUPPLEMENTS** `tautc corpus` / the message golden corpora —
 it never replaces them. The golden kit proves value round-trips; this fixture
@@ -16,15 +18,20 @@ adds the boundary, adversarial, and fail-closed vectors the kit cannot host.
 Rows added beyond the reviewed cac5e62 baseline carry `"lead": true`. Those are
 the **leading** rows: the strict-canonical D2 requirements (`NonCanonicalInt`,
 `NegativeMapKey`) that no codec satisfies yet, a nested-truncation vector,
-`2^53+1`, and rows M1-M15 of TautCheckedDecode.md §4.4 (one order of checks,
-payload words, and inputs that must decode). Per-language *baseline* smoke tests
+`2^53+1`, rows M1-M17 of TautCheckedDecode.md §4.4 (one order of checks,
+payload words, and inputs that must decode), and the gaps the language agents
+found (a leading BOM, the other simple values, every field shape, duplicate
+non-int map keys). Per-language *baseline* smoke tests
 pin the reviewed set and skip the `lead` rows; the governed `tautc parity` gate
 replays **every** row. This is how the gate LEADS (it demands not-yet-built
 behaviour) without breaking the existing green per-language smoke tests.
 
 A malformed row's `expect` is either `{"tag": ..., <payload>}`, whose payload
 fields the gate compares as strings, or `{"accept": true}` for an input that must
-decode without error (CD-C2, CD-C4).
+decode without error and re-encode to its own bytes (CD-C2, CD-C4; D2's law,
+decode ok => encode(decode(bytes)) == bytes). An accept row whose re-encoding
+differs by declaration carries it as `"reencode": "<hex>"`: an absent
+`optional=MISSING_OK` key re-encodes as null.
 """
 
 from __future__ import annotations
@@ -38,7 +45,7 @@ ROOT = HERE.parent.parent  # taut/
 sys.path.insert(0, str(ROOT / "src"))
 
 from taut.ir.load import load_schema  # noqa: E402
-from taut.wire import codec  # noqa: E402
+from taut.wire import cbor, codec  # noqa: E402
 
 CONTRACT = "taut-codec-parity/i64/v0"
 SCHEMA_PATH = "ir/parity_int.taut.py"
@@ -114,10 +121,91 @@ def _mal(name, stage, bytes_hex, expect, why, *, schema=None, lead=False) -> dic
     return row
 
 
-# --- malformed-input vectors (hand-authored hex) ------------------------------
+# --- schema-stage values: Late and Shapes (ir/parity_int.taut.py) -------------
+# Their rows' bytes come from taut's own codec, never from hand-written hex.
+SHAPES_TAGS = {f.name: f.tag for f in SCHEMA.messages["Shapes"].fields}
+
+# Every field set, the optional ones included; at least two entries in each map.
+SHAPES_FILLED = {
+    "count": -1000,
+    "ratio": 1.5,                                    # shortest form is a half: f9 3e00
+    "label": "na\u00efve \u2603 \U0001d11e",             # 2-, 3- and 4-byte UTF-8
+    "blob": b"\x00\x7f\xff",
+    "flag": True,
+    "mode": "alt",
+    "boxed": {"mode": "alt"},
+    "maybe_count": 7,
+    "maybe_mode": "ok",
+    "maybe_boxed": {"mode": "ok"},
+    "numbers": [1, -2, 300],
+    "boxes": [{"mode": "ok"}, {"mode": "alt"}],
+    "grid": [[1, 2], [], [3]],                       # a nested list holding an empty list
+    "tally": {"a": 1, "b": -2},
+    "mode_by_flag": {False: "alt", True: "ok"},
+    "box_by_id": {2: {"mode": "alt"}, 10: {"mode": "ok"}},
+    "maybe_numbers": [4, 5],
+    "maybe_tally": {"x": 0, "y": 9},
+    "late_note": "late",
+}
+
+# Every optional field null, every collection empty, the MISSING_OK field present as null.
+SHAPES_SPARSE = {
+    "count": 0,
+    "ratio": 0.0,
+    "label": "",
+    "blob": b"",
+    "flag": False,
+    "mode": "ok",
+    "boxed": {"mode": "ok"},
+    "maybe_count": None,
+    "maybe_mode": None,
+    "maybe_boxed": None,
+    "numbers": [],
+    "boxes": [],
+    "grid": [],
+    "tally": {},
+    "mode_by_flag": {},
+    "box_by_id": {},
+    "maybe_numbers": None,
+    "maybe_tally": None,
+    "late_note": None,
+}
+
+
+def _encoded(message: str, value: dict) -> str:
+    return codec.encode(SCHEMA, message, value).hex()
+
+
+def _entries(field: str, mapping: dict) -> list:
+    """A Shapes map field's wire entries for `mapping`, from taut's own codec."""
+    return codec.encode_struct(SCHEMA, "Shapes", {**SHAPES_SPARSE, field: mapping})[SHAPES_TAGS[field]]
+
+
+def _sparse_altered(*, drop: tuple[str, ...] = (), **wire) -> str:
+    """shapes-sparse's wire structure with the fields in `drop` removed and the
+    fields named in `wire` replaced by the given wire structures, then encoded."""
+    struct = codec.encode_struct(SCHEMA, "Shapes", SHAPES_SPARSE)
+    for name in drop:
+        del struct[SHAPES_TAGS[name]]
+    for name, value in wire.items():
+        struct[SHAPES_TAGS[name]] = value
+    return cbor.dumps(struct).hex()
+
+
+LATE_ABSENT = cbor.dumps({}).hex()
+LATE_NULL = _encoded("Late", {"note": None})
+LATE_INT = cbor.dumps({1: 1}).hex()
+# The encoder agrees with TautCheckedDecode.md §4.4's bytes for M16 and M17.
+assert (LATE_ABSENT, LATE_NULL, LATE_INT) == ("a0", "a101f6", "a10101")
+
+SHAPES_SPARSE_HEX = _encoded("Shapes", SHAPES_SPARSE)
+
+
+# --- malformed-input vectors ----------------------------------------------------
 # Every canonical decode tag from the contract (§2b), one nested failure, plus
 # the ratified D2-strict rows. Baseline rows are byte-for-byte stable; the leading
-# rows (NonCanonicalInt x2, NegativeMapKey, nested truncation, then M1-M15) are last.
+# rows (NonCanonicalInt x2, NegativeMapKey, nested truncation, M1-M17, then the
+# gap rows) are last. Raw rows are hand-authored hex; Late and Shapes rows are not.
 MALFORMED_VECTORS = [
     _mal("truncated-u64-argument", "raw_decode", "1b0000",
          {"tag": "Truncated"},
@@ -245,6 +333,81 @@ MALFORMED_VECTORS = [
     _mal("optional-present-null", "from_cbor", "a201f60280",
          {"accept": True}, schema="OptBox",
          why="M15: an optional field present as null decodes, to null",
+         lead=True),
+    # --- leading: M16-M17 (Late, optional=MISSING_OK) --------------------------
+    _mal("missing-ok-absent", "from_cbor", LATE_ABSENT,
+         {"accept": True, "reencode": LATE_NULL}, schema="Late",
+         why="M16: Late.note is optional=MISSING_OK, so an absent key decodes to null; the "
+             "encoder writes the null back, the declared exception to D2's law",
+         lead=True),
+    _mal("missing-ok-wrong-type", "from_cbor", LATE_INT,
+         {"tag": "WrongType", "expected": "text"}, schema="Late",
+         why="M17: MISSING_OK forgives only an absent key; Late.note present as an int is "
+             "still WrongType, with the payload word `text`",
+         lead=True),
+    # --- leading: gaps the language agents found (raw rows are hand-authored) ---
+    _mal("text-leading-bom", "raw_decode", "64efbbbf61",
+         {"accept": True},
+         "U+FEFF (ef bb bf) opening a text string is ordinary text: decode keeps it and "
+         "re-encoding writes it back; a UTF-8 decoder must not strip it as a byte-order mark",
+         lead=True),
+    _mal("simple-undefined", "raw_decode", "f7",
+         {"tag": "UnsupportedInfo", "info": 23},
+         "major 7 info 23 (undefined) is none of the kept values: false, true, null and the "
+         "three floats",
+         lead=True),
+    _mal("simple-zero", "raw_decode", "e0",
+         {"tag": "UnsupportedInfo", "info": 0},
+         "major 7 info 0 (simple value 0) is none of the kept values",
+         lead=True),
+    _mal("simple-one-byte-torn", "raw_decode", "f8",
+         {"tag": "UnsupportedInfo", "info": 24},
+         "major 7 info 24 (a one-byte simple value) whose argument byte is missing: the "
+         "initial byte decides, so its argument is never read (CD-E5 step 2)",
+         lead=True),
+    # --- leading: Shapes, every legal field shape (bytes from taut's own codec) ---
+    _mal("shapes-filled", "from_cbor", _encoded("Shapes", SHAPES_FILLED),
+         {"accept": True}, schema="Shapes",
+         why="every field shape set, the optional ones included, decodes and re-encodes "
+             "to these bytes: a half-width float, non-ASCII text, a nested list holding "
+             "an empty list, and two entries in each map",
+         lead=True),
+    _mal("shapes-sparse", "from_cbor", SHAPES_SPARSE_HEX,
+         {"accept": True}, schema="Shapes",
+         why="every optional field null, every collection empty and the MISSING_OK field "
+             "present as null: decodes and re-encodes to these bytes",
+         lead=True),
+    _mal("shapes-missing-ok-absent", "from_cbor", _sparse_altered(drop=("late_note",)),
+         {"accept": True, "reencode": SHAPES_SPARSE_HEX}, schema="Shapes",
+         why="shapes-sparse without the MISSING_OK key 19 decodes, and re-encodes with "
+             "it as null: shapes-sparse's bytes",
+         lead=True),
+    _mal("map-str-key-order", "from_cbor",
+         _encoded("Shapes", {**SHAPES_SPARSE, "tally": {"￿": 1, "\U00010000": 2, "a": 3}}),
+         {"accept": True}, schema="Shapes",
+         why="shapes-sparse whose map<str,int> holds the keys U+FFFF, U+10000 and \"a\", written "
+             "in code point order (\"a\", U+FFFF, U+10000), which is UTF-8 byte order; a codec "
+             "that sorts str keys by UTF-16 code unit puts U+10000 (d800 dc00) before U+FFFF "
+             "and does not re-encode these bytes",
+         lead=True),
+    _mal("map-str-key-duplicate", "from_cbor",
+         _sparse_altered(tally=[*_entries("tally", {"a": 1}), *_entries("tally", {"a": 2})]),
+         {"tag": "DuplicateMapKey"}, schema="Shapes",
+         why="shapes-sparse whose map<str,int> holds two entries keyed \"a\": a repeated "
+             "key is refused whatever its type; tag only, as the payload of a non-int key "
+             "is open for the owner",
+         lead=True),
+    _mal("map-bool-key-duplicate", "from_cbor",
+         _sparse_altered(mode_by_flag=[*_entries("mode_by_flag", {True: "ok"}),
+                                       *_entries("mode_by_flag", {True: "alt"})]),
+         {"tag": "DuplicateMapKey"}, schema="Shapes",
+         why="shapes-sparse whose map<bool,Mode> holds two entries keyed true: "
+             "DuplicateMapKey, tag only, as for map-str-key-duplicate",
+         lead=True),
+    _mal("list-nested-wrong-type", "from_cbor", _sparse_altered(grid=[["x"]]),
+         {"tag": "WrongType", "expected": "int"}, schema="Shapes",
+         why="shapes-sparse whose list<list<int>> holds [[\"x\"]]: an inner list's item "
+             "is checked as an int",
          lead=True),
 ]
 

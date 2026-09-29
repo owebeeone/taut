@@ -12,8 +12,9 @@ The gate finds it by module name (`parity._RUNNERS`) and calls `run()`:
   5. run it (`parity.run_runner`), which parses and judges its report.
 
 The runner prints `name<TAB>outcome<TAB>detail` per row. It checks int rows
-itself; for a malformed row it only reports what happened (`ok`; `err` with the
-tag and payload; `untyped` for any other thrown error) and the gate judges it.
+itself; for a malformed row it only reports what happened (`ok` with the hex of the
+re-encoding; `err` with the tag and payload; `untyped` for any other thrown error)
+and the gate judges it.
 Swift cannot catch a trap, so the runner flushes each line: a trap leaves the rows
 before it reported and fails the target through the runner's exit status.
 """
@@ -128,8 +129,9 @@ func emit(_ name: String, _ outcome: String, _ detail: String) {
     fflush(stdout)
 }
 
-/// A from_cbor row's typed entry point, by message name (from the fixture schema).
-func fromCbor(_ message: String, _ c: Cbor) throws {
+/// A from_cbor row's typed entry point, by message name (from the fixture schema):
+/// the decoded value's own encoding.
+func fromCbor(_ message: String, _ c: Cbor) throws -> [UInt8] {
     switch message {
 @FROM_CBOR@
     default:
@@ -146,15 +148,18 @@ func fromWire(_ name: String, _ c: Cbor) throws {
     }
 }
 
-func decodeRow(_ row: Mal) throws {
+/// A decoded row's re-encoding: the tree for raw_decode, the typed value for
+/// from_cbor, and nothing for from_wire (an enum row never accepts).
+func decodeRow(_ row: Mal) throws -> [UInt8] {
     let c = try tryDecode(try unhex(row.bytes))
     switch row.stage {
     case "raw_decode":
-        return
+        return encode(c)
     case "from_cbor":
-        try fromCbor(row.schema, c)
+        return try fromCbor(row.schema, c)
     case "from_wire":
         try fromWire(row.schema, c)
+        return []
     default:
         throw RunnerError.badRow("unknown stage \(row.stage)")
     }
@@ -233,8 +238,8 @@ for row in encodeFail {
 
 for row in malformed {
     do {
-        try decodeRow(row)
-        emit(row.name, "ok", "")
+        let again = try decodeRow(row)
+        emit(row.name, "ok", hexOf(again))
     } catch let e as CborError {
         emit(row.name, "err", describe(e))
     } catch {
@@ -279,7 +284,7 @@ def _tables() -> tuple[str, str, str]:
 def _dispatch() -> tuple[str, str]:
     """The `switch` arms for every message (`from_cbor`) and enum (`from_wire`) in the fixture."""
     dispatch = parity.fixture_dispatch()
-    from_cbor = [f"    case {_sw(name)}:\n        _ = try {name}.fromCbor(c)"
+    from_cbor = [f"    case {_sw(name)}:\n        return encode(try {name}.fromCbor(c).toCbor())"
                  for name in dispatch.messages]
     from_wire = [f"    case {_sw(name)}:\n        _ = try {name}.fromCbor(c)"
                  for name in dispatch.enums]

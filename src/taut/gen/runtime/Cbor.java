@@ -10,11 +10,14 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.function.Function;
 
 public final class Cbor {
@@ -266,6 +269,29 @@ public final class Cbor {
             }
             out.put(k, value.apply(entry));
         }
+        return out;
+    }
+    // The order of a map<str,V> field's keys: by Unicode code point, which is the order of
+    // their UTF-8 bytes. String.compareTo, and so a TreeMap's natural order, compares UTF-16
+    // code units, which puts U+10000 (d800 dc00) before U+FFFF.
+    public static final Comparator<String> CODE_POINT_ORDER = Cbor::compareCodePoints;
+    private static int compareCodePoints(String a, String b) {
+        int n = Math.min(a.length(), b.length());
+        int i = 0;
+        while (i < n) {
+            int x = a.codePointAt(i);
+            int y = b.codePointAt(i);
+            if (x != y) {
+                return Integer.compare(x, y);
+            }
+            i += Character.charCount(x);
+        }
+        return Integer.compare(a.length(), b.length());
+    }
+    // A map<str,V> field's entries in the order it encodes them (CODE_POINT_ORDER).
+    public static <V> SortedMap<String, V> sortedByCodePoint(Map<String, V> m) {
+        SortedMap<String, V> out = new TreeMap<>(CODE_POINT_ORDER);
+        out.putAll(m);
         return out;
     }
     public boolean isNull() { return kind == NULL; }

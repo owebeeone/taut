@@ -49,6 +49,17 @@ def _uses_map(t: TypeRef) -> bool:
     return False
 
 
+def _is_container(t: TypeRef) -> bool:
+    """A list or map: decoded by filling it, where a scalar, enum or message is one expression."""
+    return isinstance(t, (ListOf, MapOf))
+
+
+def _loop_var(stem: str, depth: int) -> str:
+    """A container loop's variable: the bare stem at a field's own level, numbered below it,
+    so a nested loop never shadows the loop that encloses it."""
+    return stem if depth == 0 else f"{stem}{depth}"
+
+
 def _msg_constexpr_ok(msg) -> bool:
     return not any(_uses_map(f.type) for f in msg.fields)
 
@@ -70,15 +81,16 @@ def _lit(data: bytes) -> str:
 
 # --- native type declarations -------------------------------------------------
 
-def _base_type(t: TypeRef) -> str:
+def _base_type(t: TypeRef, ns: str = "") -> str:
+    """The native type of `t`; `ns` (`taut::`) qualifies an enum or message outside namespace taut."""
     if isinstance(t, Scalar):
         return {"int": "long long", "float": "double", "str": "std::string_view", "bytes": "std::string_view", "bool": "bool"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
-        return t.name
+        return f"{ns}{t.name}"
     if isinstance(t, ListOf):
-        return f"std::vector<{_base_type(t.elem)}>"
+        return f"std::vector<{_base_type(t.elem, ns)}>"
     if isinstance(t, MapOf):
-        return f"std::map<{_base_type(t.key)}, {_base_type(t.value)}>"
+        return f"std::map<{_base_type(t.key, ns)}, {_base_type(t.value, ns)}>"
     raise TypeError(t)
 
 
@@ -103,6 +115,23 @@ def _encode_scalar(t: TypeRef, expr: str) -> str:
     raise TypeError(t)
 
 
+def _encode_stmts(t: TypeRef, expr: str, depth: int = 0) -> list[str]:
+    """Encode `expr`, a value of type `t`, at any nesting. A list is its count, then each item.
+    A map is its count, then one `{1: key, 2: value}` map per entry in ascending key order,
+    which is std::map's own order."""
+    if isinstance(t, ListOf):
+        x = _loop_var("x", depth)
+        item = " ".join(_encode_stmts(t.elem, x, depth + 1))
+        return [f"b.array({expr}.size());", f"for (const auto& {x} : {expr}) {{ {item} }}"]
+    if isinstance(t, MapOf):
+        k, v = _loop_var("k", depth), _loop_var("v", depth)
+        key = " ".join(_encode_stmts(t.key, k, depth + 1))
+        value = " ".join(_encode_stmts(t.value, v, depth + 1))
+        return [f"b.array({expr}.size());",
+                f"for (const auto& [{k}, {v}] : {expr}) {{ b.map(2); b.uint(1); {key} b.uint(2); {value} }}"]
+    return [_encode_scalar(t, expr)]
+
+
 def _decode_expr(t: TypeRef, acc: str) -> str:
     if isinstance(t, Scalar):
         return {"int": f"{acc}.as_int()", "float": f"{acc}.as_float()", "bool": f"{acc}.as_bool()",
@@ -112,6 +141,30 @@ def _decode_expr(t: TypeRef, acc: str) -> str:
     if isinstance(t, MsgRef):
         return f"taut::{t.name}::from_cbor({acc})"
     raise TypeError(t)
+
+
+def _decode_stmts(t: TypeRef, acc: str, target: str, depth: int = 0) -> list[str]:
+    """The unchecked (constexpr) decode of `acc`, a Cbor, into `target`, an empty lvalue of type
+    `t`, at any nesting. Like `from_cbor`, it trusts its input."""
+    if isinstance(t, ListOf):
+        x = _loop_var("x", depth)
+        if _is_container(t.elem):
+            item = [f"{target}.emplace_back();", *_decode_stmts(t.elem, x, f"{target}.back()", depth + 1)]
+        else:
+            item = [f"{target}.push_back({_decode_expr(t.elem, x)});"]
+        return [f"for (const auto& {x} : {acc}.as_array()) {{ {' '.join(item)} }}"]
+    if isinstance(t, MapOf):  # a map's key and value are never a list or map (`ir/validate.py`)
+        e = _loop_var("e", depth)
+        key, value = _decode_expr(t.key, f"{e}.get(1)"), _decode_expr(t.value, f"{e}.get(2)")
+        return [f"for (const auto& {e} : {acc}.as_array()) {{ {target}[{key}] = {value}; }}"]
+    return [f"{target} = {_decode_expr(t, acc)};"]
+
+
+def _decode_present_stmts(t: TypeRef, acc: str, target: str) -> list[str]:
+    """An optional field's present value: a container is engaged empty, then filled."""
+    if _is_container(t):
+        return [f"{target}.emplace();", *_decode_stmts(t, acc, f"(*{target})")]
+    return _decode_stmts(t, acc, target)
 
 
 def _duplicate_key_error(key_type: TypeRef, key: str) -> str:
@@ -127,12 +180,20 @@ def _try_scalar_method(t: Scalar) -> str:
             "str": "try_text", "bytes": "try_bytes"}[t.kind]
 
 
-def _try_decode_value(t: TypeRef, acc: str, target: str, ret: str, tmp: str) -> list[str]:
+def _return_if_failed(result: str, ret: str) -> str:
+    """Return a failed DecodeResult's error from the `try_from_cbor` of message `ret`."""
+    return f"if (!{result}) {{ return DecodeResult<{ret}>::fail({result}.error); }}"
+
+
+def _try_decode_value(t: TypeRef, acc: str, target: str, ret: str, tmp: str, depth: int = 0) -> list[str]:
+    """The checked decode of `acc`, a Cbor, into `target`, at any nesting. The first error
+    returns, in the reference's order (`wire/codec.py`): a map entry reads keys 1 and 2, then
+    its key, refuses a repeated key and only then reads its value."""
     if isinstance(t, Scalar):
         method = _try_scalar_method(t)
         return [
             f"    auto {tmp} = ({acc}).{method}();",
-            f"    if (!{tmp}) return DecodeResult<{ret}>::fail({tmp}.error);",
+            f"    {_return_if_failed(tmp, ret)}",
             f"    {target} = {tmp}.value;",
         ]
     if isinstance(t, EnumRef):
@@ -140,29 +201,30 @@ def _try_decode_value(t: TypeRef, acc: str, target: str, ret: str, tmp: str) -> 
         enum = f"{tmp}_enum"
         return [
             f"    auto {wire} = ({acc}).try_int();",
-            f"    if (!{wire}) return DecodeResult<{ret}>::fail({wire}.error);",
+            f"    {_return_if_failed(wire, ret)}",
             f"    auto {enum} = {_try_enum_fn(t.name)}({wire}.value);",
-            f"    if (!{enum}) return DecodeResult<{ret}>::fail({enum}.error);",
+            f"    {_return_if_failed(enum, ret)}",
             f"    {target} = {enum}.value;",
         ]
     if isinstance(t, MsgRef):
         nested = f"{tmp}_msg"
         return [
             f"    auto {nested} = {t.name}::try_from_cbor({acc});",
-            f"    if (!{nested}) return DecodeResult<{ret}>::fail({nested}.error);",
+            f"    {_return_if_failed(nested, ret)}",
             f"    {target} = {nested}.value;",
         ]
     if isinstance(t, ListOf):
         arr = f"{tmp}_arr"
         item = f"{tmp}_item"
+        x = _loop_var("x", depth)
         lines = [
             f"    auto {arr} = ({acc}).try_array();",
-            f"    if (!{arr}) return DecodeResult<{ret}>::fail({arr}.error);",
+            f"    {_return_if_failed(arr, ret)}",
             f"    {target}.clear();",
-            f"    for (const auto& x : *{arr}.value) {{",
+            f"    for (const auto& {x} : *{arr}.value) {{",
             f"      {_base_type(t.elem)} {item}{{}};",
         ]
-        nested = _try_decode_value(t.elem, "x", item, ret, f"{tmp}_elem")
+        nested = _try_decode_value(t.elem, x, item, ret, f"{tmp}_elem", depth + 1)
         lines.extend("  " + line for line in nested)
         lines.extend([
             f"      {target}.push_back({item});",
@@ -175,26 +237,29 @@ def _try_decode_value(t: TypeRef, acc: str, target: str, ret: str, tmp: str) -> 
         val = f"{tmp}_val"
         key_cbor = f"{tmp}_key_cbor"
         val_cbor = f"{tmp}_val_cbor"
+        e = _loop_var("e", depth)
         lines = [
             f"    auto {arr} = ({acc}).try_array();",
-            f"    if (!{arr}) return DecodeResult<{ret}>::fail({arr}.error);",
+            f"    {_return_if_failed(arr, ret)}",
             f"    {target}.clear();",
-            f"    for (const auto& e : *{arr}.value) {{",
-            f"      auto {key_cbor} = e.try_get(1);",
-            f"      if (!{key_cbor}) return DecodeResult<{ret}>::fail({key_cbor}.error);",
-            f"      auto {val_cbor} = e.try_get(2);",
-            f"      if (!{val_cbor}) return DecodeResult<{ret}>::fail({val_cbor}.error);",
+            f"    for (const auto& {e} : *{arr}.value) {{",
+            f"      auto {key_cbor} = {e}.try_get(1);",
+            f"      {_return_if_failed(key_cbor, ret)}",
+            f"      auto {val_cbor} = {e}.try_get(2);",
+            f"      {_return_if_failed(val_cbor, ret)}",
             f"      {_base_type(t.key)} {key}{{}};",
             f"      {_base_type(t.value)} {val}{{}};",
         ]
-        lines.extend("  " + line for line in _try_decode_value(t.key, f"*{key_cbor}.value", key, ret, f"{tmp}_k"))
+        key_lines = _try_decode_value(t.key, f"*{key_cbor}.value", key, ret, f"{tmp}_k", depth + 1)
+        lines.extend("  " + line for line in key_lines)
         # A repeated entry key is refused after the key decodes, before its value (CD-E5).
         lines.extend([
             f"      if ({target}.count({key}) != 0) {{",
             f"        return DecodeResult<{ret}>::fail({_duplicate_key_error(t.key, key)});",
             "      }",
         ])
-        lines.extend("  " + line for line in _try_decode_value(t.value, f"*{val_cbor}.value", val, ret, f"{tmp}_v"))
+        value_lines = _try_decode_value(t.value, f"*{val_cbor}.value", val, ret, f"{tmp}_v", depth + 1)
+        lines.extend("  " + line for line in value_lines)
         lines.extend([
             f"      {target}[{key}] = {val};",
             "    }",
@@ -206,15 +271,9 @@ def _try_decode_value(t: TypeRef, acc: str, target: str, ret: str, tmp: str) -> 
 def _field_encode_lines(f) -> list[str]:
     if f.optional:
         # parenthesize the deref: `(*x).to_cbor(b)`, not `*x.to_cbor(b)` (precedence)
-        return [f"    if ({f.name}.has_value()) {{ {_encode_scalar(f.type, '(*' + f.name + ')')} }} else {{ b.null_(); }}"]
-    if isinstance(f.type, ListOf):
-        return [f"    b.array({f.name}.size());",
-                f"    for (const auto& x : {f.name}) {{ {_encode_scalar(f.type.elem, 'x')} }}"]
-    if isinstance(f.type, MapOf):  # std::map iterates in ascending key order
-        mk, mv = _encode_scalar(f.type.key, "k"), _encode_scalar(f.type.value, "v")
-        return [f"    b.array({f.name}.size());",
-                f"    for (const auto& [k, v] : {f.name}) {{ b.map(2); b.uint(1); {mk} b.uint(2); {mv} }}"]
-    return [f"    {_encode_scalar(f.type, f.name)}"]
+        present = " ".join(_encode_stmts(f.type, f"(*{f.name})"))
+        return [f"    if ({f.name}.has_value()) {{ {present} }} else {{ b.null_(); }}"]
+    return [f"    {stmt}" for stmt in _encode_stmts(f.type, f.name)]
 
 
 def _emit_from_cbor(msg, forward_compat: bool = False) -> list[str]:
@@ -224,20 +283,17 @@ def _emit_from_cbor(msg, forward_compat: bool = False) -> list[str]:
         if f.transient:
             continue  # native-only; left default
         if f.optional == MISSING_OK:  # an absent key reads as null, like a present null
+            present = " ".join(_decode_present_stmts(f.type, "(*f)", f"v.{f.name}"))
             lines.append(f"    {{ const Cbor* f = c.try_get_opt({f.tag}).value; "
-                         f"if (f != nullptr && !f->is_null()) {{ v.{f.name} = {_decode_expr(f.type, '(*f)')}; }} }}")
+                         f"if (f != nullptr && !f->is_null()) {{ {present} }} }}")
         elif f.optional:
-            lines.append(f"    {{ const auto& f = c.get({f.tag}); if (!f.is_null()) v.{f.name} = {_decode_expr(f.type, 'f')}; }}")
-        elif isinstance(f.type, ListOf):
-            lines.append(f"    for (const auto& x : c.get({f.tag}).as_array()) v.{f.name}.push_back({_decode_expr(f.type.elem, 'x')});")
-        elif isinstance(f.type, MapOf):
-            dk, dv = _decode_expr(f.type.key, "e.get(1)"), _decode_expr(f.type.value, "e.get(2)")
-            lines.append(f"    for (const auto& e : c.get({f.tag}).as_array()) v.{f.name}[{dk}] = {dv};")
+            present = " ".join(_decode_present_stmts(f.type, "f", f"v.{f.name}"))
+            lines.append(f"    {{ const auto& f = c.get({f.tag}); if (!f.is_null()) {{ {present} }} }}")
         else:
-            lines.append(f"    v.{f.name} = {_decode_expr(f.type, f'c.get({f.tag})')};")
+            lines.append("    " + " ".join(_decode_stmts(f.type, f"c.get({f.tag})", f"v.{f.name}")))
     if forward_compat:
         known = " && ".join(f"kv.first != {f.tag}" for f in msg.wire_fields()) or "true"
-        lines.append(f"    for (const auto& kv : c.map) if ({known}) v.wire_residual.push_back(kv);")
+        lines.append(f"    for (const auto& kv : c.map) {{ if ({known}) {{ v.wire_residual.push_back(kv); }} }}")
     lines.append("    return v;")
     lines.append("  }")
     return lines
@@ -256,16 +312,16 @@ def _emit_try_from_cbor(msg, forward_compat: bool = False) -> list[str]:
         field = f"__field_{f.tag}"
         if not f.optional:
             lines.append(f"    auto {field} = c.try_get({f.tag});")
-            lines.append(f"    if (!{field}) return DecodeResult<{msg.name}>::fail({field}.error);")
+            lines.append(f"    {_return_if_failed(field, msg.name)}")
             lines.extend(_try_decode_value(f.type, f"*{field}.value", f"v.{f.name}", msg.name, f"__decoded_{f.tag}"))
             continue
         if f.optional == MISSING_OK:  # an absent key reads as null, like a present null
             lines.append(f"    auto {field} = c.try_get_opt({f.tag});")
-            lines.append(f"    if (!{field}) {{ return DecodeResult<{msg.name}>::fail({field}.error); }}")
+            lines.append(f"    {_return_if_failed(field, msg.name)}")
             lines.append(f"    if ({field}.value == nullptr || {field}.value->is_null()) {{")
         else:
             lines.append(f"    auto {field} = c.try_get({f.tag});")
-            lines.append(f"    if (!{field}) return DecodeResult<{msg.name}>::fail({field}.error);")
+            lines.append(f"    {_return_if_failed(field, msg.name)}")
             lines.append(f"    if ({field}.value->is_null()) {{")
         lines.append(f"      v.{f.name} = std::nullopt;")
         lines.append("    } else {")
@@ -311,7 +367,7 @@ def _emit_to_cbor(msg, forward_compat: bool = False) -> list[str]:
 
 
 def _emit_types(schema: Schema, forward_compat: bool = False) -> str:
-    has_map = any(isinstance(f.type, MapOf) for m in schema.messages.values() for f in m.fields)
+    has_map = any(_uses_map(f.type) for m in schema.messages.values() for f in m.fields)
     lines = [
         "// GENERATED native C++ types by taut/src/taut/gen/cpp.py — do not edit.",
         "#pragma once",
@@ -386,8 +442,11 @@ def _render_struct(schema: Schema, msg_name: str, value: dict) -> str:
     for f in msg.fields:
         if f.transient or f.name not in value:
             parts.append("{}")                        # transient/absent: value-init
-        elif f.optional:
-            parts.append("std::nullopt" if value[f.name] is None else _render(schema, f.type, value[f.name]))
+        elif f.optional and value[f.name] is None:
+            parts.append("std::nullopt")
+        elif f.optional and _is_container(f.type):
+            # a bare `{...}` would not engage the optional (`{}` is nullopt), so name the type
+            parts.append(_base_type(f.type, "taut::") + _render(schema, f.type, value[f.name]))
         else:
             parts.append(_render(schema, f.type, value[f.name]))
     return f"taut::{msg_name}{{{', '.join(parts)}}}"

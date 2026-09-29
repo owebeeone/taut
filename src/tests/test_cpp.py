@@ -15,7 +15,8 @@ from taut.gen import cpp as cpp_gen
 from taut.gen import scaffold
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
-from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, schema as mk
+from taut.ir.dsl import BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, schema as mk
+from taut.ir.validate import validate
 from taut.wire import cbor, codec
 
 
@@ -179,7 +180,8 @@ BEYOND_THE_CORPUS = [
     ("non-canonical-text-length", "raw_decode", "", "5800", "NonCanonicalInt;value=0"),
     ("non-canonical-array-count", "raw_decode", "", "9817" + "00" * 23, "NonCanonicalInt;value=23"),
     ("non-canonical-map-count", "raw_decode", "", "b9000100f6", "NonCanonicalInt;value=1"),
-    ("float-width-is-not-checked", "raw_decode", "", "fb0000000000000000", "accept"),
+    # Decode takes any float width; re-encode writes the shortest (G2, question 7, open).
+    ("float-width-is-not-checked", "raw_decode", "", "fb0000000000000000", "accept;reencode=f90000"),
     ("simple-value-24", "raw_decode", "", "f818", "UnsupportedInfo;info=24"),
     ("simple-value-23", "raw_decode", "", "f7", "UnsupportedInfo;info=23"),
     ("indefinite-array", "raw_decode", "", "9f", "UnsupportedInfo;info=31"),
@@ -198,7 +200,9 @@ BEYOND_THE_CORPUS = [
     ("enum-field-unknown", "from_cbor", "EnumBox", "a1011863", "UnknownEnum;enum=Mode;value=99"),
     ("list-item-wrong-type", "from_cbor", "OptBox", "a201f6028101", "WrongType;expected=text"),
     ("message-not-a-map", "from_cbor", "OptBox", "80", "WrongType;expected=map"),
-    ("empty-message-ignores-unknown-fields", "from_cbor", "Empty", "a10100", "accept"),
+    # No `empty-message-ignores-unknown-fields` row (Empty, a10100): whether a typed codec
+    # generated without forward-compat keeps an unknown field when it re-encodes is an open
+    # question for the owner. Python keeps it (a10100); C++, like Rust and Go, drops it (a0).
     ("enum-wire-negative", "from_wire", "Mode", "20", "UnknownEnum;enum=Mode;value=-1"),
     ("enum-wire-not-an-int", "from_wire", "Mode", "f6", "WrongType;expected=int"),
 ]
@@ -211,10 +215,10 @@ def test_cpp_decode_matches_python_beyond_the_corpus(monkeypatch):
     for name, stage, message, hexed, expected in BEYOND_THE_CORPUS:
         row = {"name": f"beyond-{name}", "stage": stage, "schema": message, "bytes": hexed,
                "why": "C++ decodes as Python does"}
-        if expected == "accept":
-            row["expect"] = {"accept": True}
+        tag, payload = parity.parse_error(expected)
+        if tag == "accept":
+            row["expect"] = {"accept": True, **payload}  # `;reencode=` where it is not the input
         else:
-            tag, payload = parity.parse_error(expected)
             row["expect"] = {"tag": tag, **payload}
         extra.append(row)
     # The table is the reference's behaviour, not a guess.
@@ -375,6 +379,132 @@ int main() {
         "before-its-value": "err DuplicateMapKey;key=k",
         "distinct": "ok",
     }
+
+
+# Legal shapes, nested (`ir/validate.py`): lists nest and may hold maps, a map's key is int,
+# str or bool and its value a scalar, enum or message, and any field may be optional.
+S_NESTED = mk(Enum("Mode", ok=0, alt=1),
+              Msg("Box", F("mode", 1, Ref("Mode"))),
+              Msg("Deep",  # no map, so its to_cbor and from_cbor are constexpr
+                  F("cube", 1, List(List(List(INT)))),
+                  F("rows", 2, List(List(Ref("Box")))),
+                  F("maybe_grid", 3, List(List(STR)), optional=True),
+                  F("maybe_modes", 4, List(Ref("Mode")), optional=MISSING_OK)),
+              Msg("Keyed",
+                  F("pages", 1, List(Map(STR, INT))),
+                  F("shelves", 2, List(List(Map(BOOL, Ref("Box"))))),
+                  F("maybe_index", 3, Map(INT, Ref("Mode")), optional=True),
+                  F("maybe_pages", 4, List(Map(INT, BYTES)), optional=MISSING_OK)))
+
+NESTED_VALUES = {
+    "deep-filled": ("Deep", {"cube": [[[1, -2], []], [], [[300]]],
+                             "rows": [[{"mode": "alt"}], [], [{"mode": "ok"}, {"mode": "alt"}]],
+                             "maybe_grid": [["a", "\u2603"], []], "maybe_modes": ["alt", "ok"]}),
+    "deep-null": ("Deep", {"cube": [], "rows": [], "maybe_grid": None, "maybe_modes": None}),
+    "deep-engaged-empty": ("Deep", {"cube": [[]], "rows": [[]], "maybe_grid": [], "maybe_modes": []}),
+    "keyed-filled": ("Keyed", {"pages": [{"b": 2, "a": 1}, {}],
+                               "shelves": [[{True: {"mode": "alt"}, False: {"mode": "ok"}}], []],
+                               "maybe_index": {3: "ok", -5: "alt"},
+                               "maybe_pages": [{2: b"\x00", 1: b""}]}),
+    "keyed-null": ("Keyed", {"pages": [], "shelves": [], "maybe_index": None, "maybe_pages": None}),
+    "keyed-engaged-empty": ("Keyed", {"pages": [{}], "shelves": [[{}]], "maybe_index": {},
+                                      "maybe_pages": []}),
+}
+
+_ABSENT = object()
+
+# Inputs to the checked decode: name, message, wire fields over an empty value (_ABSENT drops one).
+NESTED_INPUTS = [
+    ("cube-leaf-not-an-int", "Deep", {1: [[["x"]]]}),
+    ("row-box-not-a-map", "Deep", {2: [[5]]}),
+    ("grid-row-null", "Deep", {3: [None]}),
+    ("modes-absent", "Deep", {4: _ABSENT}),
+    ("page-entry-not-a-map", "Keyed", {1: [[5]]}),
+    ("page-entry-key-1-first", "Keyed", {1: [[{2: None}]]}),
+    ("page-entry-without-value", "Keyed", {1: [[{1: "a"}]]}),
+    ("page-repeated-key-before-its-value", "Keyed", {1: [[{1: "k", 2: 1}, {1: "k", 2: None}]]}),
+    ("shelf-repeated-bool-key", "Keyed", {2: [[[{1: True, 2: {1: 0}}, {1: True, 2: {1: 1}}]]]}),
+    ("index-value-null", "Keyed", {3: [{1: 3, 2: None}]}),
+    ("pages-absent", "Keyed", {1: _ABSENT}),
+]
+
+
+def _nested_wire(fields: dict) -> bytes:
+    wire = {1: [], 2: [], 3: None, 4: None}  # Deep and Keyed alike: two lists, two nulls
+    wire.update(fields)
+    return cbor.dumps({tag: v for tag, v in wire.items() if v is not _ABSENT})
+
+
+def _reference_outcome(s, message: str, data: bytes) -> str:
+    """What the reference (`wire/codec.py`) makes of `data`, as the C++ below reports it."""
+    try:
+        again = codec.encode(s, message, codec.decode(s, message, data))
+    except cbor.DecodeError as exc:  # a bool map key is carried as 0 or 1
+        return f"err {exc.tag}" + "".join(
+            f";{name}={int(v) if isinstance(v, bool) else v}" for name, v in exc.payload.items())
+    return f"ok {again.hex()}"
+
+
+def test_cpp_generates_every_legal_shape_at_any_nesting(tmp_path):
+    """Each value is built natively and encodes to the reference's bytes, which decode back,
+    checked and unchecked; each input decodes, checked, as the reference does. Deep has no map,
+    so the constexpr corpus oracle proves its values at compile time too."""
+    assert validate(S_NESTED) == []
+    assert "#include <map>" in cpp_gen._emit_types(mk(Msg("M", F("pages", 1, List(Map(STR, INT))))))
+    deep = {name: ref for name, ref in NESTED_VALUES.items() if ref[0] == "Deep"}
+    (tmp_path / "cpp").mkdir()
+    (tmp_path / "cpp" / "types.hpp").write_text('#pragma once\n#include "api.hpp"\n')
+    (tmp_path / "cpp" / "corpus.hpp").write_text(cpp_gen._emit_corpus(S_NESTED, deep))
+
+    built, prints, expected = [], [], {}
+    for name, (message, value) in NESTED_VALUES.items():
+        golden = codec.encode(S_NESTED, message, value).hex()
+        built.append(f"std::string built_{_ident(name)}() {{\n"
+                     f"    auto v = {cpp_gen._render_struct(S_NESTED, message, value)};\n"
+                     f"    taut::Buf b;\n    v.to_cbor(b);\n    return hexof(b);\n}}")
+        prints.append(f'    std::cout << "{name} built\\t" << built_{_ident(name)}() << "\\n";')
+        expected[f"{name} built"] = golden
+        expected[f"{name} checked"] = f"ok {golden}"
+        expected[f"{name} unchecked"] = golden
+        for path in ("checked", "unchecked"):
+            prints.append(f'    std::cout << "{name} {path}\\t" << {path}<taut::{message}>("{golden}") << "\\n";')
+    for name, message, fields in NESTED_INPUTS:
+        hexed = _nested_wire(fields).hex()
+        outcome = _reference_outcome(S_NESTED, message, bytes.fromhex(hexed))
+        expected[f"{name} checked"] = outcome
+        prints.append(f'    std::cout << "{name} checked\\t" << checked<taut::{message}>("{hexed}") << "\\n";')
+        if outcome.startswith("ok "):
+            expected[f"{name} unchecked"] = outcome.removeprefix("ok ")
+            prints.append(f'    std::cout << "{name} unchecked\\t" << unchecked<taut::{message}>("{hexed}") << "\\n";')
+    # The inputs reach every tag `describe` above reports with its payload, and no other.
+    assert {outcome.split(";")[0] for outcome in expected.values() if outcome.startswith("err ")} == {
+        "err WrongType", "err MissingKey", "err DuplicateMapKey"}
+
+    observed = _observe(tmp_path, S_NESTED, r"""
+#include "corpus.hpp"
+
+static_assert(taut::corpus::VECTOR_COUNT == 3);
+
+template <class M>
+std::string checked(std::string_view hex) {
+    auto r = decode<M>(hex);
+    if (!r) {
+        return "err " + describe(r.error);
+    }
+    taut::Buf b;
+    r.value.to_cbor(b);
+    return "ok " + hexof(b);
+}
+
+template <class M>
+std::string unchecked(std::string_view hex) {
+    taut::Buf b;
+    M::from_cbor(taut::parse(bytes_of(hex))).to_cbor(b);
+    return hexof(b);
+}
+
+""" + "\n\n".join(built) + "\n\nint main() {\n" + "\n".join(prints) + "\n    return 0;\n}\n")
+    assert observed == expected
 
 
 def test_cpp_generated_scalar_list_float_static_asserts_cxx20(tmp_path):

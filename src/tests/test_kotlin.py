@@ -16,7 +16,7 @@ from taut.corpus import parity_kotlin
 from taut.corpus import resext_build as rb
 from taut.gen import kotlin
 from taut.gen import scaffold
-from taut.ir.dsl import FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, extension, schema as mk
+from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, extension, schema as mk
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec
@@ -34,6 +34,26 @@ LATE = mk(
     Msg("Late", F("note", 1, STR, optional=MISSING_OK)),
     Msg("Opt", F("note", 1, STR, optional=True)),
 )
+# A map field's entries are sorted by key: an int or bool key by value, a str key by
+# Unicode code point, which is the order of its UTF-8 bytes (Python's `sorted`). UTF-16
+# code unit order (String.compareTo, toSortedMap()) puts a key above U+FFFF, whose
+# surrogate pair starts d800-dbff, before one in U+E000..U+FFFF. _KEYED_HARNESS puts
+# each key at its position here.
+KEYED = mk(Msg("Keyed",
+               F("by_text", 1, Map(STR, INT)),
+               F("by_int", 2, Map(INT, INT)),
+               F("by_flag", 3, Map(BOOL, INT))))
+TEXT_KEYS = ["\U0010ffff", "\uffff", "a\U00010000", "\U0001f600", "", "\ue000", "ab",
+             "\U00010000", "a", "\ud7ff", "a\uffff", "\u00e9"]
+INT_KEYS = [10, -1, 0, -300, 7]
+BOOL_KEYS = [True, False]
+KEYED_VALUE = {"by_text": {k: i for i, k in enumerate(TEXT_KEYS)},
+               "by_int": {k: i for i, k in enumerate(INT_KEYS)},
+               "by_flag": {k: i for i, k in enumerate(BOOL_KEYS)}}
+# _KEYED_HARNESS's arguments: the keys, comma-separated, a str key as the hex of its UTF-8.
+KEY_ARGS = [",".join(k.encode().hex() for k in TEXT_KEYS),
+            ",".join(str(k) for k in INT_KEYS),
+            ",".join(str(k).lower() for k in BOOL_KEYS)]
 
 
 def _kotlinc_candidates():
@@ -594,3 +614,73 @@ def test_kotlin_missing_ok_decode_if_kotlinc(tmp_path):
         "Opt a0": "MissingKey{1}",         # optional=True: absent is still MissingKey
         "Late encode": "a101f6",           # encode unchanged: unset is written as null
     }
+
+
+_KEYED_HARNESS = r'''
+package taut
+
+private fun unhex(s: String): ByteArray {
+    val out = ByteArray(s.length / 2)
+    for (i in out.indices) {
+        out[i] = s.substring(2 * i, 2 * i + 2).toInt(16).toByte()
+    }
+    return out
+}
+
+private fun hexOf(b: ByteArray): String {
+    val out = StringBuilder()
+    for (x in b) {
+        out.append(String.format("%02x", x.toInt() and 0xff))
+    }
+    return out.toString()
+}
+
+// The comma-separated `keys`, read by `parse`, each mapped to its position.
+private fun <K> positions(keys: String, parse: (String) -> K): Map<K, Long> {
+    val out = LinkedHashMap<K, Long>()
+    for (key in keys.split(",")) {
+        out[parse(key)] = out.size.toLong()
+    }
+    return out
+}
+
+// args: Keyed's str, int and bool keys (KEY_ARGS).
+fun main(args: Array<String>) {
+    val keyed = Keyed(
+        by_text = positions(args[0]) { String(unhex(it), Charsets.UTF_8) },
+        by_int = positions(args[1]) { it.toLong() },
+        by_flag = positions(args[2]) { it == "true" },
+    )
+    println(hexOf(encode(keyed.toCbor())))
+}
+'''
+
+
+def test_kotlin_sorts_str_map_keys_by_code_point_if_kotlinc(tmp_path):
+    """Map entries put in any order encode sorted by key as Python sorts them: a str key
+    by code point, so U+FFFF before U+10000 and "a\\uffff" before "a\\U00010000", and an
+    int or bool key by value, as before. One kotlinc build."""
+    kotlinc = _find_kotlinc()
+    java = _find_java(kotlinc)
+    scaffold.emit(KEYED, tmp_path, langs=["kotlin"], services=[], runtime=True)
+    harness = tmp_path / "keyed_harness.kt"
+    harness.write_text(_KEYED_HARNESS)
+    jar = tmp_path / "kotlin-keyed.jar"
+    sources = sorted(str(p) for p in (tmp_path / "kotlin").glob("*.kt"))
+    subprocess.run(
+        [kotlinc, *sources, str(harness), "-include-runtime", "-d", str(jar)],
+        check=True,
+        cwd=tmp_path,
+        env=_java_env(java),
+    )
+    result = subprocess.run(
+        [java, "-jar", str(jar), *KEY_ARGS],
+        check=False,
+        cwd=tmp_path,
+        env=_java_env(java),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip() == codec.encode(KEYED, "Keyed", KEYED_VALUE).hex()

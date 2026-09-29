@@ -6,8 +6,10 @@ it is built with modules off and with GOPATH, the build cache and Go's temporary
 files all inside that directory, so the build never touches the user's Go cache
 or GOPATH.
 
-The runner reports what the generated Go codec did with each row; for a malformed
-row the gate judges it (`parity.judge`).
+The runner reports what the generated Go codec did with each row, a decoded
+malformed row with the hex of its re-encoding (`Encode` of the tree for a raw row,
+of the typed value's `ToCbor()` for a from_cbor row); the gate judges it
+(`parity.judge`).
 """
 
 from __future__ import annotations
@@ -148,12 +150,13 @@ func encodeFail(row encodeFailRow) (string, string) {
 	return "fail", "every value fits int64, expected one outside it"
 }
 
-// fromCbor is a from_cbor row's typed entry point, by message name (from the fixture schema).
-func fromCbor(message string, c taut.Cbor) error {
+// fromCbor is a from_cbor row's typed entry point, by message name (from the fixture
+// schema): the decoded value's own encoding.
+func fromCbor(message string, c taut.Cbor) ([]byte, error) {
 	switch message {
 @FROM_CBOR@
 	}
-	return fmt.Errorf("no from_cbor entry point for %s", message)
+	return nil, fmt.Errorf("no from_cbor entry point for %s", message)
 }
 
 // fromWire is a from_wire row's typed entry point, by enum name (from the fixture schema).
@@ -164,24 +167,26 @@ func fromWire(enum string, c taut.Cbor) error {
 	return fmt.Errorf("no from_wire entry point for %s", enum)
 }
 
-func decodeRow(row malformedRow) error {
+// decodeRow returns a decoded row's re-encoding: the tree for raw_decode, the typed
+// value for from_cbor, and nothing for from_wire (an enum row never accepts).
+func decodeRow(row malformedRow) ([]byte, error) {
 	data, err := hex.DecodeString(row.bytes)
 	if err != nil {
-		return fmt.Errorf("row hex: %w", err)
+		return nil, fmt.Errorf("row hex: %w", err)
 	}
 	c, err := taut.TryDecode(data)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	switch row.stage {
 	case "raw_decode":
-		return nil
+		return taut.Encode(c), nil
 	case "from_cbor":
 		return fromCbor(row.schema, c)
 	case "from_wire":
-		return fromWire(row.schema, c)
+		return nil, fromWire(row.schema, c)
 	}
-	return fmt.Errorf("unknown stage %s", row.stage)
+	return nil, fmt.Errorf("unknown stage %s", row.stage)
 }
 
 // describe is an err detail: the tag, then ;field=value for each payload field the
@@ -215,9 +220,9 @@ func observe(row malformedRow) (outcome, detail string) {
 			outcome, detail = "untyped", fmt.Sprintf("panic: %v", r)
 		}
 	}()
-	err := decodeRow(row)
+	again, err := decodeRow(row)
 	if err == nil {
-		return "ok", ""
+		return "ok", hex.EncodeToString(again)
 	}
 	decodeErr, ok := err.(*taut.DecodeError)
 	if !ok {
@@ -273,10 +278,15 @@ def _dispatch() -> tuple[str, str]:
     """The `switch` cases for every message (`from_cbor`) and enum (`from_wire`) in the fixture."""
     dispatch = parity.fixture_dispatch()
 
-    def case(name: str) -> str:
+    def message(name: str) -> str:
+        return (f"\tcase {_go(name)}:\n\t\tv, err := taut.Try{name}FromCbor(c)\n"
+                f"\t\tif err != nil {{\n\t\t\treturn nil, err\n\t\t}}\n"
+                f"\t\treturn taut.Encode(v.ToCbor()), nil")
+
+    def enum(name: str) -> str:
         return f"\tcase {_go(name)}:\n\t\t_, err := taut.Try{name}FromCbor(c)\n\t\treturn err"
 
-    return "\n".join(map(case, dispatch.messages)), "\n".join(map(case, dispatch.enums))
+    return "\n".join(map(message, dispatch.messages)), "\n".join(map(enum, dispatch.enums))
 
 
 def _source() -> str:

@@ -248,6 +248,119 @@
       "expect": {"accept": true},
       "why": "M15: an optional field present as null decodes, to null",
       "lead": true
+    },
+    {
+      "name": "missing-ok-absent",
+      "stage": "from_cbor",
+      "schema": "Late",
+      "bytes": "a0",
+      "expect": {"accept": true, "reencode": "a101f6"},
+      "why": "M16: Late.note is optional=MISSING_OK, so an absent key decodes to null; the encoder writes the null back, the declared exception to D2's law",
+      "lead": true
+    },
+    {
+      "name": "missing-ok-wrong-type",
+      "stage": "from_cbor",
+      "schema": "Late",
+      "bytes": "a10101",
+      "expect": {"tag": "WrongType", "expected": "text"},
+      "why": "M17: MISSING_OK forgives only an absent key; Late.note present as an int is still WrongType, with the payload word `text`",
+      "lead": true
+    },
+    {
+      "name": "text-leading-bom",
+      "stage": "raw_decode",
+      "bytes": "64efbbbf61",
+      "expect": {"accept": true},
+      "why": "U+FEFF (ef bb bf) opening a text string is ordinary text: decode keeps it and re-encoding writes it back; a UTF-8 decoder must not strip it as a byte-order mark",
+      "lead": true
+    },
+    {
+      "name": "simple-undefined",
+      "stage": "raw_decode",
+      "bytes": "f7",
+      "expect": {"tag": "UnsupportedInfo", "info": 23},
+      "why": "major 7 info 23 (undefined) is none of the kept values: false, true, null and the three floats",
+      "lead": true
+    },
+    {
+      "name": "simple-zero",
+      "stage": "raw_decode",
+      "bytes": "e0",
+      "expect": {"tag": "UnsupportedInfo", "info": 0},
+      "why": "major 7 info 0 (simple value 0) is none of the kept values",
+      "lead": true
+    },
+    {
+      "name": "simple-one-byte-torn",
+      "stage": "raw_decode",
+      "bytes": "f8",
+      "expect": {"tag": "UnsupportedInfo", "info": 24},
+      "why": "major 7 info 24 (a one-byte simple value) whose argument byte is missing: the initial byte decides, so its argument is never read (CD-E5 step 2)",
+      "lead": true
+    },
+    {
+      "name": "shapes-filled",
+      "stage": "from_cbor",
+      "schema": "Shapes",
+      "bytes": "b3013903e702f93e00036f6e61c3af766520e2988320f09d849e0443007fff05f5060107a10101080709000aa101000b83012119012c0c82a10100a101010d838201028081030e82a20161610201a201616202210f82a201f40201a201f502001082a2010202a10101a2010a02a10100118204051282a20161780200a2016179020913646c617465",
+      "expect": {"accept": true},
+      "why": "every field shape set, the optional ones included, decodes and re-encodes to these bytes: a half-width float, non-ASCII text, a nested list holding an empty list, and two entries in each map",
+      "lead": true
+    },
+    {
+      "name": "shapes-sparse",
+      "stage": "from_cbor",
+      "schema": "Shapes",
+      "bytes": "b3010002f900000360044005f4060007a1010008f609f60af60b800c800d800e800f80108011f612f613f6",
+      "expect": {"accept": true},
+      "why": "every optional field null, every collection empty and the MISSING_OK field present as null: decodes and re-encodes to these bytes",
+      "lead": true
+    },
+    {
+      "name": "shapes-missing-ok-absent",
+      "stage": "from_cbor",
+      "schema": "Shapes",
+      "bytes": "b2010002f900000360044005f4060007a1010008f609f60af60b800c800d800e800f80108011f612f6",
+      "expect": {"accept": true, "reencode": "b3010002f900000360044005f4060007a1010008f609f60af60b800c800d800e800f80108011f612f613f6"},
+      "why": "shapes-sparse without the MISSING_OK key 19 decodes, and re-encodes with it as null: shapes-sparse's bytes",
+      "lead": true
+    },
+    {
+      "name": "map-str-key-order",
+      "stage": "from_cbor",
+      "schema": "Shapes",
+      "bytes": "b3010002f900000360044005f4060007a1010008f609f60af60b800c800d800e83a20161610203a20163efbfbf0201a20164f090808002020f80108011f612f613f6",
+      "expect": {"accept": true},
+      "why": "shapes-sparse whose map<str,int> holds the keys U+FFFF, U+10000 and \"a\", written in code point order (\"a\", U+FFFF, U+10000), which is UTF-8 byte order; a codec that sorts str keys by UTF-16 code unit puts U+10000 (d800 dc00) before U+FFFF and does not re-encode these bytes",
+      "lead": true
+    },
+    {
+      "name": "map-str-key-duplicate",
+      "stage": "from_cbor",
+      "schema": "Shapes",
+      "bytes": "b3010002f900000360044005f4060007a1010008f609f60af60b800c800d800e82a20161610201a201616102020f80108011f612f613f6",
+      "expect": {"tag": "DuplicateMapKey"},
+      "why": "shapes-sparse whose map<str,int> holds two entries keyed \"a\": a repeated key is refused whatever its type; tag only, as the payload of a non-int key is open for the owner",
+      "lead": true
+    },
+    {
+      "name": "map-bool-key-duplicate",
+      "stage": "from_cbor",
+      "schema": "Shapes",
+      "bytes": "b3010002f900000360044005f4060007a1010008f609f60af60b800c800d800e800f82a201f50200a201f50201108011f612f613f6",
+      "expect": {"tag": "DuplicateMapKey"},
+      "why": "shapes-sparse whose map<bool,Mode> holds two entries keyed true: DuplicateMapKey, tag only, as for map-str-key-duplicate",
+      "lead": true
+    },
+    {
+      "name": "list-nested-wrong-type",
+      "stage": "from_cbor",
+      "schema": "Shapes",
+      "bytes": "b3010002f900000360044005f4060007a1010008f609f60af60b800c800d818161780e800f80108011f612f613f6",
+      "expect": {"tag": "WrongType", "expected": "int"},
+      "why": "shapes-sparse whose list<list<int>> holds [[\"x\"]]: an inner list's item is checked as an int",
+      "lead": true
     }
   ]
 }

@@ -2,7 +2,9 @@
 
 node runs the IR-driven codec's `.ts` sources directly (`--experimental-strip-types`),
 so there is no separate build: a runner that fails to load exits non-zero, which
-fails the target. The rows and `dispatch.json` are copied beside it.
+fails the target. The rows and `dispatch.json` are copied beside it. A decoded
+malformed row reports the hex of its re-encoding: `cbor.ts`'s `encode` of the tree
+for a raw row, the codec's `encode` of the decoded value for a from_cbor row.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ TARGET = "typescript"
 
 _RUNNER = r'''
 import { readFileSync } from "node:fs";
-import { decode as cborDecode } from "./cbor.ts";
+import { decode as cborDecode, encode as cborEncode } from "./cbor.ts";
 import { decode, decodeRef, encode } from "./codec.ts";
 import { loadSchema } from "./schema.ts";
 
@@ -27,8 +29,9 @@ const dispatch = JSON.parse(readFileSync("dispatch.json", "utf8"));
 const PAYLOAD = ["info", "major", "key", "expected", "enum", "value"];
 
 // The fixture's typed entry points, by message name (from_cbor) and enum name (from_wire).
-const fromCbor = new Map<string, (b: Uint8Array) => unknown>(
-  dispatch.messages.map((name: string) => [name, (b: Uint8Array) => decode(schema, name, b)]));
+// A message returns the decoded value's own encoding; an enum row never accepts.
+const fromCbor = new Map<string, (b: Uint8Array) => Uint8Array>(
+  dispatch.messages.map((name: string) => [name, (b: Uint8Array) => encode(schema, name, decode(schema, name, b))]));
 const fromWire = new Map<string, (b: Uint8Array) => unknown>(
   dispatch.enums.map((name: string) => [name, (b: Uint8Array) => decodeRef(schema, { k: "enum", name }, b)]));
 
@@ -63,13 +66,16 @@ function describe(e: any): string {
   return detail;
 }
 
-function decodeRow(row: any, data: Uint8Array): void {
+// A decoded row's re-encoding: the tree for raw_decode, the typed value for
+// from_cbor, and nothing for from_wire.
+function decodeRow(row: any, data: Uint8Array): Uint8Array {
   if (row.stage === "raw_decode") {
-    cborDecode(data);
+    return cborEncode(cborDecode(data));
   } else if (row.stage === "from_cbor") {
-    fromCbor.get(row.schema)!(data);
+    return fromCbor.get(row.schema)!(data);
   } else {
     fromWire.get(row.schema)!(data);
+    return new Uint8Array(0);
   }
 }
 
@@ -99,8 +105,8 @@ for (const row of intVectors) {
 }
 for (const row of malformed) {
   try {
-    decodeRow(row, hexToBytes(row.bytes));
-    emit(row.name, "ok", "");
+    const again = decodeRow(row, hexToBytes(row.bytes));
+    emit(row.name, "ok", bytesToHex(again));
   } catch (e: any) {
     if (isDecodeError(e)) {
       emit(row.name, "err", describe(e));

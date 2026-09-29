@@ -2,7 +2,9 @@
 
 kotlinc is slow, so the gate compiles once: the generated `api.kt`, the vendored
 runtime (`cbor.kt`, `ext.kt`) and the runner go into one jar, which java runs. Both
-tools come from `toolchains.find_kotlin_tools` (on a Mac, Android Studio's).
+tools come from `toolchains.find_kotlin_tools` (on a Mac, Android Studio's). A
+decoded malformed row reports the hex of its re-encoding: `encode` of the tree for
+a raw row, of the typed value's `toCbor()` for a from_cbor row.
 """
 
 from __future__ import annotations
@@ -52,9 +54,9 @@ private fun emit(name: String, outcome: String, detail: String) {
     println("$name\t$outcome\t$flat")
 }
 
-/** A from_cbor row's typed entry point, by message name (from the fixture schema). */
-private fun fromCbor(message: String, c: Cbor) {
-    when (message) {
+/** A from_cbor row's typed entry point, by message name (from the fixture schema): the decoded value's own encoding. */
+private fun fromCbor(message: String, c: Cbor): ByteArray {
+    return when (message) {
 @FROM_CBOR@
         else -> {
             throw IllegalStateException("no from_cbor entry point for $message")
@@ -72,16 +74,19 @@ private fun fromWire(name: String, v: Long) {
     }
 }
 
-private fun decodeRow(row: Mal) {
+/** A decoded row's re-encoding: the tree for raw_decode, the typed value for from_cbor, and nothing for from_wire. */
+private fun decodeRow(row: Mal): ByteArray {
     val c = decode(unhex(row.bytes))
-    when (row.stage) {
+    return when (row.stage) {
         "raw_decode" -> {
+            encode(c)
         }
         "from_cbor" -> {
             fromCbor(row.schema, c)
         }
         "from_wire" -> {
             fromWire(row.schema, c.intVal)
+            ByteArray(0)
         }
         else -> {
             throw IllegalStateException("unknown stage ${row.stage}")
@@ -152,8 +157,8 @@ fun main() {
     }
     for (row in MALFORMED) {
         try {
-            decodeRow(row)
-            emit(row.name, "ok", "")
+            val again = decodeRow(row)
+            emit(row.name, "ok", hexOf(again))
         } catch (e: DecodeError) {
             emit(row.name, "err", describe(e))
         } catch (e: Throwable) {
@@ -197,7 +202,7 @@ def _tables() -> tuple[str, str, str]:
 def _dispatch() -> tuple[str, str]:
     """The `when` arms for every message (`from_cbor`) and enum (`from_wire`) in the fixture."""
     dispatch = parity.fixture_dispatch()
-    from_cbor = [f"        {_kt(name)} -> {{\n            {name}.fromCbor(c)\n        }}"
+    from_cbor = [f"        {_kt(name)} -> {{\n            encode({name}.fromCbor(c).toCbor())\n        }}"
                  for name in dispatch.messages]
     from_wire = [f"        {_kt(name)} -> {{\n            {name}.fromWire(v)\n        }}"
                  for name in dispatch.enums]

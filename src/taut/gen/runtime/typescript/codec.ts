@@ -43,9 +43,41 @@ function mapEntries(value: Native): [Native, Native][] {
   throw new Error("taut map values must be Map instances in TypeScript");
 }
 
+// A str key's order (D24): by Unicode code point, which is the order of its UTF-8
+// bytes and of Python's sorted(str). JS `<` compares UTF-16 code units instead, and
+// puts a character above U+FFFF, whose surrogate pair starts d800-dbff, before one in
+// U+E000..U+FFFF. Equal code points advance both strings alike, so one index serves.
+function compareCodePoints(a: string, b: string): number {
+  let i = 0;
+  while (i < a.length && i < b.length) {
+    const x = a.codePointAt(i)!;
+    const y = b.codePointAt(i)!;
+    if (x !== y) {
+      return x < y ? -1 : 1;
+    }
+    i += x > 0xffff ? 2 : 1;
+  }
+  if (a.length === b.length) {
+    return 0;
+  }
+  return a.length < b.length ? -1 : 1;
+}
+
+// An int key is a number up to 2^53 - 1 or a bigint, and one map may hold both.
+function isIntKey(v: Native): boolean {
+  return typeof v === "bigint" || typeof v === "number";
+}
+
+// The order a map<K,V> field's entries are encoded in (D24): int keys by value, in
+// either form or one of each (`<` compares a number with a bigint exactly), str keys by
+// code point, and anything else by String(), which puts a bool key's false first.
 function compareNativeKey(a: Native, b: Native): number {
-  if (typeof a === "bigint" && typeof b === "bigint") return a < b ? -1 : a > b ? 1 : 0;
-  if (typeof a === "number" && typeof b === "number") return a - b;
+  if (isIntKey(a) && isIntKey(b)) {
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  if (typeof a === "string" && typeof b === "string") {
+    return compareCodePoints(a, b);
+  }
   const as = String(a);
   const bs = String(b);
   return as < bs ? -1 : as > bs ? 1 : 0;

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import random
 import shutil
@@ -14,7 +15,7 @@ import pytest
 from taut import cli, ext
 from taut.corpus import resext_build as rb
 from taut.gen import scaffold
-from taut.ir.dsl import MISSING_OK, STR, F, Msg, schema
+from taut.ir.dsl import BOOL, INT, MISSING_OK, STR, F, Map, Msg, schema
 from taut.ir.export import export_to
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
@@ -396,13 +397,17 @@ def _late_schema():
     )
 
 
-def _emit_late(out_dir: Path) -> Path:
-    """Generate TypeScript for `_late_schema` with the runtime, beside its IR."""
-    s = _late_schema()
+def _emit_ts(s: Any, out_dir: Path, ir_name: str) -> Path:
+    """Generate TypeScript for `s` with the runtime, beside its IR as `ir_name`."""
     scaffold.emit(s, out_dir, langs=["typescript"], services=[], runtime=True)
     ts_dir = out_dir / "typescript"
-    export_to(s, ts_dir / "late.ir.json")
+    export_to(s, ts_dir / ir_name)
     return ts_dir
+
+
+def _emit_late(out_dir: Path) -> Path:
+    """Generate TypeScript for `_late_schema` with the runtime, beside its IR."""
+    return _emit_ts(_late_schema(), out_dir, "late.ir.json")
 
 
 def _run_node_tests(node: str, ts_dir: Path, harness: Path) -> None:
@@ -581,6 +586,217 @@ test("the encoder refuses a map key in any other form", () => {
   for (const key of [-1, 1.5, 2 ** 53, 5n, 2n ** 63n]) {
     assert.throws(() => cborEncode(new Map([[key, 0n]]) as never), /invalid CBOR map key/, String(key));
   }
+});
+"""
+    )
+    _run_node_tests(node, ts_dir, harness)
+
+
+def _text_schema():
+    """`Note` holds a str field, and `Keyed` a map of each key type D24 allows: str, int
+    and bool."""
+    return schema(
+        Msg("Note", F("text", 1, STR), next_id=2),
+        Msg("Keyed",
+            F("by_name", 1, Map(STR, INT)),
+            F("by_id", 2, Map(INT, INT)),
+            F("by_flag", 3, Map(BOOL, INT)),
+            next_id=4),
+    )
+
+
+# U+FEFF opening a text string is ordinary text (the parity row text-leading-bom): a
+# UTF-8 decoder must not strip it as a byte-order mark. One after the start, or a
+# second one, is the contrast: no decoder strips those.
+_BOM_TEXTS = ["﻿a", "﻿", "﻿﻿a", "a﻿"]
+
+
+def test_typescript_text_keeps_a_leading_bom_if_node(tmp_path):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+
+    s = _text_schema()
+    ts_dir = _emit_ts(s, tmp_path, "text.ir.json")
+    cases = [{"text": t, "raw": cbor.dumps(t).hex(), "typed": codec.encode(s, "Note", {"text": t}).hex()}
+             for t in _BOM_TEXTS]
+    invalid = "64efbbbfff"  # a U+FEFF, then a byte that is never UTF-8
+    assert _python_raw_outcome(invalid) == {"tag": "InvalidUtf8"}
+    (ts_dir / "bom.json").write_text(json.dumps({"cases": cases, "invalid": invalid}))
+
+    harness = ts_dir / "bom.test.ts"
+    harness.write_text(
+        """
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { decode as cborDecode, encode as cborEncode } from "./cbor.ts";
+import { decode, encode } from "./codec.ts";
+import { loadSchema } from "./schema.ts";
+
+const schema = loadSchema(JSON.parse(readFileSync("text.ir.json", "utf8")));
+const { cases, invalid } = JSON.parse(readFileSync("bom.json", "utf8"));
+""".lstrip()
+        + _TS_OUTCOME
+        + """
+test("a leading U+FEFF is ordinary text: decode keeps it and re-encoding writes it back", () => {
+  for (const c of cases) {
+    const raw = cborDecode(hexToBytes(c.raw));
+    assert.equal(raw, c.text, c.raw);
+    assert.equal(bytesToHex(cborEncode(raw)), c.raw, c.raw);
+    const note = decode(schema, "Note", hexToBytes(c.typed));
+    assert.deepEqual(note, { text: c.text }, c.typed);
+    assert.equal(bytesToHex(encode(schema, "Note", note)), c.typed, c.typed);
+  }
+});
+
+test("the decoder is still fatal: invalid UTF-8 after a U+FEFF is InvalidUtf8", () => {
+  assert.deepEqual(outcome(() => cborDecode(hexToBytes(invalid))), { tag: "InvalidUtf8" });
+});
+"""
+    )
+    _run_node_tests(node, ts_dir, harness)
+
+
+# A map<K,V> field's entries are sorted by key (D24), in the order Python's `sorted`
+# gives. A str key sorts by code point, which is its UTF-8 byte order. UTF-16 code unit
+# order differs only where U+E000..U+FFFF meets a character above U+FFFF, a surrogate
+# pair (d800-dfff). `row` holds the parity row map-str-key-order's keys; `d7ff`,
+# `same-lead` and `prefix` are orders both agree on; int and bool keys keep their order.
+_KEY_SETS = {
+    "row": ("by_name", ["￿", "\U00010000", "a"]),
+    "e000": ("by_name", ["\U00010000", ""]),
+    "top": ("by_name", ["\U0010ffff", "￿"]),
+    "after-a-prefix": ("by_name", ["a\U00010000", "a￿"]),
+    "d7ff": ("by_name", ["\U00010000", "퟿"]),
+    "same-lead": ("by_name", ["\U00010001", "\U00010000"]),
+    "prefix": ("by_name", ["ab", "a", ""]),
+    "int": ("by_id", [10, 9, -1, 0, 2 ** 53, -(2 ** 63), 2 ** 63 - 1]),
+    "bool": ("by_flag", [True, False]),
+}
+
+
+def _keyed_cases(s: Any) -> list[dict[str, Any]]:
+    """Each key set inserted in every order (forwards and backwards, above three keys),
+    each key valued by its place in the set, with the bytes Python encodes: the same
+    for every order. An int key travels as a string, exact above 2^53."""
+    cases = []
+    for name, (field, keys) in _KEY_SETS.items():
+        value = {k: i + 1 for i, k in enumerate(keys)}
+        orders = list(itertools.permutations(keys)) if len(keys) <= 3 else [keys, keys[::-1]]
+        wire = codec.encode(s, "Keyed", {"by_name": {}, "by_id": {}, "by_flag": {}, field: value}).hex()
+        for n, order in enumerate(orders):
+            entries = [[str(k) if field == "by_id" else k, value[k]] for k in order]
+            cases.append({"name": f"{name}/{n}", "field": field, "entries": entries, "hex": wire})
+    return cases
+
+
+def test_typescript_map_keys_encode_in_code_point_order_if_node(tmp_path):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+
+    assert sorted(_KEY_SETS["row"][1]) == ["a", "￿", "\U00010000"]  # the reference order
+    s = _text_schema()
+    ts_dir = _emit_ts(s, tmp_path, "text.ir.json")
+    (ts_dir / "keyed.json").write_text(json.dumps(_keyed_cases(s)))
+
+    harness = ts_dir / "keyed.test.ts"
+    harness.write_text(
+        """
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { decode, encode } from "./codec.ts";
+import { loadSchema } from "./schema.ts";
+
+const schema = loadSchema(JSON.parse(readFileSync("text.ir.json", "utf8")));
+const cases = JSON.parse(readFileSync("keyed.json", "utf8"));
+""".lstrip()
+        + _TS_OUTCOME
+        + """
+function native(c: any): any {
+  const value: any = { by_name: new Map(), by_id: new Map(), by_flag: new Map() };
+  for (const [k, v] of c.entries) {
+    value[c.field].set(c.field === "by_id" ? BigInt(k) : k, BigInt(v));
+  }
+  return value;
+}
+
+test("map keys encode in Python's order, str keys by code point, whatever the insertion order", () => {
+  for (const c of cases) {
+    assert.equal(bytesToHex(encode(schema, "Keyed", native(c))), c.hex, c.name);
+  }
+});
+
+test("each case's bytes decode and re-encode to themselves (D2)", () => {
+  for (const c of cases) {
+    assert.equal(bytesToHex(encode(schema, "Keyed", decode(schema, "Keyed", hexToBytes(c.hex)))), c.hex, c.name);
+  }
+});
+"""
+    )
+    _run_node_tests(node, ts_dir, harness)
+
+
+# An int key is a number up to 2^53 - 1 or a bigint, the only form above that, and one
+# map may hold both. Its keys still sort by value, where String() order puts 10 before 9,
+# and 10^16 (above 2^53) before 9. Each set lists its keys with the form each is built in.
+_MIXED_INT_KEY_SETS = {
+    "9-number-10-bigint": [(9, "number"), (10, "bigint")],
+    "9-bigint-10-number": [(9, "bigint"), (10, "number")],
+    "above-2^53": [(9, "number"), (10, "bigint"), (10 ** 16, "bigint")],
+}
+
+
+def test_typescript_int_map_keys_sort_by_value_in_either_form_if_node(tmp_path):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+
+    assert 10 ** 16 > 2 ** 53
+    s = _text_schema()
+    ts_dir = _emit_ts(s, tmp_path, "text.ir.json")
+    cases = []
+    for name, keys in _MIXED_INT_KEY_SETS.items():
+        value = {k: i + 1 for i, (k, _) in enumerate(keys)}
+        wire = codec.encode(s, "Keyed", {"by_name": {}, "by_id": value, "by_flag": {}}).hex()
+        for n, order in enumerate(itertools.permutations(keys)):
+            entries = [[str(k), form, value[k]] for k, form in order]
+            cases.append({"name": f"{name}/{n}", "entries": entries, "hex": wire})
+    (ts_dir / "mixed.json").write_text(json.dumps(cases))
+
+    harness = ts_dir / "mixed.test.ts"
+    harness.write_text(
+        """
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { encode } from "./codec.ts";
+import { loadSchema } from "./schema.ts";
+
+const schema = loadSchema(JSON.parse(readFileSync("text.ir.json", "utf8")));
+const cases = JSON.parse(readFileSync("mixed.json", "utf8"));
+""".lstrip()
+        + _TS_OUTCOME
+        + """
+function keyed(byId: Map<unknown, bigint>): any {
+  return { by_name: new Map(), by_id: byId, by_flag: new Map() };
+}
+
+test("int map keys encode by value, as numbers, bigints or both", () => {
+  for (const c of cases) {
+    const byId = new Map<unknown, bigint>();
+    for (const [k, form, v] of c.entries) {
+      byId.set(form === "number" ? Number(k) : BigInt(k), BigInt(v));
+    }
+    assert.equal(bytesToHex(encode(schema, "Keyed", keyed(byId))), c.hex, c.name);
+  }
+});
+
+test("a number key above 2^53 - 1 is refused: only a bigint holds it exactly", () => {
+  const byId = new Map<unknown, bigint>([[9, 1n], [2 ** 53, 2n]]);
+  assert.throws(() => encode(schema, "Keyed", keyed(byId)), { name: "EncodeError", tag: "IntOutOfSubset" });
 });
 """
     )

@@ -15,7 +15,7 @@ from taut.corpus import parity, parity_java
 from taut.corpus import resext_build as rb
 from taut.corpus.build import IR_PATH
 from taut.gen import java, scaffold
-from taut.ir.dsl import FLOAT, INT, MISSING_OK, STR, F, List as TList, Map, Msg, schema as mk
+from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, F, List as TList, Map, Msg, Ref, schema as mk
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec
@@ -34,6 +34,42 @@ FLOATY = mk(Msg("Floaty",
 # MISSING_OK reads an absent key as null; plain optional still requires the key.
 MISSING_OK_SCHEMA = mk(Msg("Late", F("note", 1, STR, optional=MISSING_OK)),
                        Msg("Opt", F("note", 1, STR, optional=True)))
+# Lists nest and a map may sit in a list, so one field's codec can hold a lambda in a
+# lambda (the parity fixture's Shapes.grid is list<list<int>>); a map value may be a
+# message. SHAPES_HARNESS decodes NESTED_VALUE's bytes and re-encodes them, and builds
+# a Keyed whose maps get their keys in the order below.
+SHAPES = mk(Msg("Leaf", F("n", 1, INT)),
+            Msg("Nested",
+                F("grid", 1, TList(TList(INT))),
+                F("cube", 2, TList(TList(TList(STR)))),
+                F("tallies", 3, TList(Map(STR, INT))),
+                F("leaves", 4, TList(TList(Map(INT, Ref("Leaf"))))),
+                F("maybe_grid", 5, TList(TList(INT)), optional=True)),
+            Msg("Keyed",
+                F("by_text", 1, Map(STR, INT)),
+                F("by_int", 2, Map(INT, INT)),
+                F("by_flag", 3, Map(BOOL, INT))))
+NESTED_VALUE = {"grid": [[1, -2], [], [3]],
+                "cube": [[["a"], []], [], [["b", "c"]]],
+                "tallies": [{"b": 2, "a": 1}, {}],
+                "leaves": [[{2: {"n": 2}, 1: {"n": 1}}], []],
+                "maybe_grid": [[], [7]]}
+# A map field's entries are sorted by key: an int or bool key by value, a str key by
+# Unicode code point, which is the order of its UTF-8 bytes (Python's `sorted`). UTF-16
+# code unit order (String.compareTo) puts a key above U+FFFF, whose surrogate pair
+# starts d800-dbff, before one in U+E000..U+FFFF. Each key's value is its position here.
+TEXT_KEYS = ["\U0010ffff", "\uffff", "a\U00010000", "\U0001f600", "", "\ue000", "ab",
+             "\U00010000", "a", "\ud7ff", "a\uffff", "\u00e9"]
+INT_KEYS = [10, -1, 0, -300, 7]
+BOOL_KEYS = [True, False]
+KEYED_VALUE = {"by_text": {k: i for i, k in enumerate(TEXT_KEYS)},
+               "by_int": {k: i for i, k in enumerate(INT_KEYS)},
+               "by_flag": {k: i for i, k in enumerate(BOOL_KEYS)}}
+# SHAPES_HARNESS's arguments after the Nested bytes: the keys, comma-separated, a str
+# key as the hex of its UTF-8.
+KEY_ARGS = [",".join(k.encode().hex() for k in TEXT_KEYS),
+            ",".join(str(k) for k in INT_KEYS),
+            ",".join(str(k).lower() for k in BOOL_KEYS)]
 
 
 def _tool_pair_candidates():
@@ -363,6 +399,55 @@ public final class MissingOkHarness {
 """
 
 
+SHAPES_HARNESS = r"""
+package taut;
+
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.Function;
+
+public final class ShapesHarness {
+    // args[0]: the hex of a Nested value's bytes, decoded and then re-encoded.
+    // args[1], args[2] and args[3]: Keyed's str, int and bool keys (KEY_ARGS).
+    public static void main(String[] args) {
+        Nested nested = Nested.fromCbor(Cbor.decode(unhex(args[0])));
+        System.out.println("nested\t" + hex(Cbor.encode(nested.toCbor())));
+        Keyed keyed = new Keyed();
+        keyed.by_text = positions(args[1], key -> new String(unhex(key), StandardCharsets.UTF_8));
+        keyed.by_int = positions(args[2], Long::parseLong);
+        keyed.by_flag = positions(args[3], Boolean::parseBoolean);
+        System.out.println("keyed\t" + hex(Cbor.encode(keyed.toCbor())));
+    }
+
+    // The comma-separated `keys`, read by `parse`, each mapped to its position.
+    private static <K> Map<K, Long> positions(String keys, Function<String, K> parse) {
+        Map<K, Long> out = new LinkedHashMap<>();
+        for (String key : keys.split(",", -1)) {
+            out.put(parse.apply(key), (long) out.size());
+        }
+        return out;
+    }
+
+    private static byte[] unhex(String text) {
+        byte[] out = new byte[text.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte) Integer.parseInt(text.substring(2 * i, 2 * i + 2), 16);
+        }
+        return out;
+    }
+
+    private static String hex(byte[] bytes) {
+        StringBuilder out = new StringBuilder();
+        for (byte b : bytes) {
+            out.append(String.format("%02x", b & 0xff));
+        }
+        return out.toString();
+    }
+}
+"""
+
+
 PUBLIC_ACCESS = r"""
 package publiccheck;
 
@@ -470,6 +555,43 @@ def test_java_missing_ok_reads_an_absent_key_as_null(tmp_path):
         "opt-null": "null",
         "late-unset-encode": "a101f6",                   # encode still writes the key, as null
     }
+
+
+@pytest.fixture(scope="module")
+def java_shapes(tmp_path_factory):
+    """SHAPES' generated code and SHAPES_HARNESS, built by one javac and run once: the
+    lines the harness prints, by label."""
+    javac, java_bin = _find_java_tools()
+    work = tmp_path_factory.mktemp("java-shapes")
+    scaffold.emit(SHAPES, work, langs=["java"], services=[], runtime=True)
+    java_dir = work / "java"
+    harness = java_dir / "ShapesHarness.java"
+    harness.write_text(textwrap.dedent(SHAPES_HARNESS).strip() + "\n")
+    classes = work / "classes"
+    classes.mkdir()
+    build = subprocess.run([javac, "-encoding", "UTF-8", "-d", str(classes), str(java_dir / "Cbor.java"),
+                            str(java_dir / "api.java"), str(harness)],
+                           cwd=work, capture_output=True, text=True)
+    assert build.returncode == 0, build.stdout + build.stderr
+    run = subprocess.run([java_bin, "-cp", str(classes), "taut.ShapesHarness",
+                          codec.encode(SHAPES, "Nested", NESTED_VALUE).hex(), *KEY_ARGS],
+                         cwd=work, capture_output=True, text=True)
+    assert run.returncode == 0, run.stdout + run.stderr
+    return dict(line.split("\t", 1) for line in run.stdout.splitlines())
+
+
+def test_java_nested_lists_round_trip(java_shapes):
+    """A lambda inside a lambda binds its own name, so list<list<int>>, a list three
+    deep, a map in a list and a message-valued map in a list of lists all compile and
+    decode and re-encode to the same bytes."""
+    assert java_shapes["nested"] == codec.encode(SHAPES, "Nested", NESTED_VALUE).hex()
+
+
+def test_java_sorts_str_map_keys_by_code_point(java_shapes):
+    """Map entries put in any order encode sorted by key as Python sorts them: a str key
+    by code point, so U+FFFF before U+10000 and "a\\uffff" before "a\\U00010000", and an
+    int or bool key by value, as before."""
+    assert java_shapes["keyed"] == codec.encode(SHAPES, "Keyed", KEYED_VALUE).hex()
 
 
 def test_java_resext_runtime_parity_invalid_cases_public_access_and_fuzz(tmp_path):

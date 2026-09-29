@@ -2,7 +2,9 @@
 
 node loads the generated `api.js` and vendored `cbor.js` directly, so there is no
 separate build: a runner that fails to load, or finds a fixture entry point missing
-from `api.js`, exits non-zero, which fails the target.
+from `api.js`, exits non-zero, which fails the target. A decoded malformed row
+reports the hex of its re-encoding: `cbor.js`'s `encode` of the tree for a raw row,
+of the decoded value's `toCbor()` for a from_cbor row.
 """
 
 from __future__ import annotations
@@ -69,13 +71,17 @@ function describe(e) {
   return detail;
 }
 
+// A decoded row's re-encoding: the tree for raw_decode, the typed value for
+// from_cbor, and nothing for from_wire (an enum row never accepts).
 function decodeRow(row, data) {
   const c = decode(data);
   if (row.stage === "from_cbor") {
-    fromCbor.get(row.schema)(c);
+    return encode(fromCbor.get(row.schema)(c).toCbor());
   } else if (row.stage === "from_wire") {
     fromWire.get(row.schema)(c);
+    return new Uint8Array(0);
   }
+  return encode(c);
 }
 
 for (const row of intVectors) {
@@ -103,8 +109,8 @@ for (const row of intVectors) {
 }
 for (const row of malformed) {
   try {
-    decodeRow(row, bytesFromHex(row.bytes));
-    emit(row.name, "ok", "");
+    const again = decodeRow(row, bytesFromHex(row.bytes));
+    emit(row.name, "ok", hexFromBytes(again));
   } catch (e) {
     if (isDecodeError(e)) {
       emit(row.name, "err", describe(e));

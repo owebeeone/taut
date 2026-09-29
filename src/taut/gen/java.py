@@ -33,7 +33,14 @@ def _field_type(f: FieldDef) -> str:
     return _java_ty(f.type, boxed=f.optional)
 
 
-def _enc(t: TypeRef, expr: str) -> str:
+def _param(depth: int) -> str:
+    """The parameter of a lambda `depth` lambdas deep: `e`, then `e1`, `e2`, ... A list's
+    items and a map's entries are each read by a lambda, and lists nest and a map may sit
+    in a list, but Java refuses a lambda parameter that redeclares an enclosing one."""
+    return "e" if depth == 0 else f"e{depth}"
+
+
+def _enc(t: TypeRef, expr: str, depth: int = 0) -> str:
     if isinstance(t, Scalar):
         return {"int": f"Cbor.int_({expr})", "str": f"Cbor.text({expr})",
                 "bytes": f"Cbor.bytes({expr})", "bool": f"Cbor.bool({expr})",
@@ -42,16 +49,21 @@ def _enc(t: TypeRef, expr: str) -> str:
         return f"Cbor.int_({expr}.wire)"
     if isinstance(t, MsgRef):
         return f"{expr}.toCbor()"
+    e = _param(depth)
     if isinstance(t, ListOf):
-        return f"Cbor.arr({expr}.stream().map(e -> {_enc(t.elem, 'e')}).toList())"
-    if isinstance(t, MapOf):  # TreeMap -> ascending keys
-        return (f"Cbor.arr(new java.util.TreeMap<>({expr}).entrySet().stream().map(e -> "
-                f"Cbor.map(java.util.List.of(new KV(1, {_enc(t.key, 'e.getKey()')}), "
-                f"new KV(2, {_enc(t.value, 'e.getValue()')})))).toList())")
+        return f"Cbor.arr({expr}.stream().map({e} -> {_enc(t.elem, e, depth + 1)}).toList())"
+    if isinstance(t, MapOf):  # ascending keys: an int or bool by value, a str by code point
+        if isinstance(t.key, Scalar) and t.key.kind == "str":
+            entries = f"Cbor.sortedByCodePoint({expr})"
+        else:
+            entries = f"new java.util.TreeMap<>({expr})"
+        return (f"Cbor.arr({entries}.entrySet().stream().map({e} -> "
+                f"Cbor.map(java.util.List.of(new KV(1, {_enc(t.key, f'{e}.getKey()', depth + 1)}), "
+                f"new KV(2, {_enc(t.value, f'{e}.getValue()', depth + 1)})))).toList())")
     raise TypeError(t)
 
 
-def _dec(t: TypeRef, expr: str) -> str:
+def _dec(t: TypeRef, expr: str, depth: int = 0) -> str:
     if isinstance(t, Scalar):
         return {"int": f"{expr}.asInt()", "str": f"{expr}.asText()",
                 "bytes": f"{expr}.asBytes()", "bool": f"{expr}.asBool()",
@@ -60,11 +72,12 @@ def _dec(t: TypeRef, expr: str) -> str:
         return f"{t.name}.fromWire({expr}.asInt())"
     if isinstance(t, MsgRef):
         return f"{t.name}.fromCbor({expr})"
+    e = _param(depth)
     if isinstance(t, ListOf):
-        return f"{expr}.asArray().stream().map(e -> {_dec(t.elem, 'e')}).toList()"
+        return f"{expr}.asArray().stream().map({e} -> {_dec(t.elem, e, depth + 1)}).toList()"
     if isinstance(t, MapOf):  # entry maps: keys 1 and 2 checked first, a repeated key refused
-        return (f"Cbor.decodeMap({expr}, e -> {_dec(t.key, 'e.get(1)')}, "
-                f"e -> {_dec(t.value, 'e.get(2)')})")
+        return (f"Cbor.decodeMap({expr}, {e} -> {_dec(t.key, f'{e}.get(1)', depth + 1)}, "
+                f"{e} -> {_dec(t.value, f'{e}.get(2)', depth + 1)})")
     raise TypeError(t)
 
 

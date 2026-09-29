@@ -7,8 +7,10 @@ built with the compiler and flags `src/tests/test_cpp.py` uses. A build failure 
 RED; a runner that dies before reporting every row fails its target.
 
 The runner prints `name<TAB>outcome<TAB>detail` per row. It checks int rows itself;
-for a malformed row it reports `ok`, `err` with the tag and payload, or `untyped`
-when a C++ exception escapes, and the gate judges it.
+for a malformed row it reports `ok` with the hex of the re-encoding (`encode_value`
+of the tree for a raw row, the typed value's `to_cbor` for a from_cbor row), `err`
+with the tag and payload, or `untyped` when a C++ exception escapes, and the gate
+judges it.
 """
 
 from __future__ import annotations
@@ -59,7 +61,12 @@ const std::vector<Mal> MALFORMED = {
 @MALFORMED@
 };
 
-using Outcome = std::optional<taut::DecodeError>;  // nullopt: decoded
+// A malformed row's outcome: its DecodeError, or none when it decoded, with the hex of
+// the re-encoding (empty for a from_wire row: an enum row never accepts).
+struct Outcome {
+    std::optional<taut::DecodeError> error;
+    std::string again;
+};
 
 int nibble(char c) {
     if (c >= '0' && c <= '9') {
@@ -171,12 +178,37 @@ std::string describe(const taut::DecodeError& e) {
     throw std::logic_error("a DecodeError tag this runner does not report");
 }
 
+// taut::Buf holds 512 bytes and does not check its bound. A re-encoding is never much
+// longer than its input (an absent MISSING_OK key adds its null), so an input longer
+// than half a Buf is not re-encoded.
+constexpr std::size_t REENCODE_INPUT_MAX = sizeof(taut::Buf::d) / 2;
+
+Outcome failed(const taut::DecodeError& e) {
+    return Outcome{e, {}};
+}
+
+Outcome decoded(const taut::Buf& again) {
+    return Outcome{std::nullopt, hexof(again)};
+}
+
+// A typed value: its error, or its own to_cbor.
 template <class Result>
-Outcome outcome(const Result& r) {
+Outcome reencoded(const Result& r) {
     if (!r) {
-        return r.error;
+        return failed(r.error);
     }
-    return std::nullopt;
+    taut::Buf again;
+    r.value.to_cbor(again);
+    return decoded(again);
+}
+
+// An enum: its error, or decoded with no re-encoding.
+template <class Result>
+Outcome checked(const Result& r) {
+    if (!r) {
+        return failed(r.error);
+    }
+    return Outcome{};
 }
 
 // A from_cbor row's typed entry point, by message name (from the fixture schema).
@@ -192,14 +224,19 @@ Outcome from_wire(std::string_view name, long long v) {
 }
 
 Outcome decode_row(const Mal& row) {
-    std::string bytes = unhex(row.bytes);
+    std::string bytes = unhex(row.bytes);  // outlives the decoded value, whose text views it
     auto c = taut::try_decode(std::string_view(bytes));
     if (!c) {
-        return c.error;
+        return failed(c.error);
     }
     std::string_view stage(row.stage);
+    if (stage != "from_wire" && bytes.size() > REENCODE_INPUT_MAX) {
+        return Outcome{std::nullopt, "not re-encoded: input longer than a taut::Buf allows"};
+    }
     if (stage == "raw_decode") {
-        return std::nullopt;
+        taut::Buf again;
+        taut::encode_value(again, c.value);
+        return decoded(again);
     }
     if (stage == "from_cbor") {
         return from_cbor(row.schema, c.value);
@@ -207,7 +244,7 @@ Outcome decode_row(const Mal& row) {
     if (stage == "from_wire") {
         auto v = c.value.try_int();
         if (!v) {
-            return v.error;
+            return failed(v.error);
         }
         return from_wire(row.schema, v.value);
     }
@@ -277,11 +314,11 @@ int main() {
     }
     for (const auto& row : MALFORMED) {
         try {
-            Outcome error = decode_row(row);
-            if (error) {
-                emit(row.name, "err", describe(*error));
+            Outcome seen = decode_row(row);
+            if (seen.error) {
+                emit(row.name, "err", describe(*seen.error));
             } else {
-                emit(row.name, "ok", "");
+                emit(row.name, "ok", seen.again);
             }
         } catch (const std::exception& e) {
             emit(row.name, "untyped", std::string("exception: ") + e.what());
@@ -324,11 +361,11 @@ def _dispatch() -> tuple[str, str]:
     """The arms for every message (`from_cbor`) and enum (`from_wire`) in the fixture."""
     dispatch = parity.fixture_dispatch()
     from_cbor = [f"    if (message == {_cxx(name)}) {{\n"
-                 f"        return outcome(taut::{name}::try_from_cbor(c));\n"
+                 f"        return reencoded(taut::{name}::try_from_cbor(c));\n"
                  f"    }}"
                  for name in dispatch.messages]
     from_wire = [f"    if (name == {_cxx(name)}) {{\n"
-                 f"        return outcome(taut::{_try_enum_fn(name)}(v));\n"
+                 f"        return checked(taut::{_try_enum_fn(name)}(v));\n"
                  f"    }}"
                  for name in dispatch.enums]
     return "\n".join(from_cbor), "\n".join(from_wire)

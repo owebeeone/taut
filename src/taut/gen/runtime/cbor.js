@@ -188,6 +188,27 @@ function compareMapKeys(a, b) {
   return aa < bb ? -1 : aa > bb ? 1 : 0;
 }
 
+// A str key's order in a map<K,V> field (D24), for the generated code: by Unicode code
+// point, which is the order of its UTF-8 bytes and of Python's sorted(str). JS `<`
+// compares UTF-16 code units instead, and puts a character above U+FFFF, whose
+// surrogate pair starts d800-dbff, before one in U+E000..U+FFFF. Equal code points
+// advance both strings alike, so one index serves.
+function compareCodePoints(a, b) {
+  let i = 0;
+  while (i < a.length && i < b.length) {
+    const x = a.codePointAt(i);
+    const y = b.codePointAt(i);
+    if (x !== y) {
+      return x < y ? -1 : 1;
+    }
+    i += x > 0xffff ? 2 : 1;
+  }
+  if (a.length === b.length) {
+    return 0;
+  }
+  return a.length < b.length ? -1 : 1;
+}
+
 function cget(c, key) {
   for (const [k, v] of expectMap(c)) if (mapKeyEquals(k, key)) return v;
   throw new DecodeError("MissingKey", { key });
@@ -475,8 +496,10 @@ function dec(data, off0) {
     }
     case 3: {
       const [n, o] = readLength(data, off, info);
+      // fatal: invalid UTF-8 is InvalidUtf8. ignoreBOM: a leading U+FEFF is ordinary
+      // text, kept so the text re-encodes to its bytes (D2), where the default strips it.
       try {
-        return [CText(new TextDecoder("utf-8", { fatal: true }).decode(data.slice(o, o + n))), o + n];
+        return [CText(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(data.slice(o, o + n))), o + n];
       } catch (_) {
         throw new DecodeError("InvalidUtf8");
       }
@@ -540,6 +563,7 @@ module.exports = {
   cgetOrNull,
   mapFromCbor,
   cmapEntries,
+  compareCodePoints,
   isNull,
   expectInt,
   expectFloat,

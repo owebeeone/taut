@@ -2,9 +2,11 @@
 residual, PascalCase exported fields. The shared parity corpus replays through the
 gate's Go runner (`taut.corpus.parity_go`)."""
 
+import copy
 import os
 import json
 import random
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -18,12 +20,15 @@ from taut.corpus import parity, parity_go, toolchains
 from taut.corpus import resext_build as resext
 from taut.gen import go
 from taut.gen import scaffold
-from taut.ir.dsl import BOOL, FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, schema as mk
+from taut.ir.dsl import BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, schema as mk
 from taut.ir.load import load_schema
+from taut.ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar
 from taut.ir.shapes import BAND_START
+from taut.ir.validate import validate
 from taut.wire import cbor, codec
 
 ROOT = Path(__file__).resolve().parents[2]
+IR_FILES = sorted((ROOT / "ir").glob("*.taut.py"))
 RAZEL = load_schema(IR_PATH.parent / "razel.taut.py")
 RESEXT = load_schema(resext.IR_PATH)
 FLOAT_SCHEMA = mk(Msg("FloatMsg",
@@ -45,12 +50,18 @@ def _go_test_env(tmp_path: Path) -> dict[str, str]:
     return env
 
 
+def _struct_fields(src: str, name: str) -> dict[str, str]:
+    """A generated struct's fields, name -> Go type, whatever gofmt's column alignment."""
+    body = src[src.index(f"type {name} struct {{\n") + len(f"type {name} struct {{\n"):]
+    return dict(line.split() for line in body[:body.index("}\n")].splitlines())
+
+
 def test_emits_structs_enums_and_codec():
     s = go.emit_types(RAZEL)
     assert "package taut" in s
     assert "type BuildResult struct {" in s
     assert "type BuildStatus int64" in s
-    assert "BuildStatusBuilt BuildStatus = 1" in s
+    assert re.search(r"\n\tBuildStatusBuilt +BuildStatus = 1\n", s)
     assert "func (x BuildResult) ToCbor() Cbor {" in s
     assert "func TryBuildResultFromCbor(c Cbor) (BuildResult, error) {" in s
     assert "func BuildResultFromCbor(c Cbor) BuildResult {" in s
@@ -58,9 +69,19 @@ def test_emits_structs_enums_and_codec():
 
 
 def test_fields_pascalcased_and_optional_is_pointer():
-    s = go.emit_types(RAZEL)
-    assert "Recomputes int64" in s   # recomputes -> Recomputes (exported)
-    assert "Message *string" in s    # optional -> nil-able pointer
+    fields = _struct_fields(go.emit_types(RAZEL), "BuildResult")
+    assert fields["Recomputes"] == "int64"   # recomputes -> Recomputes (exported)
+    assert fields["Message"] == "*string"    # optional -> nil-able pointer
+
+
+def test_optional_list_and_map_are_pointers_like_every_optional_field():
+    """An optional `T` is `*T` whatever `T` is: nil is null, and a pointer to an empty (or
+    nil) slice or map is the empty array. Lists nest as slices of slices."""
+    fields = _struct_fields(go.emit_types(parity.parity_schema()), "Shapes")
+    assert fields["MaybeNumbers"] == "*[]int64"
+    assert fields["MaybeTally"] == "*map[string]int64"
+    assert (fields["MaybeCount"], fields["MaybeBoxed"], fields["LateNote"]) == ("*int64", "*EnumBox", "*string")
+    assert (fields["Numbers"], fields["Grid"], fields["Tally"]) == ("[]int64", "[][]int64", "map[string]int64")
 
 
 def test_forward_compat_adds_residual():
@@ -72,10 +93,8 @@ def test_forward_compat_adds_residual():
 
 def test_float_scalar_codegen():
     s = go.emit_types(FLOAT_SCHEMA)
-    assert "X float64" in s
-    assert "Xs []float64" in s
-    assert "ById map[int64]float64" in s
-    assert "Maybe *float64" in s
+    assert _struct_fields(s, "FloatMsg") == {
+        "X": "float64", "Xs": "[]float64", "ById": "map[int64]float64", "Maybe": "*float64"}
     assert "CFloat(x.X)" in s
     assert "a = append(a, CFloat(e))" in s
     assert "V: CFloat(x.ById[k])" in s
@@ -141,8 +160,9 @@ RAW_EDGES = [
     ("7b0000000000000001", "NonCanonicalInt;value=1"),  # the head is checked before the body
     ("1900", "Truncated"),                              # missing argument bytes
     ("7b0020000000000000", "Truncated"),                # a text length beyond the input
-    ("fa3f800000", "ok"),                               # floats are exempt from shortest form
-    ("fb3ff0000000000000", "ok"),
+    # Decode takes any float width; re-encode writes the shortest (G2, question 7, open).
+    ("fa3f800000", "ok;reencode=f93c00"),
+    ("fb3ff0000000000000", "ok;reencode=f93c00"),
     ("f93c", "Truncated"),
     ("f7", "UnsupportedInfo;info=23"),                  # major 7 other than the eight kept values
     ("f800", "UnsupportedInfo;info=24"),
@@ -165,18 +185,19 @@ RAW_EDGES = [
 
 
 def _python_observation(data: bytes) -> str:
+    """`ok`, with `;reencode=<hex>` when the re-encoding differs from the input, or the error."""
     try:
-        cbor.loads(data)
+        again = cbor.dumps(cbor.loads(data))
     except cbor.DecodeError as exc:
         return parity.format_error(exc.tag, exc.payload)
-    return "ok"
+    return "ok" if again == data else f"ok;reencode={again.hex()}"
 
 
 def _raw_row(hex_input: str, observed: str) -> dict:
-    if observed == "ok":
-        expect: dict = {"accept": True}
+    tag, payload = parity.parse_error(observed)
+    if tag == "ok":
+        expect: dict = {"accept": True, **payload}
     else:
-        tag, payload = parity.parse_error(observed)
         expect = {"tag": tag, **payload}
     return {"name": f"edge-{hex_input or 'empty'}", "stage": "raw_decode", "bytes": hex_input,
             "expect": expect, "why": "CD-E5 edge beyond the corpus"}
@@ -204,6 +225,175 @@ def test_go_runtime_and_parity_runner_are_gofmt_clean(tmp_path):
     runtime = sorted(str(p) for p in (ROOT / "src/taut/gen/runtime").glob("*.go"))
     result = subprocess.run([gofmt, "-l", str(runner), *runtime], capture_output=True, text=True, check=False)
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+
+
+# --- every legal field shape, at any nesting ----------------------------------------------
+
+# Deeper than the fixture's `Shapes`: lists three deep, maps inside lists, each scalar in a
+# nested list, a message inside a list of lists, and optional and MISSING_OK lists and maps.
+# `IntBox` is the fixture's, as the gate's Go runner builds one.
+DEEP_SCHEMA = mk(
+    Enum("Mode", ok=0, alt=1),
+    Msg("IntBox", F("n", 1, INT), F("by_id", 2, Map(INT, INT))),
+    Msg("EnumBox", F("mode", 1, Ref("Mode"))),
+    Msg("Row", F("cells", 1, List(List(INT)), optional=True)),
+    Msg("Deep",
+        F("cube", 1, List(List(List(INT)))),
+        F("words", 2, List(List(STR))),
+        F("blobs", 3, List(List(BYTES))),
+        F("flags", 4, List(List(BOOL))),
+        F("reals", 5, List(List(FLOAT))),
+        F("modes", 6, List(List(Ref("Mode")))),
+        F("rows", 7, List(List(Ref("Row")))),
+        F("tallies", 8, List(Map(STR, INT))),
+        F("mode_maps", 9, List(List(Map(BOOL, Ref("Mode"))))),
+        F("box_maps", 10, List(Map(INT, Ref("EnumBox")))),
+        F("maybe_cube", 11, List(List(List(FLOAT))), optional=True),
+        F("maybe_rows", 12, List(Ref("Row")), optional=True),
+        F("maybe_blobs", 13, List(Map(STR, BYTES)), optional=True),
+        F("maybe_boxes", 14, Map(INT, Ref("EnumBox")), optional=True),
+        F("late_grid", 15, List(List(STR)), optional=MISSING_OK),
+        F("late_reals", 16, Map(BOOL, FLOAT), optional=MISSING_OK)),
+)
+
+
+def _generated_go() -> dict[str, str]:
+    """api.go, with and without forward-compat, for every IR file and this file's schemas."""
+    schemas = {path.name.removesuffix(".taut.py"): load_schema(path) for path in IR_FILES}
+    schemas |= {"deep": DEEP_SCHEMA, "float": FLOAT_SCHEMA, "keys": KEYS_SCHEMA, "presence": PRESENCE_SCHEMA}
+    return {f"{name}{'_fc' if fc else ''}": go.emit_types(schema, forward_compat=fc)
+            for name, schema in schemas.items() for fc in (False, True)}
+
+
+def test_generated_go_is_gofmt_clean(tmp_path):
+    gofmt = shutil.which("gofmt")
+    if gofmt is None:
+        pytest.skip("gofmt not installed")
+    paths = []
+    for name, source in _generated_go().items():
+        paths.append(tmp_path / f"{name}.go")
+        paths[-1].write_text(source)
+    result = subprocess.run([gofmt, "-l", *map(str, paths)], capture_output=True, text=True, check=False)
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+
+
+def test_every_ir_file_generates_go_that_vets(tmp_path):
+    _needs_go()
+    env = _go_test_env(tmp_path)
+    for path in IR_FILES:
+        schema = load_schema(path)
+        out = tmp_path / path.name.removesuffix(".taut.py")
+        scaffold.emit(schema, out, langs=["go"], services=[], runtime=True, forward_compat=bool(schema.extensions))
+        result = subprocess.run(["go", "vet"], cwd=out / "go", env=env, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
+        assert result.returncode == 0, f"{path.name}\n{result.stdout}"
+
+
+_SAMPLES = {
+    "int": [0, 1, -1, 23, 24, -25, 256, 1 << 40, -(1 << 63), (1 << 63) - 1],
+    "str": ["", "a", "b", "naïve", "￿", "\U00010000"],
+    "bytes": [b"", b"\x00", b"\xff\x00"],
+    "bool": [False, True],
+    "float": [0.0, -0.0, 1.5, 0.1, -2.25, 1e300, float("inf"), float("nan")],
+}
+# What a mutation puts in a node's place. No dict here holds a key a message lacks, so no
+# row carries an unknown field (which Python keeps and non-forward-compat Go drops).
+_REPLACEMENTS = [0, 7, -1, "x", b"", True, None, 1.5, [], {}, [0], ["x"], [{}], [[None]], [{1: 0}]]
+
+
+def _native(t, rng: random.Random):
+    """A random native value of type `t` in DEEP_SCHEMA, as `taut.wire.codec` takes one."""
+    if isinstance(t, Scalar):
+        return rng.choice(_SAMPLES[t.kind])
+    if isinstance(t, EnumRef):
+        return rng.choice(list(DEEP_SCHEMA.enums[t.name].members))
+    if isinstance(t, MsgRef):
+        return {f.name: None if f.optional and rng.randrange(3) == 0 else _native(f.type, rng)
+                for f in DEEP_SCHEMA.messages[t.name].fields}
+    if isinstance(t, ListOf):
+        return [_native(t.elem, rng) for _ in range(rng.randrange(4))]
+    assert isinstance(t, MapOf)
+    return {_native(t.key, rng): _native(t.value, rng) for _ in range(rng.randrange(4))}
+
+
+def _nodes(node, parent=None, key=None):
+    """`(parent, key, node)` for every node of a decoded CBOR tree; the root's parent is None."""
+    yield parent, key, node
+    children = enumerate(node) if isinstance(node, list) else node.items() if isinstance(node, dict) else ()
+    for child_key, child in children:
+        yield from _nodes(child, node, child_key)
+
+
+def _mutated(tree, rng: random.Random):
+    """A copy of `tree` with one key dropped, one item repeated or one node replaced."""
+    tree = copy.deepcopy(tree)
+    nodes = list(_nodes(tree))
+    maps = [node for _, _, node in nodes if isinstance(node, dict) and node]
+    lists = [node for _, _, node in nodes if isinstance(node, list) and node]
+    op = rng.randrange(3)
+    if op == 0 and maps:
+        node = rng.choice(maps)
+        del node[rng.choice(list(node))]                  # MissingKey, or null for MISSING_OK
+    elif op == 1 and lists:
+        node = rng.choice(lists)
+        index = rng.randrange(len(node))
+        node.insert(index, copy.deepcopy(node[index]))   # in a map's array, a repeated key
+    else:
+        parent, key, _ = rng.choice(nodes)
+        replacement = copy.deepcopy(rng.choice(_REPLACEMENTS))
+        if parent is None:
+            return replacement
+        parent[key] = replacement
+    return tree
+
+
+def _python_expect(data: bytes) -> dict:
+    """What `taut.wire.codec`, the reference, makes of `data` as a `Deep`: a row's expect.
+    Go's `DecodeError.Key` is an int64, so a repeated str or bool key is judged by its tag."""
+    try:
+        again = codec.encode(DEEP_SCHEMA, "Deep", codec.decode(DEEP_SCHEMA, "Deep", data))
+    except cbor.DecodeError as exc:
+        payload = {name: value for name, value in exc.payload.items()
+                   if exc.tag != "DuplicateMapKey" or type(value) is int}
+        return {"tag": exc.tag, **payload}
+    return {"accept": True, "reencode": again.hex()}
+
+
+def _deep_rows(seed: int = 0x0302, values: int = 40, mutations: int = 500) -> list[dict]:
+    """`from_cbor` rows for `Deep`: every optional null, every optional present and empty
+    (an empty array, not null), random values, each field's key dropped in turn, then
+    random mutations."""
+    rng = random.Random(seed)
+    fields = DEEP_SCHEMA.messages["Deep"].fields
+    unset = {f.name: None if f.optional else [] for f in fields}
+    empty = {f.name: {} if isinstance(f.type, MapOf) else [] for f in fields}
+    natives = [unset, empty, *(_native(MsgRef("Deep"), rng) for _ in range(values))]
+    encoded = [codec.encode(DEEP_SCHEMA, "Deep", value) for value in natives]
+    trees = [cbor.loads(data) for data in encoded]
+    for f in fields:
+        tree = copy.deepcopy(rng.choice(trees))
+        del tree[f.tag]                                   # MissingKey, or null for MISSING_OK
+        encoded.append(cbor.dumps(tree))
+    encoded += [cbor.dumps(_mutated(rng.choice(trees), rng)) for _ in range(mutations)]
+    return [{"name": f"deep-{i}", "stage": "from_cbor", "schema": "Deep", "bytes": data.hex(),
+             "expect": _python_expect(data), "why": "every shape at depth, beyond the corpus"}
+            for i, data in enumerate(encoded)]
+
+
+def test_go_decodes_and_reencodes_every_shape_at_depth_as_python_does(monkeypatch):
+    """DEEP_SCHEMA through the gate's own Go runner and judge: what Python encodes, and
+    mutations of it, decode or fail with Python's tag and payload, and re-encode as Python does."""
+    assert validate(DEEP_SCHEMA) == []   # legal shapes only
+    _needs_go()
+    rows = _deep_rows()
+    assert {row["expect"].get("tag", "accept") for row in rows} >= {
+        "accept", "WrongType", "MissingKey", "DuplicateMapKey", "UnknownEnum"}
+    assert rows[1]["expect"]["reencode"] != rows[0]["expect"]["reencode"]   # empty is not null
+    monkeypatch.setattr(parity, "parity_schema", lambda: DEEP_SCHEMA)
+    monkeypatch.setattr(parity, "malformed_rows", lambda: rows)
+    report = parity_go.run()
+    assert report.green, _failures(report)
+    assert {r.name for r in report.results if r.kind == "malformed"} == {row["name"] for row in rows}
 
 
 # optional=MISSING_OK (TautCheckedDecode.md CD-E5, the opt-in exception): `Late` reads an

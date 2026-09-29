@@ -12,6 +12,16 @@ from __future__ import annotations
 from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 
+def _key_order(key: TypeRef) -> str:
+    """The comparator a map<K,V> field's entries are sorted by before encoding (D24). A
+    str key sorts by code point with cbor.js's `compareCodePoints`, Python's order: JS
+    `<` compares UTF-16 code units, which puts U+10000 before U+FFFF. An int or bool key
+    compares with `<`."""
+    if isinstance(key, Scalar) and key.kind == "str":
+        return "(a, b) => compareCodePoints(a[0], b[0])"
+    return "(a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0"
+
+
 def _enc(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {"int": f"CInt({expr})", "str": f"CText({expr})",
@@ -24,7 +34,7 @@ def _enc(t: TypeRef, expr: str) -> str:
     if isinstance(t, ListOf):
         return f"CArr({expr}.map((e) => {_enc(t.elem, 'e')}))"
     if isinstance(t, MapOf):  # Map -> key-sorted array of {1:k, 2:v}
-        return (f"CArr([...{expr}.entries()].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)"
+        return (f"CArr([...{expr}.entries()].sort({_key_order(t.key)})"
                 f".map(([k, v]) => CMap([[1, {_enc(t.key, 'k')}], [2, {_enc(t.value, 'v')}]])))")
     raise TypeError(t)
 
@@ -106,7 +116,7 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
 def emit_types(schema: Schema, forward_compat: bool = False) -> str:
     out = ['"use strict";',
            "// GENERATED native JS types + codec — do not edit. Pairs with cbor.js.",
-           'const { CInt, CFloat, CText, CBytes, CBool, CArr, CMap, CNull, cget, cgetOrNull, mapFromCbor, cmapEntries, isNull, expectInt, expectFloat, expectText, expectBytes, expectBool, expectArray, expectMap, enumFromWire, enumFromCbor } = require("./cbor.js");',
+           'const { CInt, CFloat, CText, CBytes, CBool, CArr, CMap, CNull, cget, cgetOrNull, mapFromCbor, cmapEntries, compareCodePoints, isNull, expectInt, expectFloat, expectText, expectBytes, expectBool, expectArray, expectMap, enumFromWire, enumFromCbor } = require("./cbor.js");',
            ""]
     names = []
     for e in schema.enums.values():

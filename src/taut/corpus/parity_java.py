@@ -3,7 +3,9 @@
 The generated classes in `api.java` are package-private in package `taut`, so the
 runner is a class of that package too: javac compiles it with `api.java` and the
 vendored `Cbor.java` and `Ext.java`, and a compile error is RED. The runner checks
-the int rows itself and reports what each malformed row did; the gate judges it.
+the int rows itself and reports what each malformed row did, a decoded one with the
+hex of its re-encoding (`Cbor.encode` of the tree for a raw row, of the typed
+value's `toCbor()` for a from_cbor row); the gate judges it.
 """
 
 from __future__ import annotations
@@ -56,8 +58,8 @@ public final class ParityRunner {
         }
         for (Mal row : MALFORMED) {
             try {
-                decodeRow(row);
-                emit(row.name(), "ok", "");
+                byte[] again = decodeRow(row);
+                emit(row.name(), "ok", hex(again));
             } catch (Cbor.DecodeError e) {
                 emit(row.name(), "err", describe(e));
             } catch (Throwable t) {
@@ -108,19 +110,28 @@ public final class ParityRunner {
         emit(row.name(), "fail", "value fits long but expected out-of-subset");
     }
 
-    private static void decodeRow(Mal row) {
+    // A decoded row's re-encoding: the tree for raw_decode, the typed value for
+    // from_cbor, and nothing for from_wire (an enum row never accepts).
+    private static byte[] decodeRow(Mal row) {
         Cbor c = Cbor.decode(unhex(row.bytes()));
         switch (row.stage()) {
             case "raw_decode" -> {
+                return Cbor.encode(c);
             }
-            case "from_cbor" -> fromCbor(row.schema(), c);
-            case "from_wire" -> fromWire(row.schema(), c.asInt());
+            case "from_cbor" -> {
+                return fromCbor(row.schema(), c);
+            }
+            case "from_wire" -> {
+                fromWire(row.schema(), c.asInt());
+                return new byte[0];
+            }
             default -> throw new IllegalStateException("unknown stage " + row.stage());
         }
     }
 
-    // A from_cbor row's typed entry point, by message name (from the fixture schema).
-    private static void fromCbor(String message, Cbor c) {
+    // A from_cbor row's typed entry point, by message name (from the fixture schema):
+    // the decoded value's own encoding.
+    private static byte[] fromCbor(String message, Cbor c) {
         switch (message) {
 @FROM_CBOR@
             default -> throw new IllegalStateException("no from_cbor entry point for " + message);
@@ -207,7 +218,8 @@ def _tables() -> tuple[str, str, str]:
 def _dispatch() -> tuple[str, str]:
     """The `case` arms for every message (`from_cbor`) and enum (`from_wire`) in the fixture."""
     dispatch = parity.fixture_dispatch()
-    from_cbor = [f"            case {_java_str(name)} -> {name}.fromCbor(c);" for name in dispatch.messages]
+    from_cbor = [f"            case {_java_str(name)} -> {{\n                return Cbor.encode({name}.fromCbor(c).toCbor());\n            }}"
+                 for name in dispatch.messages]
     from_wire = [f"            case {_java_str(name)} -> {name}.fromWire(v);" for name in dispatch.enums]
     return "\n".join(from_cbor), "\n".join(from_wire)
 

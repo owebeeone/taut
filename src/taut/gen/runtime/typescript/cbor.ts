@@ -86,7 +86,9 @@ export const I64_MAX = (1n << 63n) - 1n;
 
 const U32_LIMIT = 0x100000000n;
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
-const textDecoder = new TextDecoder("utf-8", { fatal: true });
+// fatal: invalid UTF-8 is InvalidUtf8. ignoreBOM: a leading U+FEFF is ordinary text,
+// kept so the text re-encodes to its bytes (D2), where the default strips it.
+const textDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const floatScratch = new DataView(new ArrayBuffer(8));
 const F64_FRAC_MASK = (1n << 52n) - 1n;
 const F64_HIDDEN_BIT = 1n << 52n;

@@ -65,8 +65,9 @@ def _enc(t: TypeRef, expr: str) -> str:
         return f"{expr}.toCbor()"
     if isinstance(t, ListOf):
         return f"Cbor.arr({expr}.map {{ {_enc(t.elem, 'it')} }})"
-    if isinstance(t, MapOf):  # toSortedMap -> ascending keys
-        return (f"Cbor.arr({expr}.toSortedMap().map {{ "
+    if isinstance(t, MapOf):  # ascending keys: an int or bool by value, a str by code point
+        order = "Cbor.codePointOrder" if isinstance(t.key, Scalar) and t.key.kind == "str" else ""
+        return (f"Cbor.arr({expr}.toSortedMap({order}).map {{ "
                 f"Cbor.map(listOf(1L to {_enc(t.key, 'it.key')}, 2L to {_enc(t.value, 'it.value')})) }})")
     raise TypeError(t)
 
