@@ -262,6 +262,31 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
   [TautProtoApiSurfaceExtensions.md](TautProtoApiSurfaceExtensions.md).
   *(SPEC — roll-buildable; deferred decisions are explicitly non-blocking.)*
 
+## Checked decode and options (v0.10.0)
+
+- **D26. Checked decode.** Every decode entry point in every taut language returns
+  a value or a `DecodeError`: it never panics, aborts, overflows its stack or
+  throws anything else. The nine languages give the same tag and payload for the
+  same bytes, in one order of checks. Two new tags join: `TooDeep{limit}` and
+  `TooLarge{len, limit}`. Depth is bounded by the decode call's root
+  `max_depth` (default 32, ceiling 128), and length by its `max_encoded_len`
+  (no default). The shared corpus is parity contract
+  `taut-codec-parity/i64/v1`. The legacy codec goes in the same release, with no
+  opt-out. See [TautCheckedDecode.md](TautCheckedDecode.md).
+  *(RULED 2026-09-28 and 2026-09-30; built in v0.10.0 by
+  [TautV010Plan.md](TautV010Plan.md).)*
+- **D27. Options.** Typed properties declared with a schema, as in protobuf.
+  Each option has one definition: name, value type, levels, default,
+  inheritance, and a class. The classes are *wire*, *codegen* and *metadata*,
+  with *semantic* for `merge` at its later migration. Values are written
+  positionally, `option.<name>(v)`, at file, message, field and enum level;
+  enum value, service and method are reserved. IR version 2 carries raw values at
+  every level and resolved `effective` values at file and message. An unknown
+  name is refused everywhere. A changed wire option is breaking in both
+  directions. The first two options are `max_depth` and `max_encoded_len`. See
+  [TautOptions.md](TautOptions.md). *(RULED 2026-09-28 and 2026-09-30; built in
+  v0.10.0.)*
+
 ## Already-built foundation (for reference)
 
 Delivery shapes (atom/log/stream/swmr/snapshot_delta/crdt) + validator;

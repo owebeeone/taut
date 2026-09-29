@@ -1,9 +1,13 @@
 # Options: typed properties declared with a taut schema
 
-**Status:** DESIGN, proposed 2026-09-28 on the owner's direction (§0), awaiting the owner's ruling
-on what §0 does not settle. A document only: no code, corpus, fixture or version has changed. Once
-ruled, it becomes decision **D27** in [TautDecisions.md](TautDecisions.md); D26 is
-[TautCheckedDecode.md](TautCheckedDecode.md), whose rev2 takes both of its bounds from this note.
+**rev10, 2026-09-30:** every open question is ruled as recommended ("All 14 as recco. Go"): 1, 3,
+4, 5, 6, 7 and 8 take (a). The note becomes decision D27 and is built in v0.10.0
+([TautV010Plan.md](TautV010Plan.md)). Changed: the status and §10.
+
+**Status:** RULED 2026-09-30: every question is settled (rev10), and the note is decision **D27** in
+[TautDecisions.md](TautDecisions.md); D26 is [TautCheckedDecode.md](TautCheckedDecode.md), whose
+rev2 takes both of its bounds from this note. Built in v0.10.0 by [TautV010Plan.md](TautV010Plan.md);
+until then only OPT-M2 is in the code.
 
 **rev9, 2026-09-30:** OPT-M2's targets are built. All nine generators implement `MISSING_OK` and
 `scaffold.emit` no longer refuses it, as part of the parity pass (TautCodecParityPlan.md §8, taut
@@ -531,7 +535,8 @@ TypeScript support, which v0.10.0 brings.
 
 **Questions.** Each lists its alternatives; (a) is recommended.
 
-1. **Resolved values in the IR.** (a) Raw `options` at every level and `effective` at file and message
+1. **Resolved values in the IR.** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   (a) Raw `options` at every level and `effective` at file and message
    level, checked by the loader. (b) Raw only: the TypeScript runtime and every provider reimplement
    inheritance and defaults, a new parity surface. (c) Effective only: the IR no longer records where
    a value was declared, and cannot round-trip to the DSL.
@@ -540,18 +545,24 @@ TypeScript support, which v0.10.0 brings.
    fail-closed and implement both bounds and `MISSING_OK`, and the parity gate replays every row in all
    nine. The alternatives were to refuse only schemas that declare a bound, to refuse every schema
    until Phase 4, or to add the checks as panics or throws.
-3. **Unknown options.** (a) Refused, whatever the class. (b) Let unknown metadata options through,
+3. **Unknown options.** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   (a) Refused, whatever the class. (b) Let unknown metadata options through,
    which needs each option's class in the IR, so that a reader can tell one it has never seen.
-4. **Levels in version 2.** (a) `options` at all seven levels now, so the later three need no new
+4. **Levels in version 2.** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   (a) `options` at all seven levels now, so the later three need no new
    version. (b) The four named now, and version 3 when the others get options.
-5. **Changing a wire option.** (a) Breaking both ways. (b) Raising a bound compatible, accepting that
+5. **Changing a wire option.** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   (a) Breaking both ways. (b) Raising a bound compatible, accepting that
    readers still at the old bound refuse new writers' bytes.
-6. **Custom options.** (a) `option("ns.name", v)` raises at import until custom options are designed.
+6. **Custom options.** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   (a) `option("ns.name", v)` raises at import until custom options are designed.
    (b) Accepted there, then refused by `tautc` as unknown.
-7. **`merge` at the migration.** (a) A fourth class, *semantic*: no byte changes but what readers
+7. **`merge` at the migration.** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   (a) A fourth class, *semantic*: no byte changes but what readers
    compute does, so a change is breaking as for wire. (b) Wire. (c) Metadata, which contradicts the
    gate.
-8. **`max_encoded_len`'s default and ceiling.** (a) No default, so a schema that declares none leaves
+8. **`max_encoded_len`'s default and ceiling.** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   (a) No default, so a schema that declares none leaves
    size to its carriers as today, and a ceiling of 2^31 − 1 on declared values. (b) A default for
    every schema, such as glade's 16 MiB: uniform, but razel and taut-shape would have to declare more
    to keep what they accept today, and no safer, since only a carrier refuses before it allocates.

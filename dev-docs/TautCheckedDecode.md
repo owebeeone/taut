@@ -1,5 +1,9 @@
 # Checked decode: one error and schema-declared bounds in every taut language
 
+**rev9, 2026-09-30:** every open question is ruled as recommended ("All 14 as recco. Go"): 1, 3,
+5, 7, 8, 9 and 10 take (a). The note becomes decision D26 and is built in v0.10.0
+([TautV010Plan.md](TautV010Plan.md)). Changed: the status and §8.
+
 **rev8, 2026-09-30:** the parity pass ("just bring all languages to parity";
 [TautCodecParityPlan.md](TautCodecParityPlan.md) §8) built, in all nine codecs, the parts of this
 note that do not wait on the bounds:
@@ -44,11 +48,10 @@ from the `max_encoded_len` option; the owner's rulings on questions 4 and 6 reco
 title, §0, §1, CD-E5, CD-B1-B5, CD-C1, CD-C2, CD-C4, §4.4, the absent-field findings in §5.2-5.3,
 CD-V2, CD-V3, CD-G1-G4, G1, G3, G4 and questions 1, 2, 4 and 6.
 
-**Status:** DESIGN, proposed 2026-09-28; rev2 records the owner's rulings of the same day (§0) and
-awaits the rest. rev8: the parity pass built CD-E5, CD-E6, rows M1-M17 and `optional=MISSING_OK`
-everywhere (above); the rest is still a document only. Once ruled, it
-becomes decision **D26** in [TautDecisions.md](TautDecisions.md) (D25 is the last) and parity
-contract `taut-codec-parity/i64/v1`.
+**Status:** RULED 2026-09-30: every question is settled (rev9). The note is decision **D26** in
+[TautDecisions.md](TautDecisions.md), and its corpus is parity contract `taut-codec-parity/i64/v1`.
+The parity pass built CD-E5, CD-E6, rows M1-M17 and `optional=MISSING_OK` everywhere (rev8); the rest
+is built in v0.10.0 by [TautV010Plan.md](TautV010Plan.md).
 
 **Builds on** [RustFailClosed.md](RustFailClosed.md) (fail-closed Rust is the default since v0.8.0),
 [TautCodecParityPlan.md](TautCodecParityPlan.md) (D1, D2 ratified 2026-07-07; §2b's tag vocabulary)
@@ -625,7 +628,8 @@ fn decode(bytes: &[u8]) -> Result<Inbound, DecodeError> { // in `impl Inbound`
 
 **Questions.** Each lists its alternatives; (a) is recommended.
 
-1. **Depth bound (rev2).** Its source is settled by the owner: the `max_depth` option, default 32,
+1. **Depth bound (rev2).** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   Its source is settled by the owner: the `max_depth` option, default 32,
    ceiling 128, from each call's root (CD-B3; TautOptions.md's questions cover the option itself).
    Open here is a raw decode's depth argument. (a) Optional and capped at the ceiling, with
    `TooDeep.limit` naming the bound applied; generated code, the runtime codecs and schema-blind
@@ -637,7 +641,8 @@ fn decode(bytes: &[u8]) -> Result<Inbound, DecodeError> { // in `impl Inbound`
    question 8, where (a) is no default, so a schema that declares none leaves size to its carriers as
    today, and a ceiling of 2^31 − 1 on declared values; (b) a default, such as 16 MiB, for every
    schema; (c) no ceiling.
-3. **TypeScript form.** (a) Throw `DecodeError` and nothing else. (b) Return `{ ok, value | error }`.
+3. **TypeScript form.** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   (a) Throw `DecodeError` and nothing else. (b) Return `{ ok, value | error }`.
    (c) Both.
 4. **Absent optional field.** RULED (OWNER, 2026-09-28): `MissingKey` everywhere ("ok with the
    MissingKey adoption"; CD-E5). Its consequence, RULED (a) (OWNER, rev4: "ok"), spelled
@@ -658,17 +663,21 @@ fn decode(bytes: &[u8]) -> Result<Inbound, DecodeError> { // in `impl Inbound`
    data. (d) Make an omitted optional field the canonical form of null, so adding one is compatible
    both ways and D2's law holds; but every encoder changes, and every stored record that holds a
    null becomes non-canonical, which strict decode then refuses.
-5. **Packaging.** (a) All in v0.10.0 with the legacy removal, no opt-out. (b) v0.10.0 removes legacy,
+5. **Packaging.** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   (a) All in v0.10.0 with the legacy removal, no opt-out. (b) v0.10.0 removes legacy,
    v0.11.0 adds the bound: a second breaking regeneration for every client. (c) A flag first, which
    leaves the overflow open while it exists.
 6. **`wellformed`.** RULED (OWNER, 2026-09-28): (a). The node step drops `checked.rs` ("drop
    checked.rs") and `wellformed.rs` with it, since the fail-closed codec then checks everything the
    two check; their tests are kept (CD-G1, CD-G2).
-7. **G2.** (a) A D2 follow-up after v0.10.0 with its own lead rows; a tag such as `UnsortedMapKeys`
+7. **G2.** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   (a) A D2 follow-up after v0.10.0 with its own lead rows; a tag such as `UnsortedMapKeys`
    would also make the duplicate check one comparison per key. (b) Fold it into v0.10.0.
-8. **client-ts.** (a) Its own step after the node step. (b) Inside the node step, which the `bigint`
+8. **client-ts.** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   (a) Its own step after the node step. (b) Inside the node step, which the `bigint`
    change would enlarge.
-9. **A repeated non-int map key (rev8).** A repeated key in a `map<K,V>` field is `DuplicateMapKey`
+9. **A repeated non-int map key (rev8).** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+   A repeated key in a `map<K,V>` field is `DuplicateMapKey`
    in all nine, but its `key` payload is pinned only for an int key. For a str or bool key the nine
    report the key itself, 0, the entry's index or nothing, and Python spells a bool `True`, so the
    rows `map-str-key-duplicate` and `map-bool-key-duplicate` pin only the tag.
@@ -677,7 +686,8 @@ fn decode(bytes: &[u8]) -> Result<Inbound, DecodeError> { // in `impl Inbound`
      v0.10.0's other variant changes), and Swift, Go, C++ and Java widen their key field.
    - (b) No `key` payload for a non-int key.
    - (c) Leave it unpinned.
-10. **Unknown fields on re-encode (rev8).** Python's and TypeScript's codecs keep a message's
+10. **Unknown fields on re-encode (rev8).** RULED (a) (OWNER, 2026-09-30: "All 14 as recco").
+    Python's and TypeScript's codecs keep a message's
    unknown fields and write them back. The seven generated targets keep them only when generated
    with `--forward-compat`, which is off by default, and otherwise drop them. So `a10100` decoded
    as `Empty` re-encodes as `a10100` in two languages and as `a0` in seven, and no row covers it.
