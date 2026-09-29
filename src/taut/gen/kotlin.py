@@ -4,14 +4,15 @@ mirroring the other compiled targets. Pairs with the vendored `cbor.kt` runtime
 
 Design (per the v0.3 discussion): mutable `var` data classes with default
 `equals`/`hashCode`/`copy` (the ByteArray-equals nuance is deferred). Optionals
-are nullable `T?`; enums are `enum class` carrying the wire value; Kotlin keywords
+are nullable `T?`: an absent key is `MissingKey`, except under `optional=MISSING_OK`,
+which reads it as null; enums are `enum class` carrying the wire value; Kotlin keywords
 get backtick-escaped. Kotlin's `encode` sorts map keys, so forward-compat residual
 just rides along (no merge).
 """
 
 from __future__ import annotations
 
-from ..ir.model import EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 
 _KT_KEYWORDS = frozenset("""
 as as? break class continue do else false for fun if in in? interface is is! null
@@ -81,8 +82,8 @@ def _dec(t: TypeRef, expr: str) -> str:
         return f"{t.name}.fromCbor({expr})"
     if isinstance(t, ListOf):
         return f"{expr}.arrVal.map {{ {_dec(t.elem, 'it')} }}"
-    if isinstance(t, MapOf):
-        return (f"{expr}.arrVal.associate {{ "
+    if isinstance(t, MapOf):  # entry checks and DuplicateMapKey: the runtime's mapFieldVal
+        return (f"{expr}.mapFieldVal {{ "
                 f"{_dec(t.key, 'it.get(1)')} to {_dec(t.value, 'it.get(2)')} }}")
     raise TypeError(t)
 
@@ -137,12 +138,20 @@ def _emit_message(msg, forward_compat: bool = False) -> list[str]:
     out.append("    }")
     out.append("    companion object {")
     out.append(f"        fun fromCbor(c: Cbor): {msg.name} {{")
+    if not msg.wire_fields():
+        # No field reads the input, and a message must still be a map (CD-E5).
+        out += ["            if (c.kind != Cbor.MAP) {",
+                '                throw DecodeError.WrongType("map")',
+                "            }"]
     out.append(f"            return {msg.name}(")
     for f in msg.fields:
         if f.transient:
             continue  # native-only; data-class default applies
         n = _id(f.name)
-        if f.optional:
+        if f.optional == MISSING_OK:  # an absent key reads as null, like a present null
+            dec = (f"c.getOrNull({f.tag})?.let "
+                   f"{{ if (it.isNull) {{ null }} else {{ {_dec(f.type, 'it')} }} }}")
+        elif f.optional:
             dec = f"c.get({f.tag}).let {{ if (it.isNull) null else {_dec(f.type, 'it')} }}"
         else:
             dec = _dec(f.type, f"c.get({f.tag})")

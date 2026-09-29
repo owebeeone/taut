@@ -12,11 +12,17 @@ sealed class DecodeError(message: String) : RuntimeException(message) {
     class UnsupportedMajor(val major: Int) : DecodeError("unsupported major type $major")
     class NonIntegerMapKey : DecodeError("non-integer map key")
     class IntOverflow(val value: String) : DecodeError("integer out of i64 range: $value")
-    class DuplicateMapKey(val key: Long) : DecodeError("duplicate map key $key")
+    // The repeated key: a Long for a CBOR map key or an int-keyed map<K,V> field, and
+    // the String or Boolean key of a text- or bool-keyed one.
+    class DuplicateMapKey(val key: Any) : DecodeError("duplicate map key $key")
     class MissingKey(val key: Long) : DecodeError("missing map key $key")
     class WrongType(val expected: String) : DecodeError("expected CBOR $expected")
     class UnknownEnum(val enumName: String, val value: Long) :
         DecodeError("unknown $enumName wire value $value")
+    // D2 strictness: a 1/2/4/8-byte argument that fits a shorter form (value is the
+    // raw argument), and a map key below zero.
+    class NonCanonicalInt(val value: Long) : DecodeError("non-canonical integer encoding of $value")
+    class NegativeMapKey(val key: Long) : DecodeError("negative map key $key")
 }
 
 class Cbor(
@@ -46,6 +52,38 @@ class Cbor(
         if (kind != MAP) throw DecodeError.WrongType("map")
         for (kv in map) if (kv.first == key) return kv.second
         throw DecodeError.MissingKey(key)
+    }
+    // An optional=MISSING_OK field: an absent key is null, but this must still be a map.
+    fun getOrNull(key: Long): Cbor? {
+        if (kind != MAP) {
+            throw DecodeError.WrongType("map")
+        }
+        for (kv in map) {
+            if (kv.first == key) {
+                return kv.second
+            }
+        }
+        return null
+    }
+    // A map<K,V> field: an array of {1: key, 2: value} entry maps, read in order (CD-E5).
+    // Each entry must be a map holding key 1, then key 2, before `entry` decodes either,
+    // and a repeated key is DuplicateMapKey before its value is decoded. The check reads
+    // the raw key, before `entry`: K is an int, text or bool scalar, so a raw key equal to
+    // an earlier one (which decoded) decodes to an equal key, and any other does not.
+    fun <K, V> mapFieldVal(entry: (Cbor) -> Pair<K, V>): Map<K, V> {
+        val out = LinkedHashMap<K, V>()
+        val seen = HashSet<Any>()
+        for (e in arrVal) {
+            val key = e.get(1)
+            e.get(2)
+            val raw = scalarKey(key)
+            if (raw != null && !seen.add(raw)) {
+                throw DecodeError.DuplicateMapKey(raw)
+            }
+            val (k, v) = entry(e)
+            out[k] = v
+        }
+        return out
     }
     val intVal: Long get() {
         if (kind != INT) throw DecodeError.WrongType("int")
@@ -212,29 +250,36 @@ fun decode(data: ByteArray): Cbor {
     return v
 }
 
-private fun readArg(data: ByteArray, off: Int, info: Int): Pair<Long, Int> = when {
-    info < 24 -> Pair(info.toLong(), off)
-    info == 24 -> {
-        ensure(data, off, 1)
-        Pair(u(data, off).toLong(), off + 1)
+// A head's argument, as the raw unsigned 64 bits. Info 28-31 is UnsupportedInfo, missing
+// bytes are Truncated, and (D2) a 1/2/4/8-byte argument that fits a shorter form is
+// NonCanonicalInt: the canonical encoder never writes one, whether it is an int, a
+// length or a count. Floats do not come here.
+private fun readArg(data: ByteArray, off: Int, info: Int): Pair<Long, Int> {
+    if (info < 24) {
+        return Pair(info.toLong(), off)
     }
-    info == 25 -> {
-        ensure(data, off, 2)
-        Pair((u(data, off).toLong() shl 8) or u(data, off + 1).toLong(), off + 2)
+    val width = when (info) {
+        24 -> 1
+        25 -> 2
+        26 -> 4
+        27 -> 8
+        else -> throw DecodeError.UnsupportedInfo(info)
     }
-    info == 26 -> {
-        ensure(data, off, 4)
-        var v = 0L
-        for (j in 0 until 4) v = (v shl 8) or u(data, off + j).toLong()
-        Pair(v, off + 4)
+    ensure(data, off, width)
+    var v = 0L
+    for (j in 0 until width) {
+        v = (v shl 8) or u(data, off + j).toLong()
     }
-    info == 27 -> {
-        ensure(data, off, 8)
-        var v = 0L
-        for (j in 0 until 8) v = (v shl 8) or u(data, off + j).toLong()
-        Pair(v, off + 8)
+    val shorterMax = when (width) {
+        1 -> 23L
+        2 -> 0xFFL
+        4 -> 0xFFFFL
+        else -> 0xFFFF_FFFFL
     }
-    else -> throw DecodeError.UnsupportedInfo(info)
+    if (v >= 0 && v <= shorterMax) {
+        throw DecodeError.NonCanonicalInt(v)
+    }
+    return Pair(v, off + width)
 }
 
 private fun unsignedString(bits: Long): String = java.lang.Long.toUnsignedString(bits)
@@ -252,9 +297,22 @@ private fun negativeInt(bits: Long): Long {
     return -1L - bits
 }
 
-private fun sizeArg(bits: Long): Int {
-    if (bits < 0 || bits > Int.MAX_VALUE.toLong()) throw DecodeError.IntOverflow(unsignedString(bits))
+// A byte or text length (unsigned bits) beyond the bytes left after `off` is Truncated,
+// whatever its size.
+private fun lengthArg(data: ByteArray, off: Int, bits: Long): Int {
+    if (bits < 0 || bits > (data.size - off).toLong()) {
+        throw DecodeError.Truncated()
+    }
     return bits.toInt()
+}
+
+// A map<K,V> entry's raw key as the value its decoded key would be, or null when it is
+// not a key scalar (decoding it is then WrongType).
+private fun scalarKey(c: Cbor): Any? = when (c.kind) {
+    Cbor.INT -> c.i
+    Cbor.TEXT -> c.s
+    Cbor.BOOL -> c.i != 0L
+    else -> null
 }
 
 private fun utf8(data: ByteArray, off: Int, len: Int): String {
@@ -279,32 +337,53 @@ private fun dec(data: ByteArray, off0: Int): Pair<Cbor, Int> {
         1 -> { val (n, o) = readArg(data, off, info); return Pair(Cbor.int(negativeInt(n)), o) }
         2 -> {
             val (n, o) = readArg(data, off, info)
-            val k = sizeArg(n)
-            ensure(data, o, k)
+            val k = lengthArg(data, o, n)
             return Pair(Cbor.bytes(data.copyOfRange(o, o + k)), o + k)
         }
         3 -> {
             val (n, o) = readArg(data, off, info)
-            val k = sizeArg(n)
-            ensure(data, o, k)
+            val k = lengthArg(data, o, n)
             return Pair(Cbor.text(utf8(data, o, k)), o + k)
         }
+        // A count (unsigned) is not checked against the bytes left: items are read in
+        // order, so the first fault is reported, and every item takes at least one byte.
         4 -> {
-            val (n, o0) = readArg(data, off, info); var o = o0; val a = ArrayList<Cbor>()
-            for (j in 0 until sizeArg(n)) { val (v, o2) = dec(data, o); a.add(v); o = o2 }
+            val (n, o0) = readArg(data, off, info)
+            var o = o0
+            val a = ArrayList<Cbor>()
+            var j = 0L
+            while (java.lang.Long.compareUnsigned(j, n) < 0) {
+                val (v, o2) = dec(data, o)
+                a.add(v)
+                o = o2
+                j += 1
+            }
             return Pair(Cbor.arr(a), o)
         }
         5 -> {
-            val (n, o0) = readArg(data, off, info); var o = o0; val m = ArrayList<Pair<Long, Cbor>>()
+            val (n, o0) = readArg(data, off, info)
+            var o = o0
+            val m = ArrayList<Pair<Long, Cbor>>()
             val seen = HashSet<Long>()
-            for (j in 0 until sizeArg(n)) {
+            var j = 0L
+            while (java.lang.Long.compareUnsigned(j, n) < 0) {
+                // The key first: its item, then NonIntegerMapKey, NegativeMapKey and
+                // DuplicateMapKey, and only then the value.
                 val (kc, o2) = dec(data, o)
-                if (kc.kind != Cbor.INT) throw DecodeError.NonIntegerMapKey()
-                val key = kc.intVal
-                if (!seen.add(key)) throw DecodeError.DuplicateMapKey(key)
+                if (kc.kind != Cbor.INT) {
+                    throw DecodeError.NonIntegerMapKey()
+                }
+                val key = kc.i
+                if (key < 0) {
+                    throw DecodeError.NegativeMapKey(key)
+                }
+                if (!seen.add(key)) {
+                    throw DecodeError.DuplicateMapKey(key)
+                }
                 val (vc, o3) = dec(data, o2)
                 m.add(Pair(key, vc))
                 o = o3
+                j += 1
             }
             return Pair(Cbor.map(m), o)
         }

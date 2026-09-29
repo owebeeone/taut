@@ -12,10 +12,11 @@ import pytest
 
 from taut import ext
 from taut.corpus.build import IR_PATH
+from taut.corpus import parity_kotlin
 from taut.corpus import resext_build as rb
 from taut.gen import kotlin
 from taut.gen import scaffold
-from taut.ir.dsl import FLOAT, INT, STR, F, List, Map, Msg, extension, schema as mk
+from taut.ir.dsl import FLOAT, INT, MISSING_OK, STR, F, List, Map, Msg, extension, schema as mk
 from taut.ir.load import load_schema
 from taut.ir.shapes import BAND_START
 from taut.wire import cbor, codec
@@ -23,14 +24,16 @@ from taut.wire import cbor, codec
 RAZEL = load_schema(IR_PATH.parent / "razel.taut.py")
 RESEXT = load_schema(rb.IR_PATH)
 ROOT = Path(__file__).resolve().parents[2]
-PARITY = load_schema(ROOT / "ir/parity_int.taut.py")
-PARITY_INT_PATH = ROOT / "corpus/parity/int.vectors.json"
-PARITY_MALFORMED_PATH = ROOT / "corpus/parity/malformed.vectors.json"
 ANDROID_STUDIO_KOTLINC = Path(
     "/Applications/Android Studio.app/Contents/plugins/Kotlin/kotlinc/bin/kotlinc"
 )
 RESEXT_TAG = BAND_START + 1
 RESEXT_FUZZ_SEED = 0x5EED55_04
+# optional=MISSING_OK reads an absent key as null; optional=True still refuses it.
+LATE = mk(
+    Msg("Late", F("note", 1, STR, optional=MISSING_OK)),
+    Msg("Opt", F("note", 1, STR, optional=True)),
+)
 
 
 def _kotlinc_candidates():
@@ -138,33 +141,6 @@ def _kt_string(s):
 
 def _kt_nullable_string(s):
     return "null" if s is None else _kt_string(s)
-
-
-def _kt_long_literal(value):
-    n = int(value)
-    if n == -(1 << 63):
-        return "Long.MIN_VALUE"
-    if n == (1 << 63) - 1:
-        return "Long.MAX_VALUE"
-    return f"{n}L"
-
-
-def _kt_nullable_long(value):
-    return "null" if value is None else _kt_long_literal(value)
-
-
-def _kt_nullable_int(value):
-    return "null" if value is None else str(value)
-
-
-def _kt_pair_list(rows):
-    if not rows:
-        return "emptyList()"
-    pairs = ", ".join(
-        f"Pair({_kt_long_literal(k)}, {_kt_long_literal(v)})"
-        for k, v in rows
-    )
-    return f"listOf({pairs})"
 
 
 def _random_cbor_value(rng, depth=0):
@@ -390,220 +366,6 @@ fun main() {{
 """
 
 
-def _kotlin_parity_harness_source(int_doc, malformed_doc):
-    round_rows = [r for r in int_doc["vectors"] if r["kind"] == "round_trip"]
-    encode_fail_rows = [r for r in int_doc["vectors"] if r["kind"] == "encode_fail"]
-    round_src = ",\n".join(
-        "    IntVector("
-        f"{_kt_string(r['name'])}, "
-        f"{_kt_long_literal(r['value']['n'])}, "
-        f"{_kt_pair_list(r['value'].get('by_id', []))}, "
-        f"{_kt_string(r['cbor'])})"
-        for r in round_rows
-    )
-    encode_fail_src = ",\n".join(
-        f"    EncodeFailVector({_kt_string(r['name'])}, {_kt_string(r['value']['n'])})"
-        for r in encode_fail_rows
-    )
-    malformed_src = ",\n".join(
-        "    MalformedVector("
-        f"{_kt_string(r['name'])}, "
-        f"{_kt_string(r['stage'])}, "
-        f"{_kt_nullable_string(r.get('schema'))}, "
-        f"{_kt_string(r['bytes'])}, "
-        f"{_kt_string(r['expect']['tag'])}, "
-        f"{_kt_nullable_int(r['expect'].get('info'))}, "
-        f"{_kt_nullable_int(r['expect'].get('major'))}, "
-        f"{_kt_nullable_long(r['expect'].get('key'))}, "
-        f"{_kt_nullable_string(r['expect'].get('expected'))}, "
-        f"{_kt_nullable_string(r['expect'].get('enum'))}, "
-        f"{_kt_nullable_string(r['expect'].get('value'))})"
-        for r in malformed_doc["vectors"]
-    )
-    return f"""package taut
-
-data class IntVector(val name: String, val n: Long, val byId: List<Pair<Long, Long>>, val cbor: String)
-data class EncodeFailVector(val name: String, val n: String)
-data class MalformedVector(
-    val name: String,
-    val stage: String,
-    val schema: String?,
-    val bytes: String,
-    val tag: String,
-    val info: Int?,
-    val major: Int?,
-    val key: Long?,
-    val expected: String?,
-    val enumName: String?,
-    val value: String?,
-)
-
-private val intRows = listOf(
-{round_src}
-)
-
-private val encodeFailRows = listOf(
-{encode_fail_src}
-)
-
-private val malformedRows = listOf(
-{malformed_src}
-)
-
-private val hexChars = "0123456789abcdef".toCharArray()
-
-private fun hexToBytes(hex: String): ByteArray {{
-    val out = ByteArray(hex.length / 2)
-    for (i in out.indices) {{
-        val hi = Character.digit(hex[i * 2], 16)
-        val lo = Character.digit(hex[i * 2 + 1], 16)
-        out[i] = ((hi shl 4) or lo).toByte()
-    }}
-    return out
-}}
-
-private fun ByteArray.hex(): String {{
-    val out = StringBuilder(size * 2)
-    for (byte in this) {{
-        val x = byte.toInt() and 0xff
-        out.append(hexChars[x ushr 4])
-        out.append(hexChars[x and 0x0f])
-    }}
-    return out.toString()
-}}
-
-private fun mismatch(label: String, got: String, want: String): Int {{
-    if (got == want) return 0
-    println(label + ": got " + got + " want " + want)
-    return 1
-}}
-
-private fun errorTag(e: DecodeError): String = when (e) {{
-    is DecodeError.Truncated -> "Truncated"
-    is DecodeError.TrailingBytes -> "TrailingBytes"
-    is DecodeError.InvalidUtf8 -> "InvalidUtf8"
-    is DecodeError.UnsupportedInfo -> "UnsupportedInfo"
-    is DecodeError.UnsupportedMajor -> "UnsupportedMajor"
-    is DecodeError.NonIntegerMapKey -> "NonIntegerMapKey"
-    is DecodeError.IntOverflow -> "IntOverflow"
-    is DecodeError.DuplicateMapKey -> "DuplicateMapKey"
-    is DecodeError.MissingKey -> "MissingKey"
-    is DecodeError.WrongType -> "WrongType"
-    is DecodeError.UnknownEnum -> "UnknownEnum"
-}}
-
-private fun checkPayload(row: MalformedVector, e: DecodeError): Int {{
-    var failures = mismatch(row.name + " tag", errorTag(e), row.tag)
-    when (e) {{
-        is DecodeError.UnsupportedInfo -> if (row.info != null && e.info != row.info) {{
-            println(row.name + ": info " + e.info + " want " + row.info)
-            failures += 1
-        }}
-        is DecodeError.UnsupportedMajor -> if (row.major != null && e.major != row.major) {{
-            println(row.name + ": major " + e.major + " want " + row.major)
-            failures += 1
-        }}
-        is DecodeError.DuplicateMapKey -> if (row.key != null && e.key != row.key) {{
-            println(row.name + ": duplicate key " + e.key + " want " + row.key)
-            failures += 1
-        }}
-        is DecodeError.MissingKey -> if (row.key != null && e.key != row.key) {{
-            println(row.name + ": missing key " + e.key + " want " + row.key)
-            failures += 1
-        }}
-        is DecodeError.WrongType -> if (row.expected != null && e.expected != row.expected) {{
-            println(row.name + ": expected " + e.expected + " want " + row.expected)
-            failures += 1
-        }}
-        is DecodeError.UnknownEnum -> {{
-            if (row.enumName != null && e.enumName != row.enumName) {{
-                println(row.name + ": enum " + e.enumName + " want " + row.enumName)
-                failures += 1
-            }}
-            if (row.value != null && e.value.toString() != row.value) {{
-                println(row.name + ": enum value " + e.value + " want " + row.value)
-                failures += 1
-            }}
-        }}
-        is DecodeError.IntOverflow -> if (row.value != null && e.value != row.value) {{
-            println(row.name + ": overflow value " + e.value + " want " + row.value)
-            failures += 1
-        }}
-        else -> Unit
-    }}
-    return failures
-}}
-
-private fun exerciseMalformed(row: MalformedVector) {{
-    val bytes = hexToBytes(row.bytes)
-    when (row.stage) {{
-        "raw_decode" -> decode(bytes)
-        "from_cbor" -> when (row.schema) {{
-            "IntBox" -> IntBox.fromCbor(decode(bytes)).toCbor()
-            else -> error("unknown schema " + row.schema)
-        }}
-        "from_wire" -> when (row.schema) {{
-            "Mode" -> Mode.fromWire(decode(bytes).intVal)
-            else -> error("unknown schema " + row.schema)
-        }}
-        else -> error("unknown stage " + row.stage)
-    }}
-}}
-
-fun main() {{
-    var failures = 0
-    for (row in intRows) {{
-        val expectedMap = row.byId.toMap()
-        val value = IntBox(row.n, expectedMap)
-        failures += mismatch("encode " + row.name, encode(value.toCbor()).hex(), row.cbor)
-
-        val decoded = IntBox.fromCbor(decode(hexToBytes(row.cbor)))
-        if (decoded.n != row.n || decoded.by_id != expectedMap) {{
-            println("decode " + row.name + ": got " + decoded + " want n=" + row.n + " by_id=" + expectedMap)
-            failures += 1
-        }}
-        failures += mismatch("reencode " + row.name, encode(decoded.toCbor()).hex(), row.cbor)
-    }}
-
-    val min = java.math.BigInteger.valueOf(Long.MIN_VALUE)
-    val max = java.math.BigInteger.valueOf(Long.MAX_VALUE)
-    var unrepresentable = 0
-    for (row in encodeFailRows) {{
-        val n = java.math.BigInteger(row.n)
-        if (n < min || n > max) {{
-            unrepresentable += 1
-        }} else {{
-            println("encode-fail " + row.name + " is representable as Long")
-            failures += 1
-        }}
-    }}
-
-    var malformedChecked = 0
-    for (row in malformedRows) {{
-        try {{
-            exerciseMalformed(row)
-            println(row.name + ": did not throw")
-            failures += 1
-        }} catch (e: DecodeError) {{
-            malformedChecked += 1
-            failures += checkPayload(row, e)
-        }} catch (e: Throwable) {{
-            println(row.name + ": untyped " + e.javaClass.name + ": " + e.message)
-            failures += 1
-        }}
-    }}
-
-    println("kotlin parity round_trips=" + intRows.size +
-        " encode_fail_unrepresentable=" + unrepresentable +
-        " malformed=" + malformedChecked +
-        " failures=" + failures)
-    check(failures == 0) {{ "failures=" + failures }}
-    check(unrepresentable == encodeFailRows.size) {{ "encode fail rows=" + unrepresentable }}
-    check(malformedChecked == malformedRows.size) {{ "malformed checked=" + malformedChecked }}
-}}
-"""
-
-
 def test_emits_data_classes_enums_and_codec():
     s = kotlin.emit_types(RAZEL)
     assert "package taut" in s
@@ -688,50 +450,15 @@ def test_kotlin_float_parity_harness_if_kotlinc(tmp_path):
     subprocess.run([java, "-jar", str(jar)], check=True, cwd=ROOT, env=_java_env(java))
 
 
-def test_kotlin_shared_int_parity_harness_if_kotlinc(tmp_path):
-    kotlinc = _find_kotlinc()
-    java = _find_java(kotlinc)
-    api = tmp_path / "parity_api.kt"
-    harness = tmp_path / "parity_harness.kt"
-    jar = tmp_path / "kotlin-int-parity.jar"
-
-    # Baseline smoke test: pin the reviewed set; `lead` rows belong to the
-    # governed `tautc parity` gate (corpus/parity/gen_vectors.py).
-    int_doc = json.loads(PARITY_INT_PATH.read_text())
-    int_doc["vectors"] = [r for r in int_doc["vectors"] if not r.get("lead")]
-    malformed_doc = json.loads(PARITY_MALFORMED_PATH.read_text())
-    malformed_doc["vectors"] = [r for r in malformed_doc["vectors"] if not r.get("lead")]
-    api.write_text(kotlin.emit_types(PARITY))
-    harness.write_text(_kotlin_parity_harness_source(int_doc, malformed_doc))
-
-    subprocess.run(
-        [
-            kotlinc,
-            str(ROOT / "src/taut/gen/runtime/cbor.kt"),
-            str(api),
-            str(harness),
-            "-include-runtime",
-            "-d",
-            str(jar),
-        ],
-        check=True,
-        cwd=ROOT,
-        env=_java_env(java),
-    )
-    result = subprocess.run(
-        [java, "-jar", str(jar)],
-        check=False,
-        cwd=ROOT,
-        env=_java_env(java),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "round_trips=7" in result.stdout
-    assert "encode_fail_unrepresentable=3" in result.stdout
-    assert "malformed=12" in result.stdout
-    assert "failures=0" in result.stdout
+def test_kotlin_passes_the_parity_gate():
+    """The shared corpus, lead rows included, through `tautc parity`'s Kotlin runner
+    (`taut.corpus.parity_kotlin`: one kotlinc build). A missing toolchain skips."""
+    report = parity_kotlin.run()
+    if not report.available:
+        pytest.skip(report.skip_reason)
+    assert not report.fault, report.fault
+    assert [(r.name, r.detail) for r in report.failures] == []
+    assert report.green
 
 
 def test_kotlin_resext_corpus_and_fuzz_harness_if_kotlinc(tmp_path):
@@ -777,3 +504,93 @@ def test_kotlin_resext_corpus_and_fuzz_harness_if_kotlinc(tmp_path):
     assert f"fuzz_seed={RESEXT_FUZZ_SEED}" in result.stdout
     assert "fuzz_rows=1000" in result.stdout
     assert "fuzz_mismatches=0" in result.stdout
+
+
+def test_a_message_without_wire_fields_still_requires_a_map():
+    s = kotlin.emit_types(mk(Msg("Empty"), Msg("Cache", F("hits", 1, INT, transient=True))))
+    assert s.count('throw DecodeError.WrongType("map")') == 2
+
+
+def test_kotlin_generates_missing_ok(tmp_path):
+    scaffold.emit(LATE, tmp_path, langs=["kotlin"], services=[])
+    s = (tmp_path / "kotlin" / "api.kt").read_text()
+    assert "note = c.getOrNull(1)?.let { if (it.isNull) { null } else { it.textVal } }," in s
+    assert "note = c.get(1).let { if (it.isNull) null else it.textVal }," in s
+    assert s.count("1L to (note?.let { Cbor.text(it) } ?: Cbor.nul)") == 2  # encode unchanged
+
+
+_LATE_HARNESS = r'''
+package taut
+
+private fun unhex(s: String): ByteArray {
+    val out = ByteArray(s.length / 2)
+    for (i in out.indices) {
+        out[i] = s.substring(2 * i, 2 * i + 2).toInt(16).toByte()
+    }
+    return out
+}
+
+private fun hexOf(b: ByteArray): String {
+    val out = StringBuilder()
+    for (x in b) {
+        out.append(String.format("%02x", x.toInt() and 0xff))
+    }
+    return out.toString()
+}
+
+private fun observe(label: String, read: () -> String?) {
+    val seen = try {
+        "ok " + (read() ?: "null")
+    } catch (e: DecodeError.WrongType) {
+        "WrongType{" + e.expected + "}"
+    } catch (e: DecodeError.MissingKey) {
+        "MissingKey{" + e.key + "}"
+    } catch (e: DecodeError) {
+        e.javaClass.simpleName
+    }
+    println(label + "\t" + seen)
+}
+
+fun main() {
+    for (hex in listOf("a0", "a101f6", "a10101", "00")) {
+        observe("Late " + hex) { Late.fromCbor(decode(unhex(hex))).note }
+    }
+    observe("Opt a0") { Opt.fromCbor(decode(unhex("a0"))).note }
+    println("Late encode\t" + hexOf(encode(Late().toCbor())))
+}
+'''
+
+
+def test_kotlin_missing_ok_decode_if_kotlinc(tmp_path):
+    kotlinc = _find_kotlinc()
+    java = _find_java(kotlinc)
+    scaffold.emit(LATE, tmp_path, langs=["kotlin"], services=[], runtime=True)
+    harness = tmp_path / "late_harness.kt"
+    harness.write_text(_LATE_HARNESS)
+    jar = tmp_path / "kotlin-missing-ok.jar"
+    sources = sorted(str(p) for p in (tmp_path / "kotlin").glob("*.kt"))
+    subprocess.run(
+        [kotlinc, *sources, str(harness), "-include-runtime", "-d", str(jar)],
+        check=True,
+        cwd=tmp_path,
+        env=_java_env(java),
+    )
+    result = subprocess.run(
+        [java, "-jar", str(jar)],
+        check=False,
+        cwd=tmp_path,
+        env=_java_env(java),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    observed = dict(line.split("\t", 1) for line in result.stdout.splitlines())
+    assert observed == {
+        "Late a0": "ok null",              # absent reads as null (M16)
+        "Late a101f6": "ok null",          # present null is null
+        "Late a10101": "WrongType{text}",  # a present value keeps its type (M17)
+        "Late 00": "WrongType{map}",       # the message is still a map
+        "Opt a0": "MissingKey{1}",         # optional=True: absent is still MissingKey
+        "Late encode": "a101f6",           # encode unchanged: unset is written as null
+    }
