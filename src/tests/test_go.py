@@ -20,9 +20,10 @@ from taut.corpus import parity, parity_go, toolchains
 from taut.corpus import resext_build as resext
 from taut.gen import go
 from taut.gen import scaffold
-from taut.ir.dsl import BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, schema as mk
+from taut.ir.dsl import BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, option, schema as mk
 from taut.ir.load import load_schema
 from taut.ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar
+from taut.ir.options import effective
 from taut.ir.shapes import BAND_START
 from taut.ir.validate import validate
 from taut.wire import cbor, codec
@@ -73,12 +74,13 @@ RUNTIME = ROOT / "src" / "taut" / "gen" / "runtime"
 
 def test_no_panicking_decode_entry_point_survives():
     """Question 5 and CD-E4: every decode entry point returns `(value, error)`. Generated Go
-    has only `TryXFromCbor` and `TryXFromWire`, and neither it nor the runtime it vendors
-    (`cbor.go`, `ext.go`) panics: the runtime's `Decode` and `Get` are gone."""
+    has only `TryXFromBytes`, `TryXFromCbor` and `TryXFromWire`, and neither it nor the
+    runtime it vendors (`cbor.go`, `ext.go`) panics: the runtime's `Decode` and `Get` are
+    gone, and its raw decode takes the caller's bounds."""
     entry_points = []
     for name, source in _generated_go().items():
         assert "panic(" not in source, name
-        entry_points += re.findall(r"^func (\w+?)From(?:Cbor|Wire)\(", source, re.M)
+        entry_points += re.findall(r"^func (\w+?)From(?:Bytes|Cbor|Wire)\(", source, re.M)
     assert entry_points and all(e.startswith("Try") for e in entry_points), sorted(set(entry_points))
     for rel, _ in scaffold._RUNTIMES["go"]:
         source = (RUNTIME / rel).read_text()
@@ -86,6 +88,7 @@ def test_no_panicking_decode_entry_point_survives():
     cbor_go = (RUNTIME / "cbor.go").read_text()
     assert "func Decode(" not in cbor_go and ") Get(" not in cbor_go
     assert "func TryDecode(data []byte) (Cbor, error) {" in cbor_go
+    assert "func TryDecodeWith(data []byte, maxDepth int, maxEncodedLen int) (Cbor, error) {" in cbor_go
 
 
 def test_fields_pascalcased_and_optional_is_pointer():
@@ -140,6 +143,42 @@ def test_go_runtime_float_harness(tmp_path):
     assert result.returncode == 0, result.stdout
 
 
+# The runtime's own bounds tests (cbor_bounds_test.go, beside cbor.go): the raw decoder's
+# contract as test_cbor.py pins Python's, and the extension helpers' host bounds.
+BOUNDS_TESTS = (
+    "TestBoundsConstants",
+    "TestBoundsDefaultDepthTakes32ContainersAndRefusesThe33rd",
+    "TestBoundsArraysAndMapsCountAlike",
+    "TestBoundsATopLevelContainerHasDepth1",
+    "TestBoundsAMapKeyIsAnItemOfItsMap",
+    "TestBoundsADepthArgumentAppliesAsGiven",
+    "TestBoundsADepthArgumentAboveTheCeilingAppliesTheCeiling",
+    "TestBoundsDepthIsCheckedOnceTheHeadIsComplete",
+    "TestBoundsDeepInputIsTooDeepAndNothingEscapes",
+    "TestBoundsLength",
+    "TestBoundsLengthIsCheckedBeforeAnyByteIsRead",
+    "TestBoundsAZeroLengthBound",
+    "TestBoundsADepthBelow1IsACallerError",
+    "TestBoundsErrorTextNamesThePayload",
+    "TestBoundsAHostIsReadAtTheDepthCeiling",
+    "TestBoundsAHostIsReadWithNoLengthBound",
+)
+
+
+def test_go_runtime_bounds_harness(tmp_path):
+    """D26's bounds in the Go runtime (TautCheckedDecode.md §3, CD-E5): TryDecode's default
+    depth, TryDecodeWith's caller bounds, 100,000 and 1,000,000 deep refused without a stack
+    overflow or a panic, and the extension helpers' host read at the ceiling with no length
+    bound (TautOptions.md G3). Each test must run and pass."""
+    _needs_go()
+    result = subprocess.run(["go", "test", "-v", "-run", "^TestBounds", "./src/taut/gen/runtime"],
+                            cwd=ROOT, env=_go_test_env(tmp_path), text=True, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, check=False)
+    assert result.returncode == 0, result.stdout
+    ran = set(re.findall(r"^--- PASS: (\w+)", result.stdout, re.M))
+    assert ran == set(BOUNDS_TESTS), result.stdout
+
+
 def _needs_go() -> None:
     if toolchains.find_go() is None:
         pytest.skip("go not installed")
@@ -149,15 +188,10 @@ def _failures(report: parity.TargetReport) -> str:
     return "\n".join([report.fault, *(f"{r.name}: {r.detail}" for r in report.failures)])
 
 
-def _green_until_d1(report: parity.TargetReport) -> bool:
-    """GREEN, or RED only for the `#constants` line Go's runner prints once D1 teaches it C3's
-    protocol. The rows beyond the corpus replace its bounds rows as well as its malformed rows."""
-    return report.available and not report.failures and report.fault.split("\n")[0] in ("", parity.NO_CONSTANTS)
-
-
 def test_go_parity_gate_is_green():
-    """`tautc parity -t go`: every int and malformed row through the generated Go codec, as
-    go and go/fc, each held to the gate's governance: GREEN, or RED and allowlisted."""
+    """`tautc parity -t go`: every int, malformed and bounds row through the generated Go
+    codec, as go and go/fc, each held to the gate's governance: GREEN, or RED and
+    allowlisted."""
     _needs_go()
     reports, violations = parity.governed_variants(parity_go.run)
     assert violations == [], "\n".join(violations)
@@ -166,6 +200,146 @@ def test_go_parity_gate_is_green():
         if not report.fault:
             satisfied = {r.name for r in report.results if r.status == parity.TYPE_SATISFIED}
             assert satisfied == encode_fail, report.target
+
+
+def _const(src: str, name: str) -> int:
+    """The value of the generated constant `name`, whatever gofmt's column alignment."""
+    found = re.findall(rf"^\t{name} += (-?\d+)$", src, re.M)
+    assert len(found) == 1, (name, found)
+    return int(found[0])
+
+
+def _typed_decode(name: str) -> str:
+    """The generated decode from bytes of message `name`: its bounds, then the schema stage."""
+    return (f"func Try{name}FromBytes(data []byte) ({name}, error) {{\n"
+            f"\tc, err := TryDecodeWith(data, {name}MaxDepth, {name}MaxEncodedLen)\n"
+            "\tif err != nil {\n"
+            f"\t\treturn {name}{{}}, err\n"
+            "\t}\n"
+            f"\treturn Try{name}FromCbor(c)\n"
+            "}\n")
+
+
+@pytest.mark.parametrize("forward_compat", [False, True])
+def test_every_message_has_its_bounds_and_a_typed_decode(forward_compat):
+    """CD-B3, OPT-L6: each message's effective bounds as constants, taken from
+    `options.effective` at generation time (-1 for no length bound), and a decode from bytes,
+    `TryXFromBytes`, that applies both. The fixture's six bounds messages resolve as CD-C1 says."""
+    schema = parity.parity_schema()
+    src = go.emit_types(schema, forward_compat=forward_compat)
+    for name in schema.messages:
+        length = effective(schema, "max_encoded_len", message=name)
+        assert _const(src, f"{name}MaxDepth") == effective(schema, "max_depth", message=name), name
+        assert _const(src, f"{name}MaxEncodedLen") == (-1 if length is None else length), name
+        assert _typed_decode(name) in src, name
+    assert {name: (_const(src, f"{name}MaxDepth"), _const(src, f"{name}MaxEncodedLen")) for name in (
+        "Tree64", "Tree128", "Flat2", "Sized8", "Holds64", "HoldsSized8", "IntBox")} == {
+        "Tree64": (64, -1), "Tree128": (128, -1), "Flat2": (2, -1), "Sized8": (32, 8),
+        "Holds64": (32, -1), "HoldsSized8": (32, -1), "IntBox": (32, -1)}
+
+
+# A file that declares both bounds, a message that overrides one, and one that inherits both
+# (test_bounds.py's FILED): the generated constants resolve as `options.effective` does.
+FILED = mk(option.max_depth(3), option.max_encoded_len(16),
+           Msg("Tree", F("kids", 1, List(Ref("Tree"))), option.max_depth(64), next_id=2),
+           Msg("Plain", F("v", 1, List(INT)), next_id=2))
+
+
+def test_a_file_level_bound_reaches_each_message_that_declares_none():
+    src = go.emit_types(FILED)
+    assert (_const(src, "TreeMaxDepth"), _const(src, "TreeMaxEncodedLen")) == (64, 16)
+    assert (_const(src, "PlainMaxDepth"), _const(src, "PlainMaxEncodedLen")) == (3, 16)
+
+
+def test_go_typed_decode_applies_its_messages_bounds(tmp_path):
+    """The generated `TryXFromBytes` at run time, on FILED: a message root applies its own bounds, a
+    declared depth and an inherited length (test_bounds.py's twin), and the two-step reader,
+    TryDecode then TryXFromCbor, only the raw defaults (TautOptions.md G1)."""
+    _needs_go()
+    scaffold.emit(FILED, tmp_path, langs=["go"], services=[], runtime=True)
+    go_dir = tmp_path / "go"
+    (go_dir / "filed_test.go").write_text(textwrap.dedent("""
+        package taut
+
+        import (
+            "encoding/hex"
+            "strings"
+            "testing"
+        )
+
+        func filedHex(t *testing.T, input string) []byte {
+            t.Helper()
+            data, err := hex.DecodeString(input)
+            if err != nil {
+                t.Fatalf("bad hex %q: %v", input, err)
+            }
+            return data
+        }
+
+        func wantRefusal(t *testing.T, input string, err error, want DecodeError) {
+            t.Helper()
+            got, ok := err.(*DecodeError)
+            if !ok || *got != want {
+                t.Fatalf("%.40s: got %T %v, want %#v", input, err, err, want)
+            }
+        }
+
+        func TestFiledTreeAppliesItsOwnDepth(t *testing.T) {
+            trees := "a10181" + "a10180" // Tree{[Tree{[]}]}: depth 4, beyond the file's 3
+            tree, err := TryTreeFromBytes(filedHex(t, trees))
+            if err != nil || len(tree.Kids) != 1 || len(tree.Kids[0].Kids) != 0 {
+                t.Fatalf("%+v, %v", tree, err)
+            }
+        }
+
+        func TestFiledPlainAppliesTheFilesBounds(t *testing.T) {
+            deep := "a10181818100" // depth 4, refused before WrongType{int}
+            _, err := TryPlainFromBytes(filedHex(t, deep))
+            wantRefusal(t, deep, err, DecodeError{Tag: DecodeErrTooDeep, Limit: 3})
+            atLen := "a1018d" + strings.Repeat("00", 13) // 16 bytes
+            plain, err := TryPlainFromBytes(filedHex(t, atLen))
+            if err != nil || len(plain.V) != 13 {
+                t.Fatalf("%+v, %v", plain, err)
+            }
+            overLen := "a1018e" + strings.Repeat("00", 14) // 17 bytes
+            _, err = TryPlainFromBytes(filedHex(t, overLen))
+            wantRefusal(t, overLen, err, DecodeError{Tag: DecodeErrTooLarge, Len: 17, Limit: 16})
+            _, err = TryTreeFromBytes(filedHex(t, overLen))
+            wantRefusal(t, overLen, err, DecodeError{Tag: DecodeErrTooLarge, Len: 17, Limit: 16})
+        }
+
+        func TestFiledTwoStepReaderAppliesOnlyTheRawDefaults(t *testing.T) {
+            deep := strings.Repeat("a10181", 11) + "a10180" // depth 24: past 3, within 32
+            c, err := TryDecode(filedHex(t, deep))
+            if err != nil {
+                t.Fatal(err)
+            }
+            _, err = TryPlainFromCbor(c) // the schema stage, not the file's depth, refuses it
+            wantRefusal(t, deep, err, DecodeError{Tag: DecodeErrWrongType, Expected: "int"})
+            overLen := "a1018e" + strings.Repeat("00", 14)
+            c, err = TryDecode(filedHex(t, overLen))
+            if err != nil {
+                t.Fatalf("the raw default has no length bound: %v", err)
+            }
+            if plain, err := TryPlainFromCbor(c); err != nil || len(plain.V) != 14 {
+                t.Fatalf("%+v, %v", plain, err)
+            }
+        }
+    """))
+    _run_go_tests(go_dir, tmp_path, "TestFiledTreeAppliesItsOwnDepth",
+                  "TestFiledPlainAppliesTheFilesBounds", "TestFiledTwoStepReaderAppliesOnlyTheRawDefaults")
+
+
+def test_go_runner_reports_an_expansion_whose_length_is_not_len_as_untyped(monkeypatch):
+    """The bounds protocol, item 5: the runner expands a row's segments itself and reports an
+    expansion whose length is not the row's `len` as untyped, a raw row and a typed one alike."""
+    _needs_go()
+    torn = {"depth-100000-arrays", "len-8-declared"}
+    rows = [{**row, "len": row["len"] + 1} if row["name"] in torn else row for row in parity.bounds_rows()]
+    monkeypatch.setattr(parity, "bounds_rows", lambda: rows)
+    report = parity_go.run()
+    assert not report.fault, report.fault
+    assert {r.name: r.detail.split(" ")[0] for r in report.failures} == {name: "untyped" for name in torn}
 
 
 # Raw inputs beyond the corpus, each with what CD-E5 says of it. Python, the reference,
@@ -243,7 +417,7 @@ def test_go_raw_decode_matches_python_beyond_the_corpus(monkeypatch):
     monkeypatch.setattr(parity, "malformed_rows", lambda: rows)
     monkeypatch.setattr(parity, "bounds_rows", lambda: [])
     report = parity_go.run()
-    assert _green_until_d1(report), _failures(report)
+    assert report.green, _failures(report)
     assert {r.name for r in report.results if r.kind == "malformed"} == {row["name"] for row in rows}
 
 
@@ -424,7 +598,7 @@ def test_go_decodes_and_reencodes_every_shape_at_depth_as_python_does(monkeypatc
     monkeypatch.setattr(parity, "malformed_rows", lambda: rows)
     monkeypatch.setattr(parity, "bounds_rows", lambda: [])
     report = parity_go.run()
-    assert _green_until_d1(report), _failures(report)
+    assert report.green, _failures(report)
     assert {r.name for r in report.results if r.kind == "malformed"} == {row["name"] for row in rows}
 
 

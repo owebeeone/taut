@@ -28,14 +28,25 @@ is decoded, a repeated map key is `DuplicateMapKey` with the key as text (§8 qu
 every block is braced over its own lines, and struct fields and enum constants are
 aligned as gofmt aligns them.
 
-Fail-closed (CD-E4, question 5). The decode entry points are `TryXFromCbor` for a
-message or an enum and `TryXFromWire` for an enum, and each returns `(value, error)`,
-with a `*DecodeError` for bad input; no generated code panics.
+Fail-closed (CD-E4, question 5). The decode entry points are `TryXFromBytes` and
+`TryXFromCbor` for a message, and `TryXFromCbor` and `TryXFromWire` for an enum, and each
+returns `(value, error)`, with a `*DecodeError` for bad input; no generated code panics.
+
+Bounds (D26, TautCheckedDecode.md CD-B3; TautOptions.md OPT-L6). Each message gets
+`XMaxDepth` and `XMaxEncodedLen`, its effective `max_depth` and `max_encoded_len` as
+`options.effective` resolves them when the code is generated (-1 for no length bound), and
+`TryXFromBytes`, a decode from bytes rooted at the message, which applies both through the
+runtime's `TryDecodeWith` and then reads the tree with `TryXFromCbor`. It joins the `Try`
+family rather than taking a `DecodeX` name, which would redeclare the runtime's
+`DecodeError` for a message named `Error`, as glade's schema has.
 """
 
 from __future__ import annotations
 
+from typing import cast
+
 from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MessageDef, MsgRef, Scalar, Schema, TypeRef
+from ..ir.options import effective
 
 _SCALAR_TYPES = {"int": "int64", "str": "string", "bytes": "[]byte", "bool": "bool", "float": "float64"}
 _SCALAR_ENCODERS = {"int": "CInt", "str": "CText", "bytes": "CBytes", "bool": "CBool", "float": "CFloat"}
@@ -301,7 +312,30 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     return out
 
 
-def _emit_message(msg: MessageDef, forward_compat: bool = False) -> list[str]:
+def _emit_typed_decode(schema: Schema, msg: MessageDef) -> list[str]:
+    """`msg`'s bounds, its effective values at generation time (OPT-D3), and its decode from
+    bytes, which applies them: the call's one root decides them (OPT-D4)."""
+    name = msg.name
+    depth, length = f"{name}MaxDepth", f"{name}MaxEncodedLen"
+    max_depth = cast(int, effective(schema, "max_depth", message=name))
+    max_encoded_len = cast("int | None", effective(schema, "max_encoded_len", message=name))
+    return [f"// {name}'s bounds: its effective max_depth and max_encoded_len (-1: none).",
+            "const (",
+            *_aligned([(depth, f"= {max_depth}"),
+                       (length, f"= {-1 if max_encoded_len is None else max_encoded_len}")]),
+            ")",
+            "",
+            f"// Try{name}FromBytes decodes data rooted at {name}, under its bounds.",
+            f"func Try{name}FromBytes(data []byte) ({name}, error) {{",
+            f"\tc, err := TryDecodeWith(data, {depth}, {length})",
+            "\tif err != nil {",
+            f"\t\treturn {name}{{}}, err",
+            "\t}",
+            f"\treturn Try{name}FromCbor(c)",
+            "}"]
+
+
+def _emit_message(schema: Schema, msg: MessageDef, forward_compat: bool = False) -> list[str]:
     fields = [(_pascal(f.name), _field_type(f)) for f in msg.fields]
     if forward_compat:
         fields.append(("WireResidual", "[]KV"))
@@ -309,6 +343,8 @@ def _emit_message(msg: MessageDef, forward_compat: bool = False) -> list[str]:
     out += _emit_to_cbor(msg, forward_compat)
     out.append("")
     out += _emit_from_cbor(msg, forward_compat)
+    out.append("")
+    out += _emit_typed_decode(schema, msg)
     return out
 
 
@@ -321,5 +357,5 @@ def emit_types(schema: Schema, forward_compat: bool = False) -> str:
     for e in schema.enums.values():
         out += ["", *_emit_enum(e.name, e.members)]
     for m in schema.messages.values():
-        out += ["", *_emit_message(m, forward_compat)]
+        out += ["", *_emit_message(schema, m, forward_compat)]
     return "\n".join(out) + "\n"

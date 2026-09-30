@@ -2,18 +2,5 @@
   "version": 1,
   "contract": "taut-codec-parity/i64/v1",
   "_note": "An allowlisted target's harness STILL RUNS and REPORTS its observed failures (xfail-that-runs); it just doesn't fail CI. The inverse is enforced too: `tautc parity` FAILS if an allowlisted target passes fully (a green target must be de-listed) or a gated (non-allowlisted) target fails. An entry names a target or a `<target>/fc` variant (the target generated with forward-compat), each governed on its own. Reasons are populated from observed `tautc parity` results.",
-  "targets": [
-    {
-      "target": "go",
-      "phase": "D1",
-      "owner": "codec-parity",
-      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.go builds go's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
-    },
-    {
-      "target": "go/fc",
-      "phase": "D1",
-      "owner": "codec-parity",
-      "reason": "no #constants line: the runner does not speak C3's protocol yet, so the 30 bounds rows do not run. Step D1.go builds go's bounds (TooDeep, TooLarge, the caller's limits, the typed entry point from bytes) and de-lists it."
-    }
-  ]
+  "targets": []
 }

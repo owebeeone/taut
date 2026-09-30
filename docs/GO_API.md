@@ -17,8 +17,8 @@ Writes, into `<out>/go/`:
 
 | file | what |
 | --- | --- |
-| `api.go` | native types (`int64` enums / structs) + `ToCbor`/`TryXFromCbor` |
-| `cbor.go` | the deterministic-CBOR runtime (`Cbor`, `Encode`, `TryDecode`, `DecodeError`) |
+| `api.go` | native types (`int64` enums / structs) + `ToCbor`/`TryXFromCbor`, and per message its bounds and `TryXFromBytes` |
+| `cbor.go` | the deterministic-CBOR runtime (`Cbor`, `Encode`, `TryDecode`, `TryDecodeWith`, `DecodeError`) |
 | `ext.go` | extension accessors (`ExtSet`/`ExtGet`/`ExtClear`) |
 | `client.go` / `server.go` | typed stubs over a transport (see [Server.md](Server.md)) |
 
@@ -42,7 +42,8 @@ func TryTaskStateFromWire(v int64) (TaskState, error)   // UnknownEnum for any o
 func TryTaskStateFromCbor(c Cbor) (TaskState, error)
 ```
 
-Messages are structs with `ToCbor` / `TryXFromCbor`:
+Messages are structs with `ToCbor` / `TryXFromCbor`, and a decode from bytes,
+`TryXFromBytes`, under the message's bounds:
 
 ```go
 type User struct {
@@ -52,7 +53,18 @@ type User struct {
 
 func (x User) ToCbor() Cbor                  // CMap([]KV{{1, ..}, {2, ..}})
 func TryUserFromCbor(c Cbor) (User, error)   // c.Require(1) then .TryInt(), ...
+
+const (
+	UserMaxDepth      = 32 // User's effective max_depth
+	UserMaxEncodedLen = -1 // its effective max_encoded_len; -1 for none
+)
+
+func TryUserFromBytes(data []byte) (User, error) // bytes -> User, under both bounds
 ```
+
+The two constants are the schema's `max_depth` and `max_encoded_len` options as
+they resolve for the message when the code is generated: the message's own, else
+the file's, else the defaults, depth 32 and no length bound.
 
 Field mapping: `INT → int64`, `STR → string`, `BYTES → []byte`, `BOOL → bool`,
 `FLOAT → float64`, `List(T) → []T`, `Map(K,V) → map[K]V`. Fields and methods are
@@ -62,23 +74,25 @@ never on the wire (left as the Go zero value on decode).
 
 ## 3. Encode / decode
 
-A message ↔ CBOR bytes goes through the generated `ToCbor`/`TryXFromCbor` plus the
-runtime `Encode`/`TryDecode`:
+A message ↔ CBOR bytes goes through the generated `ToCbor` plus the runtime `Encode`,
+and back through the generated `TryXFromBytes`:
 
 ```go
-b := Encode(task.ToCbor()) // serialize: []byte
-c, err := TryDecode(b)     // deserialize: the CBOR item...
-if err != nil {
-	return err
-}
-decoded, err := TryTaskFromCbor(c) // ...then the message
+b := Encode(task.ToCbor())         // serialize: []byte
+decoded, err := TryTaskFromBytes(b) // deserialize, under Task's bounds
 if err != nil {
 	return err
 }
 ```
 
+`TryTaskFromBytes` is the runtime's `TryDecodeWith` under `TaskMaxDepth` and
+`TaskMaxEncodedLen`, then `TryTaskFromCbor`. The call's root decides its bounds: a
+message nested inside a `Task` does not change them. The two steps can also be taken
+by hand, `TryDecode(b)` then `TryTaskFromCbor(c)`, but `TryDecode` applies only the
+defaults (depth 32, no length bound), not the schema's.
+
 Every decode entry point returns `(value, error)`, with a `*DecodeError` for bad
-input; none panics.
+input; none panics, and no input exhausts the stack.
 
 ## 4. The `Cbor` runtime (`cbor.go`)
 
@@ -100,8 +114,24 @@ type Cbor struct {
 }
 
 func Encode(c Cbor) []byte
-func TryDecode(data []byte) (Cbor, error)
+func TryDecode(data []byte) (Cbor, error) // DefaultMaxDepth, no length bound
+func TryDecodeWith(data []byte, maxDepth int, maxEncodedLen int) (Cbor, error)
+
+const (
+	DefaultMaxDepth = 32  // the depth bound where none is given
+	MaxDepthCeiling = 128 // no decode applies a deeper bound
+)
 ```
+
+Decode is bounded. An array or map has depth one more than the arrays and maps
+around it, so a top-level one has depth 1; at a bound of 32, 32 nested containers
+decode and the 33rd is `TooDeep` with `Limit` 32, refused once its head is read,
+before any of its items. `TryDecodeWith` takes the caller's bounds: a `maxDepth`
+above `MaxDepthCeiling` applies the ceiling, and `Limit` names the bound applied;
+a `maxEncodedLen` of 0 or more refuses longer input as `TooLarge`, with `Len` and
+`Limit`, before a byte is read, and a negative one is no length bound. A `maxDepth`
+below 1 is the caller's error, returned as an ordinary `error`, not a
+`*DecodeError`.
 
 Constructors: `CInt(int64)`, `CText(string)`, `CBytes([]byte)`, `CArr([]Cbor)`,
 `CMap([]KV)`, `CNull()`, `CFloat(float64)`, `CBool(bool)`. Accessors (return the
@@ -112,9 +142,9 @@ zero value on the wrong `Kind`): `.Int()`, `.Text()`, `.Bytes()`, `.Bool()`,
 value by key, `MissingKey` if absent) and `.Lookup(key int64)` (value, present).
 
 `DecodeError` carries a `Tag` (`Truncated`, `WrongType`, `MissingKey`,
-`DuplicateMapKey`, ...) and the payload fields that tag names: `Info`, `Major`,
-`Key`, `Expected`, `Enum` and `Value`. `Key` is the key as text: an int in decimal, a
-str as itself, a bool as `true` or `false`.
+`DuplicateMapKey`, `TooDeep`, `TooLarge`, ...) and the payload fields that tag names:
+`Info`, `Major`, `Key`, `Expected`, `Enum`, `Value`, `Len` and `Limit`. `Key` is the
+key as text: an int in decimal, a str as itself, a bool as `true` or `false`.
 
 ## 5. Forward-compatibility (unknown-field preservation)
 
@@ -165,8 +195,10 @@ raw, err = ExtClear(raw, 0x100001)
 
 A below-band `tag` is an `*ExtTagError`, the caller's error, checked first. Host bytes
 that do not decode are a `*DecodeError`, and a host that is not a map is `WrongType`
-(`map`). The host app decodes its own message obliviously — the extension rides in
-`WireResidual` and survives.
+(`map`). The accessors do not know the host's schema, so they read a host at the depth
+ceiling, 128, with no length bound, the only bounds every valid host meets; the host's
+own reader applies the host's. The host app decodes its own message obliviously — the
+extension rides in `WireResidual` and survives.
 
 ## 7. Consuming the runtime
 

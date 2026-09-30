@@ -7,9 +7,15 @@ files all inside that directory, so the build never touches the user's Go cache
 or GOPATH.
 
 The runner reports what the generated Go codec did with each row, a decoded
-malformed row with the hex of its re-encoding (`Encode` of the tree for a raw row,
-of the typed value's `ToCbor()` for a from_cbor row); the gate judges it
-(`parity.judge`).
+malformed or bounds row with the hex of its re-encoding (`Encode` of the tree for a raw
+row, of the typed value's `ToCbor()` for a from_cbor row); the gate judges it
+(`parity.judge`). It speaks the bounds protocol (`parity`'s docstring, items 1-5): it
+prints the runtime's `DefaultMaxDepth` and `MaxDepthCeiling` once as its `#constants`
+line; a raw row with `limits` calls `TryDecodeWith` with them, and one without calls
+`TryDecode`; every from_cbor row decodes from bytes through its message's
+`TryXFromBytes`, and its line adds the bounds that entry point applies, the generated
+`XMaxDepth` and `XMaxEncodedLen`; and it expands a row's segments itself, reporting an
+expansion whose length is not the row's `len` as untyped.
 """
 
 from __future__ import annotations
@@ -28,6 +34,7 @@ _MAIN = r'''// The Go runner for `tautc parity` (taut/src/taut/corpus/parity_go.
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -49,11 +56,23 @@ type encodeFailRow struct {
 	values []string
 }
 
-type malformedRow struct {
-	name   string
-	stage  string
-	schema string
-	bytes  string
+// segment is count copies of hex, a part of a row's bytes.
+type segment struct {
+	hex   string
+	count int
+}
+
+// decodeRow is a malformed or bounds row. length is its len, -1 where it states none; a
+// raw row with limits passes maxDepth and maxEncodedLen (-1: no length bound).
+type decodeRow struct {
+	name          string
+	stage         string
+	schema        string
+	segments      []segment
+	length        int
+	limits        bool
+	maxDepth      int
+	maxEncodedLen int
 }
 
 var roundTrips = []intRow{
@@ -64,14 +83,18 @@ var encodeFails = []encodeFailRow{
 @ENCODE_FAIL@
 }
 
-var malformed = []malformedRow{
-@MALFORMED@
+var decodeRows = []decodeRow{
+@DECODE_ROWS@
 }
 
 var detailSpaces = strings.NewReplacer("\t", " ", "\n", " ", "\r", " ")
 
-func emit(name, outcome, detail string) {
-	fmt.Printf("%s\t%s\t%s\n", name, outcome, detailSpaces.Replace(detail))
+// emit prints a report line, its columns separated by tabs.
+func emit(columns ...string) {
+	for i, column := range columns {
+		columns[i] = detailSpaces.Replace(column)
+	}
+	fmt.Println(strings.Join(columns, "\t"))
 }
 
 func sameMap(a, b map[int64]int64) bool {
@@ -118,13 +141,9 @@ func roundTrip(row intRow) (outcome, detail string) {
 	if err != nil {
 		return "fail", "row hex: " + err.Error()
 	}
-	c, err := taut.TryDecode(data)
+	decoded, err := taut.TryIntBoxFromBytes(data)
 	if err != nil {
 		return "fail", "decode: " + err.Error()
-	}
-	decoded, err := taut.TryIntBoxFromCbor(c)
-	if err != nil {
-		return "fail", "from_cbor: " + err.Error()
 	}
 	if decoded.N != n || !sameMap(decoded.ById, byID) {
 		return "fail", fmt.Sprintf("decoded %+v", decoded)
@@ -151,12 +170,30 @@ func encodeFail(row encodeFailRow) (string, string) {
 }
 
 // fromCbor is a from_cbor row's typed entry point, by message name (from the fixture
-// schema): the decoded value's own encoding.
-func fromCbor(message string, c taut.Cbor) ([]byte, error) {
+// schema): the message's decode from bytes, under its bounds, and the decoded value's
+// own encoding.
+func fromCbor(message string, data []byte) ([]byte, error) {
 	switch message {
 @FROM_CBOR@
 	}
 	return nil, fmt.Errorf("no from_cbor entry point for %s", message)
+}
+
+// resolved is a from_cbor row's fourth column: the bounds its message's typed entry
+// point applies, from the generated constants, the length empty where none applies.
+func resolved(message string) string {
+	switch message {
+@RESOLVED@
+	}
+	return "no typed entry point for " + message
+}
+
+func bounds(maxDepth, maxEncodedLen int) string {
+	length := ""
+	if maxEncodedLen >= 0 {
+		length = strconv.Itoa(maxEncodedLen)
+	}
+	return fmt.Sprintf("max_depth=%d;max_encoded_len=%s", maxDepth, length)
 }
 
 // fromWire is a from_wire row's typed entry point, by enum name (from the fixture schema).
@@ -167,23 +204,49 @@ func fromWire(enum string, c taut.Cbor) error {
 	return fmt.Errorf("no from_wire entry point for %s", enum)
 }
 
-// decodeRow returns a decoded row's re-encoding: the tree for raw_decode, the typed
-// value for from_cbor, and nothing for from_wire (an enum row never accepts).
-func decodeRow(row malformedRow) ([]byte, error) {
-	data, err := hex.DecodeString(row.bytes)
-	if err != nil {
-		return nil, fmt.Errorf("row hex: %w", err)
+// expand is a row's bytes, its segments expanded, or an error when they do not expand
+// to its length.
+func expand(row decodeRow) ([]byte, error) {
+	data := []byte{}
+	for _, seg := range row.segments {
+		piece, err := hex.DecodeString(seg.hex)
+		if err != nil {
+			return nil, fmt.Errorf("row hex: %w", err)
+		}
+		data = append(data, bytes.Repeat(piece, seg.count)...)
 	}
-	c, err := taut.TryDecode(data)
-	if err != nil {
-		return nil, err
+	if row.length >= 0 && len(data) != row.length {
+		return nil, fmt.Errorf("bytes expand to %d bytes, len is %d", len(data), row.length)
 	}
+	return data, nil
+}
+
+// rawDecode is a raw_decode row's call: TryDecodeWith with the limits it passes, else
+// TryDecode.
+func rawDecode(row decodeRow, data []byte) (taut.Cbor, error) {
+	if row.limits {
+		return taut.TryDecodeWith(data, row.maxDepth, row.maxEncodedLen)
+	}
+	return taut.TryDecode(data)
+}
+
+// decoded returns a decoded row's re-encoding: the tree for raw_decode, the typed value
+// for from_cbor, and nothing for from_wire (an enum row never accepts).
+func decoded(row decodeRow, data []byte) ([]byte, error) {
 	switch row.stage {
 	case "raw_decode":
+		c, err := rawDecode(row, data)
+		if err != nil {
+			return nil, err
+		}
 		return taut.Encode(c), nil
 	case "from_cbor":
-		return fromCbor(row.schema, c)
+		return fromCbor(row.schema, data)
 	case "from_wire":
+		c, err := taut.TryDecode(data)
+		if err != nil {
+			return nil, err
+		}
 		return nil, fromWire(row.schema, c)
 	}
 	return nil, fmt.Errorf("unknown stage %s", row.stage)
@@ -208,19 +271,28 @@ func describe(e *taut.DecodeError) (string, bool) {
 		return fmt.Sprintf("%s;enum=%s;value=%s", e.Tag, e.Enum, e.Value), true
 	case "NonCanonicalInt", "IntOverflow":
 		return fmt.Sprintf("%s;value=%s", e.Tag, e.Value), true
+	case "TooDeep":
+		return fmt.Sprintf("%s;limit=%d", e.Tag, e.Limit), true
+	case "TooLarge":
+		return fmt.Sprintf("%s;len=%d;limit=%d", e.Tag, e.Len, e.Limit), true
 	}
 	return "", false
 }
 
-// observe decodes one malformed row and reports what happened: ok, err with the
-// tag and payload, or untyped for any other error or a panic.
-func observe(row malformedRow) (outcome, detail string) {
+// observe decodes one malformed or bounds row and reports what happened: ok, err with
+// the tag and payload, or untyped for a row whose bytes do not expand to its length,
+// any other error or a panic.
+func observe(row decodeRow) (outcome, detail string) {
 	defer func() {
 		if r := recover(); r != nil {
 			outcome, detail = "untyped", fmt.Sprintf("panic: %v", r)
 		}
 	}()
-	again, err := decodeRow(row)
+	data, err := expand(row)
+	if err != nil {
+		return "untyped", err.Error()
+	}
+	again, err := decoded(row, data)
 	if err == nil {
 		return "ok", hex.EncodeToString(again)
 	}
@@ -235,6 +307,8 @@ func observe(row malformedRow) (outcome, detail string) {
 }
 
 func main() {
+	emit("#constants", fmt.Sprintf("default_max_depth=%d;max_depth_ceiling=%d",
+		taut.DefaultMaxDepth, taut.MaxDepthCeiling))
 	for _, row := range roundTrips {
 		outcome, detail := roundTrip(row)
 		emit(row.name, outcome, detail)
@@ -243,9 +317,13 @@ func main() {
 		outcome, detail := encodeFail(row)
 		emit(row.name, outcome, detail)
 	}
-	for _, row := range malformed {
+	for _, row := range decodeRows {
 		outcome, detail := observe(row)
-		emit(row.name, outcome, detail)
+		if row.stage == "from_cbor" {
+			emit(row.name, outcome, detail, resolved(row.schema))
+		} else {
+			emit(row.name, outcome, detail)
+		}
 	}
 }
 '''
@@ -256,8 +334,23 @@ def _go(value: str) -> str:
     return json.dumps(value)
 
 
+def _decode_row(row: dict) -> str:
+    """A malformed or bounds row as a `decodeRow` literal: its bytes as segments, which the
+    runner expands (the bounds protocol, item 5), and a raw row's `limits`, an absent
+    `max_depth` the runtime's default and an absent `max_encoded_len` none (-1)."""
+    segments = ", ".join(f"{{{_go(hexed)}, {count}}}" for hexed, count in parity.segments(row))
+    fields = [f"name: {_go(row['name'])}", f"stage: {_go(row['stage'])}",
+              f"schema: {_go(row.get('schema', ''))}", f"segments: []segment{{{segments}}}",
+              f"length: {row.get('len', -1)}"]
+    if "limits" in row:
+        limits = row["limits"]
+        fields += ["limits: true", f"maxDepth: {limits.get('max_depth', 'taut.DefaultMaxDepth')}",
+                   f"maxEncodedLen: {limits.get('max_encoded_len', -1)}"]
+    return f"\t{{{', '.join(fields)}}},"
+
+
 def _tables() -> tuple[str, str, str]:
-    round_trip, encode_fail, malformed = [], [], []
+    round_trip, encode_fail = [], []
     for row in parity.int_rows():
         value = row["value"]
         if row["kind"] == "round_trip":
@@ -268,36 +361,40 @@ def _tables() -> tuple[str, str, str]:
             ints = [value["n"], *(item for pair in value["by_id"] for item in pair)]
             encode_fail.append(f"\t{{name: {_go(row['name'])}, "
                                f"values: []string{{{', '.join(_go(i) for i in ints)}}}}},")
-    for row in parity.malformed_rows():
-        malformed.append(f"\t{{name: {_go(row['name'])}, stage: {_go(row['stage'])}, "
-                         f"schema: {_go(row.get('schema', ''))}, bytes: {_go(row['bytes'])}}},")
-    return "\n".join(round_trip), "\n".join(encode_fail), "\n".join(malformed)
+    decode = [_decode_row(row) for row in parity.decode_rows()]
+    return "\n".join(round_trip), "\n".join(encode_fail), "\n".join(decode)
 
 
-def _dispatch() -> tuple[str, str]:
-    """The `switch` cases for every message (`from_cbor`) and enum (`from_wire`) in the fixture."""
+def _dispatch() -> tuple[str, str, str]:
+    """The `switch` cases for every message (`from_cbor`, and the bounds its typed entry
+    point applies) and enum (`from_wire`) in the fixture."""
     dispatch = parity.fixture_dispatch()
 
     def message(name: str) -> str:
-        return (f"\tcase {_go(name)}:\n\t\tv, err := taut.Try{name}FromCbor(c)\n"
+        return (f"\tcase {_go(name)}:\n\t\tv, err := taut.Try{name}FromBytes(data)\n"
                 f"\t\tif err != nil {{\n\t\t\treturn nil, err\n\t\t}}\n"
                 f"\t\treturn taut.Encode(v.ToCbor()), nil")
+
+    def bounds(name: str) -> str:
+        return f"\tcase {_go(name)}:\n\t\treturn bounds(taut.{name}MaxDepth, taut.{name}MaxEncodedLen)"
 
     def enum(name: str) -> str:
         return f"\tcase {_go(name)}:\n\t\t_, err := taut.Try{name}FromCbor(c)\n\t\treturn err"
 
-    return "\n".join(map(message, dispatch.messages)), "\n".join(map(enum, dispatch.enums))
+    return ("\n".join(map(message, dispatch.messages)), "\n".join(map(bounds, dispatch.messages)),
+            "\n".join(map(enum, dispatch.enums)))
 
 
 def _source() -> str:
-    round_trip, encode_fail, malformed = _tables()
-    from_cbor, from_wire = _dispatch()
+    round_trip, encode_fail, decode = _tables()
+    from_cbor, resolved, from_wire = _dispatch()
     return (_MAIN
             .replace("@PACKAGE@", _PACKAGE)
             .replace("@ROUND_TRIP@", round_trip)
             .replace("@ENCODE_FAIL@", encode_fail)
-            .replace("@MALFORMED@", malformed)
+            .replace("@DECODE_ROWS@", decode)
             .replace("@FROM_CBOR@", from_cbor)
+            .replace("@RESOLVED@", resolved)
             .replace("@FROM_WIRE@", from_wire))
 
 

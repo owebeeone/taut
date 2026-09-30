@@ -5,7 +5,9 @@
 // They fail closed (TautCheckedDecode.md CD-E4): host bytes that do not decode are
 // the *DecodeError decode reports, and a host that is not a map is WrongType{map}.
 // A tag below the band is the caller's error, an *ExtTagError, checked before the
-// host is read.
+// host is read. They cannot know the host's schema, so they read a host at the depth
+// ceiling, MaxDepthCeiling, with no length bound: the only bounds every valid host
+// meets, leaving the host's own to its reader (TautOptions.md G3).
 package taut
 
 import "fmt"
@@ -27,9 +29,7 @@ func extHost(host []byte, tag int64) ([]KV, error) {
 	if tag < BandStart {
 		return nil, &ExtTagError{Tag: tag}
 	}
-	// TODO(D1): read the host at the depth ceiling with no length bound (TautOptions.md
-	// G3) once TryDecode takes D1's depth parameter.
-	c, err := TryDecode(host)
+	c, err := TryDecodeWith(host, MaxDepthCeiling, -1)
 	if err != nil {
 		return nil, err
 	}

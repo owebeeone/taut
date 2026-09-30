@@ -4,9 +4,15 @@
 // null, float) in core-deterministic encoding (definite length, shortest-form
 // ints/floats, ascending map keys). Hand-rolled, stdlib only.
 //
-// Every decode entry point (TautCheckedDecode.md CD-E4), TryDecode here and the
-// generated TryXFromCbor and TryXFromWire, returns (value, error), with a
-// *DecodeError for bad input; none panics.
+// Every decode entry point (TautCheckedDecode.md CD-E4), TryDecode and TryDecodeWith
+// here and the generated TryXFromBytes, TryXFromCbor and TryXFromWire, returns (value,
+// error), with a *DecodeError for bad input; none panics.
+//
+// Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one more
+// than the arrays and maps around it, and one deeper than the call's depth bound is
+// TooDeep{Limit}; with a length bound, longer input is TooLarge{Len, Limit} before a
+// byte is read. The recursion goes no deeper than the bound, so no input exhausts the
+// goroutine stack.
 package taut
 
 import (
@@ -48,6 +54,11 @@ type Cbor struct {
 }
 
 const (
+	DefaultMaxDepth = 32  // the depth bound where none is given (CD-B1)
+	MaxDepthCeiling = 128 // no decode applies a deeper bound (CD-B3)
+)
+
+const (
 	DecodeErrTruncated        = "Truncated"
 	DecodeErrTrailingBytes    = "TrailingBytes"
 	DecodeErrInvalidUtf8      = "InvalidUtf8"
@@ -61,6 +72,8 @@ const (
 	DecodeErrMissingKey       = "MissingKey"
 	DecodeErrWrongType        = "WrongType"
 	DecodeErrUnknownEnum      = "UnknownEnum"
+	DecodeErrTooDeep          = "TooDeep"
+	DecodeErrTooLarge         = "TooLarge"
 )
 
 const maxInt64Uint = uint64(1<<63 - 1)
@@ -68,7 +81,8 @@ const maxInt64Uint = uint64(1<<63 - 1)
 // DecodeError is the one error of decode: its Tag, and the payload fields that tag
 // carries (TautCheckedDecode.md CD-E1). Key, of NegativeMapKey, DuplicateMapKey and
 // MissingKey, is the key as text (question 9): an int in decimal, a str as itself, a
-// bool as true or false.
+// bool as true or false. Limit, of TooDeep and TooLarge, is the bound applied, and Len,
+// of TooLarge, the input's length.
 type DecodeError struct {
 	Tag      string
 	Info     byte
@@ -77,6 +91,8 @@ type DecodeError struct {
 	Expected string
 	Enum     string
 	Value    string
+	Len      int
+	Limit    int
 }
 
 func UnknownEnumError(enum string, value int64) error {
@@ -103,6 +119,10 @@ func (e *DecodeError) Error() string {
 		return fmt.Sprintf("%s(%s=%s)", e.Tag, e.Enum, e.Value)
 	case DecodeErrIntOverflow, DecodeErrNonCanonicalInt:
 		return fmt.Sprintf("%s(%s)", e.Tag, e.Value)
+	case DecodeErrTooDeep:
+		return fmt.Sprintf("%s(limit=%d)", e.Tag, e.Limit)
+	case DecodeErrTooLarge:
+		return fmt.Sprintf("%s(len=%d, limit=%d)", e.Tag, e.Len, e.Limit)
 	default:
 		return e.Tag
 	}
@@ -374,12 +394,33 @@ func halfToFloat64(h uint16) float64 {
 	}
 }
 
-// TryDecode decodes one item that spans all of data, or returns the *DecodeError of
-// the first check that fails (CD-E5).
-// TODO(D1): bound the depth (TooDeep); until then, deep enough nesting exhausts the
-// goroutine stack.
+// TryDecode decodes one item that spans all of data under the default bounds,
+// DefaultMaxDepth and no length bound, or returns the *DecodeError of the first check
+// that fails (CD-E5). A message's generated TryXFromBytes applies its schema's bounds
+// instead.
 func TryDecode(data []byte) (Cbor, error) {
-	v, off, err := dec(data, 0)
+	return TryDecodeWith(data, DefaultMaxDepth, -1)
+}
+
+// TryDecodeWith decodes one item that spans all of data under the caller's bounds, or
+// returns the *DecodeError of the first check that fails (CD-E5). With a maxEncodedLen
+// of 0 or more, longer input is TooLarge before a byte is read; a negative one is no
+// length bound. An array or map one deeper than maxDepth is TooDeep once its head is
+// read, before its first item (CD-B2); a maxDepth above MaxDepthCeiling applies the
+// ceiling, and Limit names the bound applied. A maxDepth below 1 is the caller's error,
+// returned as an ordinary error, not a *DecodeError.
+func TryDecodeWith(data []byte, maxDepth int, maxEncodedLen int) (Cbor, error) {
+	if maxDepth < 1 {
+		return Cbor{}, fmt.Errorf("taut: maxDepth must be at least 1, not %d", maxDepth)
+	}
+	limit := maxDepth
+	if limit > MaxDepthCeiling {
+		limit = MaxDepthCeiling
+	}
+	if maxEncodedLen >= 0 && len(data) > maxEncodedLen {
+		return Cbor{}, &DecodeError{Tag: DecodeErrTooLarge, Len: len(data), Limit: maxEncodedLen}
+	}
+	v, off, err := dec(data, 0, 0, limit)
 	if err != nil {
 		return Cbor{}, err
 	}
@@ -431,11 +472,22 @@ func negOverflowValue(n uint64) string {
 	return "-" + strconv.FormatUint(n+1, 10)
 }
 
-// dec reads one item left to right and reports the first check that fails
-// (TautCheckedDecode.md CD-E5): the head (no byte, major type 6 whatever its info,
-// unsupported info, missing argument bytes, a non-canonical argument), then the
-// body, whose items are read in order, a map entry's key checked before its value.
-func dec(data []byte, off int) (Cbor, int, error) {
+// enter refuses a container whose head is read, inside depth others, when it would
+// sit deeper than limit (CD-B2): before its first item is read.
+func enter(depth int, limit int) error {
+	if depth >= limit {
+		return &DecodeError{Tag: DecodeErrTooDeep, Limit: limit}
+	}
+	return nil
+}
+
+// dec reads the item at off, inside depth arrays and maps, under the depth bound limit,
+// left to right, and reports the first check that fails (TautCheckedDecode.md CD-E5):
+// the head (no byte, major type 6 whatever its info, unsupported info, missing argument
+// bytes, a non-canonical argument), then the body: an array or map one level too deep
+// is refused before its first item, and items are read in order, a map entry's key
+// checked before its value.
+func dec(data []byte, off int, depth int, limit int) (Cbor, int, error) {
 	if off >= len(data) {
 		return Cbor{}, off, &DecodeError{Tag: DecodeErrTruncated}
 	}
@@ -490,9 +542,12 @@ func dec(data []byte, off int) (Cbor, int, error) {
 		if err != nil {
 			return Cbor{}, o, err
 		}
+		if err := enter(depth, limit); err != nil {
+			return Cbor{}, o, err
+		}
 		a := []Cbor{}
 		for i := uint64(0); i < n; i++ {
-			v, o2, err := dec(data, o)
+			v, o2, err := dec(data, o, depth+1, limit)
 			if err != nil {
 				return Cbor{}, o2, err
 			}
@@ -505,10 +560,13 @@ func dec(data []byte, off int) (Cbor, int, error) {
 		if err != nil {
 			return Cbor{}, o, err
 		}
+		if err := enter(depth, limit); err != nil {
+			return Cbor{}, o, err
+		}
 		m := []KV{}
 		seen := map[int64]bool{}
 		for i := uint64(0); i < n; i++ {
-			kc, o2, err := dec(data, o)
+			kc, o2, err := dec(data, o, depth+1, limit)
 			if err != nil {
 				return Cbor{}, o2, err
 			}
@@ -522,7 +580,7 @@ func dec(data []byte, off int) (Cbor, int, error) {
 				return Cbor{}, o2, &DecodeError{Tag: DecodeErrDuplicateMapKey, Key: strconv.FormatInt(kc.I, 10)}
 			}
 			seen[kc.I] = true
-			vc, o3, err := dec(data, o2)
+			vc, o3, err := dec(data, o2, depth+1, limit)
 			if err != nil {
 				return Cbor{}, o3, err
 			}
