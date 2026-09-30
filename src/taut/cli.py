@@ -144,14 +144,14 @@ def main(argv: list[str] | None = None) -> int:
     g = sub.add_parser("gen", help="generate native types + codec (and client/server) from an IR")
     g.add_argument("ir", help="path to a taut IR (.taut.py DSL module or .ir.json)")
     g.add_argument("-o", "--out", required=True, help="output directory")
-    g.add_argument("-l", "--lang", help="comma-separated targets (default: all): python,typescript,rust,cpp")
+    g.add_argument("-l", "--lang", help="comma-separated targets (default: all): python,typescript,rust,cpp,swift,go,kotlin,js,java")
     g.add_argument("-s", "--service", help="comma-separated services for client/server stubs (default: all in the IR)")
     g.add_argument("--api-only", action="store_true", help="emit only api (types + encoders/decoders), no client/server")
     g.add_argument("--rust-external-types", metavar="JSON", help="name-to-Rust-path map for types owned by a dependency; compose its schema and share its CBOR runtime")
     g.add_argument("--with-runtime", action="store_true",
-                   help="also emit the vendored CBOR runtime for compiled targets (rust->cbor.rs, cpp->taut/cbor.hpp)")
+                   help="also emit the vendored runtime (CBOR codec and extension helpers) for every target that has one, so the output is self-contained")
     g.add_argument("--forward-compat", action="store_true",
-                   help="generated structs carry a wire_residual field preserving unknown/newer tags (Rust; required if the IR has extensions)")
+                   help="generated types keep unknown/newer tags and re-encode them (every generated target; required if the IR has extensions; python and typescript always keep them)")
     g.add_argument("--fail-closed", action="store_true",
                    help="(no-op, accepted so existing build scripts still run) fail-closed decode is the "
                         "only Rust codec: the default since taut v0.8.0, and v0.10.0 removed the legacy "

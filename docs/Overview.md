@@ -68,8 +68,8 @@ is a derived projection of the tagged subset.
 | IR authoring DSL | `taut.ir.dsl` (Python-as-DSL) |
 | Validator + breaking-change gate | `taut.ir.validate`, `taut.ir.compat` |
 | Wire codec (deterministic CBOR) | `taut.wire.codec` / `taut.wire.cbor` |
-| Per-language generators | `taut.gen.rust`, `taut.gen.cpp` |
-| Golden corpus | `taut/corpus/` |
+| Per-language generators | `taut.gen.{rust,cpp,swift,go,kotlin,js,java}`, and `taut.gen.scaffold` for python and typescript types |
+| Golden corpus and parity gate | `taut/corpus/`; `tautc parity` replays `corpus/parity/` through all nine codecs ([CodecContract.md](CodecContract.md)) |
 | Reference slices + clients/servers | TypeScript runtime in `src/taut/gen/runtime/typescript/`; worked slices are disposable generated outputs |
 | CRDT reference engine + slot | `taut.crdt` |
 

@@ -598,15 +598,17 @@ def emit(
 ) -> list[Path]:
     """Generate per-language code from an IR (the engine behind the `tautc` CLI).
 
-    - `langs`: subset of {python, typescript, rust, cpp}; default all.
+    - `langs`: subset of `_LANGS` (python, typescript, rust, cpp, swift, go, kotlin, js,
+      java); default all.
     - `services`: services to emit client/server for; default = every service in
       the schema. Pass `[]` for **api only** (native types + encoders/decoders,
       no RPC stubs) — the common build-script case for compiled targets.
     - `runtime`: when True, also emit the vendored CBOR runtime for compiled
-      targets (`rust` -> `cbor.rs`, `cpp` -> `taut/cbor.hpp`) so the generated
+      targets (`_RUNTIMES`: the CBOR codec and extension helpers) so the generated
       code is self-contained. Off by default — emitted only on demand.
     - `forward_compat`: when True, generated structs carry a `wire_residual` field
-      that preserves unknown/newer-version tags (Rust today). Off by default.
+      that preserves unknown/newer-version tags, in every generated target. Off by
+      default; python and typescript always keep them.
       An IR that declares extensions requires it for compiled targets (D14:
       extensions ride the residual space) — otherwise generation is a build error.
 

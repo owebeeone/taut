@@ -42,12 +42,20 @@ def test_catalogue_metadata_only_change_is_not_a_method_change():
     assert compat.diff(old, new) == []
 
 
-def test_accepts_compatible_added_optional_field():
+def test_an_added_field_is_compatible_only_at_missing_ok():
+    """TautCheckedDecode.md question 4, ruled (a): a decoder refuses a message that lacks an
+    optional field's key (MissingKey), so a new reader accepts the messages written before the
+    field existed only when it is optional=MISSING_OK. Required and optional=True are breaking."""
     old = schema(Msg("A", F("x", 1, STR)))
-    new = schema(Msg("A", F("x", 1, STR), F("y", 2, INT, optional=True)))
-    assert compat.breaking(old, new) == []
-    compat.check_or_raise(old, new)  # does not raise
-    assert "y (tag 2) added" in _details(compat.diff(old, new))
+    missing_ok = schema(Msg("A", F("x", 1, STR), F("y", 2, INT, optional=MISSING_OK)))
+    assert compat.breaking(old, missing_ok) == []
+    compat.check_or_raise(old, missing_ok)  # does not raise
+    assert "A.y (tag 2) added (missing_ok)" in _details(compat.diff(old, missing_ok))
+    for presence, word in ((True, "optional"), (False, "required")):
+        new = schema(Msg("A", F("x", 1, STR), F("y", 2, INT, optional=presence)))
+        assert [c.detail for c in compat.breaking(old, new)] == [f"A.y (tag 2) added ({word})"]
+        with pytest.raises(Exception):
+            compat.check_or_raise(old, new)
 
 
 def test_presence_is_a_ladder_graded_by_direction():
@@ -86,12 +94,14 @@ def test_rejects_tag_renumber():
     assert compat.breaking(old, new)  # x moved tag 1->2 (and tag 1 removed)
 
 
-def test_rejects_new_required_field_but_accepts_optional():
+def test_rejects_new_required_or_optional_field_but_accepts_missing_ok():
     old = schema(Msg("A", F("x", 1, STR)))
     req = schema(Msg("A", F("x", 1, STR), F("y", 2, INT)))
     opt = schema(Msg("A", F("x", 1, STR), F("y", 2, INT, optional=True)))
+    lax = schema(Msg("A", F("x", 1, STR), F("y", 2, INT, optional=MISSING_OK)))
     assert compat.breaking(old, req)      # required add is breaking
-    assert not compat.breaking(old, opt)  # optional add is fine
+    assert compat.breaking(old, opt)      # optional add too: old messages lack the key (question 4)
+    assert not compat.breaking(old, lax)  # only MISSING_OK reads them
 
 
 def test_enum_member_value_change_breaks_but_add_is_ok():

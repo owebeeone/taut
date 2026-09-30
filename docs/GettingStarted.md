@@ -127,6 +127,13 @@ assert codec.decode(schema, "Task", codec.encode(schema, "Task", later)) == late
 The codec recurses through the composition automatically; the bytes are the same
 in every language — that's what the golden corpus pins.
 
+Decode is fail-closed: bytes that are not a valid `Task` raise `DecodeError` (a
+`ValueError`) whose `.tag` says why, such as `MissingKey`, `WrongType` or `TooDeep`, and
+nothing else escapes. It applies `Task`'s bounds, the schema's `max_depth` (32 unless
+declared, as `option.max_depth(16)` at file or message level) and `max_encoded_len`
+(none unless declared). Every language reads the same bounds and reports the same tags:
+see [PYTHON_API.md](PYTHON_API.md) and [CodecContract.md](CodecContract.md).
+
 ## 4. Talk to it across languages
 
 The contract is enough to generate/derive the rest:
@@ -158,13 +165,15 @@ prior version and rejects incompatible edits under the same major:
 
 ```sh
 python3 -m taut.ir.compat tasks.ir.json.prev tasks.ir.json
-# [compatible] Task.due (tag 5) added        → exit 0
+# [compatible] Task.due (tag 8) added (missing_ok)  → exit 0
 # [breaking]  Task.title wire-type changed    → exit 1
 ```
 
-Adding a message / enum / method / **optional** field / stream event is
-compatible; removing or renaming fields, changing tags or wire-types, or
-tightening optional→required is breaking.
+Adding a message / enum / method / stream event, or a field declared
+**`optional=MISSING_OK`**, is compatible. Adding any other field is breaking: a
+decoder refuses a message without the field's key, so a new reader would refuse
+every message written before it. Removing or renaming fields, changing tags or
+wire-types, or tightening optional→required is breaking too.
 
 When you *do* remove a field, **reserve** its tag and name so they can never be
 reused, and keep **`next_id`** ahead of every tag — both are first-class,

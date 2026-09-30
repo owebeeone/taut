@@ -8,12 +8,16 @@ diff is well-defined.
 Compatibility model for the frozen wire (messages = CBOR maps keyed by field tag,
 decoders read declared wire-fields by tag):
 
-  Compatible: add message/enum/method; add enum member; add an *optional* field;
-              add a stream event; relax a field required→optional.
-  Breaking:   remove or rename(at-tag) a field; change a field's tag or wire-type;
-              tighten optional→required; add a *required* field; remove/renumber an
-              enum member; remove message/enum/method; change a method's kind/shape/
-              param types/output/event types; remove a method param or add one.
+  Compatible: add message/enum/method; add enum member; add a field that is
+              optional=MISSING_OK; add a stream event; move a field's presence up
+              the ladder required -> optional -> missing_ok.
+  Breaking:   add a required or optional=True field (a decoder refuses a message
+              without its key, MissingKey, so a new reader refuses every message
+              written before it: TautCheckedDecode.md question 4); remove or
+              rename(at-tag) a field; change a field's tag or wire-type; move its
+              presence down the ladder; remove/renumber an enum member; remove
+              message/enum/method; change a method's kind/shape/param types/output/
+              event types; remove a method param or add one.
 
 Transient fields are off the wire and ignored by the diff.
 
@@ -120,9 +124,10 @@ def _diff_messages(old: Schema, new: Schema, out: list[Change]) -> None:
                 out.append(Change("breaking", f"{name}.{of.name} tag {of.tag}->{same_name_new.tag}"))
         for tag, nf in new_by_tag.items():
             if tag not in old_by_tag:
-                level = "compatible" if nf.optional else "breaking"
-                suffix = "" if nf.optional else " (required)"
-                out.append(Change(level, f"{name}.{nf.name} (tag {tag}) added{suffix}"))
+                # Only MISSING_OK reads a message that lacks the key (question 4, ruled (a)).
+                level = "compatible" if nf.optional == MISSING_OK else "breaking"
+                out.append(Change(level, f"{name}.{nf.name} (tag {tag}) added "
+                                         f"({_PRESENCE_NAME[nf.optional]})"))
         # reserved: adding is hygiene (compatible); un-reserving re-opens reuse (breaking)
         for t in set(om.reserved_tags) - set(nm.reserved_tags):
             out.append(Change("breaking", f"{name} tag {t} un-reserved"))
