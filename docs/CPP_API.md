@@ -11,7 +11,7 @@ corpus proves the bytes with `static_assert`. Every language reproduces the *sam
 ## 1. Generate
 
 ```sh
-tautc gen --lang cpp --with-runtime -o <out>
+tautc gen <ir> --lang cpp --with-runtime -o <out>
 ```
 
 Writes, into `<out>/cpp/`:
@@ -110,14 +110,21 @@ constexpr void encode_value(Buf& b, const Cbor& c);  // tree -> bytes (canonical
 
 The raw `try_decode` knows no schema, and serves schema-blind carriers and the generated
 code. A `max_depth` above the ceiling applies the ceiling, and `TooDeep`'s `limit` names
-the bound applied; a `max_depth` of 0 is the caller's error and throws
-`std::invalid_argument`.
+the bound applied; with a `max_encoded_len`, longer input is `TooLarge` before a byte is
+read. A `max_depth` of 0 is the caller's error and throws `std::invalid_argument`.
 
 Accessors, each the value or a `DecodeError`: `.try_int()`, `.try_text()`, `.try_bytes()`,
 `.try_bool()`, `.try_float()`, `.try_array()`, `.try_map()` (`WrongType` otherwise),
 `.try_get(key)` (map value by integer key, `MissingKey` when absent), `.try_get_opt(key)`
 (nullptr when absent); and `.is_null()`. `Text`/`Bytes` are `string_view` slices **into the
 decoded source** — keep that buffer alive while they're read.
+
+A `DecodeError` holds its `tag`, a `DecodeErrorTag` (`Truncated`, `WrongType`,
+`MissingKey`, `DuplicateMapKey`, `TooDeep`, `TooLarge`, ...), and the payload fields that
+tag names: `info`, `major`, `key`, `expected`, `enum_name`, `value`, `unsigned_value`,
+`len` and `limit`. A text or bool `DuplicateMapKey` key is in `key_text`
+(`key_is_text`): a str as itself, a bool as `true` or `false`. The full table of tags and
+payloads is in [CodecContract.md](CodecContract.md).
 
 ## 5. Forward-compatibility (unknown-field preservation)
 
@@ -126,7 +133,8 @@ Generate with `--forward-compat` and each struct gains
 doesn't name are captured there; on `to_cbor`, they're re-emitted **merged with the known
 fields in one ascending-key order** — so a node that *decodes → edits → re-encodes* a newer
 message never drops fields it doesn't understand. A message with no unknowns is
-byte-identical with or without the flag.
+byte-identical with or without the flag. Without it, `try_from_cbor` accepts unknown
+fields and drops them; the parity gate runs both builds (`cpp` and `cpp/fc`).
 
 A schema that declares an extension **requires** `--forward-compat` (build error
 otherwise — extensions ride the residual space).
@@ -157,9 +165,10 @@ auto stripped = taut::ext_clear(hv, 0x100001);
 
 They fail closed: for any host bytes each returns its result or a `DecodeError`, and a host
 that is not a map is `WrongType{map}`. Not knowing the host's root, they read it at the
-depth ceiling, 128, with no length bound, leaving the host's own bounds to its reader. A below-band `tag` is the caller's error: it throws
-`std::invalid_argument` before the host is read. The host app decodes its own message
-obliviously — the extension rides in `wire_residual` and survives.
+depth ceiling, 128, with no length bound, leaving the host's own bounds to its reader. A
+below-band `tag` is the caller's error: it throws `std::invalid_argument` before the host
+is read. The host app decodes its own message obliviously — the extension rides in
+`wire_residual` and survives.
 `ext_get`'s `Cbor` holds `string_view`s into `host` — keep the host bytes alive until it's
 decoded into an owning/typed value.
 
@@ -168,3 +177,17 @@ decoded into an owning/typed value.
 `taut/cbor.hpp` / `taut/ext.hpp` are vendored, dependency-free, header-only source — drop
 them under an include root and `#include "taut/cbor.hpp"`; `api.hpp` already does.
 `-std=c++20` is the only toolchain requirement. The bytes match every other taut target.
+
+## 8. Changed in v0.10.0
+
+- The unchecked decode is gone: `taut::parse`, `decode_at`, `Cbor::get` and the `as_*`
+  accessors, and each message's `from_cbor`. Use `try_decode` and the `try_*`
+  accessors, and a message's `try_decode` or `try_from_cbor`.
+- `try_decode` takes `max_depth` and `max_encoded_len` and is constexpr. Input nested
+  deeper than its bound, into which v0.9 recursed without limit, is `TooDeep`.
+- `ext_set`, `ext_get` and `ext_clear` return a `DecodeResult`, where v0.9 threw
+  `std::invalid_argument` for host bytes that did not decode or were not a map.
+- `DecodeErrorTag` gains `NonCanonicalInt`, `NegativeMapKey`, `TooDeep` and `TooLarge`,
+  and `DecodeError` gains `len`, `limit` and `key_text`.
+- New: each message's `max_depth`, `max_encoded_len` and `try_decode`;
+  `default_max_depth`, `max_depth_ceiling` and `try_get_opt`.

@@ -1,38 +1,282 @@
 "use strict";
 // Minimal deterministic CBOR — the JavaScript binding of the frozen wire
-// substrate. Same tiny subset (int, float, bytes, text, array, int-keyed map, bool,
-// null), core-deterministic (definite length, shortest-form ints/floats, ascending map
-// keys). Hand-rolled, no dependencies. Integers are JS numbers (safe to 2^53,
-// like the TS codec); bytes are Uint8Array.
+// substrate. Same tiny subset (i64 int, float, bytes, text, array, int-keyed map,
+// bool, null), core-deterministic (definite length, shortest-form ints/floats,
+// ascending map keys). Hand-rolled, no dependencies. Codec integer values are
+// BigInt so every i64 value is exact; raw map keys remain structural field tags.
+//
+// Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one
+// more than the arrays and maps around it, and one deeper than the call's depth
+// bound is TooDeep{limit}; with a length bound, longer input is TooLarge{len, limit}
+// before a byte is read. For any input bytes decode returns a value or throws
+// DecodeError, nothing else. The parity corpus pins the two depth numbers to taut's.
 
 const INT = 0, BYTES = 1, TEXT = 2, ARR = 3, MAP = 4, BOOL = 5, NULL = 6, FLOAT = 7;
 
-const CInt = (n) => ({ kind: INT, i: n });
+const INT_MIN = -(1n << 63n);
+const INT_MAX = (1n << 63n) - 1n;
+const UINT64_MAX = (1n << 64n) - 1n;
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+
+const DEFAULT_MAX_DEPTH = 32;   // the depth bound where none is given (CD-B1)
+const MAX_DEPTH_CEILING = 128;  // no call applies a deeper bound (CD-B3)
+
+function stringValue(value) {
+  return typeof value === "bigint" ? value.toString() : String(value);
+}
+
+class DecodeError extends Error {
+  constructor(tag, payload = {}) {
+    super(formatDecodeError(tag, payload));
+    this.name = "DecodeError";
+    this.tag = tag;
+    Object.assign(this, payload);
+  }
+}
+
+class EncodeError extends Error {
+  constructor(tag, payload = {}) {
+    super(formatEncodeError(tag, payload));
+    this.name = "EncodeError";
+    this.tag = tag;
+    Object.assign(this, payload);
+  }
+}
+
+function formatDecodeError(tag, payload) {
+  switch (tag) {
+    case "Truncated": return "truncated CBOR item";
+    case "TrailingBytes": return "trailing bytes after top-level CBOR item";
+    case "InvalidUtf8": return "invalid UTF-8 text string";
+    case "UnsupportedInfo": return `unsupported additional-info ${payload.info}`;
+    case "UnsupportedMajor": return `unsupported major type ${payload.major}`;
+    case "NonIntegerMapKey": return "CBOR map key is not an integer";
+    case "DuplicateMapKey": return `duplicate CBOR map key ${payload.key}`;
+    case "IntOverflow": return `integer outside i64 subset: ${payload.value}`;
+    case "MissingKey": return `missing map key ${payload.key}`;
+    case "WrongType": return `wrong CBOR type, expected ${payload.expected}`;
+    case "UnknownEnum": return `unknown ${payload.enum} enum value ${payload.value}`;
+    case "NonCanonicalInt": return "non-canonical integer encoding";
+    case "NegativeMapKey": return `negative CBOR map key ${payload.key}`;
+    case "TooDeep": return `CBOR nesting deeper than ${payload.limit}`;
+    case "TooLarge": return `CBOR input of ${payload.len} bytes, over the limit of ${payload.limit}`;
+    default: return tag;
+  }
+}
+
+function formatEncodeError(tag, payload) {
+  if (tag === "IntOutOfSubset") return `integer outside i64 subset: ${payload.value}`;
+  return tag;
+}
+
+function encodeIntError(value) {
+  return new EncodeError("IntOutOfSubset", { value: stringValue(value) });
+}
+
+function decodeIntOverflow(value) {
+  return new DecodeError("IntOverflow", { value: stringValue(value) });
+}
+
+function toExactBigInt(value) {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number" && Number.isSafeInteger(value)) return BigInt(value);
+  throw encodeIntError(value);
+}
+
+function checkI64ForEncode(value) {
+  const n = toExactBigInt(value);
+  if (n < INT_MIN || n > INT_MAX) throw encodeIntError(n);
+  return n;
+}
+
+function checkI64ForDecode(value) {
+  if (value < INT_MIN || value > INT_MAX) throw decodeIntOverflow(value);
+  return value;
+}
+
+function rawCInt(n) {
+  return { kind: INT, i: n };
+}
+
+function rawCMap(m) {
+  return { kind: MAP, map: m };
+}
+
+const CInt = (n) => rawCInt(checkI64ForEncode(n));
 const CFloat = (x) => ({ kind: FLOAT, f: x });
 const CText = (s) => ({ kind: TEXT, s });
 const CBytes = (b) => ({ kind: BYTES, b });
 const CBool = (x) => ({ kind: BOOL, i: x ? 1 : 0 });
 const CArr = (a) => ({ kind: ARR, arr: a });
-const CMap = (m) => ({ kind: MAP, map: m }); // m: array of [key, Cbor]
+const CMap = (m) => ({ kind: MAP, map: m.map(([k, v]) => [normalizeMapKeyForEncode(k), v]) });
 const CNull = () => ({ kind: NULL });
 
-function cget(c, key) {
-  for (const [k, v] of c.map) if (k === key) return v;
-  throw new Error("no map key " + key);
+function wrongType(expected) {
+  throw new DecodeError("WrongType", { expected });
 }
-const cmapEntries = (c) => (c.kind === MAP ? c.map : []); // forward-compat residual
-const isNull = (c) => c.kind === NULL;
 
-function head(out, major, n) {
+function expectKind(c, kind, expected) {
+  if (!c || c.kind !== kind) wrongType(expected);
+  return c;
+}
+
+function expectInt(c) {
+  return expectKind(c, INT, "int").i;
+}
+
+function expectFloat(c) {
+  return expectKind(c, FLOAT, "float").f;
+}
+
+function expectText(c) {
+  return expectKind(c, TEXT, "text").s;
+}
+
+function expectBytes(c) {
+  return expectKind(c, BYTES, "bytes").b;
+}
+
+function expectBool(c) {
+  return expectKind(c, BOOL, "bool").i !== 0;
+}
+
+function expectArray(c) {
+  return expectKind(c, ARR, "array").arr;
+}
+
+function expectMap(c) {
+  return expectKind(c, MAP, "map").map;
+}
+
+function enumFromWire(value, enumName, allowed) {
+  let wire;
+  if (typeof value === "bigint") {
+    wire = value;
+  } else if (typeof value === "number" && Number.isInteger(value)) {
+    wire = BigInt(value);
+  } else {
+    throw new DecodeError("UnknownEnum", { enum: enumName, value: stringValue(value) });
+  }
+  if (wire >= -MAX_SAFE_BIGINT && wire <= MAX_SAFE_BIGINT) {
+    const n = Number(wire);
+    if (allowed.has(n)) return n;
+  }
+  throw new DecodeError("UnknownEnum", { enum: enumName, value: wire.toString() });
+}
+
+function enumFromCbor(c, enumName, allowed) {
+  return enumFromWire(expectInt(c), enumName, allowed);
+}
+
+function mapKeyBigInt(key) {
+  if (typeof key === "bigint") return key;
+  if (typeof key === "number" && Number.isSafeInteger(key)) return BigInt(key);
+  throw encodeIntError(key);
+}
+
+function normalizeMapKeyForEncode(key) {
+  const n = mapKeyBigInt(key);
+  if (n < 0n || n > UINT64_MAX) throw encodeIntError(key);
+  return n <= MAX_SAFE_BIGINT ? Number(n) : n;
+}
+
+function normalizeMapKeyForDecode(key) {
+  if (key < 0n) return key;
+  return key <= MAX_SAFE_BIGINT ? Number(key) : key;
+}
+
+function mapKeyId(key) {
+  return mapKeyBigInt(key).toString();
+}
+
+function mapKeyEquals(a, b) {
+  return mapKeyBigInt(a) === mapKeyBigInt(b);
+}
+
+function compareMapKeys(a, b) {
+  const aa = mapKeyBigInt(a);
+  const bb = mapKeyBigInt(b);
+  return aa < bb ? -1 : aa > bb ? 1 : 0;
+}
+
+// A str key's order in a map<K,V> field (D24), for the generated code: by Unicode code
+// point, which is the order of its UTF-8 bytes and of Python's sorted(str). JS `<`
+// compares UTF-16 code units instead, and puts a character above U+FFFF, whose
+// surrogate pair starts d800-dbff, before one in U+E000..U+FFFF. Equal code points
+// advance both strings alike, so one index serves.
+function compareCodePoints(a, b) {
+  let i = 0;
+  while (i < a.length && i < b.length) {
+    const x = a.codePointAt(i);
+    const y = b.codePointAt(i);
+    if (x !== y) {
+      return x < y ? -1 : 1;
+    }
+    i += x > 0xffff ? 2 : 1;
+  }
+  if (a.length === b.length) {
+    return 0;
+  }
+  return a.length < b.length ? -1 : 1;
+}
+
+function cget(c, key) {
+  for (const [k, v] of expectMap(c)) if (mapKeyEquals(k, key)) return v;
+  throw new DecodeError("MissingKey", { key });
+}
+
+// An optional=MISSING_OK field: an absent key reads as a present null (CD-E5); the
+// message must still be a map.
+function cgetOrNull(c, key) {
+  for (const [k, v] of expectMap(c)) {
+    if (mapKeyEquals(k, key)) {
+      return v;
+    }
+  }
+  return CNull();
+}
+
+// A map<K,V> field, decoded into `out`, the generated code's fresh native Map: an
+// array of {1: key, 2: value} entries (CD-E5). Each entry is a map holding keys 1
+// and 2, checked before either is decoded, and a repeated key is DuplicateMapKey
+// before its value is decoded.
+function mapFromCbor(out, c, decodeKey, decodeValue) {
+  for (const entry of expectArray(c)) {
+    const rawKey = cget(entry, 1);
+    const rawValue = cget(entry, 2);
+    const key = decodeKey(rawKey);
+    if (out.has(key)) {
+      throw new DecodeError("DuplicateMapKey", { key });
+    }
+    out.set(key, decodeValue(rawValue));
+  }
+  return out;
+}
+
+const cmapEntries = (c) => expectMap(c); // forward-compat residual
+const isNull = (c) => c && c.kind === NULL;
+
+function head(out, major, value) {
+  const n = typeof value === "bigint" ? value : BigInt(value);
+  if (n < 0n || n > UINT64_MAX) throw encodeIntError(value);
   const mt = major << 5;
-  if (n < 24) out.push(mt | n);
-  else if (n < 0x100) out.push(mt | 24, n & 0xff);
-  else if (n < 0x10000) out.push(mt | 25, (n >> 8) & 0xff, n & 0xff);
-  else if (n < 0x100000000) out.push(mt | 26, (n >>> 24) & 0xff, (n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff);
-  else {
-    const hi = Math.floor(n / 0x100000000), lo = n >>> 0;
-    out.push(mt | 27, (hi >> 24) & 0xff, (hi >> 16) & 0xff, (hi >> 8) & 0xff, hi & 0xff,
-      (lo >>> 24) & 0xff, (lo >> 16) & 0xff, (lo >> 8) & 0xff, lo & 0xff);
+  if (n < 24n) {
+    out.push(mt | Number(n));
+  } else if (n < 0x100n) {
+    out.push(mt | 24, Number(n & 0xffn));
+  } else if (n < 0x10000n) {
+    out.push(mt | 25, Number((n >> 8n) & 0xffn), Number(n & 0xffn));
+  } else if (n < 0x100000000n) {
+    out.push(
+      mt | 26,
+      Number((n >> 24n) & 0xffn),
+      Number((n >> 16n) & 0xffn),
+      Number((n >> 8n) & 0xffn),
+      Number(n & 0xffn),
+    );
+  } else {
+    out.push(mt | 27);
+    for (let shift = 56n; shift >= 0n; shift -= 8n) out.push(Number((n >> shift) & 0xffn));
   }
 }
 
@@ -139,65 +383,290 @@ function encode(c) {
 
 function enc(c, out) {
   switch (c.kind) {
-    case INT: if (c.i >= 0) head(out, 0, c.i); else head(out, 1, -1 - c.i); break;
+    case INT: {
+      const n = checkI64ForEncode(c.i);
+      if (n >= 0n) head(out, 0, n);
+      else head(out, 1, -1n - n);
+      break;
+    }
     case FLOAT: encFloat(c.f, out); break;
     case BYTES: head(out, 2, c.b.length); for (const x of c.b) out.push(x); break;
     case TEXT: { const bb = new TextEncoder().encode(c.s); head(out, 3, bb.length); for (const x of bb) out.push(x); break; }
     case ARR: head(out, 4, c.arr.length); for (const x of c.arr) enc(x, out); break;
     case MAP: {
-      const m = [...c.map].sort((a, b) => a[0] - b[0]); // ascending keys
+      const m = [...c.map].map(([k, v]) => [normalizeMapKeyForEncode(k), v]).sort((a, b) => compareMapKeys(a[0], b[0]));
       head(out, 5, m.length);
-      for (const [k, v] of m) { head(out, 0, k); enc(v, out); }
+      for (const [k, v] of m) { head(out, 0, mapKeyBigInt(k)); enc(v, out); }
       break;
     }
     case BOOL: out.push(c.i ? 0xf5 : 0xf4); break;
     case NULL: out.push(0xf6); break;
+    default: throw new EncodeError("UnsupportedType", { value: c && c.kind });
   }
 }
 
+function requireBytes(data, off, length) {
+  if (off + length > data.length) throw new DecodeError("Truncated");
+}
+
 function readArg(data, off, info) {
-  if (info < 24) return [info, off];
-  if (info === 24) return [data[off], off + 1];
-  if (info === 25) return [(data[off] << 8) | data[off + 1], off + 2];
-  if (info === 26) { let v = 0; for (let j = 0; j < 4; j++) v = v * 256 + data[off + j]; return [v, off + 4]; }
-  let v = 0; for (let j = 0; j < 8; j++) v = v * 256 + data[off + j]; return [v, off + 8];
+  if (info < 24) return [BigInt(info), off];
+  let value;
+  let next;
+  let fitsShorter;
+  if (info === 24) {
+    requireBytes(data, off, 1);
+    value = BigInt(data[off]);
+    next = off + 1;
+    fitsShorter = value < 24n;
+  } else if (info === 25) {
+    requireBytes(data, off, 2);
+    value = (BigInt(data[off]) << 8n) | BigInt(data[off + 1]);
+    next = off + 2;
+    fitsShorter = value <= 0xffn;
+  } else if (info === 26) {
+    requireBytes(data, off, 4);
+    value = 0n;
+    for (let j = 0; j < 4; j++) value = (value << 8n) | BigInt(data[off + j]);
+    next = off + 4;
+    fitsShorter = value <= 0xffffn;
+  } else if (info === 27) {
+    requireBytes(data, off, 8);
+    value = 0n;
+    for (let j = 0; j < 8; j++) value = (value << 8n) | BigInt(data[off + j]);
+    next = off + 8;
+    fitsShorter = value <= 0xffffffffn;
+  } else {
+    throw new DecodeError("UnsupportedInfo", { info });
+  }
+  // Strict-canonical (D2): a multi-byte argument that fits a shorter width is
+  // non-minimal — the canonical encoder never emits it, so reject it.
+  if (fitsShorter) throw new DecodeError("NonCanonicalInt", { value: stringValue(value) });
+  return [value, next];
+}
+
+// A byte or text string's length. One beyond the remaining bytes is Truncated,
+// whatever its size (CD-E5), so it is checked before it becomes a Number.
+function readLength(data, off, info) {
+  const [n, next] = readArg(data, off, info);
+  if (n > BigInt(data.length - next)) {
+    throw new DecodeError("Truncated");
+  }
+  return [Number(n), next];
+}
+
+// An array's or map's item count. Each item takes at least one byte, so a count
+// beyond the remaining bytes is never met: its items are still read in order and
+// the first to fail is reported (CD-E5), at the latest the one after the last
+// byte. Capping the count there keeps it a Number without changing the outcome.
+function readCount(data, off, info) {
+  const [n, next] = readArg(data, off, info);
+  const remaining = data.length - next;
+  return [n > BigInt(remaining) ? remaining + 1 : Number(n), next];
 }
 
 function readFloat32(data, off) {
+  requireBytes(data, off, 4);
   for (let i = 0; i < 4; i++) _view.setUint8(i, data[off + i]);
   return _view.getFloat32(0, false);
 }
 
 function readFloat64(data, off) {
+  requireBytes(data, off, 8);
   for (let i = 0; i < 8; i++) _view.setUint8(i, data[off + i]);
   return _view.getFloat64(0, false);
 }
 
-function decode(data) {
-  const [v, off] = dec(data, 0);
-  if (off !== data.length) throw new Error("trailing bytes after top-level CBOR item");
+// Decode one item that fills `data` (CD-E5), under the bounds its caller passes (CD-B3):
+// `decode(data, { maxDepth, maxEncodedLen })`. With a length bound, input longer than it
+// is TooLarge{len, limit} before a byte is read. A top-level array or map has depth 1,
+// and one deeper than the depth bound is TooDeep{limit} once its head is read, `limit`
+// naming the bound applied: 32 where none is given, the ceiling where it is above it.
+function decode(data, options = {}) {
+  const { maxDepth, maxEncodedLen } = decodeBounds(options);
+  if (maxEncodedLen !== null && data.length > maxEncodedLen) {
+    throw new DecodeError("TooLarge", { len: data.length, limit: maxEncodedLen });
+  }
+  const [v, off] = dec(data, 0, 0, maxDepth);
+  if (off !== data.length) {
+    throw new DecodeError("TrailingBytes");
+  }
   return v;
 }
 
-function dec(data, off0) {
+// A bound as a caller's error names it: a number itself, else its type.
+function describeBound(value) {
+  return typeof value === "number" ? String(value) : `a ${typeof value}`;
+}
+
+// The bounds decode applies: `maxDepth`, 32 where it is absent and at most the ceiling;
+// `maxEncodedLen`, none where it is absent or null. A depth below 1 or a negative length
+// is the caller's error, a RangeError; a bound that is not an integer, an option decode
+// does not know, or options that are not an object, a TypeError. Neither is a
+// DecodeError, and each is thrown before a byte is read.
+function decodeBounds(options) {
+  if (typeof options !== "object" || options === null) {
+    throw new TypeError(`decode options must be an object, not ${options === null ? "null" : `a ${typeof options}`}`);
+  }
+  for (const name of Object.keys(options)) {
+    if (name !== "maxDepth" && name !== "maxEncodedLen") {
+      throw new TypeError(`unknown decode option ${name}; known: maxDepth, maxEncodedLen`);
+    }
+  }
+  let maxDepth = DEFAULT_MAX_DEPTH;
+  if (options.maxDepth !== undefined) {
+    if (!Number.isInteger(options.maxDepth)) {
+      throw new TypeError(`maxDepth must be an integer, not ${describeBound(options.maxDepth)}`);
+    }
+    if (options.maxDepth < 1) {
+      throw new RangeError(`maxDepth must be at least 1, not ${options.maxDepth}`);
+    }
+    maxDepth = Math.min(options.maxDepth, MAX_DEPTH_CEILING);
+  }
+  let maxEncodedLen = null;
+  if (options.maxEncodedLen !== undefined && options.maxEncodedLen !== null) {
+    if (!Number.isInteger(options.maxEncodedLen)) {
+      throw new TypeError(`maxEncodedLen must be an integer or null, not ${describeBound(options.maxEncodedLen)}`);
+    }
+    if (options.maxEncodedLen < 0) {
+      throw new RangeError(`maxEncodedLen must not be negative, not ${options.maxEncodedLen}`);
+    }
+    maxEncodedLen = options.maxEncodedLen;
+  }
+  return { maxDepth, maxEncodedLen };
+}
+
+// An array or map whose head is read, inside `depth` others: refused before its first
+// item if it would sit deeper than `limit` (CD-B2).
+function enter(depth, limit) {
+  if (depth >= limit) {
+    throw new DecodeError("TooDeep", { limit });
+  }
+}
+
+// One item's head, then its body (CD-E5), inside `depth` arrays and maps, under depth
+// bound `limit`, so it recurses at most `limit` deep. The major type is checked before
+// the additional info: major 6 is UnsupportedMajor whatever its info, and info 28-31 is
+// UnsupportedInfo from readArg (majors 0-5) or the major-7 arm.
+function dec(data, off0, depth, limit) {
+  if (off0 >= data.length) {
+    throw new DecodeError("Truncated");
+  }
   const initial = data[off0], major = initial >> 5, info = initial & 0x1f;
   let off = off0 + 1;
   switch (major) {
-    case 0: { const [n, o] = readArg(data, off, info); return [CInt(n), o]; }
-    case 1: { const [n, o] = readArg(data, off, info); return [CInt(-1 - n), o]; }
-    case 2: { const [n, o] = readArg(data, off, info); return [CBytes(data.slice(o, o + n)), o + n]; }
-    case 3: { const [n, o] = readArg(data, off, info); return [CText(new TextDecoder().decode(data.slice(o, o + n))), o + n]; }
-    case 4: { let [n, o] = readArg(data, off, info); const a = []; for (let i = 0; i < n; i++) { const [v, o2] = dec(data, o); a.push(v); o = o2; } return [CArr(a), o]; }
-    case 5: { let [n, o] = readArg(data, off, info); const m = []; for (let i = 0; i < n; i++) { const [k, o2] = dec(data, o); const [v, o3] = dec(data, o2); m.push([k.i, v]); o = o3; } return [CMap(m), o]; }
+    case 0: {
+      const [n, o] = readArg(data, off, info);
+      return [rawCInt(checkI64ForDecode(n)), o];
+    }
+    case 1: {
+      const [n, o] = readArg(data, off, info);
+      return [rawCInt(checkI64ForDecode(-1n - n)), o];
+    }
+    case 2: {
+      const [n, o] = readLength(data, off, info);
+      return [CBytes(data.slice(o, o + n)), o + n];
+    }
+    case 3: {
+      const [n, o] = readLength(data, off, info);
+      // fatal: invalid UTF-8 is InvalidUtf8. ignoreBOM: a leading U+FEFF is ordinary
+      // text, kept so the text re-encodes to its bytes (D2), where the default strips it.
+      try {
+        return [CText(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(data.slice(o, o + n))), o + n];
+      } catch (_) {
+        throw new DecodeError("InvalidUtf8");
+      }
+    }
+    case 4: {
+      let [n, o] = readCount(data, off, info);
+      enter(depth, limit);
+      const a = [];
+      for (let i = 0; i < n; i++) {
+        const [v, o2] = dec(data, o, depth + 1, limit);
+        a.push(v);
+        o = o2;
+      }
+      return [CArr(a), o];
+    }
+    case 5: {
+      let [n, o] = readCount(data, off, info);
+      enter(depth, limit);
+      const m = [];
+      const seen = new Set();
+      for (let i = 0; i < n; i++) {
+        const [k, o2] = dec(data, o, depth + 1, limit);
+        if (!k || k.kind !== INT) {
+          throw new DecodeError("NonIntegerMapKey");
+        }
+        if (k.i < 0n) {
+          throw new DecodeError("NegativeMapKey", { key: k.i });
+        }
+        const rawKey = normalizeMapKeyForDecode(k.i);
+        const id = mapKeyId(rawKey);
+        if (seen.has(id)) {
+          throw new DecodeError("DuplicateMapKey", { key: rawKey });
+        }
+        seen.add(id);
+        const [v, o3] = dec(data, o2, depth + 1, limit);
+        m.push([rawKey, v]);
+        o = o3;
+      }
+      return [rawCMap(m), o];
+    }
     case 7:
-      if (info === 20) return [CBool(false), off];
-      if (info === 21) return [CBool(true), off];
-      if (info === 22) return [CNull(), off];
-      if (info === 25) return [CFloat(halfToNumber((data[off] << 8) | data[off + 1])), off + 2];
-      if (info === 26) return [CFloat(readFloat32(data, off)), off + 4];
-      if (info === 27) return [CFloat(readFloat64(data, off)), off + 8];
+      if (info === 20) {
+        return [CBool(false), off];
+      }
+      if (info === 21) {
+        return [CBool(true), off];
+      }
+      if (info === 22) {
+        return [CNull(), off];
+      }
+      if (info === 25) {
+        requireBytes(data, off, 2);
+        return [CFloat(halfToNumber((data[off] << 8) | data[off + 1])), off + 2];
+      }
+      if (info === 26) {
+        return [CFloat(readFloat32(data, off)), off + 4];
+      }
+      if (info === 27) {
+        return [CFloat(readFloat64(data, off)), off + 8];
+      }
+      throw new DecodeError("UnsupportedInfo", { info });
+    default:
+      throw new DecodeError("UnsupportedMajor", { major });
   }
-  throw new Error("unsupported CBOR item");
 }
 
-module.exports = { CInt, CFloat, CText, CBytes, CBool, CArr, CMap, CNull, cget, cmapEntries, isNull, encode, decode };
+module.exports = {
+  DEFAULT_MAX_DEPTH,
+  MAX_DEPTH_CEILING,
+  CInt,
+  CFloat,
+  CText,
+  CBytes,
+  CBool,
+  CArr,
+  CMap,
+  CNull,
+  DecodeError,
+  EncodeError,
+  cget,
+  cgetOrNull,
+  mapFromCbor,
+  cmapEntries,
+  compareCodePoints,
+  isNull,
+  expectInt,
+  expectFloat,
+  expectText,
+  expectBytes,
+  expectBool,
+  expectArray,
+  expectMap,
+  enumFromWire,
+  enumFromCbor,
+  encode,
+  decode,
+};

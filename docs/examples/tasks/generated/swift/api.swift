@@ -5,6 +5,14 @@ public enum TaskState: Int64 {
     case `open` = 0
     case doing = 1
     case done = 2
+
+    public static func fromCbor(_ wire_c: Cbor) throws -> TaskState {
+        let wire_raw = try wire_c.tryInt()
+        guard let wire_value = TaskState(rawValue: wire_raw) else {
+            throw CborError.unknownEnum("TaskState", wire_raw)
+        }
+        return wire_value
+    }
 }
 
 public struct User {
@@ -18,11 +26,16 @@ public struct User {
     public func toCbor() -> Cbor {
         return Cbor.map([(1, Cbor.int(id)), (2, Cbor.text(name))])
     }
-    public static func fromCbor(_ c: Cbor) -> User {
+    public static func fromCbor(_ wire_c: Cbor) throws -> User {
         return User(
-            id: c.get(1).intVal,
-            name: c.get(2).textVal
+            id: try wire_c.tryGet(1).tryInt(),
+            name: try wire_c.tryGet(2).tryText()
         )
+    }
+    public static let maxDepth: Int = 32
+    public static let maxEncodedLen: Int? = nil
+    public static func decode(_ wire_bytes: [UInt8]) throws -> User {
+        return try Self.fromCbor(Cbor.tryDecode(wire_bytes, maxDepth: Self.maxDepth, maxEncodedLen: Self.maxEncodedLen))
     }
 }
 
@@ -37,11 +50,16 @@ public struct Comment {
     public func toCbor() -> Cbor {
         return Cbor.map([(1, author.toCbor()), (2, Cbor.text(text))])
     }
-    public static func fromCbor(_ c: Cbor) -> Comment {
+    public static func fromCbor(_ wire_c: Cbor) throws -> Comment {
         return Comment(
-            author: User.fromCbor(c.get(1)),
-            text: c.get(2).textVal
+            author: try User.fromCbor(wire_c.tryGet(1)),
+            text: try wire_c.tryGet(2).tryText()
         )
+    }
+    public static let maxDepth: Int = 32
+    public static let maxEncodedLen: Int? = nil
+    public static func decode(_ wire_bytes: [UInt8]) throws -> Comment {
+        return try Self.fromCbor(Cbor.tryDecode(wire_bytes, maxDepth: Self.maxDepth, maxEncodedLen: Self.maxEncodedLen))
     }
 }
 
@@ -64,15 +82,20 @@ public struct Task {
     public func toCbor() -> Cbor {
         return Cbor.map([(1, Cbor.int(id)), (2, Cbor.text(title)), (3, Cbor.int(state.rawValue)), (4, (assignee.map { $0.toCbor() } ?? Cbor.null)), (5, Cbor.array(comments.map { $0.toCbor() })), (7, Cbor.array(labels.sorted { $0.key < $1.key }.map { Cbor.map([(1, Cbor.text($0.key)), (2, Cbor.text($0.value))]) }))])
     }
-    public static func fromCbor(_ c: Cbor) -> Task {
+    public static func fromCbor(_ wire_c: Cbor) throws -> Task {
         return Task(
-            id: c.get(1).intVal,
-            title: c.get(2).textVal,
-            state: TaskState(rawValue: c.get(3).intVal)!,
-            assignee: { let v = c.get(4); return v.isNull ? nil : User.fromCbor(v) }(),
-            comments: c.get(5).arrayVal.map { Comment.fromCbor($0) },
-            labels: Dictionary(uniqueKeysWithValues: c.get(7).arrayVal.map { ($0.get(1).textVal, $0.get(2).textVal) })
+            id: try wire_c.tryGet(1).tryInt(),
+            title: try wire_c.tryGet(2).tryText(),
+            state: try TaskState.fromCbor(wire_c.tryGet(3)),
+            assignee: try { let wire_v = try wire_c.tryGet(4); if wire_v.isNull { return nil }; return try User.fromCbor(wire_v) }(),
+            comments: try wire_c.tryGet(5).tryArray().map { try Comment.fromCbor($0) },
+            labels: try wire_c.tryGet(7).tryDictionary(key: { try $0.tryText() }, value: { try $0.tryText() })
         )
+    }
+    public static let maxDepth: Int = 32
+    public static let maxEncodedLen: Int? = nil
+    public static func decode(_ wire_bytes: [UInt8]) throws -> Task {
+        return try Self.fromCbor(Cbor.tryDecode(wire_bytes, maxDepth: Self.maxDepth, maxEncodedLen: Self.maxEncodedLen))
     }
 }
 
@@ -87,11 +110,16 @@ public struct Event {
     public func toCbor() -> Cbor {
         return Cbor.map([(1, Cbor.int(ts)), (2, Cbor.text(text))])
     }
-    public static func fromCbor(_ c: Cbor) -> Event {
+    public static func fromCbor(_ wire_c: Cbor) throws -> Event {
         return Event(
-            ts: c.get(1).intVal,
-            text: c.get(2).textVal
+            ts: try wire_c.tryGet(1).tryInt(),
+            text: try wire_c.tryGet(2).tryText()
         )
+    }
+    public static let maxDepth: Int = 32
+    public static let maxEncodedLen: Int? = nil
+    public static func decode(_ wire_bytes: [UInt8]) throws -> Event {
+        return try Self.fromCbor(Cbor.tryDecode(wire_bytes, maxDepth: Self.maxDepth, maxEncodedLen: Self.maxEncodedLen))
     }
 }
 

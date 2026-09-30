@@ -74,11 +74,41 @@ value = {
 }
 
 raw: bytes = codec.encode(schema, "Task", value)   # serialize
-value = codec.decode(schema, "Task", raw)            # deserialize -> dict
+value = codec.decode(schema, "Task", raw)            # deserialize -> dict, under Task's bounds
 ```
+
+`codec.decode` is the typed decode from bytes. It applies the message's bounds, the
+schema's `max_depth` and `max_encoded_len` options as they resolve for it: the message's
+own, else the file's, else the defaults, depth 32 and no length bound. Python reads them
+from the schema, so there are no generated constants: `codec.bounds(schema,
+MsgRef("Task"))` (`MsgRef` from `taut.ir.model`) is the pair, `(32, None)` here. The
+call's root decides its bounds: a message nested inside a `Task` does not change them.
+`codec.decode_ref(schema, tref, raw)` decodes a root that is not a message, such as a
+method's `list<Task>` output, under the file's bounds. Declare bounds in the schema, at
+file or message level, with `option` from `taut.ir.dsl`:
+`schema(option.max_depth(16), Tree=Msg(option.max_encoded_len(4096), ...))`.
+
+Decode is fail-closed: bad input raises `DecodeError`, and nothing else escapes,
+whatever the bytes. `DecodeError` is a `ValueError` whose `.tag` is the tag and whose
+payload is in attributes and in the dict `.payload`:
+
+```python
+from taut.wire.cbor import DecodeError   # also codec.DecodeError
+
+try:
+    value = codec.decode(schema, "Task", raw)
+except DecodeError as e:
+    print(e.tag, e.payload)              # e.g. TooDeep {'limit': 32}
+```
+
+An absent field is `MissingKey`, an optional one too, unless it is `optional=MISSING_OK`,
+which reads it as `None`. The full table of tags and payloads is in
+[CodecContract.md](CodecContract.md).
 
 `encode_struct` / `decode_struct` are the same step stopping one level short of
 bytes (an int-tag-keyed structure), for composing into a larger CBOR document.
+`decode_struct` reads a tree its caller decoded, so it applies no bounds, and it reads
+an absent field as `None` unless it is passed `strict=True`.
 
 To go through the generated `@dataclass`, bind it yourself — `dataclasses.asdict`
 out, the constructor in (enum members become their `.name` on the wire side):
@@ -97,8 +127,12 @@ NaN canonical to `F9 7E00`, `-0.0` preserved). Hand-rolled, zero deps, pinned by
 the RFC vectors in the tests.
 
 ```python
+DEFAULT_MAX_DEPTH = 32           # the depth bound where none is given
+MAX_DEPTH_CEILING = 128          # no decode applies a deeper bound
+
 def dumps(value) -> bytes        # native Python value -> deterministic CBOR bytes
-def loads(data: bytes)           # bytes -> native Python value
+def loads(data: bytes, *, max_depth: int = 32, max_encoded_len: int | None = None)
+                                 # bytes -> native Python value
 ```
 
 The vocabulary is exactly: int, bytes, text, array, **integer-keyed** map, bool,
@@ -106,6 +140,15 @@ null, float — no tags, no indefinite lengths, no big-nums. Non-`int` (or negat
 map keys and out-of-vocabulary types raise. **Consumers use `codec`, not raw
 `cbor`** — `cbor` is the substrate the codec sits on; reach for it directly only to
 hand-inspect bytes.
+
+`loads` is the raw decode and knows no schema: it applies depth 32 and no length bound
+unless its caller passes bounds. An array or map has depth one more than the arrays and
+maps around it, so a top-level one has depth 1; one deeper than `max_depth` is `TooDeep`
+(`limit`), refused once its head is read. A `max_depth` above the ceiling applies the
+ceiling, and `limit` names the bound applied; with `max_encoded_len`, longer input is
+`TooLarge` (`len`, `limit`) before a byte is read. A `max_depth` below 1 or a negative
+`max_encoded_len` is the caller's error, a plain `ValueError` (or `TypeError` for a
+non-int), not a `DecodeError`.
 
 ## 5. Forward-compatibility (unknown-field preservation)
 
@@ -115,16 +158,16 @@ they are re-emitted **merged with the known fields in one ascending-tag order**.
 a node that *decodes → edits → re-encodes* a newer message never drops fields it
 doesn't understand, and a message with no unknowns is byte-identical either way.
 
-(`--forward-compat` only affects *codegen* targets that emit a residual field, e.g.
-Rust. The Python runtime codec always preserves — and a schema that declares an
-extension still requires `--forward-compat` when generating a typed target,
-because extensions ride this residual space.)
+(`--forward-compat` only affects *codegen* targets that emit a residual field — the
+seven generated targets, Rust to Java. The Python runtime codec always preserves — and
+a schema that declares an extension still requires `--forward-compat` when generating
+a typed target, because extensions ride this residual space.)
 
 ## 6. Extensions (side-channels) — `taut.ext`
 
 Attach / read / clear a declared extension on *any* host message's wire bytes,
 knowing only the extension's schema (never the host's). Tags live in the band
-≥ `2^20` (`BAND_START = 1048576`); a below-band tag raises.
+≥ `2^20` (`BAND_START = 1048576`).
 
 ```python
 from taut import ext
@@ -146,8 +189,14 @@ decision = ext.ext_get(schema, raw, "Decision", TAG)   # {"approved": True}  (No
 raw      = ext.ext_clear(raw, TAG)                       # strip before delivery
 ```
 
-The host app decodes its own message obliviously — the extension rides in the
-`__unknown__` residual (§5) and survives a decode/re-encode round-trip untouched.
+They fail closed: for any host bytes each returns or raises `DecodeError`, and a host
+that is not a map is `WrongType` (`map`). Not knowing the host's schema, they read a
+host at the depth ceiling, 128, with no length bound, the only bounds every valid host
+meets; the host's own reader applies the host's. `ext_get` reads the extension as
+strictly as `codec.decode` reads a message. A below-band `tag` is the caller's error, a
+plain `ValueError`, raised before the host is read. The host app decodes its own message
+obliviously — the extension rides in the `__unknown__` residual (§5) and survives a
+decode/re-encode round-trip untouched.
 
 ## 7. Consuming the runtime
 
@@ -156,3 +205,18 @@ codec (`taut.wire.codec`), the CBOR substrate (`taut.wire.cbor`), and the extens
 accessors (`taut.ext`) all ship in that package and are driven by the IR — nothing
 to vendor. Generated `api.py` is pure data types with no runtime imports; you hand
 the schema and a value dict to `codec`. The bytes match every other taut target.
+
+## 8. Changed in v0.10.0
+
+- `cbor.loads` takes `max_depth` and `max_encoded_len`, and `codec.decode` applies the
+  message's. Input nested deeper than its bound, which v0.9 decoded until a
+  `RecursionError` escaped, is `TooDeep`.
+- `DecodeError` gains the tags `TooDeep` (`limit`) and `TooLarge` (`len`, `limit`). A
+  repeated key of a `map<bool,V>` field is reported as `true` or `false`.
+- `codec.decode` refuses an absent optional field as `MissingKey` unless it is
+  `optional=MISSING_OK`; v0.9 read it as `None`.
+- The extension helpers raise `DecodeError` for a host that is not a map, where v0.9
+  leaked `TypeError` or `ValueError`, and `ext_get` reads the extension strictly.
+- New: `codec.decode_ref`, `codec.bounds`, the `option` namespace in the DSL, and IR
+  version 2, which `export_to` writes (options and their effective values) and the
+  loader reads beside version 1.

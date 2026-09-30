@@ -10,7 +10,7 @@ language reproduces the *same bytes* — the conformance corpus proves it.
 ## 1. Generate
 
 ```sh
-tautc gen --lang go --with-runtime -o <out>
+tautc gen <ir> --lang go --with-runtime -o <out>
 ```
 
 Writes, into `<out>/go/`:
@@ -144,7 +144,8 @@ value by key, `MissingKey` if absent) and `.Lookup(key int64)` (value, present).
 `DecodeError` carries a `Tag` (`Truncated`, `WrongType`, `MissingKey`,
 `DuplicateMapKey`, `TooDeep`, `TooLarge`, ...) and the payload fields that tag names:
 `Info`, `Major`, `Key`, `Expected`, `Enum`, `Value`, `Len` and `Limit`. `Key` is the
-key as text: an int in decimal, a str as itself, a bool as `true` or `false`.
+key as text: an int in decimal, a str as itself, a bool as `true` or `false`. The full
+table of tags and payloads is in [CodecContract.md](CodecContract.md).
 
 ## 5. Forward-compatibility (unknown-field preservation)
 
@@ -154,7 +155,8 @@ appended to the known entries and `Encode` sorts the map by key — so the resul
 canonical and a node that *decodes → edits → re-encodes* a newer message never
 drops fields it doesn't understand. Because Go's `Encode` sorts ascending, the
 residual just rides along (no explicit merge step). A message with no unknowns is
-byte-identical with or without the flag.
+byte-identical with or without the flag. Without it, `TryXFromCbor` accepts unknown
+fields and drops them; the parity gate runs both builds (`go` and `go/fc`).
 
 A schema that declares an extension **requires** `--forward-compat` (build error
 otherwise — extensions ride the residual space).
@@ -205,3 +207,17 @@ extension rides in `WireResidual` and survives.
 `cbor.go` / `ext.go` are vendored, dependency-free source — drop them into the
 `taut` package alongside `api.go`. `go build` / `go test` (Go 1.18 or later) is the
 only toolchain. The bytes match every other taut target.
+
+## 8. Changed in v0.10.0
+
+- `Decode` and `(Cbor).Get`, which panicked, are gone, and so are the generated
+  wrappers that panicked, `XFromWire` and `XFromCbor` (`TaskFromCbor`,
+  `TaskStateFromWire`, ...): use `TryDecode` or `TryXFromBytes`, `Require` or `Lookup`,
+  and `TryXFromWire` / `TryXFromCbor`.
+- `ExtSet`, `ExtGet` and `ExtClear` return an `error` as well; a host that is not a map
+  was a panic and is `WrongType`, and a below-band tag is an `*ExtTagError`.
+- `DecodeError.Key` is a `string`, not an `int64`, and `Len` and `Limit` are new; the
+  tags gain `NonCanonicalInt`, `NegativeMapKey`, `TooDeep` and `TooLarge`.
+- New: each message's `XMaxDepth`, `XMaxEncodedLen` and `TryXFromBytes`;
+  `TryDecodeWith`, `DefaultMaxDepth` and `MaxDepthCeiling`. Input nested deeper than its
+  bound, into which v0.9 recursed without limit, is `TooDeep`.

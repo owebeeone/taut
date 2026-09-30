@@ -2,15 +2,35 @@
 // Same tiny subset (int, float, bytes, text, array, int-keyed map, bool, null),
 // core-deterministic (definite length, shortest-form ints, ascending map keys).
 // Hand-rolled, JDK only.
+//
+// Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one more
+// than the arrays and maps around it, and one deeper than the call's depth bound is
+// TooDeep{limit} once its head is read; with a length bound, longer input is
+// TooLarge{len, limit} before a byte is read. For any input bytes decode returns a value
+// or throws DecodeError, nothing else, and it recurses no deeper than MAX_DEPTH_CEILING.
 package taut;
 
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.function.Function;
 
 public final class Cbor {
     public static final int INT = 0, BYTES = 1, TEXT = 2, ARR = 3, MAP = 4, BOOL = 5, NULL = 6, FLOAT = 7;
+    // The depth bound where none is given (CD-B1), and the deepest any call applies (CD-B3).
+    public static final int DEFAULT_MAX_DEPTH = 32;
+    public static final int MAX_DEPTH_CEILING = 128;
     public final int kind;
     public final long i;
     public final double d;
@@ -18,6 +38,247 @@ public final class Cbor {
     public final byte[] b;
     public final List<Cbor> arr;
     public final List<KV> map;
+
+    public enum DecodeTag {
+        Truncated,
+        TrailingBytes,
+        InvalidUtf8,
+        UnsupportedInfo,
+        UnsupportedMajor,
+        NonIntegerMapKey,
+        IntOverflow,
+        DuplicateMapKey,
+        MissingKey,
+        WrongType,
+        UnknownEnum,
+        NonCanonicalInt,
+        NegativeMapKey,
+        TooDeep,
+        TooLarge
+    }
+
+    public static final class DecodeError extends RuntimeException {
+        public final DecodeTag tag;
+        // The key as text: an int in decimal, a str as itself, a bool as true or false.
+        public final String key;
+        public final String expected;
+        public final String enumName;
+        public final String value;
+        public final Integer info;
+        public final Integer major;
+        // TooLarge's input length, and the bound TooDeep or TooLarge applied.
+        public final Integer len;
+        public final Integer limit;
+
+        private DecodeError(
+                DecodeTag tag,
+                String message,
+                String key,
+                String expected,
+                String enumName,
+                String value,
+                Integer info,
+                Integer major) {
+            this(tag, message, key, expected, enumName, value, info, major, null, null);
+        }
+
+        private DecodeError(
+                DecodeTag tag,
+                String message,
+                String key,
+                String expected,
+                String enumName,
+                String value,
+                Integer info,
+                Integer major,
+                Integer len,
+                Integer limit) {
+            super(message);
+            this.tag = tag;
+            this.key = key;
+            this.expected = expected;
+            this.enumName = enumName;
+            this.value = value;
+            this.info = info;
+            this.major = major;
+            this.len = len;
+            this.limit = limit;
+        }
+
+        public static DecodeError truncated() {
+            return new DecodeError(DecodeTag.Truncated, "truncated CBOR input", null, null, null, null, null, null);
+        }
+
+        public static DecodeError trailingBytes() {
+            return new DecodeError(
+                    DecodeTag.TrailingBytes,
+                    "trailing bytes after top-level CBOR item",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        public static DecodeError invalidUtf8() {
+            return new DecodeError(DecodeTag.InvalidUtf8, "invalid UTF-8 in CBOR text", null, null, null, null, null, null);
+        }
+
+        public static DecodeError unsupportedInfo(int info) {
+            return new DecodeError(
+                    DecodeTag.UnsupportedInfo,
+                    "unsupported CBOR additional-info " + info,
+                    null,
+                    null,
+                    null,
+                    null,
+                    info,
+                    null);
+        }
+
+        public static DecodeError unsupportedMajor(int major) {
+            return new DecodeError(
+                    DecodeTag.UnsupportedMajor,
+                    "unsupported CBOR major type " + major,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    major);
+        }
+
+        public static DecodeError nonIntegerMapKey() {
+            return new DecodeError(DecodeTag.NonIntegerMapKey, "non-integer CBOR map key", null, null, null, null, null, null);
+        }
+
+        public static DecodeError intOverflow(String value) {
+            return new DecodeError(
+                    DecodeTag.IntOverflow,
+                    "integer outside i64 subset: " + value,
+                    null,
+                    null,
+                    null,
+                    value,
+                    null,
+                    null);
+        }
+
+        public static DecodeError duplicateMapKey(long key) {
+            return duplicateKey(Long.toString(key));
+        }
+
+        public static DecodeError missingKey(long key) {
+            return new DecodeError(
+                    DecodeTag.MissingKey,
+                    "missing CBOR map key " + key,
+                    Long.toString(key),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        public static DecodeError wrongType(String expected) {
+            return new DecodeError(
+                    DecodeTag.WrongType,
+                    "expected CBOR " + expected,
+                    null,
+                    expected,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        public static DecodeError unknownEnum(String enumName, long value) {
+            return new DecodeError(
+                    DecodeTag.UnknownEnum,
+                    "unknown " + enumName + " wire value " + value,
+                    null,
+                    null,
+                    enumName,
+                    Long.toString(value),
+                    null,
+                    null);
+        }
+
+        // `value` is the raw unsigned argument, which a shorter form could have held.
+        public static DecodeError nonCanonicalInt(long value) {
+            String text = Long.toUnsignedString(value);
+            return new DecodeError(
+                    DecodeTag.NonCanonicalInt,
+                    "non-canonical CBOR argument " + text,
+                    null,
+                    null,
+                    null,
+                    text,
+                    null,
+                    null);
+        }
+
+        public static DecodeError negativeMapKey(long key) {
+            return new DecodeError(
+                    DecodeTag.NegativeMapKey,
+                    "negative CBOR map key " + key,
+                    Long.toString(key),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        // An array or map one level deeper than `limit`, the depth bound applied.
+        public static DecodeError tooDeep(int limit) {
+            return new DecodeError(
+                    DecodeTag.TooDeep,
+                    "CBOR nested deeper than " + limit,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    limit);
+        }
+
+        // Input of `len` bytes, longer than `limit`, the length bound applied.
+        public static DecodeError tooLarge(int len, int limit) {
+            return new DecodeError(
+                    DecodeTag.TooLarge,
+                    "CBOR input of " + len + " bytes is longer than " + limit,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    len,
+                    limit);
+        }
+
+        // A repeated `map<K,V>` key: a Long, String or Boolean, whose text String.valueOf
+        // writes as the payload wants it.
+        static DecodeError duplicateEntryKey(Object key) {
+            return duplicateKey(String.valueOf(key));
+        }
+
+        private static DecodeError duplicateKey(String key) {
+            return new DecodeError(
+                    DecodeTag.DuplicateMapKey,
+                    "duplicate map key " + key,
+                    key,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+    }
 
     private Cbor(int kind, long i, double d, String s, byte[] b, List<Cbor> arr, List<KV> map) {
         this.kind = kind; this.i = i; this.d = d; this.s = s; this.b = b; this.arr = arr; this.map = map;
@@ -32,11 +293,69 @@ public final class Cbor {
     public static final Cbor NUL = new Cbor(NULL, 0, 0.0, null, null, null, null);
 
     public Cbor get(long key) {
+        if (kind != MAP) throw DecodeError.wrongType("map");
         for (KV kv : map) if (kv.k == key) return kv.v;
-        throw new RuntimeException("no map key " + key);
+        throw DecodeError.missingKey(key);
+    }
+    // The value for `key`, or null when the map lacks it: an `optional=MISSING_OK` field.
+    public Cbor getOpt(long key) {
+        if (kind != MAP) {
+            throw DecodeError.wrongType("map");
+        }
+        for (KV kv : map) {
+            if (kv.k == key) {
+                return kv.v;
+            }
+        }
+        return null;
+    }
+    // A `map<K,V>` field: an array of entry maps {1: key, 2: value}. Each entry must
+    // hold keys 1 and 2 before either is decoded; `key` and `value` decode an entry's
+    // two items, and a repeated key is DuplicateMapKey.
+    public static <K, V> Map<K, V> decodeMap(Cbor c, Function<Cbor, K> key, Function<Cbor, V> value) {
+        Map<K, V> out = new LinkedHashMap<>();
+        for (Cbor entry : c.asArray()) {
+            entry.get(1);
+            entry.get(2);
+            K k = key.apply(entry);
+            if (out.containsKey(k)) {
+                throw DecodeError.duplicateEntryKey(k);
+            }
+            out.put(k, value.apply(entry));
+        }
+        return out;
+    }
+    // The order of a map<str,V> field's keys: by Unicode code point, which is the order of
+    // their UTF-8 bytes. String.compareTo, and so a TreeMap's natural order, compares UTF-16
+    // code units, which puts U+10000 (d800 dc00) before U+FFFF.
+    public static final Comparator<String> CODE_POINT_ORDER = Cbor::compareCodePoints;
+    private static int compareCodePoints(String a, String b) {
+        int n = Math.min(a.length(), b.length());
+        int i = 0;
+        while (i < n) {
+            int x = a.codePointAt(i);
+            int y = b.codePointAt(i);
+            if (x != y) {
+                return Integer.compare(x, y);
+            }
+            i += Character.charCount(x);
+        }
+        return Integer.compare(a.length(), b.length());
+    }
+    // A map<str,V> field's entries in the order it encodes them (CODE_POINT_ORDER).
+    public static <V> SortedMap<String, V> sortedByCodePoint(Map<String, V> m) {
+        SortedMap<String, V> out = new TreeMap<>(CODE_POINT_ORDER);
+        out.putAll(m);
+        return out;
     }
     public boolean isNull() { return kind == NULL; }
-    public List<KV> mapEntries() { return map == null ? List.of() : map; } // forward-compat residual
+    public long asInt() { if (kind == INT) return i; throw DecodeError.wrongType("int"); }
+    public double asFloat() { if (kind == FLOAT) return d; throw DecodeError.wrongType("float"); }
+    public String asText() { if (kind == TEXT) return s; throw DecodeError.wrongType("text"); }
+    public byte[] asBytes() { if (kind == BYTES) return b; throw DecodeError.wrongType("bytes"); }
+    public boolean asBool() { if (kind == BOOL) return i != 0; throw DecodeError.wrongType("bool"); }
+    public List<Cbor> asArray() { if (kind == ARR) return arr; throw DecodeError.wrongType("array"); }
+    public List<KV> mapEntries() { if (kind == MAP) return map; throw DecodeError.wrongType("map"); }
 
     public static byte[] encode(Cbor c) {
         List<Byte> out = new ArrayList<>();
@@ -148,46 +467,214 @@ public final class Cbor {
                 List<KV> m = new ArrayList<>(c.map);
                 m.sort((a, b2) -> Long.compare(a.k, b2.k)); // ascending keys
                 head(out, 5, m.size());
-                for (KV kv : m) { head(out, 0, kv.k); enc(kv.v, out); }
+                for (KV kv : m) {
+                    if (kv.k >= 0) head(out, 0, kv.k);
+                    else head(out, 1, -1 - kv.k);
+                    enc(kv.v, out);
+                }
             }
             case BOOL -> out.add((byte) (c.i != 0 ? 0xf5 : 0xf4));
             case NULL -> out.add((byte) 0xf6);
+            default -> throw new IllegalArgumentException("unknown CBOR kind " + c.kind);
         }
     }
+    // One item that fills `data`, under the default depth bound and no length bound.
     public static Cbor decode(byte[] data) {
+        return decode(data, DEFAULT_MAX_DEPTH, null);
+    }
+
+    // One item that fills `data` (CD-E5). `maxDepth` bounds nesting: a top-level array or
+    // map has depth 1, and one at depth maxDepth + 1 is TooDeep once its head is read; above
+    // MAX_DEPTH_CEILING the ceiling applies, and `limit` names the bound applied.
+    // `maxEncodedLen`, unless null, bounds the input's length, checked first. A depth below
+    // 1 or a negative length is the caller's error, IllegalArgumentException.
+    public static Cbor decode(byte[] data, int maxDepth, Integer maxEncodedLen) {
+        if (maxDepth < 1) {
+            throw new IllegalArgumentException("maxDepth must be at least 1, not " + maxDepth);
+        }
+        if (maxEncodedLen != null && maxEncodedLen < 0) {
+            throw new IllegalArgumentException("maxEncodedLen must not be negative, not " + maxEncodedLen);
+        }
+        if (maxEncodedLen != null && data.length > maxEncodedLen) {
+            throw DecodeError.tooLarge(data.length, maxEncodedLen);
+        }
         int[] off = {0};
-        Cbor v = dec(data, off);
-        if (off[0] != data.length) throw new RuntimeException("trailing bytes after top-level CBOR item");
+        Cbor v = dec(data, off, 0, Math.min(maxDepth, MAX_DEPTH_CEILING));
+        if (off[0] != data.length) {
+            throw DecodeError.trailingBytes();
+        }
         return v;
     }
-    private static int u(byte[] d, int i) { return d[i] & 0xFF; }
-    private static long readArg(byte[] d, int[] off, int info) {
-        if (info < 24) return info;
-        if (info == 24) { long v = u(d, off[0]); off[0] += 1; return v; }
-        if (info == 25) { long v = ((long) u(d, off[0]) << 8) | u(d, off[0] + 1); off[0] += 2; return v; }
-        if (info == 26) { long v = 0; for (int j = 0; j < 4; j++) v = (v << 8) | u(d, off[0] + j); off[0] += 4; return v; }
-        long v = 0; for (int j = 0; j < 8; j++) v = (v << 8) | u(d, off[0] + j); off[0] += 8; return v;
+    private static int u(byte[] d, int i) {
+        if (i < 0 || i >= d.length) throw DecodeError.truncated();
+        return d[i] & 0xFF;
     }
-    private static Cbor dec(byte[] d, int[] off) {
-        int initial = u(d, off[0]); off[0]++;
+    private static void require(byte[] d, int off, int len) {
+        if (off < 0 || len < 0 || off > d.length || len > d.length - off) throw DecodeError.truncated();
+    }
+    // The argument's raw bits: `info` itself, or the 1, 2, 4 or 8 bytes after the head.
+    private static long readRaw(byte[] d, int[] off, int info) {
+        if (info < 24) {
+            return info;
+        }
+        int width;
+        if (info == 24) {
+            width = 1;
+        } else if (info == 25) {
+            width = 2;
+        } else if (info == 26) {
+            width = 4;
+        } else if (info == 27) {
+            width = 8;
+        } else {
+            throw DecodeError.unsupportedInfo(info);
+        }
+        require(d, off[0], width);
+        long v = 0;
+        for (int j = 0; j < width; j++) {
+            v = (v << 8) | u(d, off[0] + j);
+        }
+        off[0] += width;
+        return v;
+    }
+    // An int, length or count argument. Strict-canonical (D2): an argument that a
+    // shorter form could hold is one the canonical encoder never writes. Floats are
+    // exempt and use readRaw.
+    private static long readArg(byte[] d, int[] off, int info) {
+        long v = readRaw(d, off, info);
+        boolean fitsShorter = switch (info) {
+            case 24 -> v < 24;
+            case 25 -> v <= 0xFFL;
+            case 26 -> v <= 0xFFFFL;
+            case 27 -> Long.compareUnsigned(v, 0xFFFFFFFFL) <= 0;
+            default -> false;
+        };
+        if (fitsShorter) {
+            throw DecodeError.nonCanonicalInt(v);
+        }
+        return v;
+    }
+    // A byte or text length: beyond the remaining bytes is Truncated, whatever its size.
+    private static int readLength(byte[] d, int[] off, int info) {
+        long n = readArg(d, off, info);
+        if (Long.compareUnsigned(n, d.length - off[0]) > 0) {
+            throw DecodeError.truncated();
+        }
+        return (int) n;
+    }
+    private static String unsignedStringPlusOne(long n) {
+        return new BigInteger(Long.toUnsignedString(n)).add(BigInteger.ONE).toString();
+    }
+    private static String decodeUtf8(byte[] d, int off, int n) {
+        try {
+            return StandardCharsets.UTF_8
+                    .newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(d, off, n))
+                    .toString();
+        } catch (CharacterCodingException exc) {
+            throw DecodeError.invalidUtf8();
+        }
+    }
+    // An array or map whose head is read, inside `depth` others: refused before its first
+    // item if it would sit deeper than `limit` (CD-B2).
+    private static void enter(int depth, int limit) {
+        if (depth >= limit) {
+            throw DecodeError.tooDeep(limit);
+        }
+    }
+    // One item, inside `depth` arrays and maps, under the depth bound `limit`, left to right:
+    // its head, then its body; the first failing check wins.
+    private static Cbor dec(byte[] d, int[] off, int depth, int limit) {
+        int initial = u(d, off[0]);
+        off[0]++;
         int major = initial >> 5, info = initial & 0x1f;
         switch (major) {
-            case 0 -> { return int_(readArg(d, off, info)); }
-            case 1 -> { return int_(-1 - readArg(d, off, info)); }
-            case 2 -> { int n = (int) readArg(d, off, info); byte[] bb = Arrays.copyOfRange(d, off[0], off[0] + n); off[0] += n; return bytes(bb); }
-            case 3 -> { int n = (int) readArg(d, off, info); String s = new String(d, off[0], n, StandardCharsets.UTF_8); off[0] += n; return text(s); }
-            case 4 -> { int n = (int) readArg(d, off, info); List<Cbor> a = new ArrayList<>(); for (int j = 0; j < n; j++) a.add(dec(d, off)); return arr(a); }
-            case 5 -> { int n = (int) readArg(d, off, info); List<KV> m = new ArrayList<>(); for (int j = 0; j < n; j++) { Cbor k = dec(d, off); Cbor v = dec(d, off); m.add(new KV(k.i, v)); } return map(m); }
-            case 7 -> {
-                if (info == 20) return bool(false);
-                if (info == 21) return bool(true);
-                if (info == 22) return NUL;
-                if (info == 25) return float_(halfToDouble((int) readArg(d, off, info)));
-                if (info == 26) return float_((double) Float.intBitsToFloat((int) readArg(d, off, info)));
-                if (info == 27) return float_(Double.longBitsToDouble(readArg(d, off, info)));
+            case 0 -> {
+                long n = readArg(d, off, info);
+                if (n < 0) {
+                    throw DecodeError.intOverflow(Long.toUnsignedString(n));
+                }
+                return int_(n);
             }
+            case 1 -> {
+                long n = readArg(d, off, info);
+                if (n < 0) {
+                    throw DecodeError.intOverflow("-" + unsignedStringPlusOne(n));
+                }
+                return int_(-1 - n);
+            }
+            case 2 -> {
+                int n = readLength(d, off, info);
+                byte[] bb = new byte[n];
+                System.arraycopy(d, off[0], bb, 0, n);
+                off[0] += n;
+                return bytes(bb);
+            }
+            case 3 -> {
+                int n = readLength(d, off, info);
+                String s = decodeUtf8(d, off[0], n);
+                off[0] += n;
+                return text(s);
+            }
+            case 4 -> {
+                // Items are read in order. Each takes at least one byte, so a count
+                // beyond the input ends in the error of the first item that fails.
+                long n = readArg(d, off, info);
+                enter(depth, limit);
+                List<Cbor> a = new ArrayList<>();
+                for (long j = 0; Long.compareUnsigned(j, n) < 0; j++) {
+                    a.add(dec(d, off, depth + 1, limit));
+                }
+                return arr(a);
+            }
+            case 5 -> {
+                long n = readArg(d, off, info);
+                enter(depth, limit);
+                List<KV> m = new ArrayList<>();
+                Set<Long> seen = new HashSet<>();
+                for (long j = 0; Long.compareUnsigned(j, n) < 0; j++) {
+                    // The key first: its item, then NonIntegerMapKey, NegativeMapKey and
+                    // DuplicateMapKey, and only then the value.
+                    Cbor k = dec(d, off, depth + 1, limit);
+                    if (k.kind != INT) {
+                        throw DecodeError.nonIntegerMapKey();
+                    }
+                    if (k.i < 0) {
+                        throw DecodeError.negativeMapKey(k.i);
+                    }
+                    if (!seen.add(k.i)) {
+                        throw DecodeError.duplicateMapKey(k.i);
+                    }
+                    Cbor v = dec(d, off, depth + 1, limit);
+                    m.add(new KV(k.i, v));
+                }
+                return map(m);
+            }
+            case 7 -> {
+                if (info == 20) {
+                    return bool(false);
+                }
+                if (info == 21) {
+                    return bool(true);
+                }
+                if (info == 22) {
+                    return NUL;
+                }
+                if (info == 25) {
+                    return float_(halfToDouble((int) readRaw(d, off, info)));
+                }
+                if (info == 26) {
+                    return float_((double) Float.intBitsToFloat((int) readRaw(d, off, info)));
+                }
+                if (info == 27) {
+                    return float_(Double.longBitsToDouble(readRaw(d, off, info)));
+                }
+                throw DecodeError.unsupportedInfo(info);
+            }
+            default -> throw DecodeError.unsupportedMajor(major);
         }
-        throw new RuntimeException("unsupported CBOR item");
     }
 }
 

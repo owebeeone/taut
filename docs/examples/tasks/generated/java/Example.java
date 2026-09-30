@@ -13,8 +13,19 @@ public class Example {
         t.id = 1; t.title = "ship taut"; t.state = TaskState.DONE; t.assignee = ann; t.comments = List.of(c);
         t.labels = java.util.Map.of("team", "infra", "area", "wire");
         byte[] bytes = Cbor.encode(t.toCbor());
-        Task back = Task.fromCbor(Cbor.decode(bytes));
+        // The typed decode from bytes, under Task's bounds (Task.MAX_DEPTH, Task.MAX_ENCODED_LEN).
+        Task back = Task.decode(bytes);
         boolean ok = java.util.Arrays.equals(Cbor.encode(back.toCbor()), bytes);
+        // Decode is fail-closed: bytes cut short throw Cbor.DecodeError, nothing else.
+        try {
+            Task.decode(java.util.Arrays.copyOf(bytes, bytes.length - 1));
+            ok = false;
+        } catch (Cbor.DecodeError e) {
+            ok = ok && e.tag == Cbor.DecodeTag.Truncated;
+        }
         System.out.println("java: Task round-tripped in " + bytes.length + " bytes (" + (ok ? "ok" : "MISMATCH") + ")");
+        if (!ok) {
+            System.exit(1);
+        }
     }
 }

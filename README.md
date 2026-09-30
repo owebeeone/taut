@@ -42,7 +42,7 @@ the rest:
 | **Codegen required?** | yes for most languages (or descriptor-based reflection) | **no** for Python/TS (IR-driven runtime codec); generated for the compiled targets (Rust/C++/Swift/Go/Kotlin/JS/Java) |
 | **Runtime dependency** | a protobuf runtime per language | **none** (stdlib; hand-rolled codec per target) |
 | **Field presence** | scalars had none; `optional` presence re-added in **3.15** | `optional` → null; presence is clean (fields always emitted) |
-| **`required`** | removed in proto3 | kept as a *governance assertion*, enforced by the evolution gate (never a decode error) |
+| **`required`** | removed in proto3 | kept as a *governance assertion*, enforced by the evolution gate and by decode (an absent field is `MissingKey`) |
 | **Forward-compat (unknown fields)** | dropped in 3.0, restored in **3.5** — and **binary only** (the JSON mapping drops them) | opt-in unknown-field preservation (raw tags re-emitted in canonical order) |
 | **Services / RPC** | `service`/`rpc`, but the transport *is* gRPC: HTTP/2 + codegen + runtime | `(name, in, out, shape)`; transport-agnostic (reference: JSON envelope + CBOR payload) |
 | **Streaming** | gRPC client/server/bidi streams | first-class streaming **delivery engines/profiles**: `atom` / `log` / `stream` / `swmr` / `snapshot_delta` / `crdt` |
@@ -122,6 +122,12 @@ exact hex). Python and TypeScript run a fully **IR-driven codec** (instantiate a
 client or server from JSON alone, zero codegen); Rust, C++, Swift, Go, Kotlin, JS, and Java get **generated
 native types with encoders/decoders** (compiled targets need types ahead of
 time). The C++ corpus is a wall of `static_assert`s — *compiling is the test*.
+
+Decode is **fail-closed** in all nine: every decode entry point returns a value or
+the language's `DecodeError`, whatever the bytes, and never panics or overflows its
+stack. It is bounded by the schema's `max_depth` (default 32, ceiling 128) and
+`max_encoded_len` (no default) options, declared in the DSL as `option.max_depth(16)`.
+The [codec contract](docs/CodecContract.md) has the error's tags and the bounds.
 
 ## Opinionated about the wire, not the API
 
@@ -205,10 +211,11 @@ tautc json api.taut.py -m BuildResult --from-json < x.json       # JSON -> CBOR
 - **Forward-compatibility** — unknown-field preservation: a decoder keeps
   unrecognized tags as raw CBOR and re-emits them in canonical order, so an old
   reader relaying a new message loses nothing. Default-on in the Python/TS runtime
-  codec; opt-in for generated structs (Rust + C++) via `tautc gen --forward-compat`
-  (a `wire_residual` field). Proven across all four languages by a cross-version
-  test: a v1 struct round-trips a v2-only field **byte-for-byte** — even when the
-  unknown tag interleaves between known ones.
+  codec; opt-in for the seven generated targets via `tautc gen --forward-compat` (a
+  residual field, such as Rust's `wire_residual`), without which a generated decoder
+  drops unknown fields. The parity gate runs every generated target both ways, and
+  the corpus pins the round trip: a v1 struct re-encodes a v2-only field
+  **byte-for-byte** — even when the unknown tag interleaves between known ones.
 - **Extensions** — declared, typed side-channels at a reserved tag band
   (`BAND_START = 2^20`); infrastructure reads/writes them on the wire without the
   app schema knowing.
@@ -240,8 +247,11 @@ generated outputs, not durable source.
 - [Getting Started](docs/GettingStarted.md) — author → validate → encode → generate.
 - [Reference](docs/Reference.md) — every DSL helper, the shapes, the validator rules.
 - [Building a Server](docs/Server.md) — handlers, shape engines, the WS loop.
+- [Per-language APIs](docs/README.md#per-language-apis) and the
+  [codec contract](docs/CodecContract.md) — using the generated code, and the one
+  decode contract, error and bounds all nine codecs meet.
 - [examples/tasks](docs/examples/tasks/) — a complete runnable API with generated
-  code for all four languages.
+  code for all nine languages.
 
 ## Develop
 

@@ -3,7 +3,7 @@
 export type TaskState = "open" | "doing" | "done";
 
 export interface User {
-  id: number;
+  id: bigint;
   name: string;
 }
 
@@ -13,16 +13,16 @@ export interface Comment {
 }
 
 export interface Task {
-  id: number;
+  id: bigint;
   title: string;
   state: TaskState;
   assignee: User | null;
   comments: Comment[];
-  labels: Record<string, string>;
+  labels: Map<string, string>;
 }
 
 export interface Event {
-  ts: number;
+  ts: bigint;
   text: string;
 }
 

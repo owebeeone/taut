@@ -20,12 +20,16 @@ deterministic-CBOR runtime, forward-compatibility, and side-channel extensions:
 [C++](CPP_API.md) · [Go](GO_API.md) · [Java](JAVA_API.md) · [Kotlin](KOTLIN_API.md) ·
 [JavaScript](JS_API.md) · [Swift](SWIFT_API.md)
 
+All nine implement one **[codec contract](CodecContract.md)**: fail-closed decode, one
+error with the same tags and payloads, and the schema's depth and length bounds. Each
+page ends with what changed in v0.10.0.
+
 ## Example
 
 - **[examples/tasks/](examples/tasks/)** — a complete, runnable Tasks API: the
   authored IR, a round-trip + breaking-change-gate driver (`run.py`), and the
   generated `api` / `client` / `server` for all nine targets
-  (regenerate with `tautc gen tasks.taut.py -o generated/`).
+  (regenerate with `tautc gen tasks.taut.py -o generated/ --with-runtime`).
 
 ## See also
 

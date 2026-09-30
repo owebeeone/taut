@@ -3,11 +3,24 @@
 // runtimes: the same tiny subset (int, bytes, text, array, int-keyed map, bool,
 // null, float) in core-deterministic encoding (definite length, shortest-form
 // ints/floats, ascending map keys). Hand-rolled, stdlib only.
+//
+// Every decode entry point (TautCheckedDecode.md CD-E4), TryDecode and TryDecodeWith
+// here and the generated TryXFromBytes, TryXFromCbor and TryXFromWire, returns (value,
+// error), with a *DecodeError for bad input; none panics.
+//
+// Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one more
+// than the arrays and maps around it, and one deeper than the call's depth bound is
+// TooDeep{Limit}; with a length bound, longer input is TooLarge{Len, Limit} before a
+// byte is read. The recursion goes no deeper than the bound, so no input exhausts the
+// goroutine stack.
 package taut
 
 import (
+	"fmt"
 	"math"
 	"sort"
+	"strconv"
+	"unicode/utf8"
 )
 
 type Kind int
@@ -40,6 +53,81 @@ type Cbor struct {
 	F    float64
 }
 
+const (
+	DefaultMaxDepth = 32  // the depth bound where none is given (CD-B1)
+	MaxDepthCeiling = 128 // no decode applies a deeper bound (CD-B3)
+)
+
+const (
+	DecodeErrTruncated        = "Truncated"
+	DecodeErrTrailingBytes    = "TrailingBytes"
+	DecodeErrInvalidUtf8      = "InvalidUtf8"
+	DecodeErrUnsupportedInfo  = "UnsupportedInfo"
+	DecodeErrUnsupportedMajor = "UnsupportedMajor"
+	DecodeErrNonIntegerMapKey = "NonIntegerMapKey"
+	DecodeErrNegativeMapKey   = "NegativeMapKey"
+	DecodeErrIntOverflow      = "IntOverflow"
+	DecodeErrNonCanonicalInt  = "NonCanonicalInt"
+	DecodeErrDuplicateMapKey  = "DuplicateMapKey"
+	DecodeErrMissingKey       = "MissingKey"
+	DecodeErrWrongType        = "WrongType"
+	DecodeErrUnknownEnum      = "UnknownEnum"
+	DecodeErrTooDeep          = "TooDeep"
+	DecodeErrTooLarge         = "TooLarge"
+)
+
+const maxInt64Uint = uint64(1<<63 - 1)
+
+// DecodeError is the one error of decode: its Tag, and the payload fields that tag
+// carries (TautCheckedDecode.md CD-E1). Key, of NegativeMapKey, DuplicateMapKey and
+// MissingKey, is the key as text (question 9): an int in decimal, a str as itself, a
+// bool as true or false. Limit, of TooDeep and TooLarge, is the bound applied, and Len,
+// of TooLarge, the input's length.
+type DecodeError struct {
+	Tag      string
+	Info     byte
+	Major    byte
+	Key      string
+	Expected string
+	Enum     string
+	Value    string
+	Len      int
+	Limit    int
+}
+
+func UnknownEnumError(enum string, value int64) error {
+	return &DecodeError{Tag: DecodeErrUnknownEnum, Enum: enum, Value: strconv.FormatInt(value, 10)}
+}
+
+// DuplicateMapKeyError is the error for a repeated map<K,V> entry key, the key as
+// text: fmt prints an int64 in decimal, a string as itself and a bool as true or false.
+func DuplicateMapKeyError[K int64 | string | bool](key K) error {
+	return &DecodeError{Tag: DecodeErrDuplicateMapKey, Key: fmt.Sprint(key)}
+}
+
+func (e *DecodeError) Error() string {
+	switch e.Tag {
+	case DecodeErrUnsupportedInfo:
+		return fmt.Sprintf("%s(%d)", e.Tag, e.Info)
+	case DecodeErrUnsupportedMajor:
+		return fmt.Sprintf("%s(%d)", e.Tag, e.Major)
+	case DecodeErrNegativeMapKey, DecodeErrDuplicateMapKey, DecodeErrMissingKey:
+		return fmt.Sprintf("%s(%s)", e.Tag, e.Key)
+	case DecodeErrWrongType:
+		return fmt.Sprintf("%s(%s)", e.Tag, e.Expected)
+	case DecodeErrUnknownEnum:
+		return fmt.Sprintf("%s(%s=%s)", e.Tag, e.Enum, e.Value)
+	case DecodeErrIntOverflow, DecodeErrNonCanonicalInt:
+		return fmt.Sprintf("%s(%s)", e.Tag, e.Value)
+	case DecodeErrTooDeep:
+		return fmt.Sprintf("%s(limit=%d)", e.Tag, e.Limit)
+	case DecodeErrTooLarge:
+		return fmt.Sprintf("%s(len=%d, limit=%d)", e.Tag, e.Len, e.Limit)
+	default:
+		return e.Tag
+	}
+}
+
 func CInt(n int64) Cbor     { return Cbor{Kind: KInt, I: n} }
 func CText(s string) Cbor   { return Cbor{Kind: KText, S: s} }
 func CBytes(b []byte) Cbor  { return Cbor{Kind: KBytes, B: b} }
@@ -55,14 +143,32 @@ func CBool(b bool) Cbor {
 	return c
 }
 
-// Get returns the value for an integer map key (panics if absent).
-func (c Cbor) Get(key int64) Cbor {
-	for _, kv := range c.Map {
+// Require returns the value for an integer map key: WrongType{map} when c is not a
+// map, MissingKey when the key is absent.
+func (c Cbor) Require(key int64) (Cbor, error) {
+	v, ok, err := c.Lookup(key)
+	if err != nil {
+		return Cbor{}, err
+	}
+	if !ok {
+		return Cbor{}, &DecodeError{Tag: DecodeErrMissingKey, Key: strconv.FormatInt(key, 10)}
+	}
+	return v, nil
+}
+
+// Lookup returns the value for an integer map key and whether it is present:
+// WrongType{map} when c is not a map.
+func (c Cbor) Lookup(key int64) (Cbor, bool, error) {
+	m, err := c.TryMap()
+	if err != nil {
+		return Cbor{}, false, err
+	}
+	for _, kv := range m {
 		if kv.K == key {
-			return kv.V
+			return kv.V, true, nil
 		}
 	}
-	panic("no map key")
+	return Cbor{}, false, nil
 }
 func (c Cbor) Int() int64       { return c.I }
 func (c Cbor) Text() string     { return c.S }
@@ -72,6 +178,55 @@ func (c Cbor) Array() []Cbor    { return c.Arr }
 func (c Cbor) IsNull() bool     { return c.Kind == KNull }
 func (c Cbor) MapEntries() []KV { return c.Map } // forward-compat residual capture
 func (c Cbor) Float() float64   { return c.F }
+
+func (c Cbor) TryInt() (int64, error) {
+	if c.Kind != KInt {
+		return 0, &DecodeError{Tag: DecodeErrWrongType, Expected: "int"}
+	}
+	return c.I, nil
+}
+
+func (c Cbor) TryText() (string, error) {
+	if c.Kind != KText {
+		return "", &DecodeError{Tag: DecodeErrWrongType, Expected: "text"}
+	}
+	return c.S, nil
+}
+
+func (c Cbor) TryBytes() ([]byte, error) {
+	if c.Kind != KBytes {
+		return nil, &DecodeError{Tag: DecodeErrWrongType, Expected: "bytes"}
+	}
+	return c.B, nil
+}
+
+func (c Cbor) TryBool() (bool, error) {
+	if c.Kind != KBool {
+		return false, &DecodeError{Tag: DecodeErrWrongType, Expected: "bool"}
+	}
+	return c.I != 0, nil
+}
+
+func (c Cbor) TryArray() ([]Cbor, error) {
+	if c.Kind != KArr {
+		return nil, &DecodeError{Tag: DecodeErrWrongType, Expected: "array"}
+	}
+	return c.Arr, nil
+}
+
+func (c Cbor) TryMap() ([]KV, error) {
+	if c.Kind != KMap {
+		return nil, &DecodeError{Tag: DecodeErrWrongType, Expected: "map"}
+	}
+	return c.Map, nil
+}
+
+func (c Cbor) TryFloat() (float64, error) {
+	if c.Kind != KFloat {
+		return 0, &DecodeError{Tag: DecodeErrWrongType, Expected: "float"}
+	}
+	return c.F, nil
+}
 
 func head(out *[]byte, major byte, n uint64) {
 	mt := major << 5
@@ -239,100 +394,236 @@ func halfToFloat64(h uint16) float64 {
 	}
 }
 
-func Decode(data []byte) Cbor {
-	v, off := dec(data, 0)
-	if off != len(data) {
-		panic("trailing bytes after top-level CBOR item")
-	}
-	return v
+// TryDecode decodes one item that spans all of data under the default bounds,
+// DefaultMaxDepth and no length bound, or returns the *DecodeError of the first check
+// that fails (CD-E5). A message's generated TryXFromBytes applies its schema's bounds
+// instead.
+func TryDecode(data []byte) (Cbor, error) {
+	return TryDecodeWith(data, DefaultMaxDepth, -1)
 }
 
-func readArg(data []byte, off int, info byte) (uint64, int) {
+// TryDecodeWith decodes one item that spans all of data under the caller's bounds, or
+// returns the *DecodeError of the first check that fails (CD-E5). With a maxEncodedLen
+// of 0 or more, longer input is TooLarge before a byte is read; a negative one is no
+// length bound. An array or map one deeper than maxDepth is TooDeep once its head is
+// read, before its first item (CD-B2); a maxDepth above MaxDepthCeiling applies the
+// ceiling, and Limit names the bound applied. A maxDepth below 1 is the caller's error,
+// returned as an ordinary error, not a *DecodeError.
+func TryDecodeWith(data []byte, maxDepth int, maxEncodedLen int) (Cbor, error) {
+	if maxDepth < 1 {
+		return Cbor{}, fmt.Errorf("taut: maxDepth must be at least 1, not %d", maxDepth)
+	}
+	limit := maxDepth
+	if limit > MaxDepthCeiling {
+		limit = MaxDepthCeiling
+	}
+	if maxEncodedLen >= 0 && len(data) > maxEncodedLen {
+		return Cbor{}, &DecodeError{Tag: DecodeErrTooLarge, Len: len(data), Limit: maxEncodedLen}
+	}
+	v, off, err := dec(data, 0, 0, limit)
+	if err != nil {
+		return Cbor{}, err
+	}
+	if off != len(data) {
+		return Cbor{}, &DecodeError{Tag: DecodeErrTrailingBytes}
+	}
+	return v, nil
+}
+
+// readArg reads the argument of a major 0-5 head: an int, or a length or count.
+// Additional info 28-31 is UnsupportedInfo and missing argument bytes are
+// Truncated. Strict canonical (D2): a 1-, 2-, 4- or 8-byte argument that fits a
+// shorter form is NonCanonicalInt, carrying the raw argument, because the
+// canonical encoder never writes one.
+func readArg(data []byte, off int, info byte) (uint64, int, error) {
+	var width int
+	var shorter uint64 // the largest argument the next shorter form carries
 	switch {
 	case info < 24:
-		return uint64(info), off
+		return uint64(info), off, nil
 	case info == 24:
-		return uint64(data[off]), off + 1
+		width, shorter = 1, 23
 	case info == 25:
-		return uint64(data[off])<<8 | uint64(data[off+1]), off + 2
+		width, shorter = 2, 0xff
 	case info == 26:
-		var v uint64
-		for j := 0; j < 4; j++ {
-			v = v<<8 | uint64(data[off+j])
-		}
-		return v, off + 4
+		width, shorter = 4, 0xffff
+	case info == 27:
+		width, shorter = 8, 0xffffffff
 	default:
-		var v uint64
-		for j := 0; j < 8; j++ {
-			v = v<<8 | uint64(data[off+j])
-		}
-		return v, off + 8
+		return 0, off, &DecodeError{Tag: DecodeErrUnsupportedInfo, Info: info}
 	}
+	if off > len(data)-width {
+		return 0, off, &DecodeError{Tag: DecodeErrTruncated}
+	}
+	var v uint64
+	for j := 0; j < width; j++ {
+		v = v<<8 | uint64(data[off+j])
+	}
+	if v <= shorter {
+		return 0, off, &DecodeError{Tag: DecodeErrNonCanonicalInt, Value: strconv.FormatUint(v, 10)}
+	}
+	return v, off + width, nil
 }
 
-func dec(data []byte, off int) (Cbor, int) {
+func negOverflowValue(n uint64) string {
+	if n == ^uint64(0) {
+		return "-18446744073709551616"
+	}
+	return "-" + strconv.FormatUint(n+1, 10)
+}
+
+// enter refuses a container whose head is read, inside depth others, when it would
+// sit deeper than limit (CD-B2): before its first item is read.
+func enter(depth int, limit int) error {
+	if depth >= limit {
+		return &DecodeError{Tag: DecodeErrTooDeep, Limit: limit}
+	}
+	return nil
+}
+
+// dec reads the item at off, inside depth arrays and maps, under the depth bound limit,
+// left to right, and reports the first check that fails (TautCheckedDecode.md CD-E5):
+// the head (no byte, major type 6 whatever its info, unsupported info, missing argument
+// bytes, a non-canonical argument), then the body: an array or map one level too deep
+// is refused before its first item, and items are read in order, a map entry's key
+// checked before its value.
+func dec(data []byte, off int, depth int, limit int) (Cbor, int, error) {
+	if off >= len(data) {
+		return Cbor{}, off, &DecodeError{Tag: DecodeErrTruncated}
+	}
 	initial := data[off]
 	major := initial >> 5
 	info := initial & 0x1f
 	off++
 	switch major {
 	case 0:
-		n, o := readArg(data, off, info)
-		return CInt(int64(n)), o
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
+		if n > maxInt64Uint {
+			return Cbor{}, o, &DecodeError{Tag: DecodeErrIntOverflow, Value: strconv.FormatUint(n, 10)}
+		}
+		return CInt(int64(n)), o, nil
 	case 1:
-		n, o := readArg(data, off, info)
-		return CInt(-1 - int64(n)), o
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
+		if n > maxInt64Uint {
+			return Cbor{}, o, &DecodeError{Tag: DecodeErrIntOverflow, Value: negOverflowValue(n)}
+		}
+		return CInt(-1 - int64(n)), o, nil
 	case 2:
-		n, o := readArg(data, off, info)
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
+		if n > uint64(len(data)-o) {
+			return Cbor{}, o, &DecodeError{Tag: DecodeErrTruncated}
+		}
 		k := int(n)
-		return CBytes(append([]byte{}, data[o:o+k]...)), o + k
+		return CBytes(append([]byte{}, data[o:o+k]...)), o + k, nil
 	case 3:
-		n, o := readArg(data, off, info)
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
+		if n > uint64(len(data)-o) {
+			return Cbor{}, o, &DecodeError{Tag: DecodeErrTruncated}
+		}
 		k := int(n)
-		return CText(string(data[o : o+k])), o + k
+		if !utf8.Valid(data[o : o+k]) {
+			return Cbor{}, o + k, &DecodeError{Tag: DecodeErrInvalidUtf8}
+		}
+		return CText(string(data[o : o+k])), o + k, nil
 	case 4:
-		n, o := readArg(data, off, info)
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
+		if err := enter(depth, limit); err != nil {
+			return Cbor{}, o, err
+		}
 		a := []Cbor{}
 		for i := uint64(0); i < n; i++ {
-			v, o2 := dec(data, o)
+			v, o2, err := dec(data, o, depth+1, limit)
+			if err != nil {
+				return Cbor{}, o2, err
+			}
 			a = append(a, v)
 			o = o2
 		}
-		return CArr(a), o
+		return CArr(a), o, nil
 	case 5:
-		n, o := readArg(data, off, info)
+		n, o, err := readArg(data, off, info)
+		if err != nil {
+			return Cbor{}, o, err
+		}
+		if err := enter(depth, limit); err != nil {
+			return Cbor{}, o, err
+		}
 		m := []KV{}
+		seen := map[int64]bool{}
 		for i := uint64(0); i < n; i++ {
-			kc, o2 := dec(data, o)
-			vc, o3 := dec(data, o2)
+			kc, o2, err := dec(data, o, depth+1, limit)
+			if err != nil {
+				return Cbor{}, o2, err
+			}
+			if kc.Kind != KInt {
+				return Cbor{}, o2, &DecodeError{Tag: DecodeErrNonIntegerMapKey}
+			}
+			if kc.I < 0 {
+				return Cbor{}, o2, &DecodeError{Tag: DecodeErrNegativeMapKey, Key: strconv.FormatInt(kc.I, 10)}
+			}
+			if seen[kc.I] {
+				return Cbor{}, o2, &DecodeError{Tag: DecodeErrDuplicateMapKey, Key: strconv.FormatInt(kc.I, 10)}
+			}
+			seen[kc.I] = true
+			vc, o3, err := dec(data, o2, depth+1, limit)
+			if err != nil {
+				return Cbor{}, o3, err
+			}
 			m = append(m, KV{K: kc.I, V: vc})
 			o = o3
 		}
-		return CMap(m), o
+		return CMap(m), o, nil
 	case 7:
 		switch info {
 		case 20:
-			return CBool(false), off
+			return CBool(false), off, nil
 		case 21:
-			return CBool(true), off
+			return CBool(true), off, nil
 		case 22:
-			return CNull(), off
+			return CNull(), off, nil
 		case 25:
+			if off > len(data)-2 {
+				return Cbor{}, off, &DecodeError{Tag: DecodeErrTruncated}
+			}
 			bits := uint16(data[off])<<8 | uint16(data[off+1])
-			return CFloat(halfToFloat64(bits)), off + 2
+			return CFloat(halfToFloat64(bits)), off + 2, nil
 		case 26:
+			if off > len(data)-4 {
+				return Cbor{}, off, &DecodeError{Tag: DecodeErrTruncated}
+			}
 			var bits uint32
 			for j := 0; j < 4; j++ {
 				bits = bits<<8 | uint32(data[off+j])
 			}
-			return CFloat(float64(math.Float32frombits(bits))), off + 4
+			return CFloat(float64(math.Float32frombits(bits))), off + 4, nil
 		case 27:
+			if off > len(data)-8 {
+				return Cbor{}, off, &DecodeError{Tag: DecodeErrTruncated}
+			}
 			var bits uint64
 			for j := 0; j < 8; j++ {
 				bits = bits<<8 | uint64(data[off+j])
 			}
-			return CFloat(math.Float64frombits(bits)), off + 8
+			return CFloat(math.Float64frombits(bits)), off + 8, nil
+		default:
+			// Neither false, true, null nor a float (which keep the width they came in).
+			return Cbor{}, off, &DecodeError{Tag: DecodeErrUnsupportedInfo, Info: info}
 		}
 	}
-	panic("unsupported CBOR item")
+	return Cbor{}, off, &DecodeError{Tag: DecodeErrUnsupportedMajor, Major: major}
 }

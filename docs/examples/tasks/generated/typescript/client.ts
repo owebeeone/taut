@@ -8,10 +8,10 @@ export class TasksClient {
   create(title: string): Promise<api.Task> {
     return this.c.call("create", { title }) as Promise<api.Task>;
   }
-  comment(task_id: number, author: User, text: string): Promise<api.Comment> {
+  comment(task_id: bigint, author: User, text: string): Promise<api.Comment> {
     return this.c.call("comment", { task_id, author, text }) as Promise<api.Comment>;
   }
-  set_state(id: number, state: TaskState): Promise<api.boolean> {
+  set_state(id: bigint, state: TaskState): Promise<api.boolean> {
     return this.c.call("set_state", { id, state }) as Promise<api.boolean>;
   }
   tasks_subscribe(onEvent: (event: string, value: unknown) => void): () => void {  // atom

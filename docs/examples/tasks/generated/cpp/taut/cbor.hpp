@@ -1,14 +1,23 @@
 // Compile-time deterministic CBOR — the C++ binding of the frozen wire substrate.
 // Everything is constexpr: a value is encoded to bytes *at compile time*, and the
-// generated corpus static_asserts the bytes against the golden hex. Same tiny
-// subset as the Python/TS/Rust codecs (int, bytes, text, array, int-keyed map,
-// bool, null), core-deterministic (shortest ints; maps are emitted in ascending
-// key order by the generator). Zero runtime cost; no heap; host-testable.
+// generated corpus static_asserts the bytes against the golden hex, then decodes them
+// back through the fail-closed try_decode. Same tiny subset as the Python/TS/Rust
+// codecs (int, bytes, text, array, int-keyed map, bool, null), core-deterministic
+// (shortest ints; maps are emitted in ascending key order by the generator).
+// Encode writes into a fixed Buf, with no heap; host-testable.
+//
+// Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one more
+// than the arrays and maps around it, and one deeper than the call's depth bound is
+// TooDeep{limit}; with a length bound, longer input is TooLarge{len, limit} before a byte
+// is read. So recursion never runs deeper than the bound, at most max_depth_ceiling.
 #pragma once
 
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <optional>
+#include <stdexcept>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -220,8 +229,142 @@ constexpr bool eq(const Buf& b, std::string_view bytes) {
     return true;
 }
 
-// --- decode: a constexpr CBOR value tree + parser (mirrors cbor.rs) ----------
+// --- decode: fail-closed, and constexpr like encode --------------------------
+//
+// Every decode entry point returns a DecodeResult: a value, or a DecodeError carrying
+// its tag and payload (TautCheckedDecode.md CD-E1, CD-E4). Nothing else escapes.
 
+// The depth bound where none is given, and the deepest bound any call applies
+// (TautCheckedDecode.md CD-B1, CD-B3). The parity corpus pins both to taut's own numbers
+// (`taut.ir.options`).
+inline constexpr std::size_t default_max_depth = 32;
+inline constexpr std::size_t max_depth_ceiling = 128;
+
+enum class DecodeErrorTag {
+    Truncated,
+    TrailingBytes,
+    InvalidUtf8,
+    UnsupportedInfo,
+    UnsupportedMajor,
+    NonIntegerMapKey,
+    IntOverflow,
+    DuplicateMapKey,
+    MissingKey,
+    WrongType,
+    UnknownEnum,
+    NonCanonicalInt,
+    NegativeMapKey,
+    TooDeep,
+    TooLarge,
+};
+
+struct DecodeError {
+    DecodeErrorTag tag{DecodeErrorTag::Truncated};
+    long long key{0};
+    unsigned info{0};
+    unsigned major{0};
+    const char* expected{nullptr};
+    const char* enum_name{nullptr};
+    long long value{0};
+    std::uint64_t unsigned_value{0};
+    bool negative_overflow{false};
+    // DuplicateMapKey's key as text (TautCheckedDecode.md §8 question 9) when `key_is_text`:
+    // a map<str, V> field's key, a view of the input, or a map<bool, V> field's, `true` or
+    // `false`. An int key is `key`.
+    std::string_view key_text{};
+    bool key_is_text{false};
+    // TooDeep's and TooLarge's `limit`, the bound the call applied, and TooLarge's `len`, the
+    // input's length.
+    std::size_t limit{0};
+    std::size_t len{0};
+
+    static constexpr DecodeError truncated() { return {DecodeErrorTag::Truncated}; }
+    static constexpr DecodeError trailing_bytes() { return {DecodeErrorTag::TrailingBytes}; }
+    static constexpr DecodeError invalid_utf8() { return {DecodeErrorTag::InvalidUtf8}; }
+    static constexpr DecodeError unsupported_info(unsigned info) {
+        DecodeError e{DecodeErrorTag::UnsupportedInfo};
+        e.info = info;
+        return e;
+    }
+    static constexpr DecodeError unsupported_major(unsigned major) {
+        DecodeError e{DecodeErrorTag::UnsupportedMajor};
+        e.major = major;
+        return e;
+    }
+    static constexpr DecodeError non_integer_map_key() { return {DecodeErrorTag::NonIntegerMapKey}; }
+    static constexpr DecodeError int_overflow(std::uint64_t raw, bool negative) {
+        DecodeError e{DecodeErrorTag::IntOverflow};
+        e.unsigned_value = raw;
+        e.negative_overflow = negative;
+        return e;
+    }
+    static constexpr DecodeError duplicate_map_key(long long key) {
+        DecodeError e{DecodeErrorTag::DuplicateMapKey};
+        e.key = key;
+        return e;
+    }
+    static constexpr DecodeError duplicate_map_text_key(std::string_view key) {
+        DecodeError e{DecodeErrorTag::DuplicateMapKey};
+        e.key_text = key;
+        e.key_is_text = true;
+        return e;
+    }
+    static constexpr DecodeError duplicate_map_bool_key(bool key) {
+        return duplicate_map_text_key(key ? std::string_view("true") : std::string_view("false"));
+    }
+    static constexpr DecodeError missing_key(long long key) {
+        DecodeError e{DecodeErrorTag::MissingKey};
+        e.key = key;
+        return e;
+    }
+    static constexpr DecodeError wrong_type(const char* expected) {
+        DecodeError e{DecodeErrorTag::WrongType};
+        e.expected = expected;
+        return e;
+    }
+    static constexpr DecodeError unknown_enum(const char* enum_name, long long value) {
+        DecodeError e{DecodeErrorTag::UnknownEnum};
+        e.enum_name = enum_name;
+        e.value = value;
+        return e;
+    }
+    // D2 strictness: an argument longer than needed; `unsigned_value` is the raw argument.
+    static constexpr DecodeError non_canonical_int(std::uint64_t raw) {
+        DecodeError e{DecodeErrorTag::NonCanonicalInt};
+        e.unsigned_value = raw;
+        return e;
+    }
+    static constexpr DecodeError negative_map_key(long long key) {
+        DecodeError e{DecodeErrorTag::NegativeMapKey};
+        e.key = key;
+        return e;
+    }
+    static constexpr DecodeError too_deep(std::size_t limit) {
+        DecodeError e{DecodeErrorTag::TooDeep};
+        e.limit = limit;
+        return e;
+    }
+    static constexpr DecodeError too_large(std::size_t len, std::size_t limit) {
+        DecodeError e{DecodeErrorTag::TooLarge};
+        e.len = len;
+        e.limit = limit;
+        return e;
+    }
+};
+
+template <class T>
+struct DecodeResult {
+    T value{};
+    DecodeError error{};
+    bool ok{false};
+
+    constexpr explicit operator bool() const { return ok; }
+    static constexpr DecodeResult success(T v) { return DecodeResult{v, {}, true}; }
+    static constexpr DecodeResult fail(DecodeError e) { return DecodeResult{{}, e, false}; }
+};
+
+// One decoded item. Its typed reads are the try_ accessors: each is the value or a
+// DecodeError (WrongType, MissingKey), never a default in place of a missing one.
 struct Cbor {
     enum class K { Int, Bytes, Text, Arr, Map, Bool, Null, Float };
     K k{K::Null};
@@ -231,87 +374,383 @@ struct Cbor {
     std::vector<Cbor> arr{};                        // Array
     std::vector<std::pair<long long, Cbor>> map{};  // Map (integer keys)
 
-    constexpr long long as_int() const { return i; }
-    constexpr bool as_bool() const { return i != 0; }
-    constexpr double as_float() const { return f; }
-    constexpr std::string_view as_text() const { return s; }
-    constexpr std::string_view as_bytes() const { return s; }
-    constexpr const std::vector<Cbor>& as_array() const { return arr; }
     constexpr bool is_null() const { return k == K::Null; }
-    constexpr const Cbor& get(long long key) const {
+    constexpr DecodeResult<const Cbor*> try_get(long long key) const {
+        if (k != K::Map) return DecodeResult<const Cbor*>::fail(DecodeError::wrong_type("map"));
         for (const auto& kv : map)
-            if (kv.first == key) return kv.second;
-        return *this; // unreachable for well-formed canonical input
+            if (kv.first == key) return DecodeResult<const Cbor*>::success(&kv.second);
+        return DecodeResult<const Cbor*>::fail(DecodeError::missing_key(key));
+    }
+    // An optional=MISSING_OK field's lookup: an absent key is nullptr, not MissingKey;
+    // a value that is not a map is still WrongType{map}.
+    constexpr DecodeResult<const Cbor*> try_get_opt(long long key) const {
+        if (k != K::Map) {
+            return DecodeResult<const Cbor*>::fail(DecodeError::wrong_type("map"));
+        }
+        for (const auto& kv : map) {
+            if (kv.first == key) {
+                return DecodeResult<const Cbor*>::success(&kv.second);
+            }
+        }
+        return DecodeResult<const Cbor*>::success(nullptr);
+    }
+    constexpr DecodeResult<long long> try_int() const {
+        if (k != K::Int) return DecodeResult<long long>::fail(DecodeError::wrong_type("int"));
+        return DecodeResult<long long>::success(i);
+    }
+    constexpr DecodeResult<bool> try_bool() const {
+        if (k != K::Bool) return DecodeResult<bool>::fail(DecodeError::wrong_type("bool"));
+        return DecodeResult<bool>::success(i != 0);
+    }
+    constexpr DecodeResult<double> try_float() const {
+        if (k != K::Float) return DecodeResult<double>::fail(DecodeError::wrong_type("float"));
+        return DecodeResult<double>::success(f);
+    }
+    constexpr DecodeResult<std::string_view> try_text() const {
+        if (k != K::Text) return DecodeResult<std::string_view>::fail(DecodeError::wrong_type("text"));
+        return DecodeResult<std::string_view>::success(s);
+    }
+    constexpr DecodeResult<std::string_view> try_bytes() const {
+        if (k != K::Bytes) return DecodeResult<std::string_view>::fail(DecodeError::wrong_type("bytes"));
+        return DecodeResult<std::string_view>::success(s);
+    }
+    constexpr DecodeResult<const std::vector<Cbor>*> try_array() const {
+        if (k != K::Arr) return DecodeResult<const std::vector<Cbor>*>::fail(DecodeError::wrong_type("array"));
+        return DecodeResult<const std::vector<Cbor>*>::success(&arr);
+    }
+    constexpr DecodeResult<const std::vector<std::pair<long long, Cbor>>*> try_map() const {
+        if (k != K::Map) return DecodeResult<const std::vector<std::pair<long long, Cbor>>*>::fail(DecodeError::wrong_type("map"));
+        return DecodeResult<const std::vector<std::pair<long long, Cbor>>*>::success(&map);
     }
 };
 
-constexpr unsigned char byte_at(std::string_view d, std::size_t i) {
-    return static_cast<unsigned char>(d[i]);
+namespace cbor_detail {
+
+constexpr bool has(std::string_view d, std::size_t off, std::size_t len) {
+    return off <= d.size() && len <= d.size() - off;
 }
 
-constexpr std::pair<unsigned long long, std::size_t> read_arg(std::string_view d, std::size_t off, unsigned info) {
-    if (info < 24) return {info, off};
-    if (info == 24) return {byte_at(d, off), off + 1};
-    if (info == 25) return {(static_cast<unsigned long long>(byte_at(d, off)) << 8) | byte_at(d, off + 1), off + 2};
-    if (info == 26) {
-        unsigned long long v = 0;
-        for (int j = 0; j < 4; ++j) v = (v << 8) | byte_at(d, off + j);
-        return {v, off + 4};
+constexpr DecodeResult<unsigned char> checked_byte_at(std::string_view d, std::size_t off) {
+    if (!has(d, off, 1)) {
+        return DecodeResult<unsigned char>::fail(DecodeError::truncated());
     }
-    unsigned long long v = 0; // info == 27
-    for (int j = 0; j < 8; ++j) v = (v << 8) | byte_at(d, off + j);
-    return {v, off + 8};
+    return DecodeResult<unsigned char>::success(static_cast<unsigned char>(d[off]));
 }
 
-constexpr std::pair<Cbor, std::size_t> decode_at(std::string_view d, std::size_t off) {
-    unsigned init = byte_at(d, off);
+// A head's argument (CD-E5 step 1): additional info 28-31 is UnsupportedInfo, missing
+// argument bytes are Truncated, and a 1/2/4/8-byte argument that fits a shorter form is
+// NonCanonicalInt carrying the raw argument (D2). Lengths and counts are arguments too;
+// floats never come through here.
+constexpr DecodeResult<unsigned long long> checked_read_arg(std::string_view d, std::size_t& off, unsigned info) {
+    if (info < 24) {
+        return DecodeResult<unsigned long long>::success(info);
+    }
+    if (info > 27) {
+        return DecodeResult<unsigned long long>::fail(DecodeError::unsupported_info(info));
+    }
+    const std::size_t width = std::size_t{1} << (info - 24);  // 1, 2, 4 or 8 bytes
+    if (!has(d, off, width)) {
+        return DecodeResult<unsigned long long>::fail(DecodeError::truncated());
+    }
+    unsigned long long v = 0;
+    for (std::size_t j = 0; j < width; ++j) {
+        v = (v << 8) | static_cast<unsigned char>(d[off + j]);
+    }
+    off += width;
+    // The least value that needs this width: 24 for one byte, else 2^(4 * width).
+    const unsigned long long least = width == 1 ? 24ULL : 1ULL << (4 * width);
+    if (v < least) {
+        return DecodeResult<unsigned long long>::fail(DecodeError::non_canonical_int(v));
+    }
+    return DecodeResult<unsigned long long>::success(v);
+}
+
+constexpr bool valid_utf8(std::string_view s) {
+    std::size_t i = 0;
+    while (i < s.size()) {
+        unsigned char b0 = static_cast<unsigned char>(s[i]);
+        if (b0 <= 0x7f) {
+            ++i;
+        } else if (b0 >= 0xc2 && b0 <= 0xdf) {
+            if (i + 1 >= s.size()) {
+                return false;
+            }
+            unsigned char b1 = static_cast<unsigned char>(s[i + 1]);
+            if ((b1 & 0xc0) != 0x80) {
+                return false;
+            }
+            i += 2;
+        } else if (b0 == 0xe0) {
+            if (i + 2 >= s.size()) {
+                return false;
+            }
+            unsigned char b1 = static_cast<unsigned char>(s[i + 1]);
+            unsigned char b2 = static_cast<unsigned char>(s[i + 2]);
+            if (b1 < 0xa0 || b1 > 0xbf || (b2 & 0xc0) != 0x80) {
+                return false;
+            }
+            i += 3;
+        } else if (b0 >= 0xe1 && b0 <= 0xec) {
+            if (i + 2 >= s.size()) {
+                return false;
+            }
+            unsigned char b1 = static_cast<unsigned char>(s[i + 1]);
+            unsigned char b2 = static_cast<unsigned char>(s[i + 2]);
+            if ((b1 & 0xc0) != 0x80 || (b2 & 0xc0) != 0x80) {
+                return false;
+            }
+            i += 3;
+        } else if (b0 == 0xed) {
+            if (i + 2 >= s.size()) {
+                return false;
+            }
+            unsigned char b1 = static_cast<unsigned char>(s[i + 1]);
+            unsigned char b2 = static_cast<unsigned char>(s[i + 2]);
+            if (b1 < 0x80 || b1 > 0x9f || (b2 & 0xc0) != 0x80) {
+                return false;
+            }
+            i += 3;
+        } else if (b0 >= 0xee && b0 <= 0xef) {
+            if (i + 2 >= s.size()) {
+                return false;
+            }
+            unsigned char b1 = static_cast<unsigned char>(s[i + 1]);
+            unsigned char b2 = static_cast<unsigned char>(s[i + 2]);
+            if ((b1 & 0xc0) != 0x80 || (b2 & 0xc0) != 0x80) {
+                return false;
+            }
+            i += 3;
+        } else if (b0 == 0xf0) {
+            if (i + 3 >= s.size()) {
+                return false;
+            }
+            unsigned char b1 = static_cast<unsigned char>(s[i + 1]);
+            unsigned char b2 = static_cast<unsigned char>(s[i + 2]);
+            unsigned char b3 = static_cast<unsigned char>(s[i + 3]);
+            if (b1 < 0x90 || b1 > 0xbf || (b2 & 0xc0) != 0x80 || (b3 & 0xc0) != 0x80) {
+                return false;
+            }
+            i += 4;
+        } else if (b0 >= 0xf1 && b0 <= 0xf3) {
+            if (i + 3 >= s.size()) {
+                return false;
+            }
+            unsigned char b1 = static_cast<unsigned char>(s[i + 1]);
+            unsigned char b2 = static_cast<unsigned char>(s[i + 2]);
+            unsigned char b3 = static_cast<unsigned char>(s[i + 3]);
+            if ((b1 & 0xc0) != 0x80 || (b2 & 0xc0) != 0x80 || (b3 & 0xc0) != 0x80) {
+                return false;
+            }
+            i += 4;
+        } else if (b0 == 0xf4) {
+            if (i + 3 >= s.size()) {
+                return false;
+            }
+            unsigned char b1 = static_cast<unsigned char>(s[i + 1]);
+            unsigned char b2 = static_cast<unsigned char>(s[i + 2]);
+            unsigned char b3 = static_cast<unsigned char>(s[i + 3]);
+            if (b1 < 0x80 || b1 > 0x8f || (b2 & 0xc0) != 0x80 || (b3 & 0xc0) != 0x80) {
+                return false;
+            }
+            i += 4;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+// One item (CD-E5 steps 1-2): its head, then its body, items in order. A map entry
+// reads its key item first, then checks NonIntegerMapKey, NegativeMapKey and
+// DuplicateMapKey, and only then reads its value. `depth` counts the arrays and maps
+// around the item; an array or map with `limit` around it is TooDeep once its head is
+// read, before its first item (CD-B2), so the recursion stops at `limit`.
+constexpr DecodeResult<Cbor> checked_decode_at(std::string_view d, std::size_t& off, std::size_t depth,
+                                               std::size_t limit) {
+    auto init_r = checked_byte_at(d, off);
+    if (!init_r) {
+        return DecodeResult<Cbor>::fail(init_r.error);
+    }
+    unsigned init = init_r.value;
     unsigned major = init >> 5;
     unsigned info = init & 0x1f;
-    off++;
+    ++off;
     Cbor c;
-    if (major == 0) { auto [v, o] = read_arg(d, off, info); c.k = Cbor::K::Int; c.i = static_cast<long long>(v); return {c, o}; }
-    if (major == 1) { auto [v, o] = read_arg(d, off, info); c.k = Cbor::K::Int; c.i = -1 - static_cast<long long>(v); return {c, o}; }
-    if (major == 2) { auto [v, o] = read_arg(d, off, info); c.k = Cbor::K::Bytes; c.s = d.substr(o, static_cast<std::size_t>(v)); return {c, o + static_cast<std::size_t>(v)}; }
-    if (major == 3) { auto [v, o] = read_arg(d, off, info); c.k = Cbor::K::Text; c.s = d.substr(o, static_cast<std::size_t>(v)); return {c, o + static_cast<std::size_t>(v)}; }
+
+    if (major == 0) {
+        auto v = checked_read_arg(d, off, info);
+        if (!v) {
+            return DecodeResult<Cbor>::fail(v.error);
+        }
+        if (v.value > static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
+            return DecodeResult<Cbor>::fail(DecodeError::int_overflow(v.value, false));
+        }
+        c.k = Cbor::K::Int;
+        c.i = static_cast<long long>(v.value);
+        return DecodeResult<Cbor>::success(c);
+    }
+    if (major == 1) {
+        auto v = checked_read_arg(d, off, info);
+        if (!v) {
+            return DecodeResult<Cbor>::fail(v.error);
+        }
+        if (v.value > static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
+            return DecodeResult<Cbor>::fail(DecodeError::int_overflow(v.value, true));
+        }
+        c.k = Cbor::K::Int;
+        c.i = -1 - static_cast<long long>(v.value);
+        return DecodeResult<Cbor>::success(c);
+    }
+    if (major == 2 || major == 3) {
+        auto n = checked_read_arg(d, off, info);
+        if (!n) {
+            return DecodeResult<Cbor>::fail(n.error);
+        }
+        // A length beyond the remaining bytes is Truncated, whatever its size.
+        if (n.value > d.size() - off) {
+            return DecodeResult<Cbor>::fail(DecodeError::truncated());
+        }
+        std::string_view s = d.substr(off, static_cast<std::size_t>(n.value));
+        off += s.size();
+        if (major == 3 && !valid_utf8(s)) {
+            return DecodeResult<Cbor>::fail(DecodeError::invalid_utf8());
+        }
+        c.k = major == 2 ? Cbor::K::Bytes : Cbor::K::Text;
+        c.s = s;
+        return DecodeResult<Cbor>::success(c);
+    }
+    // Arrays and maps reserve nothing from their declared count: items are read in
+    // order, so a count beyond the input ends, Truncated, at the first missing item.
     if (major == 4) {
-        auto [n, o] = read_arg(d, off, info);
+        auto n = checked_read_arg(d, off, info);
+        if (!n) {
+            return DecodeResult<Cbor>::fail(n.error);
+        }
+        if (depth >= limit) {
+            return DecodeResult<Cbor>::fail(DecodeError::too_deep(limit));
+        }
         c.k = Cbor::K::Arr;
-        for (unsigned long long j = 0; j < n; ++j) { auto [e, o2] = decode_at(d, o); c.arr.push_back(e); o = o2; }
-        return {c, o};
+        for (unsigned long long j = 0; j < n.value; ++j) {
+            auto e = checked_decode_at(d, off, depth + 1, limit);
+            if (!e) {
+                return DecodeResult<Cbor>::fail(e.error);
+            }
+            c.arr.push_back(std::move(e.value));
+        }
+        return DecodeResult<Cbor>::success(c);
     }
     if (major == 5) {
-        auto [n, o] = read_arg(d, off, info);
+        auto n = checked_read_arg(d, off, info);
+        if (!n) {
+            return DecodeResult<Cbor>::fail(n.error);
+        }
+        if (depth >= limit) {
+            return DecodeResult<Cbor>::fail(DecodeError::too_deep(limit));
+        }
         c.k = Cbor::K::Map;
-        for (unsigned long long j = 0; j < n; ++j) { auto [key, o2] = decode_at(d, o); auto [val, o3] = decode_at(d, o2); c.map.push_back({key.i, val}); o = o3; }
-        return {c, o};
+        for (unsigned long long j = 0; j < n.value; ++j) {
+            auto key = checked_decode_at(d, off, depth + 1, limit);
+            if (!key) {
+                return DecodeResult<Cbor>::fail(key.error);
+            }
+            if (key.value.k != Cbor::K::Int) {
+                return DecodeResult<Cbor>::fail(DecodeError::non_integer_map_key());
+            }
+            if (key.value.i < 0) {
+                return DecodeResult<Cbor>::fail(DecodeError::negative_map_key(key.value.i));
+            }
+            for (const auto& kv : c.map) {
+                if (kv.first == key.value.i) {
+                    return DecodeResult<Cbor>::fail(DecodeError::duplicate_map_key(key.value.i));
+                }
+            }
+            auto val = checked_decode_at(d, off, depth + 1, limit);
+            if (!val) {
+                return DecodeResult<Cbor>::fail(val.error);
+            }
+            c.map.push_back({key.value.i, std::move(val.value)});
+        }
+        return DecodeResult<Cbor>::success(c);
     }
-    // major == 7
-    if (info == 20) { c.k = Cbor::K::Bool; c.i = 0; }
-    else if (info == 21) { c.k = Cbor::K::Bool; c.i = 1; }
-    else if (info == 25) {
-        c.k = Cbor::K::Float;
-        c.f = half_to_double(static_cast<std::uint16_t>((byte_at(d, off) << 8) | byte_at(d, off + 1)));
-        off += 2;
+    if (major == 7) {
+        if (info == 20 || info == 21) {
+            c.k = Cbor::K::Bool;
+            c.i = info == 21 ? 1 : 0;
+            return DecodeResult<Cbor>::success(c);
+        }
+        if (info == 22) {
+            c.k = Cbor::K::Null;
+            return DecodeResult<Cbor>::success(c);
+        }
+        if (info == 25) {
+            if (!has(d, off, 2)) {
+                return DecodeResult<Cbor>::fail(DecodeError::truncated());
+            }
+            c.k = Cbor::K::Float;
+            c.f = half_to_double(static_cast<std::uint16_t>((static_cast<unsigned char>(d[off]) << 8) | static_cast<unsigned char>(d[off + 1])));
+            off += 2;
+            return DecodeResult<Cbor>::success(c);
+        }
+        if (info == 26) {
+            if (!has(d, off, 4)) {
+                return DecodeResult<Cbor>::fail(DecodeError::truncated());
+            }
+            std::uint32_t bits = 0;
+            for (int j = 0; j < 4; ++j) {
+                bits = (bits << 8) | static_cast<unsigned char>(d[off + j]);
+            }
+            c.k = Cbor::K::Float;
+            c.f = static_cast<double>(f32_from_bits(bits));
+            off += 4;
+            return DecodeResult<Cbor>::success(c);
+        }
+        if (info == 27) {
+            if (!has(d, off, 8)) {
+                return DecodeResult<Cbor>::fail(DecodeError::truncated());
+            }
+            std::uint64_t bits = 0;
+            for (int j = 0; j < 8; ++j) {
+                bits = (bits << 8) | static_cast<unsigned char>(d[off + j]);
+            }
+            c.k = Cbor::K::Float;
+            c.f = f64_from_bits(bits);
+            off += 8;
+            return DecodeResult<Cbor>::success(c);
+        }
+        return DecodeResult<Cbor>::fail(DecodeError::unsupported_info(info));
     }
-    else if (info == 26) {
-        std::uint32_t bits = 0;
-        for (int j = 0; j < 4; ++j) bits = (bits << 8) | byte_at(d, off + j);
-        c.k = Cbor::K::Float;
-        c.f = static_cast<double>(f32_from_bits(bits));
-        off += 4;
-    }
-    else if (info == 27) {
-        std::uint64_t bits = 0;
-        for (int j = 0; j < 8; ++j) bits = (bits << 8) | byte_at(d, off + j);
-        c.k = Cbor::K::Float;
-        c.f = f64_from_bits(bits);
-        off += 8;
-    }
-    else { c.k = Cbor::K::Null; }
-    return {c, off};
+    // Major 6 (tags), whatever its additional info.
+    return DecodeResult<Cbor>::fail(DecodeError::unsupported_major(major));
 }
 
-constexpr Cbor parse(std::string_view d) { return decode_at(d, 0).first; }
+} // namespace cbor_detail
+
+// Decode one top-level item that fills `data` (CD-E5 steps 1-4): the raw decode, which
+// knows no schema. `max_depth` bounds nesting, a top-level array or map being at depth 1;
+// one above the ceiling applies the ceiling, and TooDeep's `limit` names the bound applied
+// (question 1). `max_encoded_len`, when given, bounds the input's length, checked before
+// any byte is read. A typed reader passes neither: its message's `try_decode` passes its
+// root's bounds (CD-B3). A depth below 1 is the caller's error, std::invalid_argument, not
+// a DecodeError.
+constexpr DecodeResult<Cbor> try_decode(std::string_view data, std::size_t max_depth = default_max_depth,
+                                        std::optional<std::size_t> max_encoded_len = std::nullopt) {
+    if (max_depth < 1) {
+        throw std::invalid_argument("taut::try_decode: max_depth must be at least 1");
+    }
+    const std::size_t limit = max_depth < max_depth_ceiling ? max_depth : max_depth_ceiling;
+    if (max_encoded_len.has_value() && data.size() > *max_encoded_len) {
+        return DecodeResult<Cbor>::fail(DecodeError::too_large(data.size(), *max_encoded_len));
+    }
+    std::size_t off = 0;
+    auto decoded = cbor_detail::checked_decode_at(data, off, 0, limit);
+    if (!decoded) {
+        return decoded;
+    }
+    if (off != data.size()) {
+        return DecodeResult<Cbor>::fail(DecodeError::trailing_bytes());
+    }
+    return decoded;
+}
 
 // Re-emit an arbitrary decoded value canonically (ascending map keys). Used by
 // forward-compat: residual fields a schema doesn't name are carried as raw Cbor

@@ -3,8 +3,8 @@ import type * as api from "./api.ts";
 
 export interface TasksHandlers {
   create(title: string): Promise<api.Task>;
-  comment(task_id: number, author: User, text: string): Promise<api.Comment>;
-  set_state(id: number, state: TaskState): Promise<api.boolean>;
+  comment(task_id: bigint, author: User, text: string): Promise<api.Comment>;
+  set_state(id: bigint, state: TaskState): Promise<api.boolean>;
   tasks_subscribe(): unknown;  // Subscription (atom)
   activity_subscribe(): unknown;  // Subscription (log)
 }

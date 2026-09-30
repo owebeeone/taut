@@ -43,7 +43,8 @@ _seq = {"n": 0}
 
 async def create(title):                       # unary -> Task
     _seq["n"] += 1
-    task = {"id": _seq["n"], "title": title, "state": "open", "assignee": None, "comments": []}
+    task = {"id": _seq["n"], "title": title, "state": "open", "assignee": None,
+            "comments": [], "labels": {}}      # every field: decode refuses a Task without labels
     tasks.set(tasks.get() + [task])            # atom: replace whole-state -> 'replace' event
     activity.append({"ts": _seq["n"], "text": f"created {title}"})  # log: 'append' event
     return task

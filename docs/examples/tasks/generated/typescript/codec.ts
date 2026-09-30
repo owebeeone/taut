@@ -3,78 +3,251 @@
 // plain object keyed by field name (enums as member-name strings, bytes as
 // Uint8Array). The wire is a projection of the tagged subset: messages -> CBOR
 // maps keyed by field tag, transient fields skipped, optionals always emitted
-// (null when absent).
+// (null when absent). Decoding bytes is rooted at one type, whose effective bounds,
+// from the IR through SchemaIndex, bound the whole call (decodeRef).
 
-import { CborFloat, type CborValue, decode as cborDecode, encode as cborEncode } from "./cbor.ts";
-import { type SchemaIndex, type TypeRef } from "./schema.ts";
+import {
+  CborFloat,
+  DecodeError,
+  EncodeError,
+  I64_MAX,
+  I64_MIN,
+  type CborValue,
+  type MapKey,
+  decode as cborDecode,
+  encode as cborEncode,
+} from "./cbor.ts";
+import { MISSING_OK, type SchemaIndex, type TypeRef } from "./schema.ts";
 
 // deno-lint friendly: native values are dynamic by nature.
 type Native = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
+function wrong(expected: string): never {
+  throw new DecodeError("WrongType", { expected });
+}
+
+function intToWire(value: Native): bigint {
+  let n: bigint;
+  if (typeof value === "bigint") {
+    n = value;
+  } else if (typeof value === "number" && Number.isSafeInteger(value)) {
+    n = BigInt(value);
+  } else {
+    throw new EncodeError(String(value));
+  }
+  if (n < I64_MIN || n > I64_MAX) throw new EncodeError(n);
+  return n;
+}
+
+function mapEntries(value: Native): [Native, Native][] {
+  if (value instanceof Map) return [...value.entries()];
+  throw new Error("taut map values must be Map instances in TypeScript");
+}
+
+// A str key's order (D24): by Unicode code point, which is the order of its UTF-8
+// bytes and of Python's sorted(str). JS `<` compares UTF-16 code units instead, and
+// puts a character above U+FFFF, whose surrogate pair starts d800-dbff, before one in
+// U+E000..U+FFFF. Equal code points advance both strings alike, so one index serves.
+function compareCodePoints(a: string, b: string): number {
+  let i = 0;
+  while (i < a.length && i < b.length) {
+    const x = a.codePointAt(i)!;
+    const y = b.codePointAt(i)!;
+    if (x !== y) {
+      return x < y ? -1 : 1;
+    }
+    i += x > 0xffff ? 2 : 1;
+  }
+  if (a.length === b.length) {
+    return 0;
+  }
+  return a.length < b.length ? -1 : 1;
+}
+
+// An int key is a number up to 2^53 - 1 or a bigint, and one map may hold both.
+function isIntKey(v: Native): boolean {
+  return typeof v === "bigint" || typeof v === "number";
+}
+
+// The order a map<K,V> field's entries are encoded in (D24): int keys by value, in
+// either form or one of each (`<` compares a number with a bigint exactly), str keys by
+// code point, and anything else by String(), which puts a bool key's false first.
+function compareNativeKey(a: Native, b: Native): number {
+  if (isIntKey(a) && isIntKey(b)) {
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  if (typeof a === "string" && typeof b === "string") {
+    return compareCodePoints(a, b);
+  }
+  const as = String(a);
+  const bs = String(b);
+  return as < bs ? -1 : as > bs ? 1 : 0;
+}
+
 function toWire(schema: SchemaIndex, t: TypeRef, value: Native): CborValue {
   switch (t.k) {
     case "scalar":
-      if (t.scalar === "float") return new CborFloat(Number(value));
+      if (t.scalar === "int") {
+        return intToWire(value);
+      }
+      if (t.scalar === "float") {
+        return new CborFloat(Number(value));
+      }
+      if (t.scalar === "bytes") {
+        if (!(value instanceof Uint8Array)) {
+          throw new Error("bytes values must be Uint8Array");
+        }
+        return value;
+      }
+      if (t.scalar === "str") {
+        if (typeof value !== "string") {
+          throw new Error("str values must be string");
+        }
+        return value;
+      }
+      if (t.scalar === "bool") {
+        if (typeof value !== "boolean") {
+          throw new Error("bool values must be boolean");
+        }
+        return value;
+      }
       return value as CborValue;
     case "enum":
-      return schema.enumDef(t.name).members[value as string];
+      return BigInt(schema.enumDef(t.name).members[value as string]);
     case "list":
       return (value as Native[]).map((v) => toWire(schema, t.elem, v));
     case "map": {
-      const entries = [...(value as Map<Native, Native>).entries()]
-        .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)); // ascending keys
+      const entries = mapEntries(value).sort((a, b) => compareNativeKey(a[0], b[0])); // ascending keys
       return entries.map(([k, v]) =>
-        new Map<number, CborValue>([[1, toWire(schema, t.key, k)], [2, toWire(schema, t.value, v)]]));
+        new Map<MapKey, CborValue>([[1, toWire(schema, t.key, k)], [2, toWire(schema, t.value, v)]]));
     }
     case "msg": {
       const m = schema.message(t.name);
-      const out = new Map<number, CborValue>();
+      const out = new Map<MapKey, CborValue>();
       for (const f of schema.wireFields(m)) {
         const fv = value[f.name];
         out.set(f.tag, fv === null || fv === undefined ? null : toWire(schema, f.type, fv));
       }
       // forward-compat: re-emit unknown tags this schema doesn't name (cbor sorts keys)
-      const residual = value.__unknown__ as Map<number, CborValue> | undefined;
-      if (residual) for (const [tag, raw] of residual) out.set(tag, raw);
+      const residual = value.__unknown__ as Map<MapKey, CborValue> | undefined;
+      if (residual) {
+        for (const [tag, raw] of residual) {
+          out.set(tag, raw);
+        }
+      }
       return out;
     }
   }
 }
 
+function intFromWire(cv: CborValue): bigint {
+  if (typeof cv === "bigint") return cv;
+  wrong("int");
+}
+
+// The WrongType.expected words are TautCheckedDecode.md CD-E6's: int, float,
+// bytes, text, bool, array and map.
 function fromWire(schema: SchemaIndex, t: TypeRef, cv: CborValue): Native {
   switch (t.k) {
     case "scalar":
-      if (cv instanceof CborFloat) return cv.value;
+      if (t.scalar === "int") {
+        return intFromWire(cv);
+      }
+      if (t.scalar === "float") {
+        if (!(cv instanceof CborFloat)) {
+          wrong("float");
+        }
+        return cv.value;
+      }
+      if (t.scalar === "bytes") {
+        if (!(cv instanceof Uint8Array)) {
+          wrong("bytes");
+        }
+        return cv;
+      }
+      if (t.scalar === "str") {
+        if (typeof cv !== "string") {
+          wrong("text");
+        }
+        return cv;
+      }
+      if (t.scalar === "bool") {
+        if (typeof cv !== "boolean") {
+          wrong("bool");
+        }
+        return cv;
+      }
       return cv;
     case "enum": {
+      const wire = intFromWire(cv);
       const members = schema.enumDef(t.name).members;
-      for (const [name, val] of Object.entries(members)) if (val === cv) return name;
-      throw new Error(`unknown enum value ${cv} for ${t.name}`);
+      for (const [name, val] of Object.entries(members)) {
+        if (BigInt(val) === wire) {
+          return name;
+        }
+      }
+      throw new DecodeError("UnknownEnum", { enum: t.name, value: wire.toString() });
     }
     case "list":
-      return (cv as CborValue[]).map((v) => fromWire(schema, t.elem, v));
+      if (!Array.isArray(cv)) {
+        wrong("array");
+      }
+      return cv.map((v) => fromWire(schema, t.elem, v));
     case "map": {
+      if (!Array.isArray(cv)) {
+        wrong("array");
+      }
       const out = new Map<Native, Native>();
-      for (const e of cv as CborValue[]) {
-        const em = e as Map<number, CborValue>;
-        out.set(fromWire(schema, t.key, em.get(1)!), fromWire(schema, t.value, em.get(2)!));
+      for (const e of cv) {
+        if (!(e instanceof Map)) {
+          wrong("map");
+        }
+        if (!e.has(1)) {
+          throw new DecodeError("MissingKey", { key: 1 });
+        }
+        if (!e.has(2)) {
+          throw new DecodeError("MissingKey", { key: 2 });
+        }
+        const key = fromWire(schema, t.key, e.get(1)!);
+        if (out.has(key)) {
+          throw new DecodeError("DuplicateMapKey", { key });
+        }
+        out.set(key, fromWire(schema, t.value, e.get(2)!));
       }
       return out;
     }
     case "msg": {
       const m = schema.message(t.name);
-      const map = cv as Map<number, CborValue>;
+      if (!(cv instanceof Map)) {
+        wrong("map");
+      }
+      const map = cv as Map<MapKey, CborValue>;
       const out: Native = {};
-      const known = new Set<number>();
+      const known = new Set<MapKey>();
       for (const f of schema.wireFields(m)) {
         known.add(f.tag);
-        const raw = map.get(f.tag);
-        out[f.name] = raw === null || raw === undefined ? null : fromWire(schema, f.type, raw);
+        if (!map.has(f.tag)) {
+          // Absent is MissingKey, for an optional field too, unless the field is
+          // MISSING_OK (TautCheckedDecode.md CD-E5).
+          if (f.optional !== MISSING_OK) {
+            throw new DecodeError("MissingKey", { key: f.tag });
+          }
+          out[f.name] = null;
+          continue;
+        }
+        const raw = map.get(f.tag)!;
+        out[f.name] = raw === null && f.optional ? null : fromWire(schema, f.type, raw);
       }
       // forward-compat: capture tags this schema doesn't know (preserved raw)
-      const residual = new Map<number, CborValue>();
-      for (const [tag, raw] of map) if (!known.has(tag)) residual.set(tag, raw);
-      if (residual.size) out.__unknown__ = residual;
+      const residual = new Map<MapKey, CborValue>();
+      for (const [tag, raw] of map) {
+        if (!known.has(tag)) {
+          residual.set(tag, raw);
+        }
+      }
+      if (residual.size) {
+        out.__unknown__ = residual;
+      }
       return out;
     }
   }
@@ -84,8 +257,10 @@ export function encode(schema: SchemaIndex, message: string, value: Native): Uin
   return cborEncode(toWire(schema, { k: "msg", name: message }, value));
 }
 
+// Bytes -> native value, rooted at `message`: its effective bounds, then the strict
+// schema stage (decodeRef).
 export function decode(schema: SchemaIndex, message: string, data: Uint8Array): Native {
-  return fromWire(schema, { k: "msg", name: message }, cborDecode(data));
+  return decodeRef(schema, { k: "msg", name: message }, data);
 }
 
 // TypeRef-driven (for IR-declared method params / outputs / events).
@@ -93,6 +268,13 @@ export function encodeRef(schema: SchemaIndex, tref: TypeRef, value: Native): Ui
   return cborEncode(toWire(schema, tref, value));
 }
 
+// Bytes -> native value, rooted at any type, such as an RPC slot's list<Tree>. The
+// root's effective max_depth and max_encoded_len, a message's own or else the file's,
+// bound the whole call (TautOptions.md OPT-D4, OPT-L6): the raw stage applies them,
+// and a message nested inside changes neither. A typed decode takes no bounds of its
+// own, so no caller can raise or lower its root's.
 export function decodeRef(schema: SchemaIndex, tref: TypeRef, data: Uint8Array): Native {
-  return fromWire(schema, tref, cborDecode(data));
+  const bounds = schema.rootEffective(tref);
+  const tree = cborDecode(data, { maxDepth: bounds.max_depth, maxEncodedLen: bounds.max_encoded_len });
+  return fromWire(schema, tref, tree);
 }
