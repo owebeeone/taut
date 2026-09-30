@@ -1028,6 +1028,7 @@ def test_ext_runtime_public_api_source_shape():
     assert "root.kind != Cbor.MAP" in src
 
 
+@pytest.mark.gate
 def test_java_passes_the_shared_parity_gate():
     """Every row of the shared corpus through the gate's Java runner (`tautc parity -t
     java`), as java and java/fc, each held to the gate's governance: GREEN, or RED and

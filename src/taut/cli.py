@@ -123,10 +123,17 @@ def _cmd_json(args: argparse.Namespace) -> int:
     return 0
 
 
+def _positive_int(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be at least 1, not {value}")
+    return value
+
+
 def _cmd_parity(args: argparse.Namespace) -> int:
     try:
         outcome = parity.run_gate(target=args.target, run_compiled=not args.no_compile,
-                                  require_all=args.require_all)
+                                  require_all=args.require_all, jobs=args.jobs)
     except parity.ParityValidationError as exc:
         print(f"parity: {exc}", file=sys.stderr)
         return 2
@@ -184,6 +191,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="replay only this target's runners, the target and its <target>/fc, or one "
                          "variant such as rust/fc (default: every variant that has a runner — python "
                          "in-process, any other through its taut.corpus.parity_<target> module)")
+    pr.add_argument("-j", "--jobs", type=_positive_int, metavar="N",
+                    help="run up to N targets at once, each building in its own temporary directory "
+                         "(default: one per CPU)")
     scope = pr.add_mutually_exclusive_group()
     scope.add_argument("--no-compile", action="store_true",
                        help="skip the compiled/subprocess targets; run only the direct Python harness")

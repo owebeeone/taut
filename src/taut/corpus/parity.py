@@ -89,9 +89,11 @@ import functools
 import importlib
 import importlib.util
 import json
+import os
 import re
 import subprocess
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -986,18 +988,22 @@ class _Runners(Mapping[str, Callable[[], TargetReport]]):
 _RUNNERS: Mapping[str, Callable[[], TargetReport]] = _Runners()
 
 
-def run_targets(targets: Iterable[str]) -> dict[str, TargetReport]:
-    """Run each target or variant that has a runner; one without is left out, and a
-    runner that raises is RED rather than stopping the others."""
-    reports: dict[str, TargetReport] = {}
-    for target in targets:
-        if target not in _RUNNERS:
-            continue
+def run_targets(targets: Iterable[str], *, jobs: int | None = None) -> dict[str, TargetReport]:
+    """Run each target or variant that has a runner, up to `jobs` at once (default: one per
+    CPU): each builds in its own temporary directory, so they run side by side. One without a
+    runner is left out, a runner that raises is RED rather than stopping the others, and the
+    reports keep `targets`' order."""
+    names = [target for target in targets if target in _RUNNERS]
+
+    def run(target: str) -> TargetReport:
         try:
-            reports[target] = _RUNNERS[target]()
+            return _RUNNERS[target]()
         except Exception as exc:  # noqa: BLE001 — one broken runner must not hide the others
-            reports[target] = red(target, f"runner raised\n{type(exc).__name__}: {exc}")
-    return reports
+            return red(target, f"runner raised\n{type(exc).__name__}: {exc}")
+
+    workers = max(1, min(len(names), jobs or os.cpu_count() or 1))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        return dict(zip(names, pool.map(run, names)))
 
 
 # --- governance + summary -----------------------------------------------------
@@ -1111,11 +1117,12 @@ def _selected(target: str) -> tuple[str, ...]:
 
 
 def run_gate(*, target: str | None = None, run_compiled: bool = True,
-             require_all: bool = False) -> GateOutcome:
+             require_all: bool = False, jobs: int | None = None) -> GateOutcome:
     """Validate the artifacts, run the runners and judge governance. By default every
     variant that has a runner; `target` runs a target's variants or one variant, and
     `run_compiled=False` runs Python only. `require_all` also fails the gate for each
-    selected variant that did not run (`unrun`), as a release requires."""
+    selected variant that did not run (`unrun`), as a release requires. `jobs` bounds how many
+    runners run at once (`run_targets`)."""
     if target is not None:
         wanted = _selected(target)
     elif run_compiled:
@@ -1127,7 +1134,7 @@ def run_gate(*, target: str | None = None, run_compiled: bool = True,
     bounds_count = validate_bounds_vectors()
     statuses = target_statuses()
     allow = {s.target for s in statuses if s.status == "allowlisted"}
-    reports = run_targets(wanted)
+    reports = run_targets(wanted, jobs=jobs)
 
     violations = governance(reports, allow)
     if require_all:

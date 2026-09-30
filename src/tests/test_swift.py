@@ -455,6 +455,7 @@ def test_float_codegen_shape():
     assert "return try wire_v.tryFloat()" in s
 
 
+@pytest.mark.gate
 def test_swift_parity_gate_is_green():
     # The shared corpus, lead rows included, through the gate's own Swift runner
     # (`tautc parity -t swift`), as swift and swift/fc: every row reported, judged on tag

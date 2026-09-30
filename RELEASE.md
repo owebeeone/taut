@@ -124,9 +124,16 @@ package publication and documentation deployment where configured.
 ## taut's checks
 
 `gearu.toml` runs `scripts/release_checks.py`, which took over from `scripts/release.py` in
-v0.10.0. That script tagged as well as checking. The checks run in two groups:
-- metadata, the tests and the parity gate, on gearu's candidate;
-- the build, `twine check` and the wheel's smoke test, on the commit gearu tags.
+v0.10.0. That script tagged as well as checking. gearu runs every step on its candidate, and
+rereads only the metadata on the commit it tags: a tag-derived version needs no release commit.
+
+After the metadata step, three chains run side by side: the tests; the parity gate; and the build
+followed by the wheel's smoke test. Each step logs to its own file, and a failed step prints the end
+of its log.
+- The tests run one worker per CPU through `pytest-xdist`.
+- They leave out the tests marked `gate`, which rerun the gate's runners: the parity step runs the
+  whole gate itself.
+- The gate builds its targets side by side, one per CPU by default (`tautc parity --jobs N`).
 
 The tests step fails if any test skips, and the parity step runs `tautc parity --require-all`.
 Every language and forward-compat build must run, so every toolchain must be installed: `rustc`,
@@ -141,8 +148,8 @@ To show that a tree is ready to tag without tagging it, run every step, preferab
 clone:
 
 ```sh
-uv run --no-project --python 3.13 --with pytest --with build --with twine \
-    python scripts/release_checks.py 0.10.0
+uv run --no-project --python 3.13 --with pytest --with pytest-xdist --with build \
+    --with twine python scripts/release_checks.py 0.10.0
 ```
 
 The script takes the version in Python's form, which is what gearu passes as `{python_version}`:

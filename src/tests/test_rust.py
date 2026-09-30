@@ -1949,6 +1949,7 @@ def test_glade_build_writes_the_fail_closed_codec_and_runtime(tmp_path, monkeypa
 # The gate.
 # =============================================================================
 
+@pytest.mark.gate
 def test_rust_passes_the_parity_gate():
     """Every row of the shared corpus through the gate's Rust runner (`tautc parity -t rust`),
     as rust and rust/fc, each held to the gate's governance: GREEN, or RED and allowlisted.

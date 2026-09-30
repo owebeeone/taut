@@ -21,6 +21,7 @@ import keyword
 import os
 import sys
 import textwrap
+import threading
 
 import pytest
 
@@ -1013,6 +1014,28 @@ def test_the_cli_takes_a_target_or_an_fc_variant(monkeypatch, capsys):
     assert refused.value.code == 2
 
 
+def test_the_gate_runs_its_targets_side_by_side(monkeypatch):
+    """Each runner builds in its own temporary directory, so the gate runs them at once, one
+    per CPU unless `jobs` says otherwise: two runners that each wait for the other finish only
+    when they run together. The reports keep the variants' order."""
+    def waiting(name, meet):
+        def run():
+            meet.wait()
+            return parity.parse_report(name, "\n".join(_passing_lines(name)))
+        return run
+
+    together = threading.Barrier(2, timeout=10)
+    monkeypatch.setattr(parity, "_RUNNERS", {name: waiting(name, together) for name in ("go", "go/fc")})
+    outcome = parity.run_gate(target="go")
+    assert [(name, rep.green) for name, rep in outcome.reports.items()] == [("go", True), ("go/fc", True)]
+    alone = threading.Barrier(2, timeout=0.5)
+    monkeypatch.setattr(parity, "_RUNNERS", {name: waiting(name, alone) for name in ("go", "go/fc")})
+    assert not any(rep.green for rep in parity.run_gate(target="go", jobs=1).reports.values())
+    with pytest.raises(SystemExit) as refused:
+        main(["parity", "--jobs", "0"])
+    assert refused.value.code == 2
+
+
 def test_require_all_fails_the_gate_when_a_selected_variant_did_not_run(monkeypatch, capsys):
     """A missing toolchain skips its target, which the gate reports without failing. A release
     runs `tautc parity --require-all`, under which a selected variant that skipped, or has no
@@ -1047,6 +1070,7 @@ def test_parity_cli_python_only_reports_clean(capsys):
     assert "governance: clean" in out
 
 
+@pytest.mark.gate
 def test_full_gate_governance_clean():
     """End-to-end: every target that has a runner, through `tautc parity`. A missing
     toolchain skips with its reason (not a violation), so this holds whichever

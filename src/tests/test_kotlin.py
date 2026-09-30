@@ -721,6 +721,7 @@ def test_kotlin_float_parity_harness_if_kotlinc(tmp_path):
     subprocess.run([java, "-jar", str(jar)], check=True, cwd=ROOT, env=_java_env(java))
 
 
+@pytest.mark.gate
 def test_kotlin_passes_the_parity_gate():
     """The shared corpus, lead rows included, through `tautc parity`'s Kotlin runner
     (`taut.corpus.parity_kotlin`: one kotlinc build each), as kotlin and kotlin/fc, each held

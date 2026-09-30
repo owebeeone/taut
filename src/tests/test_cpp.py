@@ -188,6 +188,7 @@ def test_cpp_codegen_emits_each_messages_bounds_and_typed_decode():
     assert "static ::taut::DecodeResult<::taut::IntBox> try_decode(" in _struct_text(hpp, "IntBox")
 
 
+@pytest.mark.gate
 def test_cpp_passes_the_parity_gate():
     """Every row of the shared corpus through the gate's C++ runner (`tautc parity -t cpp`),
     as cpp and cpp/fc, each held to the gate's governance: GREEN, or RED and allowlisted."""

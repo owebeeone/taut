@@ -3,6 +3,7 @@
 release itself; these tests pin its interface, its metadata check, and that gearu.toml runs every
 step once, with the release's version."""
 
+import ast
 import importlib.util
 import subprocess
 import sys
@@ -15,10 +16,11 @@ SCRIPT = ROOT / "scripts" / "release_checks.py"
 
 
 def _script():
-    spec = importlib.util.spec_from_file_location("release_checks", SCRIPT)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    if "release_checks" not in sys.modules:   # registered first, as an import would: dataclass needs it
+        spec = importlib.util.spec_from_file_location("release_checks", SCRIPT)
+        sys.modules["release_checks"] = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sys.modules["release_checks"])
+    return sys.modules["release_checks"]
 
 
 def _run(*args):
@@ -55,14 +57,25 @@ def test_a_bad_step_selection_is_refused(only):
     assert run.returncode == 2 and "release_checks.py: error:" in run.stderr, run.stderr
 
 
-def test_gearu_runs_every_step_once_with_the_release_version():
+def test_gearu_runs_every_step_on_its_candidate_and_rereads_metadata_on_the_tagged_commit():
+    """A tag-derived version needs no release commit, so the commit gearu tags is its candidate:
+    `checks` runs every step once, and `exact_checks` only rereads the metadata."""
     tomllib = pytest.importorskip("tomllib")
     release = tomllib.loads((ROOT / "gearu.toml").read_text(encoding="utf-8"))["release"]
-    steps = []
-    for command in (*release["checks"], *release["exact_checks"]):
+    [checks], [exact] = release["checks"], release["exact_checks"]
+    for command in (checks, exact):
         assert command[command.index("scripts/release_checks.py") + 1] == "{python_version}"
-        steps += command[command.index("--only") + 1].split(",")
-    assert steps == list(_script().STEPS)
+    assert "--only" not in checks
+    assert exact[exact.index("--only") + 1] == "metadata"
+    assert {"pytest", "pytest-xdist", "build", "twine"} <= {
+        checks[i + 1] for i, arg in enumerate(checks) if arg == "--with"}
+
+
+def test_metadata_runs_first_and_the_other_steps_side_by_side():
+    stages = _script().stages
+    assert stages(_script().STEPS) == [[("metadata",)], [("tests",), ("parity",), ("build", "smoke")]]
+    assert stages(("metadata",)) == [[("metadata",)]]
+    assert stages(("parity", "build", "smoke")) == [[("parity",), ("build", "smoke")]]
 
 
 def test_the_tests_step_names_each_skipped_test_but_not_an_expected_failure(tmp_path):
@@ -78,3 +91,32 @@ def test_the_tests_step_names_each_skipped_test_but_not_an_expected_failure(tmp_
         '<testcase classname="tests.test_x" name="test_c"/>'
         '</testsuite></testsuites>', encoding="utf-8")
     assert _script().skipped_tests(report) == ["tests.test_kotlin.test_a: no kotlinc that runs"]
+
+
+def _gate_reruns():
+    """Each test that reruns what the parity step runs, with whether it is marked `gate`: one
+    that runs the whole gate (`parity.run_gate(run_compiled=True)`), or a target's real runner
+    through `parity.governed_variants`."""
+    found = {}
+    for path in sorted((ROOT / "src" / "tests").glob("test_*.py")):
+        for fn in ast.parse(path.read_text(encoding="utf-8")).body:
+            if not (isinstance(fn, ast.FunctionDef) and fn.name.startswith("test_")):
+                continue
+            for call in (node for node in ast.walk(fn) if isinstance(node, ast.Call)):
+                name = ast.unparse(call.func)
+                runner = (name == "parity.governed_variants" and call.args
+                          and ast.unparse(call.args[0]).startswith("parity_"))
+                whole = name == "parity.run_gate" and any(
+                    k.arg == "run_compiled" and ast.unparse(k.value) == "True" for k in call.keywords)
+                if runner or whole:
+                    marks = {ast.unparse(d) for d in fn.decorator_list}
+                    found[f"{path.name}::{fn.name}"] = "pytest.mark.gate" in marks
+    return found
+
+
+def test_every_test_that_reruns_the_gate_is_marked_gate():
+    """The release's tests step deselects `gate` tests, because its parity step runs the whole
+    gate with --require-all. An unmarked rerun would build every target twice."""
+    found = _gate_reruns()
+    assert len(found) == 8, found      # the whole gate, and seven generated targets' own runs
+    assert [name for name, marked in found.items() if not marked] == []

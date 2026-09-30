@@ -48,3 +48,6 @@ include = ["taut*"]
 
 [tool.pytest.ini_options]
 testpaths = ["src/tests"]
+markers = [
+    "gate: reruns the parity gate's runners; a release deselects these, since its parity step runs the whole gate with --require-all",
+]

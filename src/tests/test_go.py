@@ -188,6 +188,7 @@ def _failures(report: parity.TargetReport) -> str:
     return "\n".join([report.fault, *(f"{r.name}: {r.detail}" for r in report.failures)])
 
 
+@pytest.mark.gate
 def test_go_parity_gate_is_green():
     """`tautc parity -t go`: every int, malformed and bounds row through the generated Go
     codec, as go and go/fc, each held to the gate's governance: GREEN, or RED and

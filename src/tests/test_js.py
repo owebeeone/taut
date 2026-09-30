@@ -862,6 +862,7 @@ def _needs_node() -> None:
         pytest.skip("node is not installed")
 
 
+@pytest.mark.gate
 def test_js_parity_gate_is_green():
     """`tautc parity -t js`: every int, malformed and bounds row through the generated JS codec,
     as js and js/fc, each held to the gate's governance: GREEN, or RED and allowlisted."""
