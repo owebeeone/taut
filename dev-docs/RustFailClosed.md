@@ -1,5 +1,9 @@
 # Fail-closed Rust codec (the default since v0.8.0)
 
+**2026-09-30, v0.10.0:** the legacy path is removed, as D1's sunset set: `--legacy-codec`, `emit()`'s
+`fail_closed` parameter, the legacy `cbor.rs` template, and the runtime's panicking `decode()` and
+accessors (taut `0a9da65`). Every generated Rust codec is fail-closed and bounded (`3b1c272`).
+
 **Status:** implemented and **the default** (D1 ratified, flipped @ **v0.8.0**).
 `tautc gen` emits the fail-closed Rust codec with no flag. The legacy fail-open
 codec survives only behind the deprecated **`--legacy-codec`** opt-out (warns on

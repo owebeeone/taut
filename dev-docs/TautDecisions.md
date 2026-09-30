@@ -273,8 +273,8 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
   (no default). The shared corpus is parity contract
   `taut-codec-parity/i64/v1`. The legacy codec goes in the same release, with no
   opt-out. See [TautCheckedDecode.md](TautCheckedDecode.md).
-  *(RULED 2026-09-28 and 2026-09-30; built in v0.10.0 by
-  [TautV010Plan.md](TautV010Plan.md).)*
+  *(RULED 2026-09-28 and 2026-09-30; BUILT for v0.10.0, taut `d875e4e` to `7ad69b3`,
+  [TautV010Plan.md](TautV010Plan.md) §5.)*
 - **D27. Options.** Typed properties declared with a schema, as in protobuf.
   Each option has one definition: name, value type, levels, default,
   inheritance, and a class. The classes are *wire*, *codegen* and *metadata*,
@@ -284,8 +284,8 @@ distribution/gate → [TautDistribution.md](TautDistribution.md); code shape →
   every level and resolved `effective` values at file and message. An unknown
   name is refused everywhere. A changed wire option is breaking in both
   directions. The first two options are `max_depth` and `max_encoded_len`. See
-  [TautOptions.md](TautOptions.md). *(RULED 2026-09-28 and 2026-09-30; built in
-  v0.10.0.)*
+  [TautOptions.md](TautOptions.md). *(RULED 2026-09-28 and 2026-09-30; BUILT for
+  v0.10.0, taut `553b74a` to `09523b4`.)*
 
 ## Already-built foundation (for reference)
 

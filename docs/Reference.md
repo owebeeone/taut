@@ -128,6 +128,39 @@ The older all-explicit form is still valid for compatibility:
 Msg("Task", F("id", 1, INT), F("title", 2, STR))
 ```
 
+### Options
+
+An option is a typed property declared with the schema, as in protobuf (D27, TautOptions.md). It is
+written as a positional value, `option.<name>(value)`, at file level (in `schema(...)`), at message
+level (in `Msg(...)`), at field level (after `F`'s type) or at enum level (in `Enum(...)`). Enum
+value, service and method levels are reserved:
+
+```python
+from taut.ir.dsl import option
+
+SCHEMA = schema(
+    option.max_depth(16),                            # file level
+    Tree=Msg(option.max_depth(64),                   # message level, overrides the file's
+             kids=F(1, List(Ref.Tree))),
+)
+```
+
+- **One definition per option:** its value type, the levels it may sit at, its default, how it
+  inherits, and its class: *wire* (changes what decodes), *codegen*, *metadata* or *semantic*.
+- **An unknown name fails:** at import (`option.max_dept` raises), in IR JSON at load, and in
+  `validate`. `option("ns.name", v)` is reserved for custom options.
+- **Effective values** resolve from the element out: a message's own value, else the file's, else
+  the default (`taut.ir.options.effective`). A message used inside another inherits nothing from it.
+- **The first two options** are both wire options, at file and message level:
+  - `max_depth`: default 32, 1 to 128.
+  - `max_encoded_len`: no default, 1 to 2^31 − 1.
+
+  They bound a decode call (§8).
+- **Compatibility:** changing a wire option's effective value at any root is breaking, in both
+  directions (§10's gate).
+- **The IR** (version 2) carries each level's declared `options`, and the resolved `effective`
+  values at file and message level. The loader recomputes `effective` and refuses a stale one.
+
 ## 5. Services and methods (web APIs)
 
 ```python
@@ -247,19 +280,42 @@ canonical encoder could emit: `decode(bytes)` succeeds only if `encode(decode(by
 No conforming writer omits a field's key, and accepting a message without it would re-encode to
 different bytes. This replaced an earlier, lenient model
 ([TautModules.md §2](../dev-docs/TautModules.md)) in which a missing field, even a required one,
-decoded to null. Rust, JavaScript and Python's `codec.decode` follow the rule (`decode_struct` is
-lenient unless called with `strict=True`); TypeScript still reads a missing optional key as `None`
-until the checked-decode release brings it in line
-([TautCheckedDecode.md](../dev-docs/TautCheckedDecode.md)).
+decoded to null. Every language follows the rule, and the parity corpus pins it (Python's
+`decode_struct`, which reads a decoded tree, is lenient unless called with `strict=True`).
 
 What it means for evolving a schema: after an optional field is added, an old reader still reads new
 messages (it keeps the new tag as an unknown field, below), but a new reader refuses a message written
 before the field existed. Adding the field with `optional=MISSING_OK` avoids that: a new reader reads
 the field of such a message as `None`. For that field the round trip deliberately changes bytes,
 since re-encoding the message writes the key, as `null`. The breaking-change gate treats presence as
-a ladder, `False` to `True` to `MISSING_OK`: a move up is compatible and a move down breaking.
+a ladder, `False` to `True` to `MISSING_OK`: a move up is compatible and a move down breaking, and
+it treats adding a field as compatible only at `MISSING_OK`.
 Without `MISSING_OK`, upgrade writers before readers, and re-encode stored messages before a new
 reader reads them.
+
+### Decode: one error, fail-closed, bounded
+
+Every decode entry point, in every language, returns a value or a `DecodeError` (in the language's
+idiom). It never panics, aborts, overflows its stack or throws anything else. The nine languages
+give the same tag and payload for the same bytes, in one order of checks; the tags, payloads and
+order are in [CodecContract.md](CodecContract.md). Decoding is strict-canonical: it accepts only
+what the canonical encoder could write.
+
+A decode call is bounded by its **root**, the message it is asked to decode:
+- **Depth.** The root's effective `max_depth` (default 32, never above 128). A top-level array or
+  map has depth 1; one level deeper than the bound is `TooDeep{limit}`.
+- **Length.** The root's effective `max_encoded_len`, if one is declared. Longer input is
+  `TooLarge{len, limit}`, before any byte is read.
+- **Typed decode** (Python's `codec.decode`, TypeScript's `decode`, each generated message's
+  `decode`) applies the root's bounds and takes no bounds argument, so every reader of a root
+  agrees.
+- **Raw decode** knows no schema. It applies depth 32 and no length bound unless the caller passes
+  bounds, with the depth capped at 128. Python's form is `cbor.loads(data, *, max_depth=32,
+  max_encoded_len=None)`.
+- **Extension helpers** read a host at the ceiling, 128, with no length bound. A host that is not a
+  map is `WrongType{map}`.
+
+A message nested inside another does not change the bounds of a call in progress.
 
 ### Forward compatibility (unknown-field preservation, default-on)
 
@@ -302,7 +358,16 @@ raises on any error. It enforces:
   above it and are unique; an extension's message exists;
 - every method has a known `shape` and a non-empty `out` whose slots ⊆ the
   shape's slots (no duplicate slots); `unary` is the default once-delivered shape;
-- known `role` and `kind`.
+- known `role` and `kind`;
+- every declared option is registered, sits at a level its definition allows, and holds a value of
+  its type and range;
+- at every root (each message, and each method's param and out slot types), `max_depth` is at
+  least the root's non-recursive nesting and at most 128, and a declared `max_encoded_len` is at
+  least the root's smallest encoding.
+
+`lint(schema) -> list[str]` returns warnings that never fail a build, which `tautc` prints:
+- a recursive message that declares no `max_depth`;
+- a message whose declared bound cannot take effect inside another message that embeds it.
 
 ## 10. Toolchain / library API
 
@@ -321,7 +386,9 @@ from taut.ir import compat
 | `schema_from_json(data)` | inverse — load `Schema` from IR JSON (lossless round-trip) |
 | `validate(schema)` / `validate_or_raise(schema)` | coherence check |
 | `codec.encode(schema, msg, value)` → `bytes` | native dict → CBOR |
-| `codec.decode(schema, msg, bytes)` → `dict` | CBOR → native dict |
+| `codec.decode(schema, msg, bytes)` → `dict` | CBOR → native dict, bounded by `msg`'s effective options |
+| `cbor.loads(data, *, max_depth=32, max_encoded_len=None)` | raw CBOR decode, no schema |
+| `options.effective(schema, name, message=...)` | an option's effective value |
 | `codec.encode_struct` / `decode_struct` | composable int-keyed form (for nesting) |
 | `compat.diff(old, new)` / `breaking(...)` / `check_or_raise(...)` | the version diff |
 
@@ -335,6 +402,10 @@ The TypeScript generic runtime lives in `src/taut/gen/runtime/typescript/` and i
 emitted by `tautc gen --lang typescript --with-runtime`; Rust/C++ can still be
 pointed at whatever generated-output tree the caller chooses.
 
+**`tautc`** runs `validate` and prints `lint`'s warnings before it generates or exports.
+`--legacy-codec` is gone: every generated codec is fail-closed, and `--fail-closed` is accepted as
+a no-op.
+
 **The project's own build** (worked example): `python3 -m taut.corpus.build`
 validates the GripLab IR (`taut/ir/griplab.taut.py`), exports
 `corpus/griplab.ir.json`, and writes the golden corpus + Rust + C++ artifacts.
@@ -347,6 +418,11 @@ validates the GripLab IR (`taut/ir/griplab.taut.py`), exports
 - **Regeneration gate** (`taut/src/tests/test_regen.py`): generated files must
   byte-match fresh generator output — hand-edits fail CI.
 - **Breaking-change gate** (§10) — governs API evolution.
+- **Parity gate** (`tautc parity`): replays `corpus/parity/{int,malformed,bounds}.vectors.json`
+  through all nine codecs, and through the seven generated ones built with forward-compat
+  (`<target>/fc`). It compares tag and payload and checks each accepted row's re-encoding. A target
+  may fail only while `corpus/parity/allowlist.json` lists it with a reason. The contract is
+  `taut-codec-parity/i64/v1`; see [CodecContract.md](CodecContract.md).
 
 ## 12. Reference implementations
 

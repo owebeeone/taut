@@ -1,5 +1,14 @@
 # Checked decode: one error and schema-declared bounds in every taut language
 
+**rev10, 2026-09-30:** built in v0.10.0 ([TautV010Plan.md](TautV010Plan.md) §5):
+- the bounds in all nine codecs (§3; Python `d875e4e`, the rest D1);
+- the corpus rows B1-B30 and their protocol (`8c85acf`);
+- question 9's key as text and question 10's forward-compat variants (`288b99e` and D2);
+- fail-closed extension helpers and the legacy codec's removal (D2).
+
+All nine codecs and seven forward-compat builds pass every row, and the parity contract is
+`taut-codec-parity/i64/v1`. The contract is stated in `docs/CodecContract.md`.
+
 **rev9, 2026-09-30:** every open question is ruled as recommended ("All 14 as recco. Go"): 1, 3,
 5, 7, 8, 9 and 10 take (a). The note becomes decision D26 and is built in v0.10.0
 ([TautV010Plan.md](TautV010Plan.md)). Changed: the status and §8.

@@ -125,3 +125,28 @@ As in the parity pass:
    `checked.rs` and `wellformed.rs`. glade's schema declares `max_encoded_len`, and `frame_len` takes
    its limit from it.
 4. gwz-dev regenerates in its own lane; client-ts follows the node step (question 8).
+
+## 5. Status
+
+**2026-09-30: phases A-D are done; E is in progress.** All nine codecs, and the seven generated
+targets' forward-compat builds, pass all 88 rows of `tautc parity`. The allowlist is empty, and
+taut's suite passes 878 tests.
+
+| Phase | Step | taut commit |
+|---|---|---|
+| A | the rulings and this plan | `b54849e` |
+| B | B1 options core, B4 compatibility and the generator refusal, B3 IR version 2, B2 validate and lint | `553b74a`, `50d5050`, `cdf668a`, `09523b4` |
+| C | C1 Python's bounds, C2 forward-compat variants with question 9's rows and `Names`, C3 the bounds rows and protocol | `d875e4e`, `288b99e`, `8c85acf` |
+| D2 | go, rust (the legacy codec removed), js and typescript, swift, kotlin, cpp, java | `97f7b67`, `0a9da65`, `11982f8`, `b66f13e`, `b405655`, `84be8b2`, `caed122` |
+| D1 | typescript, js, rust, swift, java, cpp, kotlin, go | `1b95d2b`, `288f82a`, `3b1c272`, `7f7a930`, `1a9bc03`, `21871e2`, `4516e6e`, `7ad69b3` |
+
+D2 ran before D1, and C2 before C3, so that the forward-compat model existed before the bounds rows
+that need it; the plan's steps are otherwise as written.
+
+**Found and fixed on the way:**
+- Generator hygiene in cpp, swift and java: locals are prefixed, runtime names are qualified, and
+  Java's codecs live in `<Message>$Codec`.
+- Go and C++ can generate glade's own schema, an optional list among its fields.
+- The 32-bit length truncation in Rust.
+- TypeScript's RPC client, which hung when a response failed to decode.
+- Kotlin's forward-compat build of a field-less message.

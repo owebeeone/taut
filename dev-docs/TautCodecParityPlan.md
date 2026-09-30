@@ -178,6 +178,11 @@ rejection** on encode+decode, §2c/D2 strictness, `fail_closed=True` default in 
 - **4.2 —** Green each; remove from the allowlist. Parallelizes in code; CI toolchains are the real cost.
 
 ### Phase 5 — Governance
+**2026-09-30 (v0.10.0):**
+- 5.1 is `docs/CodecContract.md`.
+- D1's sunset is done: the legacy codec is gone (taut `0a9da65`).
+- 5.3's contract is `taut-codec-parity/i64/v1`.
+- Phase 4 is done: every Wave-2 target is gated GREEN (TautV010Plan.md §5).
 - **5.1 — `CodecContract.md`:** the two invariants (`i64` + fail-closed), the tag table + payloads +
   `IntOutOfSubset`, D2 outcome, corpus paths + `tautc parity`, the resolved **D1 sunset**, the "not parity until
   it passes the corpus" rule, a **live nine-target status list**, and a note that the shape layer's rs/py/ts

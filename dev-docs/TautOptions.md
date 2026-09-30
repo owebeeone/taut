@@ -1,5 +1,13 @@
 # Options: typed properties declared with a taut schema
 
+**rev11, 2026-09-30:** built in v0.10.0 ([TautV010Plan.md](TautV010Plan.md) §5):
+- `options.py`, the model and the DSL (B1, `553b74a`);
+- validate and lint (B2, `09523b4`);
+- IR version 2 (B3, `cdf668a`);
+- the compatibility gate and the generator refusal (B4, `50d5050`).
+
+Every target implements both wire options.
+
 **rev10, 2026-09-30:** every open question is ruled as recommended ("All 14 as recco. Go"): 1, 3,
 4, 5, 6, 7 and 8 take (a). The note becomes decision D27 and is built in v0.10.0
 ([TautV010Plan.md](TautV010Plan.md)). Changed: the status and §10.
