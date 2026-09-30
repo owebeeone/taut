@@ -9,7 +9,9 @@ reserves (no field may take it, ir/validate.py), and it reaches the runtime's he
 as members of a `Cbor` value (`tryGet`, `tryDictionary`, ...), never as free functions,
 which a field of the same name would hide. A field still cannot be named like a type
 the code names (`Cbor`, its message, or the message or enum of a field) or like the
-member `toCbor`. Decode is fail-closed: `fromCbor` returns or throws `CborError`.
+member `toCbor`, nor a message or enum like a name the module already has:
+`ir/validate.py` refuses RESERVED_FIELD_NAMES, RESERVED_TYPE_NAMES and `name_clashes`.
+Decode is fail-closed: `fromCbor` returns or throws `CborError`.
 
 Each message is also a decode root (TautCheckedDecode.md CD-B3; TautOptions.md OPT-L6): its
 effective bounds, as `taut.ir.options.effective` resolves them when the code is generated,
@@ -22,10 +24,45 @@ field of the same name (a Swift type may have both) hides none of them.
 
 from __future__ import annotations
 
+from types import MappingProxyType
+
 from ..ir.model import (
     MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MessageDef, MsgRef, Scalar, Schema, TypeRef,
 )
 from ..ir.options import effective
+from .names import Clash
+
+RESERVED_FIELD_NAMES = MappingProxyType({
+    "Cbor": "a runtime type the struct's code names",
+    "CborError": "a runtime type a message's fromCbor names when it has no wire field",
+    "toCbor": "a member function",
+})
+"""Field names a struct cannot take: inside it an instance member hides a type of its name, even
+where a static member names the type, and a property cannot share its name with a method. A
+field named like a message or enum is `name_clashes`'s."""
+
+RESERVED_TYPE_NAMES = MappingProxyType({
+    **dict.fromkeys("Cbor CborError".split(), "a runtime type"),
+    **dict.fromkeys("""append16 append32 append64 checkExtensionTag checkedCount dec decodeUtf8
+        enc encFloat encode enter extClear extGet extSet head hostMap negativeOverflowValue readArg
+        requireBytes tryDecode""".split(), "a runtime function"),
+    **dict.fromkeys("defaultMaxDepth extensionBandStart maxDepthCeiling".split(),
+                    "a runtime constant"),
+    **dict.fromkeys("""Array ArraySlice Bool CustomStringConvertible Double Equatable Float Float16
+        Hashable Int Int64 Set String Swift UInt16 UInt32 UInt64 UInt8 Unicode precondition
+        stride""".split(), "a standard library name the code uses"),
+    **dict.fromkeys("decode fromCbor maxDepth maxEncodedLen toCbor".split(),
+                    "a member every message has, which hides the type inside one"),
+    **dict.fromkeys("wire_c wire_raw wire_v".split(), "a parameter or local that hides the type"),
+    **dict.fromkeys("hash hashValue rawValue".split(),
+                    "a member every enum has, which hides the type inside one"),
+})
+"""Message and enum names Swift cannot take in the module the generated code shares with its
+runtime (`cbor.swift`, `ext.swift`): every name the runtime declares, private ones too, a standard
+library name the code uses, which a type of the module's shadows, and a member, parameter or
+local that hides the type where the code names it. Not `Error`: the runtime's `CborError`
+conforms to `Swift.Error`, spelled out, so a message or enum may take the name, as glade's
+message `Error` does."""
 
 # Swift reserved words — field names / enum cases that collide get backtick-escaped
 # (e.g. razel's `VersionInfo.protocol`).
@@ -47,6 +84,22 @@ _BYTES = "wire_bytes"  # a decode's parameter, the bytes it reads
 
 def _id(name: str) -> str:
     return f"`{name}`" if name in _SWIFT_KEYWORDS else name
+
+
+def name_clashes(schema: Schema) -> list[Clash]:
+    """A field named like any declared message or enum: inside its struct it hides the type
+    wherever the code names one (its own message, a field's message or enum). An enum named like
+    one of its members, whose case hides the enum inside it."""
+    clashes: list[Clash] = []
+    for m in schema.messages.values():
+        for f in m.fields:
+            if f.name in schema.messages or f.name in schema.enums:
+                kind = "message" if f.name in schema.messages else "enum"
+                clashes.append((f"{m.name}.{f.name}", "field", f"a declared {kind}'s name"))
+    for e in schema.enums.values():
+        if e.name in e.members:
+            clashes.append((f"enum {e.name}", "enum", "one of its members' name"))
+    return clashes
 
 
 def _swift_ty(t: TypeRef) -> str:

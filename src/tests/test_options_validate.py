@@ -274,8 +274,8 @@ def test_a_root_that_is_not_a_message_takes_the_file_values_else_the_defaults():
 
 # --- per declaration: name, level and value, at every level -----------------------------------
 
-BASE = schema(Enum("Kind", a=0), Msg("M", F("x", 1, INT)))
-WHERE = {"file": "file", "message": "M", "field": "M.x", "enum": "enum Kind"}
+BASE = schema(Enum("Level", a=0), Msg("M", F("x", 1, INT)))
+WHERE = {"file": "file", "message": "M", "field": "M.x", "enum": "enum Level"}
 
 
 def _declare(level, options):
@@ -288,8 +288,8 @@ def _declare(level, options):
     if level == "field":
         field = dataclasses.replace(m.fields[0], options=options)
         return dataclasses.replace(BASE, messages={"M": dataclasses.replace(m, fields=(field,))})
-    kind = dataclasses.replace(BASE.enums["Kind"], options=options)
-    return dataclasses.replace(BASE, enums={"Kind": kind})
+    kind = dataclasses.replace(BASE.enums["Level"], options=options)
+    return dataclasses.replace(BASE, enums={"Level": kind})
 
 
 def test_the_base_model_is_valid():
@@ -311,12 +311,12 @@ def test_a_bound_is_refused_at_a_level_it_does_not_have(level, name, value):
 
 def test_the_dsl_leaves_the_level_to_validate():
     s = schema(
-        Enum("Kind", option.max_encoded_len(3), a=0),
+        Enum("Level", option.max_encoded_len(3), a=0),
         Msg("Tree", F("kids", 1, List(Ref("Tree")), option.max_depth(5)), option.max_depth(64)),
     )
     assert validate(s) == [
         "Tree.kids: option max_depth is not allowed at field level (allowed: file, message)",
-        "enum Kind: option max_encoded_len is not allowed at enum level (allowed: file, message)",
+        "enum Level: option max_encoded_len is not allowed at enum level (allowed: file, message)",
     ]
 
 
@@ -398,11 +398,11 @@ def test_a_file_max_encoded_len_must_hold_every_root_that_inherits_it():
     s = schema(
         option.max_encoded_len(3),
         Msg("Small", F("x", 1, INT)),
-        Msg("Pair", F("x", 1, INT), F("y", 2, INT)),
+        Msg("Couple", F("x", 1, INT), F("y", 2, INT)),
         Msg("Own", option.max_encoded_len(5), F("x", 1, INT), F("y", 2, INT)),
     )
     assert validate(s) == [
-        "Pair: max_encoded_len 3 (the file's) is below its smallest encoding, 5 bytes"]
+        "Couple: max_encoded_len 3 (the file's) is below its smallest encoding, 5 bytes"]
 
 
 def test_a_type_with_no_finite_value_admits_no_declared_length():

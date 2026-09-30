@@ -23,14 +23,17 @@ so no call can raise or lower its root's.
 Names. A message's code compiles whatever its fields are called (TautV010Plan.md §0; the
 parity fixture's `Names`), because no name the generator chooses can meet a field:
   - every parameter and local it declares in a struct starts with `__`, which C++
-    reserves for the implementation, so no field is named like one;
+    reserves for the implementation; of them only `to_cbor`'s `__b` and `__ri` hide a
+    field, which it names unqualified, and no field can take them (below);
   - every name it takes from outside the struct (the runtime's types and helpers, the
     schema's enums and messages, the struct itself, their `try_` functions) is qualified
     from the global namespace, `::taut::`, so no member can hide it. `std::` needs no
     such care: the name before a `::` is looked up as a namespace or a type, never as a
     data member.
 A field still cannot take a member's name (`to_cbor`, `try_from_cbor`, `try_decode`,
-`max_depth`, `max_encoded_len`), and the `wire_` prefix is taut's (`ir/validate.py`).
+`max_depth`, `max_encoded_len`), nor a message or enum a name the runtime declares in
+`namespace taut`: `ir/validate.py` refuses RESERVED_FIELD_NAMES, RESERVED_TYPE_NAMES and
+`name_clashes`, and taut's `wire_` prefix.
 
 `emit(schema, references)` is given the reference values by the caller (importing
 corpus.build here would be a cycle).
@@ -39,17 +42,52 @@ corpus.build here would be a cycle).
 from __future__ import annotations
 
 import struct
+from collections.abc import Iterator
 from pathlib import Path
+from types import MappingProxyType
 
 from ..ir.model import MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from ..ir.options import effective
 from ..wire import codec
+from .names import Clash, scope_clashes
 
 _TAUT = Path(__file__).resolve().parents[3]      # .../glial-dev/taut
 _REPO = _TAUT.parent                              # trial/ is a sibling
 _GEN = _REPO / "trial" / "cpp" / "generated"
 TYPES_PATH = _GEN / "types.hpp"
 CORPUS_PATH = _GEN / "corpus.hpp"
+
+RESERVED_FIELD_NAMES = MappingProxyType({
+    **dict.fromkeys(("to_cbor", "try_from_cbor", "try_decode"), "a member function"),
+    **dict.fromkeys(("max_depth", "max_encoded_len"), "a member constant"),
+    "__b": "to_cbor's parameter, which hides the field there",
+    "__ri": "a local of the forward-compat to_cbor, which hides the field there",
+})
+"""Field names a struct cannot take: a data member may not share its name with a member function
+or constant, and `to_cbor` names its fields unqualified, where its own `__b` and `__ri` hide them
+(the second silently: the field encodes the local's value)."""
+
+RESERVED_TYPE_NAMES = MappingProxyType({
+    **dict.fromkeys("Buf Cbor DecodeError DecodeErrorTag DecodeResult HalfNarrow".split(),
+                    "a runtime type"),
+    **dict.fromkeys("cbor_detail detail".split(), "a runtime namespace"),
+    **dict.fromkeys("""encode_value eq eq_hex ext_append_bytes ext_append_float ext_check_tag
+        ext_clear ext_get ext_head ext_set f32_bits f32_from_bits f64_bits f64_from_bits
+        f64_is_inf_bits f64_is_nan_bits half_exact half_to_double hex_nibble narrow_half
+        round_shift_right single_exact try_decode""".split(), "a runtime function"),
+    **dict.fromkeys("EXT_BAND_START default_max_depth max_depth_ceiling".split(),
+                    "a runtime constant"),
+    "wire": "every enum's function",
+    "std": "the namespace `std::` names are looked up in",
+    **dict.fromkeys("to_cbor try_from_cbor max_depth max_encoded_len".split(),
+                    "a member its struct would share its name with"),
+    "v": "the parameter of an enum's functions, which hides the enum there",
+})
+"""Message and enum names C++ cannot take in `namespace taut`: every name the runtime declares
+there (`taut/cbor.hpp`, and `taut/ext.hpp` when it is included first), whose function or
+variable hides a struct of its name, `wire`, `std`, a struct's own members, and the parameter
+`v` of `wire` and `try_E_from_wire`. An enum's `try_E_from_wire` meeting another name is
+`name_clashes`'s."""
 
 
 def _variant(member: str) -> str:
@@ -62,6 +100,20 @@ def _ident(name: str) -> str:
 
 def _try_enum_fn(name: str) -> str:
     return f"try_{_ident(name)}_from_wire"
+
+
+def _namespace_names(schema: Schema) -> Iterator[tuple[str, str, str]]:
+    """Each name the generated header declares in `namespace taut`, and the enum or message it
+    is for (`wire` overloads, one per enum)."""
+    for e in schema.enums.values():
+        yield from ((name, f"enum {e.name}", "enum") for name in (e.name, _try_enum_fn(e.name)))
+    for m in schema.messages.values():
+        yield m.name, m.name, "message"
+
+
+def name_clashes(schema: Schema) -> list[Clash]:
+    """An enum's `try_E_from_wire` that meets another message's or enum's name, or the runtime's."""
+    return scope_clashes(_namespace_names(schema), RESERVED_TYPE_NAMES)
 
 
 def _uses_map(t: TypeRef) -> bool:

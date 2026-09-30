@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import MappingProxyType
 
 from ..ir.load import load_schema
 from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
@@ -36,6 +37,20 @@ _REPO = _TAUT.parent                              # .../glial-dev (trial/ is a s
 IR_PATH = _TAUT / "ir" / "griplab.taut.py"
 GOLDEN_PATH = _TAUT / "corpus" / "griplab.golden.json"
 OUT_PATH = _REPO / "trial" / "rs" / "src" / "generated.rs"
+
+RESERVED_FIELD_NAMES: MappingProxyType[str, str] = MappingProxyType({})
+"""None: the code reads a field through `self.` or names it in a struct literal, where nothing
+it declares meets the field (the `wire_` prefix is taut's, `ir/validate.py`)."""
+
+RESERVED_TYPE_NAMES = MappingProxyType({
+    **dict.fromkeys("Cbor DecodeError".split(), "a runtime type"),
+    **dict.fromkeys("Option Result String Vec".split(), "a prelude type the code names"),
+    **dict.fromkeys("bool f64 i64 u8 usize".split(), "a primitive type the code names"),
+    "std": "the root of the code's `std::` paths",
+    "Default": "the trait of a transient field's `Default::default()`",
+})
+"""Message and enum names the generated module cannot take: a struct or enum there shadows the
+runtime types it imports and the prelude and primitive types, `std` and `Default` its code names."""
 
 
 def _variant(member: str) -> str:

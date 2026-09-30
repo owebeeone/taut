@@ -19,7 +19,8 @@ public let defaultMaxDepth: Int = 32
 /// No decode applies a deeper bound: a larger `maxDepth` applies this one (CD-B3).
 public let maxDepthCeiling: Int = 128
 
-public enum CborError: Error, Equatable, CustomStringConvertible {
+/// It conforms to `Swift.Error`, spelled out: a schema may name a message `Error`, as glade's does.
+public enum CborError: Swift.Error, Equatable, CustomStringConvertible {
     case truncated
     case trailingBytes
     case invalidUtf8

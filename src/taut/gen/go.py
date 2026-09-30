@@ -43,15 +43,92 @@ family rather than taking a `DecodeX` name, which would redeclare the runtime's
 
 from __future__ import annotations
 
+import re
+from collections.abc import Iterator
+from types import MappingProxyType
 from typing import cast
 
 from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MessageDef, MsgRef, Scalar, Schema, TypeRef
 from ..ir.options import effective
+from .names import Clash, scope_clashes
 
 _SCALAR_TYPES = {"int": "int64", "str": "string", "bytes": "[]byte", "bool": "bool", "float": "float64"}
 _SCALAR_ENCODERS = {"int": "CInt", "str": "CText", "bytes": "CBytes", "bool": "CBool", "float": "CFloat"}
 _SCALAR_DECODERS = {"int": "TryInt", "str": "TryText", "bytes": "TryBytes", "bool": "TryBool", "float": "TryFloat"}
 _MAP_KEYS = ("int", "str", "bool")
+
+RESERVED_FIELD_NAMES = MappingProxyType({
+    "ToCbor": "a method",
+    "WireResidual": "the forward-compat residual field",
+})
+"""Go names (`field_name`) no field can take: a struct cannot have a field and a method of one
+name, nor two fields of one."""
+
+RESERVED_TYPE_NAMES = MappingProxyType({
+    **dict.fromkeys("Cbor DecodeError ExtTagError KV Kind".split(), "a runtime type"),
+    **dict.fromkeys("""CArr CBool CBytes CFloat CInt CMap CNull CText DuplicateMapKeyError Encode
+        ExtClear ExtGet ExtSet TryDecode TryDecodeWith UnknownEnumError dec enc enter extHost
+        float64ToHalfBits floatBytes halfToFloat64 head negOverflowValue readArg
+        roundShiftEven""".split(), "a runtime function"),
+    **dict.fromkeys("""BandStart DecodeErrDuplicateMapKey DecodeErrIntOverflow DecodeErrInvalidUtf8
+        DecodeErrMissingKey DecodeErrNegativeMapKey DecodeErrNonCanonicalInt
+        DecodeErrNonIntegerMapKey DecodeErrTooDeep DecodeErrTooLarge DecodeErrTrailingBytes
+        DecodeErrTruncated DecodeErrUnknownEnum DecodeErrUnsupportedInfo DecodeErrUnsupportedMajor
+        DecodeErrWrongType DefaultMaxDepth KArr KBool KBytes KFloat KInt KMap KNull KText
+        MaxDepthCeiling maxInt64Uint""".split(), "a runtime constant"),
+    **dict.fromkeys("fmt math sort strconv utf8".split(), "a package the runtime imports"),
+    **dict.fromkeys("""append bool byte copy error false float32 float64 int int64 iota len make nil
+        string true uint uint16 uint32 uint64""".split(), "a predeclared name the code uses"),
+    **dict.fromkeys("c data err fv ok v".split(), "a parameter or local that hides the type"),
+})
+"""Message and enum names Go cannot take: every package-level name of the runtime (`cbor.go`,
+`ext.go`, same package), a package it imports, a predeclared name the generated code or runtime
+uses, and a parameter or local of a decoder that hides a type the decoder names. A list's
+numbered locals and the names a message or enum derives are `name_clashes`'s."""
+
+# A list decoder's locals, numbered by nesting level (`_depth`): `arr`, `x` and `e`, then `arr1`,
+# `x1` and `e1`, and so on down.
+_LIST_LOCAL = re.compile(r"(?:arr|e|x)(?:[1-9][0-9]*)?")
+
+
+def field_name(name: str) -> str:
+    """A field's name as its Go struct spells it, which RESERVED_FIELD_NAMES holds."""
+    return _pascal(name)
+
+
+def _package_names(schema: Schema) -> Iterator[tuple[str, str, str]]:
+    """Each name the generated file declares at package level, and the enum or message it is for."""
+    for e in schema.enums.values():
+        where = f"enum {e.name}"
+        yield from ((name, where, "enum") for name in (
+            e.name, f"Try{e.name}FromWire", f"Try{e.name}FromCbor",
+            *(f"{e.name}{_pascal(member)}" for member in e.members)))
+    for m in schema.messages.values():
+        yield from ((name, m.name, "message") for name in (
+            m.name, f"Try{m.name}FromCbor", f"Try{m.name}FromBytes", f"{m.name}MaxDepth",
+            f"{m.name}MaxEncodedLen"))
+
+
+def name_clashes(schema: Schema) -> list[Clash]:
+    """Two fields of a message with one Go name; a message or enum named like a list's local,
+    which hides the type where a list nested inside names it; and the names a message or enum
+    derives meeting another's or the runtime's (`DefaultMaxDepth`, for a message `Default`)."""
+    clashes: list[Clash] = []
+    for m in schema.messages.values():
+        seen: dict[str, str] = {}
+        for f in m.fields:
+            name = _pascal(f.name)
+            if name in seen:
+                clashes.append((f"{m.name}.{f.name}", "field",
+                                f"its Go name {name} is also {m.name}.{seen[name]}'s"))
+            else:
+                seen[name] = f.name
+    local = "a local of a list's decoder, which hides the type inside a nested list"
+    clashes += [(m.name, "message", local) for m in schema.messages.values()
+                if _LIST_LOCAL.fullmatch(m.name)]
+    clashes += [(f"enum {e.name}", "enum", local) for e in schema.enums.values()
+                if _LIST_LOCAL.fullmatch(e.name)]
+    return clashes + scope_clashes(_package_names(schema), RESERVED_TYPE_NAMES)
 
 
 def _pascal(name: str) -> str:

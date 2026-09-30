@@ -363,7 +363,14 @@ raises on any error. It enforces:
   its type and range;
 - at every root (each message, and each method's param and out slot types), `max_depth` is at
   least the root's non-recursive nesting and at most 128, and a declared `max_encoded_len` is at
-  least the root's smallest encoding.
+  least the root's smallest encoding;
+- no field, message or enum takes a name that some target's generated code or runtime already
+  declares where the name would go, such as C++'s member `to_cbor`, Java's `MAX_DEPTH` or a
+  message `Cbor`. The error names each target the name breaks and why. Each generator keeps its
+  own list (`RESERVED_FIELD_NAMES`, `RESERVED_TYPE_NAMES`, `name_clashes`), and validate refuses
+  their union, so a schema that validates generates in all nine targets. Language keywords are
+  not covered: some generators escape them, and a keyword a generator does not escape still fails
+  there, such as a Python field `from`.
 
 `lint(schema) -> list[str]` returns warnings that never fail a build, which `tautc` prints:
 - a recursive message that declares no `max_depth`;

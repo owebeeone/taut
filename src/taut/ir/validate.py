@@ -11,10 +11,20 @@ Options (TautOptions.md OPT-L4): every declared option is registered, sits at on
 its levels and has a value its constructor would take, and every root's effective
 bounds lie between its floors and the ceilings. `lint` returns the warnings tautc
 SHOULD print (OPT-D4, OPT-D5), which never make a schema invalid.
+
+Reserved names (TautV010Plan.md, step E1a): no field, message or enum takes a name that some
+generator's code or runtime already uses where that name is declared, so a schema that
+validates generates and compiles in all nine targets. Each generator keeps its reservations
+beside it (`taut/gen/names.py`); validate takes their union and names each target a name
+breaks. A language keyword is a separate concern.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
+
+from ..gen import cpp, go, java, js, kotlin, rust, scaffold, swift
+from ..gen.names import Clash
 from .model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef, is_presence
 from .options import (
     LEVELS,
@@ -32,6 +42,28 @@ from .shapes import BAND_START, ROLES, SHAPES
 # The options a decode call takes from its root (OPT-D4): lint follows one a message declares
 # into the roots that embed that message.
 _BOUNDS = ("max_depth", "max_encoded_len")
+
+
+def _as_written(name: str) -> str:
+    return name
+
+
+# Each target's reservations, kept beside its generator (taut/gen/names.py): the field names it
+# cannot take, as it spells a field (Go PascalCases one), the message and enum names, and the
+# clashes that take more than one name. TypeScript's types reserve none: node strips them
+# unchecked, and its codec reads the IR.
+_RESERVED: tuple[tuple[str, Mapping[str, str], Mapping[str, str], Callable[[str], str],
+                       Callable[[Schema], list[Clash]] | None], ...] = (
+    ("rust", rust.RESERVED_FIELD_NAMES, rust.RESERVED_TYPE_NAMES, _as_written, None),
+    ("cpp", cpp.RESERVED_FIELD_NAMES, cpp.RESERVED_TYPE_NAMES, _as_written, cpp.name_clashes),
+    ("swift", swift.RESERVED_FIELD_NAMES, swift.RESERVED_TYPE_NAMES, _as_written, swift.name_clashes),
+    ("go", go.RESERVED_FIELD_NAMES, go.RESERVED_TYPE_NAMES, go.field_name, go.name_clashes),
+    ("kotlin", kotlin.RESERVED_FIELD_NAMES, kotlin.RESERVED_TYPE_NAMES, _as_written, None),
+    ("java", java.RESERVED_FIELD_NAMES, java.RESERVED_TYPE_NAMES, _as_written, None),
+    ("js", js.RESERVED_FIELD_NAMES, js.RESERVED_TYPE_NAMES, _as_written, js.name_clashes),
+    ("python", scaffold.PYTHON_RESERVED_FIELD_NAMES, scaffold.PYTHON_RESERVED_TYPE_NAMES,
+     _as_written, scaffold.python_name_clashes),
+)
 
 
 def validate(schema: Schema) -> list[str]:
@@ -148,11 +180,53 @@ def validate(schema: Schema) -> list[str]:
                     bound.add(slot)
                     check_ref(t, f"{ctx} out[{slot}]")
 
+    # --- names some generator cannot take (step E1a) ---
+    errors.extend(_reserved_name_errors(schema))
+
     # --- options (OPT-L4) ---
     errors.extend(_declaration_errors(schema))
     errors.extend(_root_errors(schema))
 
     return errors
+
+
+def _reserved_name_errors(schema: Schema) -> list[str]:
+    """One error per field, message or enum whose name some target cannot take, in the schema's
+    order, naming each such target and why (`_RESERVED`)."""
+    names: dict[tuple[str, str], dict[str, str]] = {}   # (where, kind) -> target -> why
+    for m in schema.messages.values():
+        names[(m.name, "message")] = {}
+        names.update(((f"{m.name}.{f.name}", "field"), {}) for f in m.fields)
+    names.update(((f"enum {e.name}", "enum"), {}) for e in schema.enums.values())
+
+    for target, fields, types, spell, clashes in _RESERVED:
+        for m in schema.messages.values():
+            if m.name in types:
+                names[(m.name, "message")].setdefault(target, types[m.name])
+            for f in m.fields:
+                if spell(f.name) in fields:
+                    names[(f"{m.name}.{f.name}", "field")].setdefault(target, fields[spell(f.name)])
+        for e in schema.enums.values():
+            if e.name in types:
+                names[(f"enum {e.name}", "enum")].setdefault(target, types[e.name])
+        if clashes is not None:
+            for where, kind, why in clashes(schema):
+                names.setdefault((where, kind), {}).setdefault(target, why)
+    return [f"{where}: {kind} name reserved by {_reserving(by)}"
+            for (where, kind), by in names.items() if by]
+
+
+def _reserving(by: dict[str, str]) -> str:
+    """'the cpp generator (a member function)'; targets that give one reason share it: 'the cpp
+    and rust generators (a runtime type); the swift generator (...)'."""
+    reasons: dict[str, list[str]] = {}
+    for target, why in by.items():
+        reasons.setdefault(why, []).append(target)
+    parts = []
+    for why, targets in reasons.items():
+        named = targets[0] if len(targets) == 1 else f"{', '.join(targets[:-1])} and {targets[-1]}"
+        parts.append(f"the {named} generator{'s' if len(targets) > 1 else ''} ({why})")
+    return "; ".join(parts)
 
 
 def validate_or_raise(schema: Schema) -> None:

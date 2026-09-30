@@ -34,8 +34,29 @@ call applied (TautOptions.md G1).
 
 from __future__ import annotations
 
+from types import MappingProxyType
+
 from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from ..ir.options import effective
+
+RESERVED_FIELD_NAMES = MappingProxyType({
+    **dict.fromkeys(("MAX_DEPTH", "MAX_ENCODED_LEN"), "a static field of the class"),
+    "wireResidual": "the forward-compat residual field",
+})
+"""Field names a class cannot take: a class cannot have two fields of one name. Its methods may
+share one with a field."""
+
+RESERVED_TYPE_NAMES = MappingProxyType({
+    **dict.fromkeys("Cbor Ext KV".split(), "a runtime type"),
+    **dict.fromkeys("""Boolean Byte Character Double Float IllegalArgumentException Integer Long
+        Math Object RuntimeException String System""".split(),
+                    "a java.lang class the code names, which a class of the package shadows"),
+    "java": "the package the code names java.util's classes through",
+})
+"""Message and enum names Java cannot take in `package taut`, which api.java shares with its
+runtime (`Cbor.java`, `Ext.java`): a class the runtime declares there, a class of java.lang the
+code or runtime names, and `java`. A class of the package shadows java.lang's but not a class
+the runtime imports by name."""
 
 
 def _java_ty(t: TypeRef, boxed: bool = False) -> str:

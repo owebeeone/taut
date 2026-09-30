@@ -17,10 +17,40 @@ runtime's raw `decode`. `fromCbor` reads a tree its caller decoded and applies n
 
 from __future__ import annotations
 
+from types import MappingProxyType
 from typing import cast
 
 from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from ..ir.options import effective
+
+RESERVED_FIELD_NAMES = MappingProxyType({
+    "Cbor": "a runtime type the class's code names",
+    "Companion": "the class's companion object",
+    "wireResidual": "the forward-compat residual property",
+})
+"""Field names a class cannot take: inside it a property hides the runtime type `Cbor` its
+`toCbor` names, and it may not share a name with its companion or another property."""
+
+RESERVED_TYPE_NAMES = MappingProxyType({
+    **dict.fromkeys("Cbor DecodeError".split(), "a runtime type"),
+    **dict.fromkeys("""checkExtTag compareCodePoints doubleToHalfBits extClear extGet hostMap
+        negativeInt positiveInt unsignedString""".split(),
+                    "a runtime function whose parameters a message's constructor can repeat"),
+    **dict.fromkeys("BAND_START DEFAULT_MAX_DEPTH MAX_DEPTH_CEILING".split(), "a runtime constant"),
+    **dict.fromkeys("""Any Boolean Byte ByteArray Character Charsets Comparator Double Int List Long
+        Map MutableList Pair RuntimeException String""".split(),
+                    "a standard library name the code uses"),
+    **dict.fromkeys("java taut".split(), "a package the code names"),
+    **dict.fromkeys("Companion MAX_DEPTH MAX_ENCODED_LEN".split(),
+                    "a companion or a member of one, which hides the type inside every class"),
+    **dict.fromkeys("c it".split(), "a parameter that hides the type"),
+})
+"""Message and enum names Kotlin cannot take in `package taut`, which the generated code shares
+with its runtime (`cbor.kt`, `ext.kt`): a runtime class or constant, a runtime function whose
+parameters are taut types (a message's constructor with the same parameters conflicts with it),
+a standard library name the code uses, which a class of the package shadows, the packages
+`java` and `taut` the code names, and a companion member or parameter that hides the type where
+the code names it."""
 
 _KT_KEYWORDS = frozenset("""
 as as? break class continue do else false for fun if in in? interface is is! null

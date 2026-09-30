@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from importlib import resources
 from pathlib import Path
+from types import MappingProxyType
 
 from . import cpp as _cpp
 from . import go as _go
@@ -25,6 +26,7 @@ from ..ir.model import (
     EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, ServiceDef, TypeRef,
 )
 from ..ir.options import OPTIONS
+from .names import Clash
 
 # Compiled targets whose generated code imports external runtime modules. Maps
 # lang -> list of (output path relative to its lang dir, vendored resource file).
@@ -66,6 +68,28 @@ def _attr(name: str) -> str:
 # =============================================================================
 # Python
 # =============================================================================
+
+PYTHON_RESERVED_FIELD_NAMES = MappingProxyType({
+    "mro": "an attribute every class has, which dataclass reads as the field's default",
+})
+"""Field names a dataclass cannot take besides `__*__` ones (`python_name_clashes`): an attribute
+the class has before `dataclass` runs is read as the field's default, and a field without one may
+not follow it."""
+
+PYTHON_RESERVED_TYPE_NAMES = MappingProxyType({
+    "dataclass": "a name api.py imports, which a later message's decorator would call",
+    "Enum": "a name api.py imports, which a later enum would subclass",
+})
+"""Message and enum names api.py cannot take: a class rebinds the name it imports."""
+
+
+def python_name_clashes(schema: Schema) -> list[Clash]:
+    """A field named `__*__`: Python reserves the form, and most such names are attributes every
+    class has, which dataclass reads as a default like `mro`'s. Which ones grows with Python."""
+    return [(f"{m.name}.{f.name}", "field", "a `__*__` name, which Python reserves")
+            for m in schema.messages.values() for f in m.fields
+            if len(f.name) > 4 and f.name.startswith("__") and f.name.endswith("__")]
+
 
 def _py_ty(t: TypeRef | None) -> str:
     if t is None:

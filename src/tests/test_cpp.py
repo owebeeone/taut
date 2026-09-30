@@ -709,8 +709,10 @@ HYGIENE_VALUE = {"Mode": "alt", "Inner": {"Inner": 7}, "Holder": 3,
 def test_cpp_compiles_fields_named_like_anything_its_code_uses(tmp_path):
     """Generated code names its own parameters and locals with `__` and qualifies every other
     name `::taut::`, so a field named like any of them compiles, plain and forward-compat, and
-    round-trips. (Keywords, and the member functions' own names, stay out of reach.)"""
-    assert validate(S_HYGIENE) == []
+    round-trips. (Keywords, and the member functions' own names, stay out of reach.) Other
+    targets cannot take some of these names, so validate refuses them for those, but none for
+    cpp (test_reserved_names.py)."""
+    assert [e for e in validate(S_HYGIENE) if re.search(r"\bcpp\b", e)] == []
     golden = codec.encode(S_HYGIENE, "Holder", HYGIENE_VALUE).hex()
     unknown = cbor.dumps({**cbor.loads(bytes.fromhex(golden)), 99: [1, "u"]}).hex()
     main = f"""

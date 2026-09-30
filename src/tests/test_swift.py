@@ -578,6 +578,42 @@ def test_swift_fields_named_like_generated_code_compile(tmp_path, forward_compat
     assert run.stdout.splitlines() == [wire, "true", wire, wire, "32 true 7 d"]
 
 
+# glade's schema declares a message `Error` beside an enum `ErrorCode`.
+ERROR_SCHEMA = mk(
+    Enum("ErrorCode", ok=0, denied=1),
+    Msg("Error", F("code", 1, Ref("ErrorCode")), F("message", 2, STR),
+        F("corr", 3, STR, optional=True)),
+    Msg("Reply", F("errors", 1, List(Ref("Error")))),
+)
+
+
+@pytest.mark.parametrize("forward_compat", [False, True], ids=["plain", "fc"])
+def test_swift_compiles_a_message_named_error(tmp_path, forward_compat):
+    """A message may be named `Error`: the runtime's CborError conforms to `Swift.Error`,
+    which the module's own `Error` does not hide, so decode still throws and a caller still
+    catches CborError."""
+    _require_swiftc()
+    generated = _emit_swift(ERROR_SCHEMA, tmp_path / "gen", forward_compat)
+    value = {"errors": [{"code": "denied", "message": "no", "corr": None}]}
+    wire = codec.encode(ERROR_SCHEMA, "Reply", value).hex()
+    harness = tmp_path / "main.swift"
+    harness.write_text(_swift_support() + textwrap.dedent(f"""
+        let reply = try Reply.decode(bytes(fromHex: "{wire}"))
+        print(hex(encode(reply.toCbor())))
+        print(reply.errors[0].code == .denied, reply.errors[0].message)
+        do {{
+            _ = try Error.decode(bytes(fromHex: "00"))
+        }} catch let error as CborError {{
+            print(error == .wrongType("map"))
+        }}
+        """))
+    exe = _compile_swift(tmp_path, [generated / "cbor.swift", generated / "api.swift", harness],
+                         "swift-error-message")
+    run = subprocess.run([str(exe)], text=True, capture_output=True)
+    assert run.returncode == 0, run.stderr + run.stdout
+    assert run.stdout.splitlines() == [wire, "true no", "true"]
+
+
 def _keys_wire(text=(), flag=(), ids=()) -> str:
     """A Keys whose three maps hold these keys, in order, each entry its own value."""
     def entries(keys):
