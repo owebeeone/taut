@@ -1,7 +1,7 @@
 # taut v0.10.0: options, checked decode and the legacy codec's removal
 
-**Status:** PLAN, 2026-09-30, on the owner's "All 14 as recco. Go". It builds two decisions, every
-question ruled (a):
+**Status:** BUILT, 2026-09-30, and ready to tag (§5). Planned on the owner's "All 14 as recco. Go",
+it builds two decisions, every question ruled (a):
 - D26, checked decode ([TautCheckedDecode.md](TautCheckedDecode.md));
 - D27, options ([TautOptions.md](TautOptions.md)).
 
@@ -128,9 +128,19 @@ As in the parity pass:
 
 ## 5. Status
 
-**2026-09-30: phases A-D are done; E is in progress.** All nine codecs, and the seven generated
-targets' forward-compat builds, pass all 88 rows of `tautc parity`. The allowlist is empty, and
-taut's suite passes 878 tests.
+**2026-09-30: phases A-E are done, and the tree is ready to tag.**
+- All nine codecs, and the seven generated targets' forward-compat builds, pass `tautc parity`'s
+  88 rows: 11 int, 47 malformed and 30 bounds. A target whose native integer is `i64` skips the
+  three encode refusals it cannot express. The allowlist is empty.
+- taut's suite passes 1,243 tests.
+- E2 ran `scripts/release.py`'s gates on `a32be84`, in a local clone, without the script's tag, push
+  or release:
+  - the pyproject check, the suite and the gate;
+  - `python -m build` at a pretended 0.10.0, and `twine check` on the sdist and the wheel;
+  - the wheel's smoke test.
+
+  It also generated every target, with its vendored runtime, from the installed wheel. This
+  status, committed after E2, changes only this document.
 
 | Phase | Step | taut commit |
 |---|---|---|
@@ -139,6 +149,8 @@ taut's suite passes 878 tests.
 | C | C1 Python's bounds, C2 forward-compat variants with question 9's rows and `Names`, C3 the bounds rows and protocol | `d875e4e`, `288b99e`, `8c85acf` |
 | D2 | go, rust (the legacy codec removed), js and typescript, swift, kotlin, cpp, java | `97f7b67`, `0a9da65`, `11982f8`, `b66f13e`, `b405655`, `84be8b2`, `caed122` |
 | D1 | typescript, js, rust, swift, java, cpp, kotlin, go | `1b95d2b`, `288f82a`, `3b1c272`, `7f7a930`, `1a9bc03`, `21871e2`, `4516e6e`, `7ad69b3` |
+| E1 | E1b the API docs and the Tasks example; question 4 in the compatibility gate; E1c `CodecContract.md` and `Reference.md`; E1a reserved names | `1f16fe0`, `39d7e0c`, `cc201e9`, `a32be84` |
+| E2 | the final gate and the release checks, without a tag | this status |
 
 D2 ran before D1, and C2 before C3, so that the forward-compat model existed before the bounds rows
 that need it; the plan's steps are otherwise as written.
@@ -150,3 +162,22 @@ that need it; the plan's steps are otherwise as written.
 - The 32-bit length truncation in Rust.
 - TypeScript's RPC client, which hung when a response failed to decode.
 - Kotlin's forward-compat build of a field-less message.
+- The compatibility gate still classed an added `optional=True` field as compatible. Question 4's
+  rule landed in E: only `optional=MISSING_OK` is.
+- A field or type named like something a generator's code or runtime declares, which broke the
+  build or, for a C++ field `__ri` under forward-compat, silently encoded a loop counter. E1a has
+  `validate` refuse each such name, naming the targets (`Reference.md` §9).
+- Swift's `CborError` conformed to an unqualified `Error`, which a schema's message `Error`, as
+  in glade's schema, hid. The runtime now spells `Swift.Error`.
+
+**Known limits, left for follow-ups:**
+- `validate` does not check language keywords, and the generators' escape lists miss some: glade's
+  schema does not build in Kotlin (the enum member `value`) or Python (the field `from`). glade
+  uses neither target.
+- The generated TypeScript `client.ts` and `server.ts` do not pass `tsc`: `api.boolean`, and an
+  unqualified `User`.
+- Braces: every control-flow body this release wrote or changed is braced. Code it did not touch
+  still has unbraced one-line bodies, such as the Kotlin generator's enum `fromWire` loop, and
+  their migration is its own step.
+- A caller's bad argument, such as a depth below 1, traps, panics or throws by the language's
+  idiom in Swift, C++, Rust and Kotlin. It is never a `DecodeError`.
