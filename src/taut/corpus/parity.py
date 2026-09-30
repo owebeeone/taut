@@ -1021,6 +1021,20 @@ def governance(reports: dict[str, TargetReport], allow: set[str]) -> list[str]:
     return violations
 
 
+def unrun(wanted: Iterable[str], reports: dict[str, TargetReport]) -> list[str]:
+    """A violation for each variant in `wanted` that did not run: skipped for a missing
+    toolchain, or without a runner. A release requires every one (`tautc parity
+    --require-all`); otherwise a skip is reported and does not fail the gate."""
+    violations: list[str] = []
+    for name in wanted:
+        rep = reports.get(name)
+        if rep is None:
+            violations.append(f"{name}: has no runner, but every target must run")
+        elif not rep.available:
+            violations.append(f"{name}: skipped ({rep.skip_reason}), but every target must run")
+    return violations
+
+
 def governed_variants(run: Callable[..., TargetReport],
                       path: Path = ALLOWLIST) -> tuple[list[TargetReport], list[str]]:
     """A generated target's own test, held to what the gate holds it to: `run`, its runner's
@@ -1096,10 +1110,12 @@ def _selected(target: str) -> tuple[str, ...]:
     return tuple(name for name in known if split_variant(name)[0] == target)
 
 
-def run_gate(*, target: str | None = None, run_compiled: bool = True) -> GateOutcome:
+def run_gate(*, target: str | None = None, run_compiled: bool = True,
+             require_all: bool = False) -> GateOutcome:
     """Validate the artifacts, run the runners and judge governance. By default every
     variant that has a runner; `target` runs a target's variants or one variant, and
-    `run_compiled=False` runs Python only."""
+    `run_compiled=False` runs Python only. `require_all` also fails the gate for each
+    selected variant that did not run (`unrun`), as a release requires."""
     if target is not None:
         wanted = _selected(target)
     elif run_compiled:
@@ -1114,6 +1130,8 @@ def run_gate(*, target: str | None = None, run_compiled: bool = True) -> GateOut
     reports = run_targets(wanted)
 
     violations = governance(reports, allow)
+    if require_all:
+        violations += unrun(wanted, reports)
     lines = _summary(reports, statuses, int_count, mal_count, bounds_count)
     if violations:
         lines.append("")
@@ -1121,7 +1139,8 @@ def run_gate(*, target: str | None = None, run_compiled: bool = True) -> GateOut
         lines += [f"  - {v}" for v in violations]
     else:
         lines.append("")
-        lines.append("governance: clean (no gated target failing, no green target allowlisted)")
+        ran = "; every selected target ran" if require_all else ""
+        lines.append(f"governance: clean (no gated target failing, no green target allowlisted{ran})")
     return GateOutcome(lines, violations, reports)
 
 

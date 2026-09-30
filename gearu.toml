@@ -1,0 +1,29 @@
+# taut's releases (RELEASE.md). gearu verifies the tree, tags it and pushes the tag, and the GitHub
+# Release it creates starts .github/workflows/publish.yml, which publishes taut-proto to PyPI.
+[project]
+name = "taut"
+branch = "main"
+remote = "origin"
+tag_prefix = "v"
+github_repo = "owebeeone/taut"
+
+[python]
+manifest = "pyproject.toml"
+version = "scm"
+
+[release]
+# scripts/release_checks.py's steps. gearu runs `checks` on its candidate and `exact_checks` on the
+# commit it tags, which is the same commit (a tag-derived version needs no release commit), so the
+# steps are split between the two and none runs twice. The tests and parity steps fail rather
+# than skip a language, so each toolchain must be installed.
+checks = [
+    ["uv", "run", "--no-project", "--python", "3.13", "--with", "pytest",
+     "python", "scripts/release_checks.py", "{python_version}", "--only", "metadata,tests,parity"],
+]
+exact_checks = [
+    ["uv", "run", "--no-project", "--python", "3.13", "--with", "build", "--with", "twine",
+     "python", "scripts/release_checks.py", "{python_version}", "--only", "build,smoke"],
+]
+github_notes = """taut-proto {python_version}
+
+Publishing this GitHub Release triggers the PyPI Trusted Publishing workflow."""

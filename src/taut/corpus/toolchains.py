@@ -4,10 +4,9 @@ Each finder returns the path of a toolchain that runs, or None when there is non
 A runner turns None into a skip with a reason, and nothing else skips: a build that
 fails is RED (TautCheckedDecode.md §5.4).
 
-The Java and Kotlin search orders copy the per-language tests
-(`src/tests/test_java.py::_find_java_tools`, `src/tests/test_kotlin.py::_find_kotlinc`
-and `_find_java`): JAVA_HOME, then Android Studio's bundled JBR, then PATH; KOTLINC,
-then Android Studio's Kotlin plugin, then PATH.
+The Java search order copies `src/tests/test_java.py::_find_java_tools`, and the Kotlin
+tests use `find_kotlin_tools` itself: JAVA_HOME, then Android Studio's bundled JBR, then
+PATH; KOTLINC, then Android Studio's Kotlin plugin, then PATH.
 """
 
 from __future__ import annotations
@@ -145,9 +144,8 @@ def find_kotlin_java(kotlinc: str) -> str | None:
 def find_kotlin_tools() -> tuple[str, str] | None:
     """(kotlinc, java): the first kotlinc that runs under the java found for it.
 
-    The candidates and their order are the tests'; unlike `_find_kotlinc`, the
-    probe runs kotlinc with that java's environment, so an Android Studio install
-    needs no JAVA_HOME."""
+    The probe runs kotlinc with that java's environment, so an Android Studio install
+    needs no JAVA_HOME. The Kotlin tests find their tools here too."""
     for kotlinc in _kotlinc_candidates():
         if not kotlinc.is_file():
             continue

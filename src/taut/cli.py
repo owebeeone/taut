@@ -125,14 +125,16 @@ def _cmd_json(args: argparse.Namespace) -> int:
 
 def _cmd_parity(args: argparse.Namespace) -> int:
     try:
-        outcome = parity.run_gate(target=args.target, run_compiled=not args.no_compile)
+        outcome = parity.run_gate(target=args.target, run_compiled=not args.no_compile,
+                                  require_all=args.require_all)
     except parity.ParityValidationError as exc:
         print(f"parity: {exc}", file=sys.stderr)
         return 2
     for line in outcome.lines:
         print(line)
-    # Nonzero ONLY on a governance violation: a gated target failing, or a green
-    # target still allowlisted. Observed reds on allowlisted targets do not fail.
+    # Nonzero ONLY on a governance violation: a gated target failing, a green target
+    # still allowlisted, or, under --require-all, a selected target that did not run.
+    # Observed reds on allowlisted targets do not fail.
     return 1 if outcome.violations else 0
 
 
@@ -182,8 +184,13 @@ def main(argv: list[str] | None = None) -> int:
                     help="replay only this target's runners, the target and its <target>/fc, or one "
                          "variant such as rust/fc (default: every variant that has a runner — python "
                          "in-process, any other through its taut.corpus.parity_<target> module)")
-    pr.add_argument("--no-compile", action="store_true",
-                    help="skip the compiled/subprocess targets; run only the direct Python harness")
+    scope = pr.add_mutually_exclusive_group()
+    scope.add_argument("--no-compile", action="store_true",
+                       help="skip the compiled/subprocess targets; run only the direct Python harness")
+    scope.add_argument("--require-all", action="store_true",
+                       help="fail when a selected target does not run, skipped for a missing toolchain "
+                            "or without a runner, as a release requires (default: a skip is reported "
+                            "and does not fail the gate)")
     pr.set_defaults(func=_cmd_parity)
 
     args = p.parse_args(argv)

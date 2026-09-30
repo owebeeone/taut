@@ -428,8 +428,10 @@ validates the GripLab IR (`taut/ir/griplab.taut.py`), exports
 - **Parity gate** (`tautc parity`): replays `corpus/parity/{int,malformed,bounds}.vectors.json`
   through all nine codecs, and through the seven generated ones built with forward-compat
   (`<target>/fc`). It compares tag and payload and checks each accepted row's re-encoding. A target
-  may fail only while `corpus/parity/allowlist.json` lists it with a reason. The contract is
-  `taut-codec-parity/i64/v1`; see [CodecContract.md](CodecContract.md).
+  may fail only while `corpus/parity/allowlist.json` lists it with a reason. A target whose
+  toolchain is missing is skipped, with the reason; `--require-all` fails the gate instead, as a
+  release does (`RELEASE.md`). The contract is `taut-codec-parity/i64/v1`; see
+  [CodecContract.md](CodecContract.md).
 
 ## 12. Reference implementations
 

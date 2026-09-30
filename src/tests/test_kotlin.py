@@ -7,7 +7,6 @@ import json
 import os
 import random
 import re
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -15,7 +14,7 @@ import pytest
 
 from taut import ext
 from taut.corpus.build import IR_PATH
-from taut.corpus import parity, parity_kotlin
+from taut.corpus import parity, parity_kotlin, toolchains
 from taut.corpus import resext_build as rb
 from taut.gen import kotlin
 from taut.gen import scaffold
@@ -31,9 +30,6 @@ from taut.wire import cbor, codec
 RAZEL = load_schema(IR_PATH.parent / "razel.taut.py")
 RESEXT = load_schema(rb.IR_PATH)
 ROOT = Path(__file__).resolve().parents[2]
-ANDROID_STUDIO_KOTLINC = Path(
-    "/Applications/Android Studio.app/Contents/plugins/Kotlin/kotlinc/bin/kotlinc"
-)
 RESEXT_TAG = BAND_START + 1
 RESEXT_FUZZ_SEED = 0x5EED55_04
 INT_MIN, INT_MAX = -(1 << 63), (1 << 63) - 1
@@ -82,93 +78,14 @@ KEY_ARGS = [",".join(k.encode().hex() for k in TEXT_KEYS),
             ",".join(str(k).lower() for k in BOOL_KEYS)]
 
 
-def _kotlinc_candidates():
-    seen = set()
-
-    def add(path):
-        if not path:
-            return
-        p = Path(path)
-        if p.is_dir():
-            p = p / "bin" / "kotlinc"
-        key = os.fspath(p)
-        if key not in seen:
-            seen.add(key)
-            yield p
-
-    yield from add(os.environ.get("KOTLINC"))
-    yield from add(ANDROID_STUDIO_KOTLINC)
-    yield from add(shutil.which("kotlinc"))
-
-
-def _find_kotlinc():
-    attempted = []
-    for kotlinc in _kotlinc_candidates():
-        if not kotlinc.is_file():
-            attempted.append(f"{kotlinc} (missing)")
-            continue
-        try:
-            subprocess.run(
-                [str(kotlinc), "-version"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-            )
-        except (OSError, subprocess.CalledProcessError) as exc:
-            attempted.append(f"{kotlinc} ({exc})")
-            continue
-        return str(kotlinc)
-    tried = "; ".join(attempted) if attempted else "no candidates"
-    pytest.skip(f"no usable kotlinc found; searched KOTLINC, Android Studio, PATH: {tried}")
-
-
-def _java_candidates(kotlinc):
-    seen = set()
-
-    def add(path):
-        if path is None:
-            return
-        p = Path(path)
-        key = os.fspath(p)
-        if key not in seen:
-            seen.add(key)
-            yield p
-
-    java_home = os.environ.get("JAVA_HOME")
-    if java_home:
-        yield from add(Path(java_home) / "bin" / "java")
-
-    for parent in Path(kotlinc).resolve().parents:
-        for rel in (
-            Path("jbr/Contents/Home/bin/java"),
-            Path("jbr/bin/java"),
-            Path("jdk/Contents/Home/bin/java"),
-            Path("jdk/bin/java"),
-        ):
-            yield from add(parent / rel)
-
-    yield from add(shutil.which("java"))
-
-
-def _find_java(kotlinc):
-    attempted = []
-    for java in _java_candidates(kotlinc):
-        if not java.is_file():
-            attempted.append(f"{java} (missing)")
-            continue
-        try:
-            subprocess.run(
-                [str(java), "-version"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-            )
-        except (OSError, subprocess.CalledProcessError) as exc:
-            attempted.append(f"{java} ({exc})")
-            continue
-        return str(java)
-    tried = "; ".join(attempted) if attempted else "no candidates"
-    pytest.skip(f"no usable JVM found for Kotlin parity harness: {tried}")
+def _find_kotlin_tools():
+    """(kotlinc, java): the gate's finder, `toolchains.find_kotlin_tools`, which probes kotlinc
+    under the java it finds for it, so Android Studio's bundle needs no JAVA_HOME."""
+    tools = toolchains.find_kotlin_tools()
+    if tools is None:
+        pytest.skip("no kotlinc that runs: searched KOTLINC, Android Studio and PATH, each with "
+                    "JAVA_HOME, a JDK beside it or PATH's java")
+    return tools
 
 
 def _java_env(java):
@@ -786,8 +703,7 @@ def test_the_runtime_exports_the_depth_numbers_and_a_bounded_raw_decode():
 
 
 def test_kotlin_float_parity_harness_if_kotlinc(tmp_path):
-    kotlinc = _find_kotlinc()
-    java = _find_java(kotlinc)
+    kotlinc, java = _find_kotlin_tools()
     jar = tmp_path / "kotlin-float-parity.jar"
     subprocess.run(
         [
@@ -825,8 +741,7 @@ def test_kotlin_resext_corpus_and_fuzz_harness_if_kotlinc(tmp_path):
     build that also holds the runtime's caller errors: a below-band tag (invalid_cases) and an
     out-of-range bound passed to the raw decode (argument_cases, TautOptions.md OPT-P3). A host
     is read at the depth ceiling with no length bound (bound_mismatches, G3)."""
-    kotlinc = _find_kotlinc()
-    java = _find_java(kotlinc)
+    kotlinc, java = _find_kotlin_tools()
     api = tmp_path / "api.kt"
     bare = tmp_path / "bare.kt"
     harness = tmp_path / "resext_harness.kt"
@@ -976,8 +891,7 @@ fun main() {
 
 
 def test_kotlin_missing_ok_decode_if_kotlinc(tmp_path):
-    kotlinc = _find_kotlinc()
-    java = _find_java(kotlinc)
+    kotlinc, java = _find_kotlin_tools()
     scaffold.emit(LATE, tmp_path, langs=["kotlin"], services=[], runtime=True)
     harness = tmp_path / "late_harness.kt"
     harness.write_text(_LATE_HARNESS)
@@ -1054,8 +968,7 @@ def test_kotlin_sorts_str_map_keys_by_code_point_if_kotlinc(tmp_path):
     """Map entries put in any order encode sorted by key as Python sorts them: a str key
     by code point, so U+FFFF before U+10000 and "a\\uffff" before "a\\U00010000", and an
     int or bool key by value, as before. One kotlinc build."""
-    kotlinc = _find_kotlinc()
-    java = _find_java(kotlinc)
+    kotlinc, java = _find_kotlin_tools()
     scaffold.emit(KEYED, tmp_path, langs=["kotlin"], services=[], runtime=True)
     harness = tmp_path / "keyed_harness.kt"
     harness.write_text(_KEYED_HARNESS)

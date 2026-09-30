@@ -1013,6 +1013,31 @@ def test_the_cli_takes_a_target_or_an_fc_variant(monkeypatch, capsys):
     assert refused.value.code == 2
 
 
+def test_require_all_fails_the_gate_when_a_selected_variant_did_not_run(monkeypatch, capsys):
+    """A missing toolchain skips its target, which the gate reports without failing. A release
+    runs `tautc parity --require-all`, under which a selected variant that skipped, or has no
+    runner, fails the gate with its reason."""
+    def green(name):
+        return lambda: parity.parse_report(name, "\n".join(_passing_lines(name)))
+
+    runners = {name: green(name) for name in ("python", "go", "go/fc")}
+    runners["go/fc"] = lambda: parity.skipped("go/fc", "go not found")
+    monkeypatch.setattr(parity, "_RUNNERS", runners)
+    assert parity.run_gate(target="go").violations == []
+    assert parity.run_gate(target="go", require_all=True).violations == [
+        "go/fc: skipped (go not found), but every target must run"]
+    assert main(["parity", "-t", "go"]) == 0
+    assert main(["parity", "-t", "go", "--require-all"]) == 1
+    assert "  - go/fc: skipped (go not found), but every target must run" in capsys.readouterr().out
+    runners["go/fc"] = green("go/fc")
+    assert main(["parity", "-t", "go", "--require-all"]) == 0
+    # By default every variant is selected, and one without a runner did not run either.
+    assert "rust: has no runner, but every target must run" in parity.run_gate(require_all=True).violations
+    with pytest.raises(SystemExit) as refused:
+        main(["parity", "--require-all", "--no-compile"])   # Python only is not every target
+    assert refused.value.code == 2
+
+
 def test_parity_cli_python_only_reports_clean(capsys):
     assert main(["parity", "--no-compile"]) == 0
     out = capsys.readouterr().out

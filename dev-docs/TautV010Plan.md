@@ -115,7 +115,9 @@ As in the parity pass:
 - `run_tests.py` is never run: it writes into glade.
 
 ## 4. After this plan: the owner's to start
-1. The v0.10.0 tag, and PyPI.
+1. The v0.10.0 tag, and PyPI. From the owner's terminal: `gearu plan 0.10.0`, then
+   `gearu release 0.10.0 --push --github-release` ([RELEASE.md](../RELEASE.md)). The GitHub
+   Release starts the PyPI workflow.
 2. The shape packages' 0.10 train (CD-V3):
    - taut-shape raises its pin;
    - taut-shape-rs re-vendors `cbor.rs`, its generated files and `parity_vectors.rs`, and caps its
@@ -169,6 +171,20 @@ that need it; the plan's steps are otherwise as written.
   `validate` refuse each such name, naming the targets (`Reference.md` §9).
 - Swift's `CborError` conformed to an unqualified `Error`, which a schema's message `Error`, as
   in glade's schema, hid. The runtime now spells `Swift.Error`.
+
+**Release management moves to gearu** (owner, 2026-09-30: "go"). This follows E2, and the switch is
+its own commit:
+- `gearu.toml` runs the new `scripts/release_checks.py`, which replaces `scripts/release.py`. That
+  script tagged as well as checking.
+- `tautc parity --require-all` fails the gate when a target does not run. Without it, a release
+  cut where a toolchain was missing would skip that language unverified, and the PyPI workflow
+  runs only the Python tests.
+- The release's tests step fails on a skipped test, for the same reason.
+- The Kotlin tests now find `kotlinc` as the gate does, running it under the JDK found for it,
+  so Android Studio's bundle needs no `JAVA_HOME`. Before, they skipped without one.
+- `gearu init` wrote `AGENTS.md` and `RELEASE.md`.
+
+The check script ran every step on the switch's tree, and `gearu plan 0.10.0` passed on it.
 
 **Known limits, left for follow-ups:**
 - `validate` does not check language keywords, and the generators' escape lists miss some: glade's

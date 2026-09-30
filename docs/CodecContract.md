@@ -126,7 +126,9 @@ to its expected bytes, and that a typed row resolved its root's bounds.
 
 A target is **gated** unless `corpus/parity/allowlist.json` lists it with a reason. The gate fails
 when a gated target fails, or when a listed target passes. A missing toolchain skips its target,
-with the reason. A failed build or a runner that exits non-zero fails its target.
+with the reason, except under `tautc parity --require-all`: there a target that does not run fails
+the gate, and a release runs it that way (`RELEASE.md`). A failed build or a runner that exits
+non-zero fails its target.
 
 ## 8. What is outside
 
