@@ -14,6 +14,7 @@ Run: `PYTHONPATH=src python -m taut.corpus.glade_build`.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from . import kit, synth
@@ -112,26 +113,43 @@ def glade_values(schema: Schema) -> dict[str, tuple[str, dict]]:
     return values
 
 
-def emit_rust(schema: Schema, corpus: dict[str, dict]) -> None:
+def taut_tag() -> str:
+    """The newest release tag this checkout's HEAD descends from (`git describe`): the taut
+    that `emit_rust`'s output came from (TautCheckedDecode.md CD-G1)."""
+    describe = ["git", "-C", str(_TAUT), "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*"]
+    return subprocess.run(describe, capture_output=True, text=True, check=True).stdout.strip()
+
+
+def header(tag: str) -> str:
+    """The lines each file `emit_rust` writes begins with: the taut tag it came from, and the
+    command that regenerates it (TautCheckedDecode.md CD-G1)."""
+    return (f"// taut {tag} wrote this file: `PYTHONPATH=src python3 -m taut.corpus.glade_build`,\n"
+            "// run in the taut checkout, regenerates it. Do not edit it by hand.\n")
+
+
+def emit_rust(schema: Schema, corpus: dict[str, dict], tag: str | None = None) -> None:
     """Emit the rust glade-wire codec crate sources (P0.S4): generated types +
     `roundtrip` dispatcher + VECTORS (via the shared rust generator), plus the
     CBOR runtime, both fail-closed: decode returns `DecodeError`, never panics. The
     crate's Cargo.toml + lib.rs (parity tests) are tracked by hand; these two files
-    are regenerated artifacts, like trial/rs."""
+    are regenerated artifacts, like trial/rs, each under `header(tag)`: `tag`, or
+    else the one `taut_tag()` names."""
     if not GLADE_RS_DIR.parent.exists():
         return  # crate not scaffolded yet; nothing to regenerate
+    lines = header(tag or taut_tag())
     GLADE_RS_DIR.mkdir(parents=True, exist_ok=True)
-    (GLADE_RS_DIR / "generated.rs").write_text(rust_gen._emit(schema, corpus))
-    (GLADE_RS_DIR / "cbor.rs").write_text(RUNTIME_CBOR_RS.read_text())
+    (GLADE_RS_DIR / "generated.rs").write_text(lines + rust_gen._emit(schema, corpus))
+    (GLADE_RS_DIR / "cbor.rs").write_text(lines + RUNTIME_CBOR_RS.read_text())
 
 
 def main() -> None:
+    tag = taut_tag()   # before anything is written: a checkout with no tag writes nothing
     schema = load_schema(IR_PATH)
     validate_or_raise(schema)
     export_to(schema, IR_JSON_PATH)
     corpus = kit.build_corpus(schema, glade_values(schema))
     GOLDEN_PATH.write_text(kit.golden_json(corpus))
-    emit_rust(schema, corpus)
+    emit_rust(schema, corpus, tag)
     print(f"wrote IR to {IR_JSON_PATH} and {len(corpus)} vectors to {GOLDEN_PATH}")
 
 

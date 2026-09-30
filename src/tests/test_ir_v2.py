@@ -9,6 +9,7 @@ to, and an `effective` naming a wire option Python's runtime does not implement.
 """
 
 import copy
+import dataclasses
 import json
 from pathlib import Path
 
@@ -440,5 +441,8 @@ def test_each_committed_ir_is_a_current_version_2_export(source, committed):
 @pytest.mark.parametrize("source, committed", _COMMITTED)
 def test_each_committed_ir_still_loads_as_version_1(source, committed):
     back = schema_from_json(_as_version_1(json.loads(committed.read_text())))
-    assert back == load_schema(source)   # none declares an option
+    # Version 1 carries no options. glade's file-level max_encoded_len (TautCheckedDecode.md
+    # CD-G3) is the only one a committed IR declares, and its version-1 form reads as the same
+    # schema without it.
+    assert back == dataclasses.replace(load_schema(source), options={})
     assert effective_map(back) == DEFAULTS

@@ -1921,28 +1921,48 @@ def test_rust_corpus_emitter_is_fail_closed(tmp_path):
 def test_glade_build_writes_the_fail_closed_codec_and_runtime(tmp_path, monkeypatch):
     """`glade_build` regenerates glade's wire-rs sources from the fail-closed path: its
     `cbor.rs` is the fail-closed runtime and its `generated.rs` the corpus emitter's
-    fail-closed codec. Written into a scratch crate, since `glade_build.main()` writes into
-    glade itself."""
+    fail-closed codec, each under a header naming the taut tag it came from and the command
+    that regenerates it (TautCheckedDecode.md CD-G1). Written into a scratch crate, since
+    `glade_build.main()` writes into glade itself."""
     crate = tmp_path / "glade" / "wire-rs"
     monkeypatch.setattr(glade_build, "GLADE_RS_DIR", crate / "src")
     glade_schema = load_schema(glade_build.IR_PATH)
     corpus = json.loads(glade_build.GOLDEN_PATH.read_text())
-    glade_build.emit_rust(glade_schema, corpus)
+    glade_build.emit_rust(glade_schema, corpus, tag="v9.8.7")
     assert not crate.exists()   # no crate scaffolded: nothing to regenerate
 
     crate.mkdir(parents=True)
-    glade_build.emit_rust(glade_schema, corpus)
+    glade_build.emit_rust(glade_schema, corpus, tag="v9.8.7")
     src = crate / "src"
     assert sorted(p.name for p in src.iterdir()) == ["cbor.rs", "generated.rs"]
-    assert (src / "cbor.rs").read_text() == CBOR_RS.read_text()
+    header = glade_build.header("v9.8.7")
+    assert header.startswith("// taut v9.8.7 wrote this file:")
+    assert "`PYTHONPATH=src python3 -m taut.corpus.glade_build`" in header
+    assert all(line.startswith("// ") for line in header.splitlines())
+    assert (src / "cbor.rs").read_text() == header + CBOR_RS.read_text()
     generated = (src / "generated.rs").read_text()
-    assert generated == rust._emit(glade_schema, corpus)
+    assert generated == header + rust._emit(glade_schema, corpus)
     assert "use crate::cbor::{Cbor, DecodeError};" in generated
     assert "pub fn from_wire(v: i64) -> Result<Self, DecodeError>" in generated
     rustc = shutil.which("rustc")
     if rustc is None:
         pytest.skip("rustc not available")
     _run_corpus_emitter(rustc, tmp_path, src / "cbor.rs", src / "generated.rs")
+
+
+def test_glade_build_names_the_release_tag_its_checkout_descends_from():
+    """With no tag given, `emit_rust`'s header names the newest release tag (`v` and a
+    version) that this checkout's HEAD descends from: the taut its output came from."""
+    if not (ROOT / ".git").exists():
+        pytest.skip("not a git checkout: no tag to name")
+    tag = glade_build.taut_tag()
+    listed = subprocess.run(["git", "-C", str(ROOT), "tag", "--list", tag], capture_output=True,
+                            text=True, check=True).stdout.split()
+    assert listed == [tag]
+    assert tag.startswith("v") and tag[1:].split(".")[0].isdigit()
+    head_descends = subprocess.run(["git", "-C", str(ROOT), "merge-base", "--is-ancestor", tag,
+                                    "HEAD"])
+    assert head_descends.returncode == 0
 
 
 # =============================================================================

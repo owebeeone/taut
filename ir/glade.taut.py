@@ -30,9 +30,18 @@ from pathlib import Path
 # Make the taut builder importable when this file is loaded by path.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from taut.ir.dsl import BOOL, BYTES, INT, STR, Enum, F, List, Msg, Ref, schema
+from taut.ir.dsl import BOOL, BYTES, INT, STR, Enum, F, List, Msg, Ref, option, schema
 
 SCHEMA = schema(
+    # ---- bounds ------------------------------------------------------------
+    # A frame is its FrameType tag byte, then one frame message, and a carrier
+    # refuses a frame over 16 MiB, its tag byte included, before it allocates
+    # for it (the frame limit ruled for the carrier port, plan Step 4.5b). So a
+    # frame message is at most 16 MiB less one byte. glade-wire's frame limit
+    # is this bound plus the tag byte, so the node and its clients cannot
+    # drift apart (TautCheckedDecode.md CD-B4, CD-G3).
+    option.max_encoded_len(16 * 1024 * 1024 - 1),
+
     # ---- enums -------------------------------------------------------------
     # FrameType is the transport type-tag registry: the session framing writes
     # this tag + length around each frame message. Not a union message — the

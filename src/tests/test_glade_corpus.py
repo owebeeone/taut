@@ -6,6 +6,7 @@ import json
 
 from taut.corpus.glade_build import GOLDEN_PATH, IR_PATH, glade_values
 from taut.ir.load import load_schema
+from taut.ir.options import effective
 from taut.wire import codec
 
 
@@ -55,3 +56,18 @@ def test_glade_shape_enum_appends_swmr_and_crdt_without_renumbering_existing_sha
     }
     _message, op = glade_values(schema)["edge/op-swmr"]
     assert op["shape"] == "swmr"
+
+
+def test_glade_declares_a_bound_that_keeps_the_frame_cap_at_16_mib():
+    """A glade frame is its FrameType tag byte, then one frame message, and a carrier refuses a
+    frame over 16 MiB, its tag byte included (glade's frame limit). glade's schema declares the
+    message's share of that at file level, 16 MiB less the tag byte, so every message resolves
+    to it, at the default depth, and glade-wire's frame limit, one byte more, stays 16 MiB
+    (TautCheckedDecode.md CD-B4, CD-G3)."""
+    schema = load_schema(IR_PATH)
+    message_bound = 16 * 1024 * 1024 - 1
+    assert schema.options == {"max_encoded_len": message_bound}
+    assert effective(schema, "max_encoded_len") == message_bound
+    for message in schema.messages:
+        assert effective(schema, "max_encoded_len", message=message) == message_bound, message
+        assert effective(schema, "max_depth", message=message) == 32, message

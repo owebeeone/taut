@@ -1,9 +1,11 @@
 {
   "version": 2,
-  "options": {},
+  "options": {
+    "max_encoded_len": 16777215
+  },
   "effective": {
     "max_depth": 32,
-    "max_encoded_len": null
+    "max_encoded_len": 16777215
   },
   "shapes": {
     "unary": {
@@ -352,7 +354,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -401,7 +403,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -465,7 +467,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -601,7 +603,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -677,7 +679,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -729,7 +731,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -778,7 +780,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -827,7 +829,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -891,7 +893,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -940,7 +942,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -980,7 +982,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -1008,7 +1010,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -1069,7 +1071,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -1130,7 +1132,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -1191,7 +1193,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -1228,7 +1230,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -1265,7 +1267,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
@@ -1326,7 +1328,7 @@
       "options": {},
       "effective": {
         "max_depth": 32,
-        "max_encoded_len": null
+        "max_encoded_len": 16777215
       },
       "reserved_tags": [],
       "reserved_names": [],
