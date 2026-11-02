@@ -77,6 +77,11 @@ class EnumDef:
     members: dict[str, int]   # native member name -> integer wire value
     options: dict[str, object] = field(default_factory=dict)   # declared here (OPT-L3)
 
+    @property
+    def case(self) -> "_EnumCaseNamespace":
+        """Unambiguous authoring lookup, including metadata-named members."""
+        return _EnumCaseNamespace(self)
+
     def __getattr__(self, name: str) -> "EnumMemberRef":
         if name in self.members:
             return EnumMemberRef(self.name, name)
@@ -87,6 +92,30 @@ class EnumDef:
 class EnumMemberRef:
     enum: str
     member: str
+
+
+class _EnumCaseNamespace:
+    """Read-only authoring view; it contributes no fields to portable IR."""
+
+    __slots__ = ("_definition",)
+
+    def __init__(self, definition: EnumDef):
+        object.__setattr__(self, "_definition", definition)
+
+    def __getattribute__(self, name: str) -> object:
+        definition = object.__getattribute__(self, "_definition")
+        if name in definition.members:
+            return EnumMemberRef(definition.name, name)
+        return object.__getattribute__(self, name)
+
+    def __getattr__(self, name: str) -> "EnumMemberRef":
+        raise AttributeError(f"Unknown enum member {name!r}")
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError("Enum case namespace is read-only")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError("Enum case namespace is read-only")
 
 
 @dataclass(frozen=True)

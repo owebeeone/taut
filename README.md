@@ -99,6 +99,14 @@ SCHEMA = schema(
   `Msg(...)` control names such as `reserved` and `next_id`.
 - **`reserved` + `next_id`** are first-class, validated message features (not
   comments) — retired tags/names can never be reused, and `next_id` is checked.
+- **Qualified enum cases** use the Python authoring namespace, for example
+  `choice = Enum("Choice", name=0, text=1)` and
+  `Case(kind=choice.case.name)`. The `.case` namespace returns typed member
+  references, including choices named `name`, `members`, `options`, or `case`;
+  definition metadata such as `choice.name` is unchanged. Ordinary
+  `choice.text` lookup remains available, and missing cases raise AttributeError.
+  This is authoring syntax only; wire values, IR layout and generated APIs do
+  not change.
 - **Methods are the minimal contract `(name, in, out, shape)`.** `shape` is the
   *sole* discriminator: `unary` (request→response, the default) is just the
   degenerate member of the **validated canonical shape registry**, alongside
