@@ -826,3 +826,45 @@ def test_windows_extended_path_spelling_shares_owner_and_schema_identity(tmp_pat
     record=json.loads((owner/'.taut-rust-runtime.json').read_text())
     assert len(record['users'])==1 and (owner/'validation.rs').exists()
     owner_application(app/'rust',owner)
+
+
+@pytest.mark.parametrize('suffix',['.',' '])
+@pytest.mark.parametrize('role',['output','runtime'])
+def test_distinct_windows_namespace_directories_refuse_without_mutation(tmp_path,suffix,role):
+    import os
+    if os.name!='nt':pytest.skip('Windows namespace filename semantics')
+    ordinary=tmp_path/'owner';ordinary.mkdir()
+    extended=Path('\\\\?\\'+str(tmp_path/('owner'+suffix)));extended.mkdir()
+    assert not os.path.samefile(ordinary,extended)
+    first=schema(First=Msg(n=F(1,INT)))
+    second=schema(Second=Msg(n=F(1,INT)))
+    app=ordinary if role=='output' else tmp_path/'app'
+    bindings={} if role=='output' else {'rust':{'source_root':str(ordinary)}}
+    emit(first,app,langs=['rust'],services=[],runtime_mode='source',runtime_bindings=bindings)
+    before=snapshot(ordinary);app_before=snapshot(app)
+    destination=extended if role=='output' else tmp_path/'other'
+    bindings={} if role=='output' else {'rust':{'source_root':str(extended)}}
+    with pytest.raises(ValueError,match='unsupported Windows namespace path component'):
+        emit(second,destination,langs=['rust'],services=[],runtime_mode='source',runtime_bindings=bindings)
+    assert snapshot(ordinary)==before and snapshot(app)==app_before
+    assert list(extended.iterdir())==[]
+    if role=='runtime':assert not destination.exists()
+
+
+@pytest.mark.parametrize('suffix',['.',' '])
+@pytest.mark.parametrize('boundary',['locks','user','apply'])
+def test_windows_namespace_rejection_is_shared_by_identity_boundaries(tmp_path,suffix,boundary):
+    import os
+    from taut.gen.python_runtime import apply_outputs,output_locks
+    from taut.gen.rust_runtime import user_identity
+    if os.name!='nt':pytest.skip('Windows namespace filename semantics')
+    ordinary=tmp_path/'owner';ordinary.mkdir()
+    extended=Path('\\\\?\\'+str(tmp_path/('owner'+suffix)));extended.mkdir()
+    target=ordinary/'keep.txt';target.write_text('original')
+    before=snapshot(ordinary)
+    with pytest.raises(ValueError,match='unsupported Windows namespace path component'):
+        if boundary=='locks':
+            with output_locks([ordinary,extended]):pytest.fail('unsafe roots reached lock body')
+        elif boundary=='user':user_identity(extended/'.taut-rust-outputs.json')
+        else:apply_outputs({target:b'changed',extended/'other.txt':b'new'},[])
+    assert snapshot(ordinary)==before and list(extended.iterdir())==[]

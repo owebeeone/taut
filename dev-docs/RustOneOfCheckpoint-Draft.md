@@ -1,6 +1,6 @@
 # Rust OneOf checkpoint — draft and review object
 
-Status: remediation 1 source frozen for dual Code+Surface / State re-verdicts.
+Status: remediation 2 source frozen for dual Code+Surface / State re-verdicts.
 Acceptance and GitHub publication are not claimed by this draft. The exact source
 tuple is supplied by the checkpoint commit and the generated reviewer prompts.
 
@@ -10,7 +10,13 @@ control their one-patch correction: qualified allocator Box helpers preserve
 schema types named Box; lexical safety checks precede canonical owner/user path
 identity, including Windows drive/UNC spellings; shared application preflight
 rejects physical write/delete overlap. Both originating reviewers must verify
-closure on the new committed tuple. This is the first bounded remediation round.
+closure on the new committed tuple. Their remediation-1 reports close both initial
+findings. Code reports GO; State reports a new bounded P2-2: unconditional Windows
+namespace-prefix removal conflates physically distinct trailing-dot/space paths.
+`RustOneOfCheckpoint-RemPlan-2.md` controls the second and final bounded correction:
+reject ambiguous namespace filename components before normalization, locking or
+mutation, consistently across roots, users and write/delete identities. Safe
+ordinary drive/UNC prefix equivalence and existing safety checks remain supported.
 
 Authority: [RustOneOfCheckpoint-Authority.md](RustOneOfCheckpoint-Authority.md)
 records the original implementation directive, the Python freeze/clearance,

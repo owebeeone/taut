@@ -184,6 +184,11 @@ preserved with named errors; directory aliases/obstructions are rejected before
 mutation. Mode changes remove only unmodified tracked stale files and retain
 components needed by other producers/consumers. Legacy untracked copies require
 a fresh directory or explicit user-managed migration. Headers alone are no proof.
+Windows extended drive/UNC prefix spellings are accepted for ordinary filename
+components. Namespace components with trailing dots/spaces, DOS device names or
+reserved filename characters are rejected before locking or writing: removing
+their prefix can change which filesystem object they identify. Use ordinary
+filename components for schema outputs and runtime owners.
 
 Mandatory descriptors/imports, the new owner module dependency and adapter/facts
 constants are an intentional generated-code migration in both modes. The four

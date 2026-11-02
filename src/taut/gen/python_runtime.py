@@ -64,7 +64,28 @@ def _physical_path(path):
     first; resolving identity is not permission to follow a directory reparse point.
     """
     import os
-    resolved = Path(path).resolve()
+    lexical = Path(path)
+    if os.name == 'nt':
+        spelling = str(lexical)
+        ordinary = None
+        if spelling[:8].lower() == '\\\\?\\unc\\':
+            ordinary = Path('\\\\' + spelling[8:])
+        elif spelling.startswith('\\\\?\\') and len(spelling) > 6 and spelling[5:7] == ':\\':
+            ordinary = Path(spelling[4:])
+        if ordinary is not None:
+            components = ordinary.parts[1:]
+            if ordinary.anchor.startswith('\\\\'):
+                components += tuple(ordinary.anchor.strip('\\').split('\\'))
+            reserved = {'CON', 'PRN', 'AUX', 'NUL', 'CONIN$', 'CONOUT$'}
+            reserved.update(f'{base}{digit}' for base in ('COM', 'LPT') for digit in '123456789\u00b9\u00b2\u00b3')
+            for component in components:
+                if component in ('.', '..'):
+                    continue
+                if (component.endswith(('.', ' ')) or component.split('.')[0].upper() in reserved
+                        or any(ord(char) < 32 or char in '<>:"|?*' for char in component)):
+                    raise ValueError(f'{lexical}: unsupported Windows namespace path component {component!r}; '
+                                     'use ordinary filename components without trailing dots/spaces or reserved names')
+    resolved = lexical.resolve()
     if os.name == 'nt':
         spelling = str(resolved)
         if spelling[:8].lower() == '\\\\?\\unc\\':
