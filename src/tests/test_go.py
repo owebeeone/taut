@@ -427,7 +427,7 @@ def test_go_runtime_and_parity_runner_are_gofmt_clean(tmp_path):
     if gofmt is None:
         pytest.skip("gofmt not installed")
     runner = tmp_path / "main.go"
-    runner.write_text(parity_go._source())
+    runner.write_text(parity_go._source(), encoding="utf-8", newline="\n")
     runtime = sorted(str(p) for p in RUNTIME.glob("*.go"))
     result = subprocess.run([gofmt, "-l", str(runner), *runtime], capture_output=True, text=True, check=False)
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
@@ -478,7 +478,7 @@ def test_generated_go_is_gofmt_clean(tmp_path):
     paths = []
     for name, source in _generated_go().items():
         paths.append(tmp_path / f"{name}.go")
-        paths[-1].write_text(source)
+        paths[-1].write_text(source, encoding="utf-8", newline="\n")
     result = subprocess.run([gofmt, "-l", *map(str, paths)], capture_output=True, text=True, check=False)
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
 

@@ -5,7 +5,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_proto_api_surface_extensions_doc_exists_and_covers_contract():
-    doc = ROOT / "dev-docs" / "TautProtoApiSurfaceExtensions.md"
+    # The proposal was archived with the other inactive development records.
+    doc = ROOT / "dev-docs" / "history" / "parked" / "TautProtoApiSurfaceExtensions.md"
     text = doc.read_text()
 
     required_sections = [

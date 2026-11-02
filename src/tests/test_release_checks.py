@@ -62,7 +62,8 @@ def test_gearu_runs_every_step_on_its_candidate_and_rereads_metadata_on_the_tagg
     `checks` runs every step once, and `exact_checks` only rereads the metadata."""
     tomllib = pytest.importorskip("tomllib")
     release = tomllib.loads((ROOT / "gearu.toml").read_text(encoding="utf-8"))["release"]
-    [checks], [exact] = release["checks"], release["exact_checks"]
+    [checks] = [c for c in release["checks"] if "scripts/release_checks.py" in c]
+    [exact] = [c for c in release["exact_checks"] if "scripts/release_checks.py" in c]
     for command in (checks, exact):
         assert command[command.index("scripts/release_checks.py") + 1] == "{python_version}"
     assert "--only" not in checks
@@ -120,3 +121,24 @@ def test_every_test_that_reruns_the_gate_is_marked_gate():
     found = _gate_reruns()
     assert len(found) == 8, found      # the whole gate, and seven generated targets' own runs
     assert [name for name, marked in found.items() if not marked] == []
+
+
+@pytest.mark.parametrize('damage', ['missing','extra','skip','failed','wrong-host','wrong-source'])
+def test_release_coverage_refuses_incomplete_or_unqualified_execution(damage):
+    checks = _script()
+    universe = {'tree_hash':'same', 'selected':{
+        'native':{'posix':False,'gate':False},
+        'posix':{'posix':True,'gate':False},
+        'wrapper':{'posix':False,'gate':True}}}
+    def record(host, name):
+        return {'host':host,'tree_hash':'same','exitstatus':0,
+                'selected':{name:{}},'phases':{name:{'setup':'passed','call':'passed','teardown':'passed'}}}
+    runs = [record('windows','native'), record('posix','posix')]
+    assert checks.verify_test_coverage(universe,runs)['covered']=={'native':'windows','posix':'posix'}
+    if damage=='missing': runs.pop()
+    elif damage=='extra': runs[0]['selected']['surprise']={}
+    elif damage=='skip': runs[1]['phases']['posix']['call']='skipped'
+    elif damage=='failed': runs[1]['exitstatus']=1
+    elif damage=='wrong-host': runs[1]['host']='windows'
+    elif damage=='wrong-source': runs[1]['tree_hash']='different'
+    with pytest.raises(checks.NotReady): checks.verify_test_coverage(universe,runs)

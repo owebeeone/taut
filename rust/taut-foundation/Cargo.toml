@@ -5,7 +5,9 @@ edition = "2021"
 rust-version = "1.75"
 license = "MIT"
 description = "Taut no_std + alloc codec, descriptor and explicit validation foundation"
-publish = false
+repository = "https://github.com/owebeeone/taut"
+readme = "README.md"
+include = ["src/**", "Cargo.toml", "README.md", "LICENSE", "provenance.json"]
 
 [features]
 default = []

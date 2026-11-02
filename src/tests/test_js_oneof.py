@@ -316,7 +316,7 @@ def test_unavailable_bound_source_owner_is_not_adopted(tmp_path,mode):
     assert not (tmp_path/'output').exists()
 
 
-@pytest.mark.parametrize('kind',['file','symlink'])
+@pytest.mark.parametrize('kind',['file',pytest.param('symlink',marks=pytest.mark.posix)])
 def test_obstructed_or_alias_owner_unchanged(tmp_path,kind):
     owner=tmp_path/'owner'
     if kind=='file': owner.write_text('obstruction')

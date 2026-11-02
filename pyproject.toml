@@ -50,5 +50,6 @@ include = ["taut*"]
 [tool.pytest.ini_options]
 testpaths = ["src/tests"]
 markers = [
+    "posix: process and symlink semantics exercised on POSIX in the strict release test partition",
     "gate: reruns the parity gate's runners; a release deselects these, since its parity step runs the whole gate with --require-all",
 ]

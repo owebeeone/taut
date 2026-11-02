@@ -1108,6 +1108,7 @@ def _tool(path, code=0):
 
 
 @pytest.mark.skipif(os.name == "nt", reason="fake tools are shell scripts")
+@pytest.mark.posix
 def test_java_tools_come_from_java_home_first(tmp_path, monkeypatch):
     home = tmp_path / "jdk"
     javac, java = _tool(home / "bin" / "javac"), _tool(home / "bin" / "java")
@@ -1118,6 +1119,7 @@ def test_java_tools_come_from_java_home_first(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(os.name == "nt", reason="fake tools are shell scripts")
+@pytest.mark.posix
 def test_kotlinc_comes_from_the_kotlinc_variable_with_the_java_it_runs_with(tmp_path, monkeypatch):
     kotlinc = _tool(tmp_path / "kotlinc" / "bin" / "kotlinc")
     java = _tool(tmp_path / "jdk" / "bin" / "java")
@@ -1128,6 +1130,7 @@ def test_kotlinc_comes_from_the_kotlinc_variable_with_the_java_it_runs_with(tmp_
 
 
 @pytest.mark.skipif(os.name == "nt", reason="PATH isolation uses POSIX paths")
+@pytest.mark.posix
 def test_a_missing_toolchain_is_none(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(tmp_path))
     monkeypatch.delenv("JAVA_HOME", raising=False)

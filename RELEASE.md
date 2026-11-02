@@ -123,6 +123,26 @@ package publication and documentation deployment where configured.
 
 ## taut's checks
 
+The 0.11 train also releases the dependency-free `taut-foundation` Rust crate.
+Gearu versions `rust/taut-foundation/Cargo.toml` with the Python package and
+verifies its canonical-source inventory and standalone Cargo package. Its
+runtime files are generated from the canonical sources, never independently
+maintained. The crate includes its own license, README and provenance.
+
+For the initial crate publication, prepare and push with Gearu **without**
+`--github-release`. Run `foundation.yml` in `owebeeone/taut-shape-rs` with the
+exact release commit, version, and `publish=true`; that existing repository's
+`crates-io` environment holds the bootstrap credential. The workflow verifies
+the immutable Taut tag before publishing. First run it with `publish=false`
+against the committed readiness source to check packaging and credential
+presence. Presence cannot prove the token's new-crate scope; a failed bootstrap
+publication blocks the Python release and the rest of the train.
+
+Only after foundation is visible on crates.io, rerun Gearu with
+`--push --github-release` to publish Taut to PyPI. Then release the three shape
+libraries against registry dependencies. Never copy the bootstrap credential
+to a checkout or publish from a local source tree.
+
 `gearu.toml` runs `scripts/release_checks.py`, which took over from `scripts/release.py` in
 v0.10.0. That script tagged as well as checking. gearu runs every step on its candidate, and
 rereads only the metadata on the commit it tags: a tag-derived version needs no release commit.
@@ -136,6 +156,22 @@ of its log.
 - The gate builds its targets side by side, one per CPU by default (`tautc parity --jobs N`).
 
 The tests step fails if any test skips, and the parity step runs `tautc parity --require-all`.
+The qualified strict test environment is native Windows plus its Ubuntu WSL
+mount of the same candidate. Set `TAUT_RELEASE_POSIX_PYTHON` to an absolute WSL
+Python path with pytest; `TAUT_RELEASE_WSL_DISTRO` defaults to `Ubuntu`.
+The `posix` marker assigns the three shell/PATH probes and the real symlink
+probe to WSL. All remaining non-`gate` cases run natively, including MSVC,
+Windows junctions and namespace semantics. Neither execution may skip.
+The gate first collects every case, records IDs and candidate raw-file hashes,
+then verifies the exact platform union and all setup/call/teardown results.
+`TAUT_RELEASE_EVIDENCE_DIR` retains JSON/XML ledgers and logs outside the candidate.
+The eight duplicate `gate` wrappers are recorded separately; the mandatory
+parity command must execute all sixteen variants and all 88 rows per variant.
+
+`release-inputs.json` pins the four sibling test inputs. Gearu materializes
+committed clones with LF checkout and frozen TypeScript dependencies; publication
+CI fetches the same immutable input revisions. The checked package itself
+continues to install without any sibling repository.
 Every language and forward-compat build must run, so every toolchain must be installed: `rustc`,
 a C++ compiler, `swiftc`, `go`, a `node` that strips TypeScript types, a JDK and `kotlinc`.
 - The JDK is found through `JAVA_HOME`, then Android Studio's bundled one, then `PATH`.

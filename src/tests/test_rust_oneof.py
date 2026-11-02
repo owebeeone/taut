@@ -1,6 +1,7 @@
 """Rust implementation of the Python reference corpus and delivery contract."""
 from pathlib import Path
 import json
+import re
 import subprocess
 
 import pytest
@@ -432,6 +433,7 @@ def test_actual_shape_library_aliases_application_foundation(tmp_path,owner_mode
     s=schema(*library_schema.enums.values(),*library_schema.messages.values(),choice,
         AppEnvelope=Msg(tag=F(1,OneOf(choice)),packet=F(2,Ref.LogRecord,Case(tag=choice.packet))))
     owner=ROOT/'rust/taut-foundation'
+    foundation_version=re.search(r'^version = "([^"]+)"', (owner/'Cargo.toml').read_text(), re.M)[1]
     bindings={'rust':{'module':'taut_shape'}}
     if owner_mode=='source':
         owner=tmp_path/'source-owner'
@@ -452,7 +454,7 @@ edition="2021"
 [lib]
 path="lib.rs"
 [dependencies]
-taut-foundation={{version="0.10.0",features=["validation"]}}
+taut-foundation={{version="={foundation_version}",features=["validation"]}}
 taut-shape={{path={json.dumps(shape_root.as_posix())},default-features=false,features=["validation"]}}
 [patch.crates-io]
 taut-foundation={{path={json.dumps(owner.as_posix())}}}

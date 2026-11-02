@@ -29,8 +29,10 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -77,7 +79,7 @@ def run(command: list[object], *, out: IO[str], env: dict[str, str] | None = Non
 def source_env() -> dict[str, str]:
     """The environment that runs this tree's source: `src` first on PYTHONPATH."""
     env = os.environ.copy()
-    src = str(REPO / "src")
+    src = str(REPO / "src") + os.pathsep + str(REPO / "scripts")
     env["PYTHONPATH"] = src + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
     return env
 
@@ -151,20 +153,91 @@ def step_metadata(version: str, work: Path, out: IO[str]) -> None:
         raise NotReady("\n".join(problems))
 
 
+def verify_test_coverage(universe: dict, runs: list[dict]) -> dict:
+    required = {name: marks for name, marks in universe['selected'].items() if not marks['gate']}
+    assigned = {}
+    for run in runs:
+        if run['tree_hash'] != universe['tree_hash'] or run['exitstatus']:
+            raise NotReady('test run failed or candidate source bytes differ across hosts')
+        expected = {name for name, marks in required.items()
+                    if marks['posix'] == (run['host'] == 'posix')}
+        if set(run['selected']) != expected or set(run['phases']) != expected:
+            raise NotReady('test coverage differs from the exact required platform assignment')
+        for name, phases in run['phases'].items():
+            if name in assigned or phases.get('call') != 'passed' or set(phases.values()) != {'passed'}:
+                raise NotReady('test skipped, failed, duplicated or did not execute: '+name)
+            assigned[name] = run['host']
+    if set(assigned) != set(required):
+        raise NotReady('required test coverage is missing')
+    return {'tree_hash': universe['tree_hash'], 'covered': assigned,
+            'parity_wrappers': [name for name, marks in universe['selected'].items() if marks['gate']]}
+
+
 def step_tests(version: str, work: Path, out: IO[str]) -> None:
     require_modules("pytest", "xdist")
     report = work / "pytest.xml"
+    if os.name != 'nt':
+        raise NotReady('the strict release qualifies Windows filesystem cases plus a WSL POSIX complement')
+    python = os.environ.get("TAUT_RELEASE_POSIX_PYTHON")
+    if not python or not python.startswith("/"):
+        raise NotReady("set TAUT_RELEASE_POSIX_PYTHON to a qualified WSL Python with pytest")
+    universe_path, native_path = work/'universe.json', work/'windows-tests.json'
+    run([sys.executable, '-m', 'pytest', 'src/tests', '--collect-only', '-q',
+         '-p', 'no:cacheprovider', '-p', 'release_test_ledger',
+         '--release-ledger='+str(universe_path), '--release-host=collection'], out=out, env=source_env())
+    selection = "not gate"
+    if os.name == "nt":
+        selection += " and not posix"
     run([sys.executable, "-m", "pytest", "src/tests", "-q", "-rs", "-p", "no:cacheprovider",
-         "-n", "auto", "-m", "not gate", f"--basetemp={work / 'pytest'}", f"--junit-xml={report}"],
+         '-p', 'release_test_ledger', '--release-ledger='+str(native_path), '--release-host=windows',
+         "-n", "auto", "-m", selection, f"--basetemp={work / 'pytest'}", f"--junit-xml={report}"],
         out=out, env=source_env())
     skipped = skipped_tests(report)
     if skipped:
         raise NotReady(f"{len(skipped)} tests skipped, and a release runs every test; install what "
                        "they name:\n  " + "\n  ".join(skipped))
+    if os.name == "nt":
+        # Both partitions read the same candidate through the WSL mount. Every
+        # non-gate case runs exactly once; neither partition may skip a case.
+        distro = os.environ.get("TAUT_RELEASE_WSL_DISTRO", "Ubuntu")
+        def posix_path(path: Path) -> str:
+            result = subprocess.run(["wsl", "-d", distro, "--", "wslpath", "-a", "-u", str(path)],
+                                    capture_output=True, text=True, check=True)
+            return result.stdout.strip()
+        posix_repo = posix_path(REPO)
+        posix_report = work / "pytest-posix.xml"
+        posix_ledger = work / 'posix-tests.json'
+        run(["wsl", "-d", distro, "--", "env", f"PYTHONPATH={posix_repo}/src:{posix_repo}/scripts",
+             "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1", "PYTHONDONTWRITEBYTECODE=1",
+             "TMPDIR=" + posix_path(work), python, "-m", "pytest", posix_repo + "/src/tests",
+             "-q", "-rs", "-p", "no:cacheprovider", "-m", "not gate and posix",
+             '-p', 'release_test_ledger', '--release-ledger='+posix_path(posix_ledger), '--release-host=posix',
+             "--basetemp=" + posix_path(work / "pytest-posix"),
+             "--junit-xml=" + posix_path(posix_report)], out=out)
+        skipped = skipped_tests(posix_report)
+        cases = list(ElementTree.parse(posix_report).getroot().iter("testcase"))
+        if not cases or skipped:
+            raise NotReady("POSIX partition must execute without skips: " + "; ".join(skipped))
+        out.write(f"POSIX partition executed {len(cases)} cases from the same candidate, no skips\n")
+        load = lambda path: json.loads(path.read_text(encoding='utf-8'))
+        coverage = verify_test_coverage(load(universe_path), [load(native_path), load(posix_ledger)])
+        (work/'coverage.json').write_text(json.dumps(coverage, indent=2, sort_keys=True)+'\n', encoding='utf-8')
+        out.write(f"exact union covers {len(coverage['covered'])} required tests, no skips or omissions\n")
 
 
 def step_parity(version: str, work: Path, out: IO[str]) -> None:
     run([sys.executable, "-m", "taut.cli", "parity", "--require-all"], out=out, env=source_env())
+    out.flush()
+    text = (work/'parity.log').read_text(encoding='utf-8')
+    rows = {name: {'pass': int(passed), 'fail': int(failed), 'type_satisfied': int(typed)}
+            for name, passed, failed, typed in re.findall(
+                r'^([a-z]+(?:/fc)?)\s+gated\s+(\d+)\s+(\d+)\s+(\d+)\s+GREEN$', text, re.M)}
+    required = {'python','typescript','js','rust','cpp','swift','go','kotlin','java'}
+    required |= {name+'/fc' for name in required-{'python','typescript'}}
+    if set(rows) != required or any(row['fail'] or row['pass']+row['type_satisfied'] != 88
+                                    for row in rows.values()):
+        raise NotReady('the complete 16-variant, 88-row parity coverage ledger is not GREEN')
+    (work/'parity-coverage.json').write_text(json.dumps(rows, indent=2, sort_keys=True)+'\n', encoding='utf-8')
 
 
 def step_build(version: str, work: Path, out: IO[str]) -> None:
@@ -277,12 +350,21 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"{args.version!r} is not a release version, such as 0.10.0 or 0.10.0rc1")
     steps = selected_steps(parser, args.only)
     started = time.monotonic()
+    evidence = os.environ.get('TAUT_RELEASE_EVIDENCE_DIR')
+    if evidence:
+        Path(evidence).mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="taut-release-checks-") as tmp:
         work = Path(tmp)
         for stage in stages(steps):
             with ThreadPoolExecutor(max_workers=len(stage)) as pool:
                 results = list(pool.map(lambda chain: run_chain(chain, args.version, work), stage))
             failed = [result for result in results if result.problem is not None]
+            if evidence:
+                destination = Path(evidence)/work.name
+                destination.mkdir(exist_ok=True)
+                for receipt in work.iterdir():
+                    if receipt.is_file():
+                        shutil.copyfile(receipt, destination/receipt.name)
             for result in failed:
                 tail = result.log.read_text(encoding="utf-8", errors="replace").splitlines()[-60:]
                 print("\n".join([f"[release-checks] {result.step}: the end of its log", *tail,
