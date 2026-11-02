@@ -1,0 +1,265 @@
+[
+  {
+    "name": "missing_text",
+    "record": "Content",
+    "value": {
+      "kind": "text",
+      "text": null,
+      "number": null,
+      "flag": null
+    },
+    "issues": [
+      {
+        "code": "oneof.payload_missing",
+        "path": [
+          {
+            "kind": "field",
+            "value": "text"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "valid_text",
+    "record": "Content",
+    "value": {
+      "kind": "text",
+      "text": "Hello",
+      "number": null,
+      "flag": null
+    },
+    "issues": []
+  },
+  {
+    "name": "empty_text_present",
+    "record": "Content",
+    "value": {
+      "kind": "text",
+      "text": "",
+      "number": null,
+      "flag": null
+    },
+    "issues": []
+  },
+  {
+    "name": "zero_present",
+    "record": "Content",
+    "value": {
+      "kind": "number",
+      "text": null,
+      "number": 0,
+      "flag": null
+    },
+    "issues": []
+  },
+  {
+    "name": "false_present",
+    "record": "Content",
+    "value": {
+      "kind": "flag",
+      "text": null,
+      "number": null,
+      "flag": false
+    },
+    "issues": []
+  },
+  {
+    "name": "extra_number",
+    "record": "Content",
+    "value": {
+      "kind": "text",
+      "text": "Hello",
+      "number": 42,
+      "flag": null
+    },
+    "issues": [
+      {
+        "code": "oneof.payload_unexpected",
+        "path": [
+          {
+            "kind": "field",
+            "value": "number"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "missing_selected_with_other_payload",
+    "record": "Content",
+    "value": {
+      "kind": "text",
+      "text": null,
+      "number": 42,
+      "flag": null
+    },
+    "issues": [
+      {
+        "code": "oneof.payload_missing",
+        "path": [
+          {
+            "kind": "field",
+            "value": "text"
+          }
+        ]
+      },
+      {
+        "code": "oneof.payload_unexpected",
+        "path": [
+          {
+            "kind": "field",
+            "value": "number"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "unit_case",
+    "record": "Content",
+    "value": {
+      "kind": "empty",
+      "text": null,
+      "number": null,
+      "flag": null
+    },
+    "issues": []
+  },
+  {
+    "name": "unit_with_extra",
+    "record": "Content",
+    "value": {
+      "kind": "empty",
+      "text": null,
+      "number": 0,
+      "flag": null
+    },
+    "issues": [
+      {
+        "code": "oneof.payload_unexpected",
+        "path": [
+          {
+            "kind": "field",
+            "value": "number"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "switch_without_clearing",
+    "record": "Content",
+    "value": {
+      "kind": "number",
+      "text": "old",
+      "number": 7,
+      "flag": null
+    },
+    "issues": [
+      {
+        "code": "oneof.payload_unexpected",
+        "path": [
+          {
+            "kind": "field",
+            "value": "text"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "envelope_missing",
+    "record": "Envelope",
+    "value": {
+      "selection": "content",
+      "content": null
+    },
+    "issues": [
+      {
+        "code": "oneof.payload_missing",
+        "path": [
+          {
+            "kind": "field",
+            "value": "content"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "envelope_nested_invalid",
+    "record": "Envelope",
+    "value": {
+      "selection": "content",
+      "content": {
+        "kind": "number",
+        "text": null,
+        "number": null,
+        "flag": null
+      }
+    },
+    "issues": [
+      {
+        "code": "oneof.payload_missing",
+        "path": [
+          {
+            "kind": "field",
+            "value": "content"
+          },
+          {
+            "kind": "field",
+            "value": "number"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "envelope_nested_valid",
+    "record": "Envelope",
+    "value": {
+      "selection": "content",
+      "content": {
+        "kind": "flag",
+        "text": null,
+        "number": null,
+        "flag": false
+      }
+    },
+    "issues": []
+  },
+  {
+    "name": "envelope_unit",
+    "record": "Envelope",
+    "value": {
+      "selection": "empty",
+      "content": null
+    },
+    "issues": []
+  },
+  {
+    "name": "envelope_extra",
+    "record": "Envelope",
+    "value": {
+      "selection": "empty",
+      "content": {
+        "kind": "text",
+        "text": null,
+        "number": null,
+        "flag": null
+      }
+    },
+    "issues": [
+      {
+        "code": "oneof.payload_unexpected",
+        "path": [
+          {
+            "kind": "field",
+            "value": "content"
+          }
+        ]
+      }
+    ]
+  }
+]

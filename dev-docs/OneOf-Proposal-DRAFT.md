@@ -1,0 +1,11 @@
+# Oneof proposal review DRAFT brief
+Scope: review and amend proposal text only. No implementation, release, workspace commit or push.
+Authority: operator requested a review loop using ~/.claude/skills/review-loop/SKILL.md.
+Operator requirements: referenceable enum objects and qualified member refs; OneOf(enum, virtual=False, exhaustive=False); field-local Case only, no free-hanging Case. Nonvirtual discriminator stored/required. Virtual schema-only, no discriminator data and first-cut virtual validation deferred. Exhaustive true requires all enum members nominated on payload fields; false allows unmatched payload-free choices. Construction/mutation/codecs never implicitly validate; invalid drafts can serialize and be repaired. Explicit validators return reports of all detectable issues rather than throwing, across all nine supported target languages. JSON omits absent oneof payloads including virtual groups, presence is non-null not truthiness. Preserve invalid populated fields. CBOR unchanged in this JSON-specific proposal. User asks for coherent proposal, not implementation review.
+Lane-owner choices to evaluate, not operator mandates: exhaustive default False; report deferred_checks/is_complete; canonical path/key ordering; runtime cycle handling; exact public function names and IR version.
+Editable: Taut proposal and filed review/remediation documents only. Taut production/probe source, GARNS resolver, parser and external dependencies are reference-only. Historic tests are evidence, not production acceptance. No additional repo process documents CurrentProgramCheckpoint/AgentProcessRules/GwzProcessOptimization exist in this workspace or members (searched explicitly).
+This isolated committed snapshot is the draft-review object; no user-workspace git history is changed. Follow review-loop skill, maximum two blind axes and at most two remediation rounds; file reports verbatim. The earlier informal review was pre-skill, not either formal axis. Do not read it or peer reports.
+
+Snapshot: /var/folders/02/bn9c9g2x5qj8bb42zb857p7c0000gn/T/taut-oneof-proposal-review-4xo89oy3
+Revision: 8d7a8bff959a5711362a0aba107a62aaeee4a94a
+Tier: dual, Consistency+Surface and Safety. Remediation cap: two.

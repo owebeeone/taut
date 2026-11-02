@@ -1,0 +1,17 @@
+# Taut build proposal — DRAFT review brief
+
+Object: consolidated OneOf-ExplicitValidation-BuildProposal.md. Requested gate is document coherence/fitness as a Python-first and all-nine-language build proposal, NOT implementation acceptance or a full low-level adapter ABI freeze.
+
+Original operator authority: one document for exact language API projections; reusable general reports not bespoke oneof types; implement Python first after design then other agents; instance methods not globals/statics; Boolean fast path plus report path; local/recursive option default recursive; C++ noexcept; shared nominal runtime reports; enabled/disabled goldens. Subsequent explicit decisions: descriptors always present, distinct compiler/descriptor contract, old dependencies rejected (wrong toolchain), changed goldens acknowledged; no mandatory message superclass/interface; known Taut imported types rather than arbitrary class serialization; descriptor-driven Python validation, no dynamic messages; C++ raw primitive kind enumeration and fixed native types, child MessageDescriptor refs; host class objects optional; static captureless access adapters and space priority, not speed. User last requested fixing build proposal and review-loop skill only, then left.
+
+Supersessions: BuildProposal sections 1-2 and its explicit table control over conflicting older BehavioralBaseline clauses/history. Earlier behavioral GO/GO was for a prior object, not this build document. The current build doc may explicitly defer concrete adapter ABI, import-prefix configuration and numeric version allocation to focused design before backend implementation. Do not mistake those stated boundaries for completed work; assess whether any omitted decision prevents the requested build/API plan from being coherent.
+
+Scope: lane owner edits only build proposal and its review/draft/remediation/verdict documents. Reviewers are read-only, inspect these two committed docs and this DRAFT only. Source, probes, external dependencies, GARNS resolver/parser, versions/release configuration are reference-only. No implementation/test/build/version bump, workspace stage/commit/push/release authorized. Isolated temporary snapshot commits freeze review bytes without changing workspace git history. Applicable standing rules: scope provenance and no discovery-authorized expansion; source control bodies braced and Rust conditional sections enclosed if ever implemented; GWZ for actual workspace structural/git mutations. No CurrentProgramCheckpoint/AgentProcessRules/GwzProcessOptimization found in this workspace or its members in prior explicit search.
+
+Process: /Users/owebeeone/.claude/skills/review-loop/SKILL.md. Dual Consistency+Surface and Safety, peer-blind; reports filed verbatim; one merged remediation patch, at most two remediation rounds. No peer current report access. Earlier unrelated reviewers are not participants on this revision. Reviewers must classify whether any remediation creates new architecture requiring replacements per skill; do not demand extra implementation or outside-scope experiments for a document-only gate.
+
+Snapshot: /var/folders/02/bn9c9g2x5qj8bb42zb857p7c0000gn/T/taut-build-proposal-review-hkd1izpi
+Revision: e6d0c21b22c6c80b86f2e380c179c315a1fae5d8
+Tier: dual Consistency+Surface / Safety. Round: initial. Remediation used 0/2.
+
+Review completion: dual GO/GO on the initial settled tuple; zero findings, remediation 0/2. See TautBuild-Verdict.md. This accepts proposal coherence only; workspace remains uncommitted.
