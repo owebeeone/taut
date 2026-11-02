@@ -1,0 +1,518 @@
+{
+  "branch_repos": null,
+  "errors": [],
+  "kind": "response",
+  "members": [
+    {
+      "error": null,
+      "git_status": {
+        "ahead": null,
+        "behind": null,
+        "branch": "main",
+        "detached": false,
+        "dirty": true,
+        "head": "c02765930f06cfcb19a522843aa54582db514706",
+        "member_id": "mem_taut",
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 35,
+        "upstream": null
+      },
+      "lock_difference_reasons": [
+        "DirtyWorktree"
+      ],
+      "lock_match": "Differs",
+      "member_id": "mem_taut",
+      "member_path": "taut",
+      "planned": null,
+      "source_kind": "Git",
+      "state": null,
+      "status": "Ok",
+      "url_resolution": null
+    },
+    {
+      "error": null,
+      "git_status": {
+        "ahead": null,
+        "behind": null,
+        "branch": "main",
+        "detached": false,
+        "dirty": false,
+        "head": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+        "member_id": "mem_taut_shape_py",
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 0,
+        "upstream": null
+      },
+      "lock_difference_reasons": null,
+      "lock_match": "Matches",
+      "member_id": "mem_taut_shape_py",
+      "member_path": "taut-shape-py",
+      "planned": null,
+      "source_kind": "Git",
+      "state": null,
+      "status": "Ok",
+      "url_resolution": null
+    },
+    {
+      "error": null,
+      "git_status": {
+        "ahead": null,
+        "behind": null,
+        "branch": "main",
+        "detached": false,
+        "dirty": false,
+        "head": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+        "member_id": "mem_taut_shape_rs",
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 0,
+        "upstream": null
+      },
+      "lock_difference_reasons": null,
+      "lock_match": "Matches",
+      "member_id": "mem_taut_shape_rs",
+      "member_path": "taut-shape-rs",
+      "planned": null,
+      "source_kind": "Git",
+      "state": null,
+      "status": "Ok",
+      "url_resolution": null
+    },
+    {
+      "error": null,
+      "git_status": {
+        "ahead": null,
+        "behind": null,
+        "branch": "main",
+        "detached": false,
+        "dirty": false,
+        "head": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+        "member_id": "mem_taut_shape_ts",
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 0,
+        "upstream": null
+      },
+      "lock_difference_reasons": null,
+      "lock_match": "Matches",
+      "member_id": "mem_taut_shape_ts",
+      "member_path": "taut-shape-ts",
+      "planned": null,
+      "source_kind": "Git",
+      "state": null,
+      "status": "Ok",
+      "url_resolution": null
+    }
+  ],
+  "merge": null,
+  "meta": {
+    "action": "Status",
+    "aggregate_status": "Dirty",
+    "message": null,
+    "operation_id": "op_46680_1793639927664",
+    "request_id": "req_46680_1793639927664",
+    "schema_version": "gwz.protocol/v0"
+  },
+  "stash_bundles": null,
+  "workspace_git_status": {
+    "branch_differences": [],
+    "branch_groups": [
+      {
+        "label": "main",
+        "member_ids": [
+          "mem_taut",
+          "mem_taut_shape_py",
+          "mem_taut_shape_rs",
+          "mem_taut_shape_ts"
+        ],
+        "member_paths": [
+          "taut",
+          "taut-shape-py",
+          "taut-shape-rs",
+          "taut-shape-ts"
+        ]
+      }
+    ],
+    "branches": [
+      {
+        "ahead": null,
+        "behind": null,
+        "branch": "main",
+        "detached": false,
+        "head": "c02765930f06cfcb19a522843aa54582db514706",
+        "label": "main",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "unborn": false,
+        "upstream": null
+      },
+      {
+        "ahead": null,
+        "behind": null,
+        "branch": "main",
+        "detached": false,
+        "head": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+        "label": "main",
+        "member_id": "mem_taut_shape_py",
+        "member_path": "taut-shape-py",
+        "unborn": false,
+        "upstream": null
+      },
+      {
+        "ahead": null,
+        "behind": null,
+        "branch": "main",
+        "detached": false,
+        "head": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+        "label": "main",
+        "member_id": "mem_taut_shape_rs",
+        "member_path": "taut-shape-rs",
+        "unborn": false,
+        "upstream": null
+      },
+      {
+        "ahead": null,
+        "behind": null,
+        "branch": "main",
+        "detached": false,
+        "head": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+        "label": "main",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "unborn": false,
+        "upstream": null
+      }
+    ],
+    "clean": false,
+    "file_changes": [
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/api.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/api.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/package/python/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/package/python/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/package/python/api.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/package/python/api.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/api.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/api.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/ext.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/ext.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/facts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/facts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/rules.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/rules.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/validation.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/validation.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl",
+        "worktree_status": "?"
+      }
+    ],
+    "root_file_changes": [],
+    "root_status": {
+      "branch": "main",
+      "detached": false,
+      "dirty": false,
+      "head": "a8f37984471654902149d136b7a13a588346b58f",
+      "staged": 0,
+      "unborn": false,
+      "unstaged": 0,
+      "untracked": 0
+    }
+  }
+}

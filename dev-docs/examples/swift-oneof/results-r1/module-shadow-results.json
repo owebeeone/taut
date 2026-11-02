@@ -1,0 +1,46 @@
+[
+  {
+    "name": "Foundation",
+    "qualified": false,
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-False\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-False\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-False\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-False\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-False\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-False\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-False\\app.exe"
+    ],
+    "exit": 0,
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-False\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-False\\app.exp\n\n"
+  },
+  {
+    "name": "Foundation",
+    "qualified": true,
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-True\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-True\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-True\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-True\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-True\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-True\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-True\\app.exe"
+    ],
+    "exit": 1,
+    "stderr": "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\module-shadow\\Foundation-True\\paths.swift:22:55: error: type 'Foundation' has no member 'Data'\n\n20 |     public static func forKey(_ type: String, _ bytes: [UInt8]) -> Self {\n\n21 |         precondition([\"str\", \"int\", \"bool\"].contains(type), \"unsupported map key category\")\n\n22 |         return Self(\"key\", nil, nil, type, Foundation.Data(bytes).base64EncodedString())\n\n   |                                                       `- error: type 'Foundation' has no member 'Data'\n\n23 |     }\n\n24 | }\n\n"
+  },
+  {
+    "name": "Swift",
+    "qualified": false,
+    "generation_error": "Swift: message name reserved by the swift generator (a standard library name the code uses)"
+  },
+  {
+    "name": "Swift",
+    "qualified": true,
+    "generation_error": "Swift: message name reserved by the swift generator (a standard library name the code uses)"
+  }
+]

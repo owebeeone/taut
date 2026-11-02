@@ -4,7 +4,50 @@ Profiles vary resources/bindings, not transition or retirement semantics.
 """
 from pathlib import Path
 import json
-from .python_runtime import _is_alias
+import os
+from .python_runtime import _is_alias, _physical_path, validate_namespace_path
+
+
+def retiring_roots(data):
+    """Read prior-root provenance, never permission to own its source files.
+
+    Called before lock discovery AND under the lock. Inspect raw strings before
+    Path can normalize away ambiguous Windows components or a reparse ancestor.
+    """
+    values = data.get('retiring_source_roots', [])
+    if not isinstance(values, list):
+        raise ValueError('invalid retiring_source_roots: expected a list of canonical absolute roots')
+    roots = []
+    for value in values:
+        if (not isinstance(value, str) or not value or '\x00' in value
+                or not os.path.isabs(value)):
+            raise ValueError('invalid retiring_source_roots: expected canonical absolute root strings')
+        validate_namespace_path(value)
+        if os.name != 'nt' and any(component in ('.', '..') for component in value.split('/')):
+            raise ValueError(f'{value}: unsafe retiring runtime root namespace')
+        if os.name == 'nt':
+            import ntpath
+            drive, tail = ntpath.splitdrive(value.replace('/', '\\'))
+            reserved = {'CON', 'PRN', 'AUX', 'NUL', 'CONIN$', 'CONOUT$'}
+            reserved.update(f'{base}{digit}' for base in ('COM', 'LPT') for digit in '123456789\u00b9\u00b2\u00b3')
+            if not drive or not tail.startswith('\\') or any(
+                component in ('.', '..') or component.endswith(('.', ' '))
+                or component.split('.')[0].upper() in reserved
+                or any(ord(char) < 32 or char in '<>:"|?*' for char in component)
+                for component in tail.split('\\') if component
+            ):
+                raise ValueError(f'{value}: unsafe retiring runtime root namespace')
+        lexical = Path(value)
+        if not lexical.is_absolute() or any(
+            _is_alias(component) or (component.exists() and not component.is_dir())
+            for component in (lexical, *lexical.parents)
+        ):
+            raise ValueError(f'{value}: unsafe/obstructed retiring runtime root')
+        canonical = _physical_path(lexical)
+        if str(canonical) != value or canonical in roots:
+            raise ValueError(f'{value}: noncanonical/duplicate retiring runtime root')
+        roots.append(canonical)
+    return tuple(roots)
 
 def plan_outputs(profile, directory, texts, *, mode, validation, source_root, consume_source=False, external=False):
     canonical_path, manifest = profile.canonical_path, profile.manifest
@@ -28,11 +71,14 @@ def plan_outputs(profile, directory, texts, *, mode, validation, source_root, co
         name = target.relative_to(directory).as_posix()
         if _is_alias(target) or (target.exists() and name not in old['files']):
             raise ValueError(f'unknown/handwritten {label} output {target}; use a fresh directory or migration')
-    roots = {source_root}
+    retiring = set(retiring_roots(old))
+    roots = {source_root, *retiring}
     if old.get('source_root'):
         roots.add(canonical_path(old['source_root']))
     user = user_identity(path)
     canonical = Path(__file__).parent / 'runtime'
+    next_retiring = set()
+    active_root = source_root if mode == 'source' or consume_source else None
     for root in roots:
         owner_path = root / ('.taut-' + language_target + '-runtime.json')
         if old.get('source_root') and root == canonical_path(old['source_root']) and not owner_path.exists():
@@ -47,10 +93,10 @@ def plan_outputs(profile, directory, texts, *, mode, validation, source_root, co
             raise ValueError(f'{owner_path}: cannot remap a {label} physical source owner to another import_path; use explicit migration')
         if selected_source:
             runtime['import_path'] = runtime_import
-        if mode in ('source', 'package') or runtime_import or consume_source or owner_path.exists():
+        if root in retiring or mode in ('source', 'package') or runtime_import or consume_source or owner_path.exists():
             for filename in FILES:
                 candidate = root / filename
-                if candidate.exists() and filename not in runtime['files']:
+                if (candidate.exists() or _is_alias(candidate)) and filename not in runtime['files']:
                     raise ValueError(f'unknown/handwritten {label} runtime {candidate}; use a fresh owner root or explicit migration')
         consuming = (mode != 'source' or external) and consume_source
         if root == source_root and consuming and not owner_path.exists():
@@ -83,15 +129,24 @@ def plan_outputs(profile, directory, texts, *, mode, validation, source_root, co
             contents = {name: (root / name).read_bytes() for name in desired}
         else:
             contents = {}
-        deletes.update(root / name for name in runtime['files'].keys() - contents.keys())
+        stale = {root / name for name in runtime['files'].keys() - contents.keys()}
         if owner_path.exists() or contents:
             runtime['files'] = {name: digest(content) for name, content in contents.items()}
             if contents:
                 writes[owner_path] = encoded(runtime)
             else:
-                deletes.add(owner_path)
+                stale.add(owner_path)
+        deletes.update(stale)
+        if stale and root != active_root:
+            # Persist the old physical identity before any stale deletion can
+            # erase its owner. A later consistent plan, not this deletion pass,
+            # may clear the provenance. It never authorizes orphan adoption.
+            next_retiring.add(root)
     new = dict(old, files={name: digest(text.encode()) for name, text in texts.items()}, mode=mode or 'supplied',
                validation=validation, source_root=str(source_root) if mode == 'source' or consume_source else None)
+    new.pop('retiring_source_roots', None)
+    if next_retiring:
+        new['retiring_source_roots'] = sorted(map(str, next_retiring))
     writes[path] = encoded(new)
     return writes, deletes
 
@@ -112,6 +167,8 @@ def manifest(profile, path, kind):
             raise ValueError('incompatible ownership/contracts/generation policy')
         if kind == profile.TARGET + '-runtime' and data['files'].keys() - FILES.keys():
             raise ValueError('unsupported runtime source inventory')
+        if kind == profile.TARGET + '-schema':
+            retiring_roots(data)
         if any(not isinstance(user, dict) or user.keys() - {'validation', 'consumer'}
                or type(user.get('validation')) is not bool
                or ('consumer' in user and type(user['consumer']) is not bool)

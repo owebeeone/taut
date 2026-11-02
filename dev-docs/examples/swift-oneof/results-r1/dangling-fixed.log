@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cmd",
+    "/c",
+    "mklink",
+    "/J",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\dangling-probe-fixed\\swift\\cbor.swift",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\dangling-probe-fixed\\empty"
+  ],
+  "alias_exists": false,
+  "is_alias": true,
+  "result": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\dangling-probe-fixed\\swift\\cbor.swift; use a fresh owner root or explicit migration",
+  "receipt_unchanged": true,
+  "retiring_roots": [
+    "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\dangling-probe-fixed\\swift"
+  ]
+}

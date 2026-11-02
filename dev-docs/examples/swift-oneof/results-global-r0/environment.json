@@ -1,0 +1,18 @@
+{
+  "GIT_CONFIG_GLOBAL": "D:/projects/limbo/swift-oneof-scratch/global-gate-r0/gwz-xdg/git/config",
+  "GIT_OPTIONAL_LOCKS": "0",
+  "GOCACHE": "D:/projects/limbo/swift-oneof-scratch/global-gate-r0/go-cache",
+  "GOTMPDIR": "D:/projects/limbo/swift-oneof-scratch/global-gate-r0/go-tmp",
+  "JAVA_TOOL_OPTIONS": "-Dfile.encoding=UTF-8",
+  "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+  "PYTHONDONTWRITEBYTECODE": "1",
+  "PYTHONPATH": "D:/projects/limbo/swift-oneof-scratch/global-gate-r0;D:/projects/limbo/taut-dev/taut/src;C:/Users/gianni/AppData/Local/Programs/Python/Python311/Lib/site-packages",
+  "PYTHONUTF8": "1",
+  "TEMP": "D:/projects/limbo/swift-oneof-scratch/global-gate-r0/tmp",
+  "TMP": "D:/projects/limbo/swift-oneof-scratch/global-gate-r0/tmp",
+  "XDG_CONFIG_HOME": "D:/projects/limbo/swift-oneof-scratch/global-gate-r0/gwz-xdg",
+  "executable": "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+  "npm_config_cache": "D:/projects/limbo/swift-oneof-scratch/global-gate-r0/npm-cache",
+  "pytest": "9.1.1",
+  "python": "3.13.5 (main, Jul 23 2025, 00:30:06) [MSC v.1944 64 bit (AMD64)]"
+}

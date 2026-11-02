@@ -929,12 +929,19 @@ def emit(
         plans.append((directory, source_root, directory / ".taut-kotlin-outputs.json", kotlin_plan_outputs,
                       kotlin_texts, {"consume_source": consume_source, "external": bool(kotlin_external_types)}))
     import json
+    def previous_runtime_roots(previous):
+        data = json.loads(previous.read_text(encoding="utf-8"))
+        roots = [data['source_root']] if data.get('source_root') else []
+        if previous.name in {'.taut-go-outputs.json', '.taut-swift-outputs.json'}:
+            from .owned_runtime import retiring_roots
+            roots.extend(retiring_roots(data))
+        return roots
+
     for _, _, previous, _, _, _ in plans:
         if _is_alias(previous) or (previous.exists() and not previous.is_file()):
             raise ValueError(f'{previous}: unsafe previous ownership metadata; use a fresh output root or explicit migration')
         if previous.exists():
-            prior_root = json.loads(previous.read_text(encoding="utf-8")).get("source_root")
-            if prior_root:
+            for prior_root in previous_runtime_roots(previous):
                 validate_namespace_path(prior_root)
                 prior_path = Path(prior_root).absolute()
                 if any(_is_alias(component) or (component.exists() and not component.is_dir())
@@ -945,9 +952,9 @@ def emit(
         deletes = set()
         for directory, source_root, previous, planner, texts, extra in plans:
             if previous.exists():
-                locked_prior = json.loads(previous.read_text(encoding="utf-8")).get("source_root")
-                if locked_prior and Path(locked_prior).resolve() not in {p.resolve() for p in lock_roots}:
-                    raise ValueError("output ownership changed concurrently; rerun generation to lock its new runtime owner")
+                for locked_prior in previous_runtime_roots(previous):
+                    if Path(locked_prior).resolve() not in {p.resolve() for p in lock_roots}:
+                        raise ValueError("output ownership changed concurrently; rerun generation to lock its new runtime owner")
             writes, stale = planner(directory, texts, mode=mode, validation=validation,
                                     source_root=source_root, **extra)
             conflicts = set(writes) & set(all_writes)

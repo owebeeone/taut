@@ -1,0 +1,267 @@
+[
+  {
+    "name": "Data",
+    "mode": "baseline",
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\baseline\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\baseline\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\baseline\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 0,
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\baseline\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\baseline\\app.exp\n\n"
+  },
+  {
+    "name": "Data",
+    "mode": "flat-off",
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\flat-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\flat-off\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\flat-off\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 1,
+    "stderr": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\paths.swift:22:49: error: missing argument label 'value:' in call\n\n20 |     public static func forKey(_ type: String, _ bytes: [UInt8]) -> Self {\n\n21 |         precondition([\"str\", \"int\", \"bool\"].contains(type), \"unsupported map key category\")\n\n22 |         return Self(\"key\", nil, nil, type, Data(bytes).base64EncodedString())\n\n   |                                                 `- error: missing argument label 'value:' in call\n\n23 |     }\n\n24 | }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\paths.swift:22:49: error: cannot convert value of type '[UInt8]' to expected argument type 'Int64'\n\n20 |     public static func forKey(_ type: String, _ bytes: [UInt8]) -> Self {\n\n21 |         precondition([\"str\", \"int\", \"bool\"].contains(type), \"unsupported map key category\")\n\n22 |         return Self(\"key\", nil, nil, type, Data(bytes).base64EncodedString())\n\n   |                                                 `- error: cannot convert value of type '[UInt8]' to expected argument type 'Int64'\n\n23 |     }\n\n24 | }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\paths.swift:22:56: error: value of type 'Data' has no member 'base64EncodedString'\n\n20 |     public static func forKey(_ type: String, _ bytes: [UInt8]) -> Self {\n\n21 |         precondition([\"str\", \"int\", \"bool\"].contains(type), \"unsupported map key category\")\n\n22 |         return Self(\"key\", nil, nil, type, Data(bytes).base64EncodedString())\n\n   |                                                        `- error: value of type 'Data' has no member 'base64EncodedString'\n\n23 |     }\n\n24 | }\n\n"
+  },
+  {
+    "name": "Data",
+    "mode": "imported-off",
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\built",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\built",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\imported-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\imported-off\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\imported-off\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 0,
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\imported-off\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Data\\imported-off\\app.exp\n\n"
+  },
+  {
+    "name": "NSLock",
+    "mode": "baseline",
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\baseline\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\baseline\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\baseline\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 0,
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\baseline\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\baseline\\app.exp\n\n"
+  },
+  {
+    "name": "NSLock",
+    "mode": "flat-off",
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\flat-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\flat-off\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\flat-off\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 1,
+    "stderr": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:49:31: error: missing argument for parameter 'value' in call\n\n 47 |     let name: String\n\n 48 |     private let load: () -> T\n\n 49 |     private let lock = NSLock()\n\n    |                               `- error: missing argument for parameter 'value' in call\n\n 50 |     private var cached: T?\n\n 51 |     init(_ name: String, _ load: @escaping () -> T) {\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\flat-off\\swift\\api.swift:7:12: note: 'init(value:)' declared here\n\n 5 |     public var value: Int64\n\n 6 | \n\n 7 |     public init(value: Int64) {\n\n   |            `- note: 'init(value:)' declared here\n\n 8 |         self.value = value\n\n 9 |     }\n\n"
+  },
+  {
+    "name": "NSLock",
+    "mode": "imported-off",
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\built",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\built",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\imported-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\imported-off\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\imported-off\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 0,
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\imported-off\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\NSLock\\imported-off\\app.exp\n\n"
+  },
+  {
+    "name": "ObjectIdentifier",
+    "mode": "baseline",
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\baseline\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\baseline\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\baseline\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 0,
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\baseline\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\baseline\\app.exp\n\n"
+  },
+  {
+    "name": "ObjectIdentifier",
+    "mode": "flat-off",
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\flat-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\flat-off\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\flat-off\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 1,
+    "stderr": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:288:17: error: type 'ReferenceIdentity' does not conform to protocol 'Hashable'\n\n286 |     func issue(_ code: String, _ rule: String, _ path: [PathSegment], _ message: String) -> Bool\n\n287 | }\n\n288 | internal struct ReferenceIdentity: Hashable {\n\n    |                 `- error: type 'ReferenceIdentity' does not conform to protocol 'Hashable'\n\n289 |     let object: ObjectIdentifier\n\n    |         `- note: stored property type 'ObjectIdentifier' does not conform to protocol 'Hashable', preventing synthesized conformance of 'ReferenceIdentity' to 'Hashable'\n\n290 |     let nativeType: ObjectIdentifier\n\n    |         `- note: stored property type 'ObjectIdentifier' does not conform to protocol 'Hashable', preventing synthesized conformance of 'ReferenceIdentity' to 'Hashable'\n\n291 |     let schemaType: String\n\n292 |     let fingerprint: String\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:288:17: error: type 'ReferenceIdentity' does not conform to protocol 'Equatable'\n\n286 |     func issue(_ code: String, _ rule: String, _ path: [PathSegment], _ message: String) -> Bool\n\n287 | }\n\n288 | internal struct ReferenceIdentity: Hashable {\n\n    |                 |- error: type 'ReferenceIdentity' does not conform to protocol 'Equatable'\n\n    |                 `- note: add stubs for conformance\n\n289 |     let object: ObjectIdentifier\n\n    |         `- note: stored property type 'ObjectIdentifier' does not conform to protocol 'Equatable', preventing synthesized conformance of 'ReferenceIdentity' to 'Equatable'\n\n290 |     let nativeType: ObjectIdentifier\n\n    |         `- note: stored property type 'ObjectIdentifier' does not conform to protocol 'Equatable', preventing synthesized conformance of 'ReferenceIdentity' to 'Equatable'\n\n291 |     let schemaType: String\n\n292 |     let fingerprint: String\n\n\n\nSwift.==:1:24: note: candidate would match if 'ReferenceIdentity' conformed to 'RawRepresentable'\n\n1 | @inlinable public func == <T>(lhs: T, rhs: T) -> Bool where T : RawRepresentable, T.RawValue : Equatable\n\n  |                        `- note: candidate would match if 'ReferenceIdentity' conformed to 'RawRepresentable'\n\n\n\nSwift.FloatingPoint.==:2:20: note: candidate would match if 'ReferenceIdentity' conformed to 'FloatingPoint'\n\n1 | protocol FloatingPoint {\n\n2 | public static func == (lhs: Self, rhs: Self) -> Bool}\n\n  |                    `- note: candidate would match if 'ReferenceIdentity' conformed to 'FloatingPoint'\n\n3 | \n\n\n\nSwift.BinaryInteger.==:2:20: note: candidate would match if 'ReferenceIdentity' conformed to 'BinaryInteger'\n\n1 | protocol BinaryInteger {\n\n2 | public static func == <Other>(lhs: Self, rhs: Other) -> Bool where Other : BinaryInteger}\n\n  |                    `- note: candidate would match if 'ReferenceIdentity' conformed to 'BinaryInteger'\n\n3 | \n\n\n\nSwift._Pointer.==:2:20: note: candidate would match if 'ReferenceIdentity' conformed to '_Pointer'\n\n1 | protocol _Pointer {\n\n2 | public static func == (lhs: Self, rhs: Self) -> Bool}\n\n  |                    `- note: candidate would match if 'ReferenceIdentity' conformed to '_Pointer'\n\n3 | \n\n\n\nSwift._Pointer.==:2:31: note: candidate would match if 'ReferenceIdentity' conformed to '_Pointer'\n\n1 | protocol _Pointer {\n\n2 | @inlinable public static func == <Other>(lhs: Self, rhs: Other) -> Bool where Other : _Pointer}\n\n  |                               `- note: candidate would match if 'ReferenceIdentity' conformed to '_Pointer'\n\n3 | \n\n\n\nSwift.Strideable.==:2:31: note: candidate would match if 'ReferenceIdentity' conformed to 'Strideable'\n\n1 | protocol Strideable {\n\n2 | @inlinable public static func == (x: Self, y: Self) -> Bool}\n\n  |                               `- note: candidate would match if 'ReferenceIdentity' conformed to 'Strideable'\n\n3 | \n\n\n\nSwift.StringProtocol.==:2:31: note: candidate would match if 'ReferenceIdentity' conformed to 'StringProtocol'\n\n1 | protocol StringProtocol {\n\n2 | @inlinable public static func == <RHS>(lhs: Self, rhs: RHS) -> Bool where RHS : StringProtocol}\n\n  |                               `- note: candidate would match if 'ReferenceIdentity' conformed to 'StringProtocol'\n\n3 | \n\n\n\nSwift.SIMD.==:2:20: note: candidate would match if 'ReferenceIdentity' conformed to 'SIMD'\n\n1 | protocol SIMD {\n\n2 | public static func == (a: Self, b: Self) -> Bool}\n\n  |                    `- note: candidate would match if 'ReferenceIdentity' conformed to 'SIMD'\n\n3 | \n\n\n\nFoundation.__BridgedNSError.==:2:20: note: candidate would match if 'ReferenceIdentity' conformed to '__BridgedNSError'\n\n1 | protocol __BridgedNSError {\n\n2 | public static func == (lhs: Self, rhs: Self) -> Bool}\n\n  |                    `- note: candidate would match if 'ReferenceIdentity' conformed to '__BridgedNSError'\n\n3 | \n\n\n\nFoundation._BridgedStoredNSError.==:2:20: note: candidate would match if 'ReferenceIdentity' conformed to '_BridgedStoredNSError'\n\n1 | protocol _BridgedStoredNSError {\n\n2 | public static func == (lhs: Self, rhs: Self) -> Bool}\n\n  |                    `- note: candidate would match if 'ReferenceIdentity' conformed to '_BridgedStoredNSError'\n\n3 | \n\n\n\nFoundationEssentials.AttributedStringProtocol.==:2:20: note: candidate would match if 'ReferenceIdentity' conformed to 'AttributedStringProtocol'\n\n1 | protocol AttributedStringProtocol {\n\n2 | public static func == <RHS>(lhs: Self, rhs: RHS) -> Bool where RHS : AttributedStringProtocol}\n\n  |                    `- note: candidate would match if 'ReferenceIdentity' conformed to 'AttributedStringProtocol'\n\n3 | \n\n\n\nSwift.Equatable.==:2:13: note: protocol requires function '==' with type '(borrowing ReferenceIdentity, borrowing ReferenceIdentity) -> Bool'\n\n1 | protocol Equatable {\n\n2 | static func == (lhs: borrowing Self, rhs: borrowing Self) -> Bool}\n\n  |             `- note: protocol requires function '==' with type '(borrowing ReferenceIdentity, borrowing ReferenceIdentity) -> Bool'\n\n3 | \n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:237:66: error: missing argument label 'value:' in call\n\n235 |         self.fingerprint = fingerprint; self.fieldsByName = byName; self.groupAt = groups\n\n236 |         self.nativeRepresentation = nativeRepresentation\n\n237 |         self.boundNativeType = nativeType.map { ObjectIdentifier($0) }\n\n    |                                                                  `- error: missing argument label 'value:' in call\n\n238 |     }\n\n239 |     public func checkLinks() { for field in fields { field.type.checkLink() } }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:237:66: error: cannot convert value of type 'any Any.Type' to expected argument type 'Int64'\n\n235 |         self.fingerprint = fingerprint; self.fieldsByName = byName; self.groupAt = groups\n\n236 |         self.nativeRepresentation = nativeRepresentation\n\n237 |         self.boundNativeType = nativeType.map { ObjectIdentifier($0) }\n\n    |                                                                  `- error: cannot convert value of type 'any Any.Type' to expected argument type 'Int64'\n\n238 |     }\n\n239 |     public func checkLinks() { for field in fields { field.type.checkLink() } }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:258:53: error: operator function '==' requires that 'ObjectIdentifier' conform to 'Equatable'\n\n256 |                 guard let expected = messages[type.reference!] else { preconditionFailure(\"missing Swift message registry reference\") }\n\n257 |                 precondition(linked.qualifiedName == expected.qualifiedName && linked.fingerprint == expected.fingerprint &&\n\n258 |                              linked.boundNativeType == expected.boundNativeType, \"wrong Swift message registry owner\")\n\n    |                                                     `- error: operator function '==' requires that 'ObjectIdentifier' conform to 'Equatable'\n\n259 |             case \"enum\":\n\n260 |                 let linked = type.enumDescriptor()\n\n\n\nSwift.Optional:1:11: note: requirement from conditional conformance of 'ObjectIdentifier?' to 'Equatable'\n\n1 | extension Optional : Equatable where Wrapped : Equatable {\n\n  |           `- note: requirement from conditional conformance of 'ObjectIdentifier?' to 'Equatable'\n\n2 |     public static func == (lhs: Wrapped?, rhs: Wrapped?) -> Bool\n\n3 | }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:304:49: error: operator function '==' requires that 'ObjectIdentifier' conform to 'Equatable'\n\n302 |                 _ enumValue: @escaping (V, Int) -> Int64?, _ read: @escaping (V, Int) -> MetadataValue,\n\n303 |                 _ walk: @escaping (V, Int, any RecordTraversal, [PathSegment]) -> Bool) {\n\n304 |         precondition(descriptor.boundNativeType == ObjectIdentifier(V.self) && descriptor.nativeRepresentation == \"struct\" &&\n\n    |                                                 `- error: operator function '==' requires that 'ObjectIdentifier' conform to 'Equatable'\n\n305 |                      !(V.self is AnyObject.Type), \"Swift native binding/descriptor type mismatch; regenerate/rebind\")\n\n306 |         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read\n\n\n\nSwift.Optional:1:11: note: requirement from conditional conformance of 'Optional<ObjectIdentifier>' to 'Equatable'\n\n1 | extension Optional : Equatable where Wrapped : Equatable {\n\n  |           `- note: requirement from conditional conformance of 'Optional<ObjectIdentifier>' to 'Equatable'\n\n2 |     public static func == (lhs: Wrapped?, rhs: Wrapped?) -> Bool\n\n3 | }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:304:69: error: missing argument label 'value:' in call\n\n302 |                 _ enumValue: @escaping (V, Int) -> Int64?, _ read: @escaping (V, Int) -> MetadataValue,\n\n303 |                 _ walk: @escaping (V, Int, any RecordTraversal, [PathSegment]) -> Bool) {\n\n304 |         precondition(descriptor.boundNativeType == ObjectIdentifier(V.self) && descriptor.nativeRepresentation == \"struct\" &&\n\n    |                                                                     `- error: missing argument label 'value:' in call\n\n305 |                      !(V.self is AnyObject.Type), \"Swift native binding/descriptor type mismatch; regenerate/rebind\")\n\n306 |         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:304:69: error: cannot convert value of type 'V.Type' to expected argument type 'Int64'\n\n302 |                 _ enumValue: @escaping (V, Int) -> Int64?, _ read: @escaping (V, Int) -> MetadataValue,\n\n303 |                 _ walk: @escaping (V, Int, any RecordTraversal, [PathSegment]) -> Bool) {\n\n304 |         precondition(descriptor.boundNativeType == ObjectIdentifier(V.self) && descriptor.nativeRepresentation == \"struct\" &&\n\n    |                                                                     `- error: cannot convert value of type 'V.Type' to expected argument type 'Int64'\n\n305 |                      !(V.self is AnyObject.Type), \"Swift native binding/descriptor type mismatch; regenerate/rebind\")\n\n306 |         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:313:49: error: operator function '==' requires that 'ObjectIdentifier' conform to 'Equatable'\n\n311 |                 _ enumValue: @escaping (V, Int) -> Int64?, _ read: @escaping (V, Int) -> MetadataValue,\n\n312 |                 _ walk: @escaping (V, Int, any RecordTraversal, [PathSegment]) -> Bool) where V: AnyObject {\n\n313 |         precondition(descriptor.boundNativeType == ObjectIdentifier(V.self) && descriptor.nativeRepresentation == \"class\",\n\n    |                                                 `- error: operator function '==' requires that 'ObjectIdentifier' conform to 'Equatable'\n\n314 |                      \"Swift reference binding/descriptor type mismatch; regenerate/rebind\")\n\n315 |         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read\n\n\n\nSwift.Optional:1:11: note: requirement from conditional conformance of 'Optional<ObjectIdentifier>' to 'Equatable'\n\n1 | extension Optional : Equatable where Wrapped : Equatable {\n\n  |           `- note: requirement from conditional conformance of 'Optional<ObjectIdentifier>' to 'Equatable'\n\n2 |     public static func == (lhs: Wrapped?, rhs: Wrapped?) -> Bool\n\n3 | }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:313:69: error: missing argument label 'value:' in call\n\n311 |                 _ enumValue: @escaping (V, Int) -> Int64?, _ read: @escaping (V, Int) -> MetadataValue,\n\n312 |                 _ walk: @escaping (V, Int, any RecordTraversal, [PathSegment]) -> Bool) where V: AnyObject {\n\n313 |         precondition(descriptor.boundNativeType == ObjectIdentifier(V.self) && descriptor.nativeRepresentation == \"class\",\n\n    |                                                                     `- error: missing argument label 'value:' in call\n\n314 |                      \"Swift reference binding/descriptor type mismatch; regenerate/rebind\")\n\n315 |         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:313:69: error: cannot convert value of type 'V.Type' to expected argument type 'Int64'\n\n311 |                 _ enumValue: @escaping (V, Int) -> Int64?, _ read: @escaping (V, Int) -> MetadataValue,\n\n312 |                 _ walk: @escaping (V, Int, any RecordTraversal, [PathSegment]) -> Bool) where V: AnyObject {\n\n313 |         precondition(descriptor.boundNativeType == ObjectIdentifier(V.self) && descriptor.nativeRepresentation == \"class\",\n\n    |                                                                     `- error: cannot convert value of type 'V.Type' to expected argument type 'Int64'\n\n314 |                      \"Swift reference binding/descriptor type mismatch; regenerate/rebind\")\n\n315 |         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:317:56: error: missing argument label 'value:' in call\n\n315 |         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read\n\n316 |         self.walk = walk; self.referenceIdentity = {\n\n317 |             ReferenceIdentity(object: ObjectIdentifier($0), nativeType: ObjectIdentifier(V.self),\n\n    |                                                        `- error: missing argument label 'value:' in call\n\n318 |                               schemaType: descriptor.qualifiedName, fingerprint: descriptor.fingerprint)\n\n319 |         }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:317:56: error: 'V' is not convertible to 'Int64'\n\n315 |         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read\n\n316 |         self.walk = walk; self.referenceIdentity = {\n\n317 |             ReferenceIdentity(object: ObjectIdentifier($0), nativeType: ObjectIdentifier(V.self),\n\n    |                                                        |- error: 'V' is not convertible to 'Int64'\n\n    |                                                        `- note: did you mean to use 'as!' to force downcast?\n\n318 |                               schemaType: descriptor.qualifiedName, fingerprint: descriptor.fingerprint)\n\n319 |         }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:317:90: error: missing argument label 'value:' in call\n\n315 |         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read\n\n316 |         self.walk = walk; self.referenceIdentity = {\n\n317 |             ReferenceIdentity(object: ObjectIdentifier($0), nativeType: ObjectIdentifier(V.self),\n\n    |                                                                                          `- error: missing argument label 'value:' in call\n\n318 |                               schemaType: descriptor.qualifiedName, fingerprint: descriptor.fingerprint)\n\n319 |         }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:317:90: error: cannot convert value of type 'V.Type' to expected argument type 'Int64'\n\n315 |         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read\n\n316 |         self.walk = walk; self.referenceIdentity = {\n\n317 |             ReferenceIdentity(object: ObjectIdentifier($0), nativeType: ObjectIdentifier(V.self),\n\n    |                                                                                          `- error: cannot convert value of type 'V.Type' to expected argument type 'Int64'\n\n318 |                               schemaType: descriptor.qualifiedName, fingerprint: descriptor.fingerprint)\n\n319 |         }\n\n"
+  },
+  {
+    "name": "ObjectIdentifier",
+    "mode": "imported-off",
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\built",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\built",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\imported-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\imported-off\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\imported-off\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 0,
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\imported-off\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\ObjectIdentifier\\imported-off\\app.exp\n\n"
+  },
+  {
+    "name": "AnyObject",
+    "mode": "baseline",
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\baseline\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\baseline\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\baseline\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 0,
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\baseline\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\baseline\\app.exp\n\n"
+  },
+  {
+    "name": "AnyObject",
+    "mode": "flat-off",
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\flat-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\flat-off\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\flat-off\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 1,
+    "stderr": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:284:17: error: inheritance from non-protocol, non-class type 'AnyObject'\n\n282 | }\n\n283 | /// A traversal callback boundary, never a common protocol for generated messages.\n\n284 | public protocol RecordTraversal: AnyObject {\n\n    |                 `- error: inheritance from non-protocol, non-class type 'AnyObject'\n\n285 |     func record<V>(_ value: V, _ binding: MessageBinding<V>, _ path: [PathSegment]) -> Bool\n\n286 |     func issue(_ code: String, _ rule: String, _ path: [PathSegment], _ message: String) -> Bool\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:284:34: error: type 'Self' constrained to non-protocol, non-class type 'AnyObject'\n\n282 | }\n\n283 | /// A traversal callback boundary, never a common protocol for generated messages.\n\n284 | public protocol RecordTraversal: AnyObject {\n\n    |                                  `- error: type 'Self' constrained to non-protocol, non-class type 'AnyObject'\n\n285 |     func record<V>(_ value: V, _ binding: MessageBinding<V>, _ path: [PathSegment]) -> Bool\n\n286 |     func issue(_ code: String, _ rule: String, _ path: [PathSegment], _ message: String) -> Bool\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:312:96: error: type 'V' constrained to non-protocol, non-class type 'AnyObject'\n\n310 |     public init(reference descriptor: MessageDescriptor, _ present: @escaping (V, Int) -> Bool,\n\n311 |                 _ enumValue: @escaping (V, Int) -> Int64?, _ read: @escaping (V, Int) -> MetadataValue,\n\n312 |                 _ walk: @escaping (V, Int, any RecordTraversal, [PathSegment]) -> Bool) where V: AnyObject {\n\n    |                                                                                                |- error: type 'V' constrained to non-protocol, non-class type 'AnyObject'\n\n    |                                                                                                `- note: use 'V == AnyObject' to require 'V' to be 'AnyObject'\n\n313 |         precondition(descriptor.boundNativeType == ObjectIdentifier(V.self) && descriptor.nativeRepresentation == \"class\",\n\n314 |                      \"Swift reference binding/descriptor type mismatch; regenerate/rebind\")\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift:317:56: error: argument type 'V' expected to be an instance of a class or class-constrained type\n\n315 |         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read\n\n316 |         self.walk = walk; self.referenceIdentity = {\n\n317 |             ReferenceIdentity(object: ObjectIdentifier($0), nativeType: ObjectIdentifier(V.self),\n\n    |                                                        `- error: argument type 'V' expected to be an instance of a class or class-constrained type\n\n318 |                               schemaType: descriptor.qualifiedName, fingerprint: descriptor.fingerprint)\n\n319 |         }\n\n"
+  },
+  {
+    "name": "AnyObject",
+    "mode": "imported-off",
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\built",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\built",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\imported-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\imported-off\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\imported-off\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 0,
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\imported-off\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\AnyObject\\imported-off\\app.exp\n\n"
+  },
+  {
+    "name": "Void",
+    "mode": "baseline",
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\baseline\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\baseline\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\baseline\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 0,
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\baseline\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\baseline\\app.exp\n\n"
+  },
+  {
+    "name": "Void",
+    "mode": "flat-off",
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\off\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\flat-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\flat-off\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\flat-off\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 1,
+    "stderr": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\flat-off\\swift\\api.swift:40:5: error: missing return in closure expected to return 'Void'\n\n38 |         precondition(wire_evidence.owner == \"taut.swift.foundation\" && wire_evidence.descriptor == 1 && wire_evidence.codec == 1 && Set([\"codec.v1\", \"descriptors.v1\", \"oneof.v1\"]).isSubset(of: wire_evidence.capabilities) && foundationOwner == wire_evidence.owner && descriptorContract == 1 && codecContract == 1 && Set([\"codec.v1\", \"descriptors.v1\", \"oneof.v1\"]).isSubset(of: foundationCapabilities()), \"incompatible actual selected Swift foundation; regenerate/rebind\")\n\n39 |         confirmFoundation(wire_evidence, foundationOwner, descriptorContract, codecContract, foundationCapabilities())\n\n40 |     }()\n\n   |     `- error: missing return in closure expected to return 'Void'\n\n41 |     static let message0: MessageDescriptor = MessageDescriptor(\"Void\", \"schema_ff991d098edc8b75.Void\", [FieldDescriptor(\"value\", \"value\", 1, .int, \"required\", false, false, [:])], [], [], [], [], nil, [:], [\"max_depth\": .int(32), \"max_encoded_len\": .null], \"46cdf8db78ccae23e1b9731dc9ed72795bebbe2fbadd8feaad2fe741b451b337\", \"struct\", Void.self)\n\n42 |     static let binding0: MessageBinding<Void> = MessageBinding(Void.descriptor,\n\n"
+  },
+  {
+    "name": "Void",
+    "mode": "imported-off",
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\built",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\built",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\imported-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\imported-off\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\imported-off\\app.exe"
+    ],
+    "generation": "accepted",
+    "exit": 1,
+    "stderr": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names-matrix\\Void\\imported-off\\swift\\api.swift:41:5: error: missing return in closure expected to return 'Void'\n\n39 |         precondition(wire_evidence.owner == \"taut.swift.foundation\" && wire_evidence.descriptor == 1 && wire_evidence.codec == 1 && Set([\"codec.v1\", \"descriptors.v1\", \"oneof.v1\"]).isSubset(of: wire_evidence.capabilities) && TautFoundation.foundationOwner == wire_evidence.owner && TautFoundation.descriptorContract == 1 && TautFoundation.codecContract == 1 && Set([\"codec.v1\", \"descriptors.v1\", \"oneof.v1\"]).isSubset(of: TautFoundation.foundationCapabilities()), \"incompatible actual selected Swift foundation; regenerate/rebind\")\n\n40 |         TautFoundation.confirmFoundation(wire_evidence, TautFoundation.foundationOwner, TautFoundation.descriptorContract, TautFoundation.codecContract, TautFoundation.foundationCapabilities())\n\n41 |     }()\n\n   |     `- error: missing return in closure expected to return 'Void'\n\n42 |     static let message0: TautFoundation.MessageDescriptor = TautFoundation.MessageDescriptor(\"Void\", \"schema_ff991d098edc8b75.Void\", [TautFoundation.FieldDescriptor(\"value\", \"value\", 1, .int, \"required\", false, false, [:])], [], [], [], [], nil, [:], [\"max_depth\": .int(32), \"max_encoded_len\": .null], \"46cdf8db78ccae23e1b9731dc9ed72795bebbe2fbadd8feaad2fe741b451b337\", \"struct\", Void.self)\n\n43 |     static let binding0: TautFoundation.MessageBinding<Void> = TautFoundation.MessageBinding(Void.descriptor,\n\n"
+  }
+]

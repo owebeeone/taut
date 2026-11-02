@@ -1,0 +1,15 @@
+{
+  "command": [
+    "cmd",
+    "/c",
+    "mklink",
+    "/J",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\dangling-probe\\swift\\cbor.swift",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\dangling-probe\\empty"
+  ],
+  "alias_exists": false,
+  "is_alias": true,
+  "result": "success",
+  "receipt_unchanged": false,
+  "retiring_roots": null
+}

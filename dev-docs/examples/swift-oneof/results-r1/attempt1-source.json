@@ -1,0 +1,9 @@
+{
+  "src/taut/gen/swift_metadata.py": "ddee8a545f38281691e05ef5605ad259b07d5ebc58223c8c15678b22d737ce28",
+  "src/taut/gen/runtime/swift/paths.swift": "b703dbae529ff6c48b3aba687abf8080e2acfc39a3cc93ac3be04218e1c39eb2",
+  "src/taut/gen/runtime/swift/descriptors.swift": "d5997603bfdc07665125fe8493d7b6da6357c3ac63746e2e31a96cd7cc5d6992",
+  "src/taut/gen/owned_runtime.py": "fa60d1e1eb3b47683c71d2f09f175986bf78e9d347ad272a0d1b852dd9a3c704",
+  "src/taut/gen/scaffold.py": "7f74895ed686705aba9d6bef0616a781114b0a99c5f6abaa07311d68baff043b",
+  "src/tests/test_swift_oneof.py": "be3b66fd1eafb885d2ef29faaea0fc3bd41bc97602bdd81adf483dff761c810d",
+  "src/tests/test_go_oneof.py": "c3f9441d4115946024a1a5d00ace4348b763e3b47404bdaae8d8e89d6e67a089"
+}

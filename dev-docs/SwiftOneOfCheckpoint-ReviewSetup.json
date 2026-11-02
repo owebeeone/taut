@@ -1,0 +1,106 @@
+{
+  "status": "Two original final NO-GO reports filed verbatim; initial tuple remains frozen",
+  "reviewers_total": 2,
+  "peer_blind": true,
+  "clones_raw_tracked_each": 1114,
+  "global_completed_receipt_consumed_by_both": true,
+  "evidence_files": {
+    "code-ecma-help.xml": {
+      "size": 399,
+      "sha256": "74b933fc863150db3cafc608c8a09ec11ed517176dbe8f85e1521533fa144f1d"
+    },
+    "code-help-tests.xml": {
+      "size": 1764,
+      "sha256": "c888331c7a88b6e97329bffede77e9cddd6b4684ecb8b8e650648f676288d136"
+    },
+    "code-names-matrix-results.json": {
+      "size": 43589,
+      "sha256": "a5e4fbc6aaf413345209135b7b965412101502c5d9d30e84cfa945a636de8626"
+    },
+    "code-names-more-results.json": {
+      "size": 14794,
+      "sha256": "89d0a38486d292f0e1b03ab5e58e84db9da02c8085fa4f32e0d3f6a2d5254d30"
+    },
+    "code-names-results.json": {
+      "size": 3250,
+      "sha256": "045f1f9fd34538edd521a03b4f46d1e6d5f31b4674a2b98d2a7c7c8c6cda4665"
+    },
+    "code-native-tests.xml": {
+      "size": 19239,
+      "sha256": "95a6cd57657655c71d8032f4d3eb640072d80ee59ee19cac8be7ed6667293bd2"
+    },
+    "code-prompt.md": {
+      "size": 18772,
+      "sha256": "9d99bf5d36d19564058d1c4e52cc39a6fb43ba55d32c2380c0c3c900ce3a03d5"
+    },
+    "code-setup.json": {
+      "size": 329999,
+      "sha256": "90d827be5e0a08239d7111719003bd89b3bb20f319df34b6e22b76c64e6e0fb9"
+    },
+    "code-shared-tests.xml": {
+      "size": 9704,
+      "sha256": "e5b2b647f377aa6b4bf2d84f10cf1cceb609a39f588975657d9108bb2a54ca6f"
+    },
+    "dispatch.json": {
+      "size": 1333,
+      "sha256": "03978196b17e920d2117b490c87745b0cf41f915d3d8f1e5eaa5d4a3ff4bd636"
+    },
+    "prompt-generation.json": {
+      "size": 1316,
+      "sha256": "d41ca67c696ea810d5c1937a38b61262cf165e769e2a7301b076eaf9d0e0bbbe"
+    },
+    "state-go-receipt-first-results.json": {
+      "size": 1741,
+      "sha256": "cb85b49d67c4b26cbd1f197609cb2a0264c20d4198c40f9b80b09198a863c98d"
+    },
+    "state-go-receipt-first.py": {
+      "size": 1597,
+      "sha256": "85f0d572c875bd645ea2d2f1be58548d15256911c5dfc9ad4d15a3f1547926bc"
+    },
+    "state-native-tests.xml": {
+      "size": 19239,
+      "sha256": "de06e2d3411a47c31e2f4b0bf1b740d4c2cae652c67be7f8ce8a30fedd570f56"
+    },
+    "state-prompt.md": {
+      "size": 17576,
+      "sha256": "ca18c474071d7b19ee51ecd406bd49cbfe435655fc007a7c2ac46314ea76a785"
+    },
+    "state-receipt-first-results.json": {
+      "size": 2525,
+      "sha256": "d338ef25c7a15cd781c65841b4f3de63f270e16dfd95db59a227e34ebecfd129"
+    },
+    "state-receipt-first.py": {
+      "size": 1771,
+      "sha256": "8d7355596d0832fb835c714cb646de41f2648b047aec901f31eaf07b89eca003"
+    },
+    "state-setup.json": {
+      "size": 330094,
+      "sha256": "a76426f3ea14157db1a1cfdccfee9f942dfea430bdf90d2c4baba2f574c8c7e5"
+    },
+    "state-shared-tests.xml": {
+      "size": 10732,
+      "sha256": "9f5806b960ab75fc8e6431bac0cba46cdd7154d18fa51b69f8fb3d97cb14d57a"
+    },
+    "state-wheel-tests.xml": {
+      "size": 373,
+      "sha256": "499817fabd2db43fbe5e4edfa197c0dd391c91d95281491470ecfd0a3952cfa3"
+    }
+  },
+  "reports": {
+    "State": {
+      "sha256": "95a98398843436d165e5e32a471076c172f84529115e605cf3079a66be8e1131",
+      "path": "dev-docs/SwiftOneOfCheckpoint-ReviewState.md",
+      "bytes": 19033
+    },
+    "Code": {
+      "sha256": "954df90865cd1fb81e4768a827688f3b9a4c87d20a2888bd3eb75099c9583994",
+      "path": "dev-docs/SwiftOneOfCheckpoint-ReviewCode.md",
+      "bytes": 23309
+    }
+  },
+  "state_export_integrity": "Author corrected UTF8 serialization only and attested exact emitted full report; initial export remains in scratch/final-report-initial-export.md",
+  "global_evidence": "dev-docs/examples/swift-oneof/results-global-r0/evidence-inventory.json",
+  "global_inventory_sha256": "93b84b7cca6fa4bf502e45a819b1babc837716335ba225ba35da33ec2650beca",
+  "production_edited": false,
+  "staging_commit_push_performed": false
+}

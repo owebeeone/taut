@@ -190,6 +190,22 @@ distinct basenames using byte-identical copies; Swift rejects duplicate basename
 The [Swift example](../dev-docs/examples/swift-oneof/README.md) includes those exact
 commands, output ownership rules and independently compiled child bindings.
 
+Native messages named `Data`, `NSLock`, `ObjectIdentifier`, `AnyObject` and `Void`
+are supported: foundation helpers resolve through their defining modules. A local
+message or enum named `Foundation` hides that module in flat supplied builds, so
+generation refuses it before writing output. Bind an explicitly imported runtime
+module, such as `{"swift":{"module":"TautFoundation"}}`, to use that name in
+source, package or imported supplied mode. The existing `Swift` reservation stays
+in effect.
+
+Changing from generated runtime sources to a supplied runtime retires only known,
+unmodified files and preserves other users and handwritten files. Ownership
+receipts retain prior runtime roots until a later generation verifies cleanup.
+An interrupted retirement with missing ownership evidence or leftover sources
+refuses unchanged and names the affected root; inspect it and use a fresh output
+root or explicit migration. Fresh and repeated nonowning flat supplied builds
+continue to leave caller-supplied runtime files untouched.
+
 Every message publishes `static let descriptor` and `static var schemaDescriptor`
 with complete immutable fields/types/enums/options/reservations/constraints.
 `--with-validation` adds `validate(recursive: Bool = true) -> ValidationReport`

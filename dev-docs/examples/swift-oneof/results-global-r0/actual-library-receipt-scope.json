@@ -1,0 +1,13 @@
+{
+  "association": "R0 full28 inventory overridden by accepted R1 changed11 hashes; final merged source checked against actual accepted library HEAD",
+  "corrected_library_receipt_hashes": {
+    "dev-docs/examples/typescript-oneof/results-r1/library-build.log": "a9120e106f55b637d79043a28576a95ca418ce7ee638c392c32ec15d649723fa",
+    "dev-docs/examples/typescript-oneof/results-r1/library-tests.log": "05df00cf2b9ea3f6fcf812fe5518103c072f8db148b9bdc1732a7a0ca37ac065",
+    "dev-docs/examples/typescript-oneof/results-r1/library-typecheck.log": "8d0e8ca6face14b38c6ec53924037c0098a0fbeb982ff06383bc756d96a86127"
+  },
+  "corrected_receipt_manifest": "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles-R1.json",
+  "frozen_dependency_lock_sha256": "e110b44300bc75e28489500b7d2165b27414e2c6283853d7e4220b5fc27e06db",
+  "production_files_match_prior_315_typecheck_build_receipt": 28,
+  "scope": "prior exact-source 315/typecheck/build receipts reused; no new standalone library gate; broad may execute actual composition tests",
+  "source_tuple": "1aaeab65e4564a462044d2f5d824cd2f375aae97"
+}

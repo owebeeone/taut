@@ -1,0 +1,24 @@
+{
+  "template": "C:\\Users\\gianni\\.codex\\skills\\review-loop\\references\\review-prompt-template.md",
+  "template_sha256": "3b10ae89cf101c6273d34668eaaeaebf7e030a4c132406e0b234a846665eca58",
+  "method": "verbatim canonical Prompt body + exactly one canonical axis section; Code includes canonical Surface; exact tuple/authority/scope/commands filled; mandated report outline appended",
+  "prompts": {
+    "code": {
+      "prompt": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\prompt.md",
+      "sha256": "9d99bf5d36d19564058d1c4e52cc39a6fb43ba55d32c2380c0c3c900ce3a03d5",
+      "setup": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\setup.json",
+      "setup_sha256": "90d827be5e0a08239d7111719003bd89b3bb20f319df34b6e22b76c64e6e0fb9",
+      "bytes": 18772
+    },
+    "state": {
+      "prompt": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\state-raw\\prompt.md",
+      "sha256": "ca18c474071d7b19ee51ecd406bd49cbfe435655fc007a7c2ac46314ea76a785",
+      "setup": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\state-raw\\setup.json",
+      "setup_sha256": "a76426f3ea14157db1a1cfdccfee9f942dfea430bdf90d2c4baba2f574c8c7e5",
+      "bytes": 17576
+    }
+  },
+  "peer_blind": true,
+  "reviewers_total": 2,
+  "global_verdict_barrier": true
+}

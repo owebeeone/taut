@@ -1,0 +1,107 @@
+{
+  "source": {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\source-foundation",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\source-foundation",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\source\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\source\\app\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\source\\app\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "missing\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=text\nempty\trecursive\ttrue\ttrue\nextra\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nroundtrip\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nzero\trecursive\ttrue\ttrue\nfalse\trecursive\ttrue\ttrue\nempty-list\trecursive\ttrue\ttrue\npayload-free\trecursive\ttrue\ttrue\nbad-tag-child\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=kind\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\nnonselected-child\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=child\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\ncycle\trecursive\tfalse\ttrue\tI:validation.ownership_cycle:validation.shape.v1:f=child\nwrapper\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=0/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=1/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YXo=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YmFh/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,AA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,GBg=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,IA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9A==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9Q==/f=text\nlocal\tlocal\ttrue\ttrue\nvirtual-child\trecursive\tfalse\tfalse\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-repaired\trecursive\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-local\tlocal\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nindependent\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=left\tI:oneof.payload_missing:taut.oneof.v1:f=b\nplain\trecursive\ttrue\ttrue\n",
+    "api_sha256": {
+      "source\\swift\\api.swift": "030aca886f763d637da7874c16c15022e7a82088fe2c12c036a134d8cbac6192"
+    }
+  },
+  "package": {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\package-foundation",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\package-foundation",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\package\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\package\\app\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\package\\app\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "missing\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=text\nempty\trecursive\ttrue\ttrue\nextra\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nroundtrip\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nzero\trecursive\ttrue\ttrue\nfalse\trecursive\ttrue\ttrue\nempty-list\trecursive\ttrue\ttrue\npayload-free\trecursive\ttrue\ttrue\nbad-tag-child\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=kind\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\nnonselected-child\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=child\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\ncycle\trecursive\tfalse\ttrue\tI:validation.ownership_cycle:validation.shape.v1:f=child\nwrapper\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=0/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=1/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YXo=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YmFh/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,AA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,GBg=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,IA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9A==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9Q==/f=text\nlocal\tlocal\ttrue\ttrue\nvirtual-child\trecursive\tfalse\tfalse\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-repaired\trecursive\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-local\tlocal\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nindependent\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=left\tI:oneof.payload_missing:taut.oneof.v1:f=b\nplain\trecursive\ttrue\ttrue\n",
+    "api_sha256": {
+      "package\\swift\\api.swift": "030aca886f763d637da7874c16c15022e7a82088fe2c12c036a134d8cbac6192"
+    }
+  },
+  "supplied": {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\package-foundation",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\package-foundation",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\supplied\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\supplied\\app\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\supplied\\app\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "missing\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=text\nempty\trecursive\ttrue\ttrue\nextra\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nroundtrip\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nzero\trecursive\ttrue\ttrue\nfalse\trecursive\ttrue\ttrue\nempty-list\trecursive\ttrue\ttrue\npayload-free\trecursive\ttrue\ttrue\nbad-tag-child\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=kind\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\nnonselected-child\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=child\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\ncycle\trecursive\tfalse\ttrue\tI:validation.ownership_cycle:validation.shape.v1:f=child\nwrapper\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=0/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=1/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YXo=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YmFh/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,AA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,GBg=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,IA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9A==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9Q==/f=text\nlocal\tlocal\ttrue\ttrue\nvirtual-child\trecursive\tfalse\tfalse\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-repaired\trecursive\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-local\tlocal\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nindependent\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=left\tI:oneof.payload_missing:taut.oneof.v1:f=b\nplain\trecursive\ttrue\ttrue\n",
+    "api_sha256": {
+      "supplied\\swift\\api.swift": "030aca886f763d637da7874c16c15022e7a82088fe2c12c036a134d8cbac6192"
+    }
+  },
+  "flat-off": {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-off\\supplied\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-off\\supplied\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-off\\supplied\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-off\\supplied\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-off\\app\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-off\\app\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "flat supplied PASS\n",
+    "api_sha256": {
+      "flat-off\\supplied\\cbor.swift": "4828ee6229d24a75da1813bb72982895085c571854d03008fbd2a878d80338f6",
+      "flat-off\\supplied\\descriptors.swift": "d5997603bfdc07665125fe8493d7b6da6357c3ac63746e2e31a96cd7cc5d6992",
+      "flat-off\\supplied\\ext.swift": "9bf764a3ef3a64f74e2662b09a64044ed8d8c34ec319d5c7e4a8cae02e4297b3",
+      "flat-off\\supplied\\paths.swift": "b703dbae529ff6c48b3aba687abf8080e2acfc39a3cc93ac3be04218e1c39eb2",
+      "flat-off\\swift\\api.swift": "cf7b7cb840be6845e3897be122aaab4bfb4add27db5de041a067cfc7e6879b26"
+    }
+  },
+  "flat-on": {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-on\\supplied\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-on\\supplied\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-on\\supplied\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-on\\supplied\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-on\\supplied\\reports.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-on\\supplied\\validation.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-on\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-on\\app\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\alias-final-example\\flat-on\\app\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "flat supplied PASS\n",
+    "api_sha256": {
+      "flat-on\\supplied\\cbor.swift": "4828ee6229d24a75da1813bb72982895085c571854d03008fbd2a878d80338f6",
+      "flat-on\\supplied\\descriptors.swift": "d5997603bfdc07665125fe8493d7b6da6357c3ac63746e2e31a96cd7cc5d6992",
+      "flat-on\\supplied\\ext.swift": "9bf764a3ef3a64f74e2662b09a64044ed8d8c34ec319d5c7e4a8cae02e4297b3",
+      "flat-on\\supplied\\paths.swift": "b703dbae529ff6c48b3aba687abf8080e2acfc39a3cc93ac3be04218e1c39eb2",
+      "flat-on\\supplied\\reports.swift": "4d3b3b633e6d21f79a84a07494ed985d3b8617f0e428b765657a31f1b01aaec9",
+      "flat-on\\supplied\\validation.swift": "ab9bf32a5e2c4f764093f96a17e87c0c2d90e9e3d16ad708172db64665ec8dc8",
+      "flat-on\\swift\\api.swift": "b4f7069067c6e40351d2ae866d4e26448cc464b08d467aa2567828c8afd7620c"
+    }
+  }
+}

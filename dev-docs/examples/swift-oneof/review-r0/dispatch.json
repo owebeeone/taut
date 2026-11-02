@@ -1,0 +1,28 @@
+{
+  "tuple": {
+    "taut": "c02765930f06cfcb19a522843aa54582db514706",
+    "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "a8f37984471654902149d136b7a13a588346b58f"
+  },
+  "agents": {
+    "Code+Surface": "/root/swift_review_code",
+    "State": "/root/swift_review_state"
+  },
+  "total_original_reviewers": 2,
+  "peer_blind": true,
+  "prompts": "prompt-generation.json",
+  "clones": {
+    "Code+Surface": "code-raw/setup.json",
+    "State": "state-raw/setup.json"
+  },
+  "each_all_raw_tracked_blobs_verified": 1114,
+  "all_clone_setup_command_exits_zero": true,
+  "core_autocrlf_false_before_checkout": true,
+  "full_history_and_oracles_verified": true,
+  "global_receipt_barrier": true,
+  "no_saved_workspace_builds": true,
+  "verbatim_export": "Each reviewer exports exact final UTF8report to its owned scratch/final-report.md; laneowner copies/hashes without edits",
+  "initial_setup_failures": "Initial backslash source-path local clone attempts refused ownership before checkout; exact task-local trust+forward-slash source arguments resolved. Failed empty attempt directories retained; no global/wildcard config or saved-source change."
+}

@@ -46,7 +46,7 @@ private func effectiveFacts(_ facts: [String: MetadataValue]) -> [String: Metada
 private final class DescriptorLink<T> {
     let name: String
     private let load: () -> T
-    private let lock = NSLock()
+    private let lock = Foundation.NSLock()
     private var cached: T?
     init(_ name: String, _ load: @escaping () -> T) {
         precondition(!name.isEmpty, "missing Swift descriptor reference")
@@ -193,7 +193,7 @@ public struct MessageDescriptor {
     public let effectiveOptions: [String: MetadataValue]
     public let fingerprint: String
     public let nativeRepresentation: String
-    internal let boundNativeType: ObjectIdentifier?
+    internal let boundNativeType: Swift.ObjectIdentifier?
     public let fieldsByName: [String: Int]
     internal let groupAt: [Int: OneOfDescriptor]
     public init(_ name: String, _ qualifiedName: String, _ fields: [FieldDescriptor],
@@ -234,7 +234,7 @@ public struct MessageDescriptor {
         self.nextId = nextId; self.options = options; self.effectiveOptions = effectiveFacts(effectiveOptions)
         self.fingerprint = fingerprint; self.fieldsByName = byName; self.groupAt = groups
         self.nativeRepresentation = nativeRepresentation
-        self.boundNativeType = nativeType.map { ObjectIdentifier($0) }
+        self.boundNativeType = nativeType.map { Swift.ObjectIdentifier($0) }
     }
     public func checkLinks() { for field in fields { field.type.checkLink() } }
 }
@@ -281,13 +281,13 @@ public struct SchemaDescriptor {
     }
 }
 /// A traversal callback boundary, never a common protocol for generated messages.
-public protocol RecordTraversal: AnyObject {
+public protocol RecordTraversal: Swift.AnyObject {
     func record<V>(_ value: V, _ binding: MessageBinding<V>, _ path: [PathSegment]) -> Bool
     func issue(_ code: String, _ rule: String, _ path: [PathSegment], _ message: String) -> Bool
 }
 internal struct ReferenceIdentity: Hashable {
-    let object: ObjectIdentifier
-    let nativeType: ObjectIdentifier
+    let object: Swift.ObjectIdentifier
+    let nativeType: Swift.ObjectIdentifier
     let schemaType: String
     let fingerprint: String
 }
@@ -301,20 +301,20 @@ public struct MessageBinding<V> {
     public init(_ descriptor: MessageDescriptor, _ present: @escaping (V, Int) -> Bool,
                 _ enumValue: @escaping (V, Int) -> Int64?, _ read: @escaping (V, Int) -> MetadataValue,
                 _ walk: @escaping (V, Int, any RecordTraversal, [PathSegment]) -> Bool) {
-        precondition(descriptor.boundNativeType == ObjectIdentifier(V.self) && descriptor.nativeRepresentation == "struct" &&
-                     !(V.self is AnyObject.Type), "Swift native binding/descriptor type mismatch; regenerate/rebind")
+        precondition(descriptor.boundNativeType == Swift.ObjectIdentifier(V.self) && descriptor.nativeRepresentation == "struct" &&
+                     !(V.self is Swift.AnyObject.Type), "Swift native binding/descriptor type mismatch; regenerate/rebind")
         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read
         self.walk = walk; self.referenceIdentity = nil
     }
     /// Reference adapters use the actual object's identity, never a bridged value.
     public init(reference descriptor: MessageDescriptor, _ present: @escaping (V, Int) -> Bool,
                 _ enumValue: @escaping (V, Int) -> Int64?, _ read: @escaping (V, Int) -> MetadataValue,
-                _ walk: @escaping (V, Int, any RecordTraversal, [PathSegment]) -> Bool) where V: AnyObject {
-        precondition(descriptor.boundNativeType == ObjectIdentifier(V.self) && descriptor.nativeRepresentation == "class",
+                _ walk: @escaping (V, Int, any RecordTraversal, [PathSegment]) -> Bool) where V: Swift.AnyObject {
+        precondition(descriptor.boundNativeType == Swift.ObjectIdentifier(V.self) && descriptor.nativeRepresentation == "class",
                      "Swift reference binding/descriptor type mismatch; regenerate/rebind")
         self.descriptor = descriptor; self.present = present; self.enumValue = enumValue; self.read = read
         self.walk = walk; self.referenceIdentity = {
-            ReferenceIdentity(object: ObjectIdentifier($0), nativeType: ObjectIdentifier(V.self),
+            ReferenceIdentity(object: Swift.ObjectIdentifier($0), nativeType: Swift.ObjectIdentifier(V.self),
                               schemaType: descriptor.qualifiedName, fingerprint: descriptor.fingerprint)
         }
     }

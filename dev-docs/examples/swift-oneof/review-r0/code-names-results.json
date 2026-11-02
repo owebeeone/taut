@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Data",
+    "generation": "accepted",
+    "compile_exit": 1,
+    "stderr": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\canonical\\paths.swift:22:49: error: missing argument label 'value:' in call\n\n20 |     public static func forKey(_ type: String, _ bytes: [UInt8]) -> Self {\n\n21 |         precondition([\"str\", \"int\", \"bool\"].contains(type), \"unsupported map key category\")\n\n22 |         return Self(\"key\", nil, nil, type, Data(bytes).base64EncodedString())\n\n   |                                                 `- error: missing argument label 'value:' in call\n\n23 |     }\n\n24 | }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\canonical\\paths.swift:22:49: error: cannot convert value of type '[UInt8]' to expected argument type 'Int64'\n\n20 |     public static func forKey(_ type: String, _ bytes: [UInt8]) -> Self {\n\n21 |         precondition([\"str\", \"int\", \"bool\"].contains(type), \"unsupported map key category\")\n\n22 |         return Self(\"key\", nil, nil, type, Data(bytes).base64EncodedString())\n\n   |                                                 `- error: cannot convert value of type '[UInt8]' to expected argument type 'Int64'\n\n23 |     }\n\n24 | }\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\canonical\\paths.swift:22:56: error: value of type 'Data' has no member 'base64EncodedString'\n\n20 |     public static func forKey(_ type: String, _ bytes: [UInt8]) -> Self {\n\n21 |         precondition([\"str\", \"int\", \"bool\"].contains(type), \"unsupported map key category\")\n\n22 |         return Self(\"key\", nil, nil, type, Data(bytes).base64EncodedString())\n\n   |                                                        `- error: value of type 'Data' has no member 'base64EncodedString'\n\n23 |     }\n\n24 | }\n\n"
+  },
+  {
+    "name": "NSLock",
+    "generation": "accepted",
+    "compile_exit": 1,
+    "stderr": "D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\canonical\\descriptors.swift:49:31: error: missing argument for parameter 'value' in call\n\n 47 |     let name: String\n\n 48 |     private let load: () -> T\n\n 49 |     private let lock = NSLock()\n\n    |                               `- error: missing argument for parameter 'value' in call\n\n 50 |     private var cached: T?\n\n 51 |     init(_ name: String, _ load: @escaping () -> T) {\n\n\n\nD:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\NSLock\\swift\\api.swift:7:12: note: 'init(value:)' declared here\n\n 5 |     public var value: Int64\n\n 6 | \n\n 7 |     public init(value: Int64) {\n\n   |            `- note: 'init(value:)' declared here\n\n 8 |         self.value = value\n\n 9 |     }\n\n"
+  },
+  {
+    "name": "Foundation",
+    "generation": "accepted",
+    "compile_exit": 0,
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\Foundation\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\code-raw\\scratch\\probes\\names\\Foundation\\app.exp\n\n"
+  }
+]

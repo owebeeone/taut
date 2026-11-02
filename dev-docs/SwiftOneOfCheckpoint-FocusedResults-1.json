@@ -1,0 +1,301 @@
+{
+  "status": "FOCUSED GATES PASS; findings remain open until original-axis closure at corrected settled tuple",
+  "source_parent": "c02765930f06cfcb19a522843aa54582db514706",
+  "source_inventory_sha256": "7be5937d06eab85d3f1b2f579b18cb36b476d3a8cc79de43812675c457f76b49",
+  "source_count": 30,
+  "changed_production_count": 12,
+  "source_inventory": "dev-docs/examples/swift-oneof/results-r1/source-before-alias-final-focused.json",
+  "final_runs": {
+    "go-shared-final": {
+      "command": [
+        "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+        "-m",
+        "pytest",
+        "D:/projects/limbo/taut-dev/taut/src/tests/test_go_oneof.py",
+        "D:/projects/limbo/taut-dev/taut/src/tests/test_scaffold.py",
+        "D:/projects/limbo/taut-dev/taut/src/tests/test_map_gen.py",
+        "D:/projects/limbo/taut-dev/taut/src/tests/test_java_oneof.py::test_jvm_help_describes_supported_targets_json_files_and_defaults",
+        "D:/projects/limbo/taut-dev/taut/src/tests/test_js_ts_distribution.py::test_shared_help_preserves_jvm_and_ecma_methods_defaults_and_artifact_formats",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "--basetemp",
+        "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\final-go-shared-final-temp",
+        "--junitxml",
+        "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\final-go-shared-final.xml"
+      ],
+      "cwd": "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1",
+      "exit": 0,
+      "elapsed_seconds": 64.283,
+      "source_inventory_sha256": "7be5937d06eab85d3f1b2f579b18cb36b476d3a8cc79de43812675c457f76b49",
+      "source_unchanged": true,
+      "python": "3.13.5 (main, Jul 23 2025, 00:30:06) [MSC v.1944 64 bit (AMD64)]",
+      "executable": "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+      "environment": {
+        "PYTHONPATH": "D:/projects/limbo/taut-dev/taut/src;C:/Users/gianni/AppData/Local/Programs/Python/Python311/Lib/site-packages",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "TEMP": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/tmp",
+        "TMP": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/tmp",
+        "GOCACHE": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/gocache",
+        "GOMODCACHE": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/gomodcache",
+        "XDG_CONFIG_HOME": "D:/projects/limbo/swift-oneof-scratch/gwz-xdg"
+      },
+      "counts": {
+        "tests": 405,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "swift-affected-final": {
+      "command": [
+        "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+        "-m",
+        "pytest",
+        "D:/projects/limbo/taut-dev/taut/src/tests/test_swift_oneof.py",
+        "-k",
+        "native_helper_type_names or foundation_module_shadow or foundation_flat_collision or retirement or unknown_modified_outputs or shared_enabled_consumer or cli or binding_requires or raw_windows or programmatic",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "--basetemp",
+        "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\final-swift-affected-final-temp",
+        "--junitxml",
+        "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\final-swift-affected-final.xml"
+      ],
+      "cwd": "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1",
+      "exit": 0,
+      "elapsed_seconds": 144.441,
+      "source_inventory_sha256": "7be5937d06eab85d3f1b2f579b18cb36b476d3a8cc79de43812675c457f76b49",
+      "source_unchanged": true,
+      "python": "3.13.5 (main, Jul 23 2025, 00:30:06) [MSC v.1944 64 bit (AMD64)]",
+      "executable": "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+      "environment": {
+        "PYTHONPATH": "D:/projects/limbo/taut-dev/taut/src;C:/Users/gianni/AppData/Local/Programs/Python/Python311/Lib/site-packages",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "TEMP": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/tmp",
+        "TMP": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/tmp",
+        "GOCACHE": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/gocache",
+        "GOMODCACHE": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/gomodcache",
+        "XDG_CONFIG_HOME": "D:/projects/limbo/swift-oneof-scratch/gwz-xdg"
+      },
+      "counts": {
+        "tests": 101,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "wheel-prelock-final": {
+      "command": [
+        "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+        "-m",
+        "pytest",
+        "D:/projects/limbo/taut-dev/taut/src/tests/test_swift_distribution.py",
+        "D:/projects/limbo/taut-dev/taut/src/tests/test_cpp_go_distribution.py::test_pair_plans_all_targets_before_mutation",
+        "D:/projects/limbo/taut-dev/taut/src/tests/test_cpp_go_distribution.py::test_previous_owner_alias_rejected_before_lock_mutation",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "--basetemp",
+        "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\final-wheel-prelock-final-temp",
+        "--junitxml",
+        "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\final-wheel-prelock-final.xml"
+      ],
+      "cwd": "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1",
+      "exit": 0,
+      "elapsed_seconds": 30.324,
+      "source_inventory_sha256": "7be5937d06eab85d3f1b2f579b18cb36b476d3a8cc79de43812675c457f76b49",
+      "source_unchanged": true,
+      "python": "3.13.5 (main, Jul 23 2025, 00:30:06) [MSC v.1944 64 bit (AMD64)]",
+      "executable": "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+      "environment": {
+        "PYTHONPATH": "D:/projects/limbo/taut-dev/taut/src;C:/Users/gianni/AppData/Local/Programs/Python/Python311/Lib/site-packages",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "TEMP": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/tmp",
+        "TMP": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/tmp",
+        "GOCACHE": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/gocache",
+        "GOMODCACHE": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/gomodcache",
+        "XDG_CONFIG_HOME": "D:/projects/limbo/swift-oneof-scratch/gwz-xdg"
+      },
+      "counts": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "native_examples": {
+    "executions": 5,
+    "all_exit_zero": true,
+    "receipt": "dev-docs/examples/swift-oneof/results-r1/native-example-final.json"
+  },
+  "full_swift_before_final_alias": {
+    "tests": 186,
+    "failures": 0,
+    "skips": 0,
+    "deselected": 1,
+    "source_inventory_sha256": "48d9bddb268230d07ce50201bb051a3d5c80ca6e48b0959359416f3f431520c6",
+    "receipt": "dev-docs/examples/swift-oneof/results-r1/final-swift.json",
+    "limit": "Retained at its original source hash; final delta only one unknown-runtime alias condition and two Go/Swift regression cases. Final affected Swift101, Go/shared405, wheel11 and five examples use final hash. Canonical Swift/native generator bytes unchanged by that final delta."
+  },
+  "wheel": {
+    "path": "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\final-wheel-prelock-final-temp\\test_compiler_wheel_isolated_s0\\dist\\taut_proto-0.10.0+local.swift.probe-py3-none-any.whl",
+    "sha256": "80384ae2d6e78873b3fd3c28f79d136442c565251fcdd0921649d83c3a326bc9",
+    "canonical_resources": {
+      "cbor.swift": "4828ee6229d24a75da1813bb72982895085c571854d03008fbd2a878d80338f6",
+      "ext.swift": "9bf764a3ef3a64f74e2662b09a64044ed8d8c34ec319d5c7e4a8cae02e4297b3",
+      "swift/paths.swift": "b703dbae529ff6c48b3aba687abf8080e2acfc39a3cc93ac3be04218e1c39eb2",
+      "swift/descriptors.swift": "d5997603bfdc07665125fe8493d7b6da6357c3ac63746e2e31a96cd7cc5d6992",
+      "swift/reports.swift": "4d3b3b633e6d21f79a84a07494ed985d3b8617f0e428b765657a31f1b01aaec9",
+      "swift/validation.swift": "ab9bf32a5e2c4f764093f96a17e87c0c2d90e9e3d16ad708172db64665ec8dc8"
+    },
+    "isolated_generation": true,
+    "native_source_package_default_flat": true,
+    "current_owned_planner_scaffold_metadata_bytes_verified": true
+  },
+  "go_preservation": {
+    "baseline": "83291c2c7c7b126e41625bd29623870330f3b0d6",
+    "original_kernel_sha256": "ddf8e3d86f058a7681a5b5c37db326fd8f09d07431e9a041781c8bcb3dc8abf4",
+    "current_owned_kernel_sha256": "eee21a90952e093f3bc4c300aac852e69f90b6ac081f93a812049f3969d5da06",
+    "unchanged_go_emitter_and_metadata": {
+      "src/taut/gen/go.py": "39aac13eceefc6e83f8a6b6de407e80cb16e02ebaf697848fd6afb66735aa357",
+      "src/taut/gen/go_metadata.py": "b92d4a38510234c2fff64b1b5e5c205f60fc871c1489d64e5a3cd689a865ce0f"
+    },
+    "checks": [
+      {
+        "validation": false,
+        "step": 0,
+        "mode": "source",
+        "consume_source": false,
+        "exact_maps_equal": true,
+        "retirement_provenance_only_delta": {},
+        "all_other_write_bytes_equal": true,
+        "deletion_sets_equal": true
+      },
+      {
+        "validation": false,
+        "step": 1,
+        "mode": "source",
+        "consume_source": false,
+        "exact_maps_equal": true,
+        "retirement_provenance_only_delta": {},
+        "all_other_write_bytes_equal": true,
+        "deletion_sets_equal": true
+      },
+      {
+        "validation": false,
+        "step": 2,
+        "mode": "package",
+        "consume_source": true,
+        "exact_maps_equal": true,
+        "retirement_provenance_only_delta": {},
+        "all_other_write_bytes_equal": true,
+        "deletion_sets_equal": true
+      },
+      {
+        "validation": false,
+        "step": 3,
+        "mode": "package",
+        "consume_source": false,
+        "exact_maps_equal": false,
+        "retirement_provenance_only_delta": {
+          "before": null,
+          "after": [
+            "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\go-equivalence-final-False\\owner"
+          ]
+        },
+        "all_other_write_bytes_equal": true,
+        "deletion_sets_equal": true
+      },
+      {
+        "validation": false,
+        "step": 4,
+        "mode": "source",
+        "consume_source": false,
+        "exact_maps_equal": false,
+        "retirement_provenance_only_delta": {
+          "before": [
+            "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\go-equivalence-final-False\\owner"
+          ],
+          "after": null
+        },
+        "all_other_write_bytes_equal": true,
+        "deletion_sets_equal": true
+      },
+      {
+        "validation": true,
+        "step": 0,
+        "mode": "source",
+        "consume_source": false,
+        "exact_maps_equal": true,
+        "retirement_provenance_only_delta": {},
+        "all_other_write_bytes_equal": true,
+        "deletion_sets_equal": true
+      },
+      {
+        "validation": true,
+        "step": 1,
+        "mode": "source",
+        "consume_source": false,
+        "exact_maps_equal": true,
+        "retirement_provenance_only_delta": {},
+        "all_other_write_bytes_equal": true,
+        "deletion_sets_equal": true
+      },
+      {
+        "validation": true,
+        "step": 2,
+        "mode": "package",
+        "consume_source": true,
+        "exact_maps_equal": true,
+        "retirement_provenance_only_delta": {},
+        "all_other_write_bytes_equal": true,
+        "deletion_sets_equal": true
+      },
+      {
+        "validation": true,
+        "step": 3,
+        "mode": "package",
+        "consume_source": false,
+        "exact_maps_equal": false,
+        "retirement_provenance_only_delta": {
+          "before": null,
+          "after": [
+            "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\go-equivalence-final-True\\owner"
+          ]
+        },
+        "all_other_write_bytes_equal": true,
+        "deletion_sets_equal": true
+      },
+      {
+        "validation": true,
+        "step": 4,
+        "mode": "source",
+        "consume_source": false,
+        "exact_maps_equal": false,
+        "retirement_provenance_only_delta": {
+          "before": [
+            "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\go-equivalence-final-True\\owner"
+          ],
+          "after": null
+        },
+        "all_other_write_bytes_equal": true,
+        "deletion_sets_equal": true
+      }
+    ],
+    "exact_maps": 6,
+    "provenance_only_deltas": 4
+  },
+  "protections": "dev-docs/examples/swift-oneof/results-r1/protected-after-focused.json",
+  "overlap": "Counts overlap; never sum.405=387Go-file cases (145existing+242newsharedGo/Swiftstate)+12scaffold+4map+2help.101Swift is focused,55nonselected.11=1Swiftwheel+9previousowneraliases+1pairplan.186priorfullSwift=156feature+30existing;1duplicateparitydeselected.",
+  "development_attempts": [
+    "Original namespace and flat receipt-first r0 failures remain in verbatim reports and review-r0 evidence.",
+    "State230, additional10 and names38 development results precede final two Swift reservation controls and final dangling-alias hardening; they are not relabeled final source.",
+    "Initial baseline-module-name harness directly invoked the raw old emitter, bypassed its normal reserved-name preflight, and wrongly expected Swift to compile. Original script retained; corrected probe records native failure and unchanged old Swift reservation. Foundation message/enum old-success controls pass.",
+    "Dangling junction probe reproduced exists=False/is_alias=True false cleanup success before the final one-line fix; fixed probe and BOTH actual Windows junction regressions now refuse unchanged. No symlink privilege skip was weakened."
+  ],
+  "global_limit": "No full broad/all16 repeat. Completed r0 package remains at c0276593/a8f37984 with2260pass/3baselinefail/5skip/8duplicateexclusions; all16GREEN. No new-source broad-green claim.",
+  "reviewer_closure": "SAME TWO original reviewers, no self-closure, no new agents, remediation round1"
+}

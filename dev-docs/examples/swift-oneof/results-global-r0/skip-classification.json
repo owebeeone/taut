@@ -1,0 +1,32 @@
+[
+  {
+    "classname": "src.tests.test_js_oneof",
+    "detail": "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests\\test_js_oneof.py:326: Windows symlink privilege unavailable; junction coverage is separate",
+    "name": "test_obstructed_or_alias_owner_unchanged[symlink]",
+    "reason": "Windows symlink privilege unavailable; junction coverage is separate"
+  },
+  {
+    "classname": "src.tests.test_parity",
+    "detail": "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests\\test_parity.py:1110: fake tools are shell scripts",
+    "name": "test_java_tools_come_from_java_home_first",
+    "reason": "fake tools are shell scripts"
+  },
+  {
+    "classname": "src.tests.test_parity",
+    "detail": "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests\\test_parity.py:1120: fake tools are shell scripts",
+    "name": "test_kotlinc_comes_from_the_kotlinc_variable_with_the_java_it_runs_with",
+    "reason": "fake tools are shell scripts"
+  },
+  {
+    "classname": "src.tests.test_parity",
+    "detail": "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests\\test_parity.py:1130: PATH isolation uses POSIX paths",
+    "name": "test_a_missing_toolchain_is_none",
+    "reason": "PATH isolation uses POSIX paths"
+  },
+  {
+    "classname": "src.tests.test_rust",
+    "detail": "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests\\test_rust.py:921: the wasm32-unknown-unknown target is not installed",
+    "name": "test_rust_runtime_keeps_long_lengths_whole_on_a_32_bit_target",
+    "reason": "the wasm32-unknown-unknown target is not installed"
+  }
+]

@@ -1,0 +1,157 @@
+{
+  "observed_launcher_exit_code": 0,
+  "observed_pytest_exit_code": 1,
+  "test_runs": {
+    "all16_codec_gate": 1,
+    "broad_pytest": 1
+  },
+  "additional_test_runs": 0,
+  "baseline_scratch_byte_observation": {
+    "pytest-temp/test_generated_go_is_gofmt_cle0/deep.go": {
+      "sha256": "941d48c8035591c0b3584bab3c0287faa53473864ced7ace279aa85becc3ed04",
+      "size": 37824,
+      "CRLF": 1496,
+      "LF_total": 1496,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/deep_fc.go": {
+      "sha256": "fdf848c8203a889e8cdfce12d20cf2e203e6333169723e17bd8b38e6c3e75764",
+      "size": 39086,
+      "CRLF": 1548,
+      "LF_total": 1548,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/float.go": {
+      "sha256": "90f6a54506e39eead6547d9763fe179aba27cd72bc07b7eb1a41d7d2b70d880a",
+      "size": 5358,
+      "CRLF": 206,
+      "LF_total": 206,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/float_fc.go": {
+      "sha256": "b89957544321cbf413555576327b66b7da468d6ead1ddd31763dbafa1e1380e5",
+      "size": 5671,
+      "CRLF": 219,
+      "LF_total": 219,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/glade.go": {
+      "sha256": "d384fe73f42881c91d78aa4bf93717afe20f2d9519851e27f5b680e64e702b4b",
+      "size": 75822,
+      "CRLF": 2862,
+      "LF_total": 2862,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/glade_fc.go": {
+      "sha256": "722fc7e43e65d7951201798b2b8875da606216343037189703fff49e6a574b58",
+      "size": 81200,
+      "CRLF": 3096,
+      "LF_total": 3096,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/griplab.go": {
+      "sha256": "2b4db9be6190def96974a1fcaf53502272db3c09262c9b4b7cbe028ffd9d14e3",
+      "size": 53506,
+      "CRLF": 1978,
+      "LF_total": 1978,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/griplab_fc.go": {
+      "sha256": "765f93a2e841fd060457126bc13b275538a53cc74501ecc6aa7a3334a47f46a8",
+      "size": 57601,
+      "CRLF": 2160,
+      "LF_total": 2160,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/keys.go": {
+      "sha256": "01b1f867855ef82d173b46d083ddf2df2a51f051d94cdeda6dd4d2b24737f104",
+      "size": 6043,
+      "CRLF": 234,
+      "LF_total": 234,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/keys_fc.go": {
+      "sha256": "5f4be181340c0d36d5c450e22f520c6ce9cd59974f74a165e19e5840b5babd41",
+      "size": 6333,
+      "CRLF": 247,
+      "LF_total": 247,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/parity_int.go": {
+      "sha256": "74ab3146ca3967d54aa94aee0daf4327ad31f4ef34b2e12f97094633c1aa34ea",
+      "size": 64257,
+      "CRLF": 2536,
+      "LF_total": 2536,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/parity_int_fc.go": {
+      "sha256": "da8a84952fc371f2d1fd9f98ae68b2cfaa3cea6723c870d53c9b57ac289debfe",
+      "size": 68230,
+      "CRLF": 2705,
+      "LF_total": 2705,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/presence.go": {
+      "sha256": "d7068a83abb0b3a0441114077f46b21bb6c859d654c7250c43f6b80438765865",
+      "size": 5301,
+      "CRLF": 192,
+      "LF_total": 192,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/presence_fc.go": {
+      "sha256": "b9972abe27b8cccfb13f1dc45fd49fdf7b231701dddb8c6dd6891cbee57cd8a8",
+      "size": 5809,
+      "CRLF": 218,
+      "LF_total": 218,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/razel.go": {
+      "sha256": "afe17bbff5ca613c5650ad8ff431f2e9a49cf19b283741c3466ded570ca79e58",
+      "size": 31661,
+      "CRLF": 1128,
+      "LF_total": 1128,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/razel_fc.go": {
+      "sha256": "32a6f940b5838f4f55540b019efc5a282f3479aa7dc3c273a7f8d37095bac457",
+      "size": 33869,
+      "CRLF": 1232,
+      "LF_total": 1232,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/resext.go": {
+      "sha256": "1e733bf9c243453e3ee1c8c1ee09e965efde9ca78d39f7d5bd12d8827194b517",
+      "size": 6244,
+      "CRLF": 225,
+      "LF_total": 225,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_generated_go_is_gofmt_cle0/resext_fc.go": {
+      "sha256": "9d08f1d6e366a2fd23311ea41dd599ae9894e6f80d75efb92bcd40c424b7a139",
+      "size": 6806,
+      "CRLF": 251,
+      "LF_total": 251,
+      "bare_LF": 0
+    },
+    "pytest-temp/test_go_runtime_and_parity_run0/main.go": {
+      "sha256": "1038699524b862ccaf1238869c7e88bff4364d0635bbd32f42f3eeb5865cdc53",
+      "size": 23385,
+      "CRLF": 485,
+      "LF_total": 485,
+      "bare_LF": 0
+    }
+  },
+  "association": "Read-only inspection of retained Windows write_text outputs. Known CRLF failures remain enabled; LF feature regression passed in same broad run. See baseline-source-proof.json for exact unchanged baseline files. No formatter rerun was performed.",
+  "raw_source_integrity": {
+    "source_total": 718,
+    "raw_blob_total": 736,
+    "swift_owned_raw_count": 45,
+    "raw_before_after_equal": true,
+    "protected_counts": {
+      "excluded_python_artifacts": 35,
+      "indices": 5,
+      "locks_and_manifests": 47,
+      "user_sources": 5
+    }
+  }
+}

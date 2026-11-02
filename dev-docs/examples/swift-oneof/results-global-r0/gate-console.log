@@ -1,0 +1,158 @@
+PRECHECK OK: exact5HEADs; source/protected5/excluded35/locks/indices; only permitted review evidence may appear
+START all16 codec parity: require_all=True,jobs=2
+int vectors: 11    malformed vectors: 47    bounds vectors: 30
+
+target      status       pass fail skip/type  observed
+rust        gated          85    0         3  GREEN
+rust/fc     gated          85    0         3  GREEN
+python      gated          88    0         0  GREEN
+typescript  gated          88    0         0  GREEN
+js          gated          88    0         0  GREEN
+js/fc       gated          88    0         0  GREEN
+cpp         gated          85    0         3  GREEN
+cpp/fc      gated          85    0         3  GREEN
+swift       gated          85    0         3  GREEN
+swift/fc    gated          85    0         3  GREEN
+go          gated          85    0         3  GREEN
+go/fc       gated          85    0         3  GREEN
+kotlin      gated          85    0         3  GREEN
+kotlin/fc   gated          85    0         3  GREEN
+java        gated          85    0         3  GREEN
+java/fc     gated          85    0         3  GREEN
+
+governance: clean (no gated target failing, no green target allowlisted; every selected target ran)
+
+START ONE broad gate: only8marked duplicate parity deselections; all enum cases enabled
+{
+  "source_tuple": {
+    "taut": "c02765930f06cfcb19a522843aa54582db514706",
+    "workspace": "a8f37984471654902149d136b7a13a588346b58f",
+    "shape_python": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "shape_rust": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "shape_ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97"
+  },
+  "tuple_before": {
+    "taut": "c02765930f06cfcb19a522843aa54582db514706",
+    "shape_ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "a8f37984471654902149d136b7a13a588346b58f",
+    "shape_python": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "shape_rust": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4"
+  },
+  "tuple_after": {
+    "taut": "c02765930f06cfcb19a522843aa54582db514706",
+    "shape_ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "a8f37984471654902149d136b7a13a588346b58f",
+    "shape_python": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "shape_rust": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4"
+  },
+  "heads_unchanged": true,
+  "source_unchanged": true,
+  "protected_indices_locks_unchanged": true,
+  "selected_source_counts": {
+    "taut": 442,
+    "shape_ts": 95,
+    "workspace": 45,
+    "shape_python": 74,
+    "shape_rust": 62
+  },
+  "status_before": {
+    "permitted_untracked_review_evidence": [],
+    "protected_old_untracked_count": 35
+  },
+  "status_after": {
+    "permitted_untracked_review_evidence": [],
+    "protected_old_untracked_count": 35
+  },
+  "parity_variants": 16,
+  "parity_violations": [],
+  "broad_command": [
+    "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+    "-m",
+    "pytest",
+    "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests",
+    "-q",
+    "-m",
+    "not gate",
+    "-p",
+    "no:cacheprovider",
+    "-p",
+    "collection_receipt",
+    "--basetemp",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp",
+    "--junitxml",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\broad-results.xml"
+  ],
+  "broad_exit_code": 1,
+  "broad_tests": 2268,
+  "selected_count": 2268,
+  "passed": 2260,
+  "failures": [
+    [
+      "test_dev_docs",
+      "test_proto_api_surface_extensions_doc_exists_and_covers_contract"
+    ],
+    [
+      "test_go",
+      "test_go_runtime_and_parity_runner_are_gofmt_clean"
+    ],
+    [
+      "test_go",
+      "test_generated_go_is_gofmt_clean"
+    ]
+  ],
+  "baseline_failures": [
+    [
+      "test_dev_docs",
+      "test_proto_api_surface_extensions_doc_exists_and_covers_contract"
+    ],
+    [
+      "test_go",
+      "test_generated_go_is_gofmt_clean"
+    ],
+    [
+      "test_go",
+      "test_go_runtime_and_parity_runner_are_gofmt_clean"
+    ]
+  ],
+  "new_failures": [],
+  "skipped": 5,
+  "deselected": 8,
+  "deselections_unclassified": [],
+  "exact8deselections": true,
+  "new_target_collection": {
+    "test_go_oneof.py": 145,
+    "test_cpp_oneof.py": 88,
+    "test_cpp_go_distribution.py": 11,
+    "test_swift_oneof.py": 116,
+    "test_swift.py": 30,
+    "test_swift_distribution.py": 1,
+    "test_oneof.py": 93
+  },
+  "go145_selected": true,
+  "swift116_selected": true,
+  "swift_feature_results": {
+    "passed": 116,
+    "failed": 0,
+    "skipped": 0
+  },
+  "go_feature_results": {
+    "passed": 145,
+    "failed": 0,
+    "skipped": 0
+  },
+  "fixed_jvm_help_status": "passed",
+  "elapsed_seconds": 1213.7,
+  "actual_library": {
+    "production_files_match_prior_315_typecheck_build_receipt": 28,
+    "source_tuple": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "frozen_dependency_lock_sha256": "e110b44300bc75e28489500b7d2165b27414e2c6283853d7e4220b5fc27e06db",
+    "association": "R0 full28 inventory overridden by accepted R1 changed11 hashes; final merged source checked against actual accepted library HEAD",
+    "corrected_receipt_manifest": "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles-R1.json",
+    "corrected_library_receipt_hashes": {
+      "dev-docs/examples/typescript-oneof/results-r1/library-build.log": "a9120e106f55b637d79043a28576a95ca418ce7ee638c392c32ec15d649723fa",
+      "dev-docs/examples/typescript-oneof/results-r1/library-tests.log": "05df00cf2b9ea3f6fcf812fe5518103c072f8db148b9bdc1732a7a0ca37ac065",
+      "dev-docs/examples/typescript-oneof/results-r1/library-typecheck.log": "8d0e8ca6face14b38c6ec53924037c0098a0fbeb982ff06383bc756d96a86127"
+    },
+    "scope": "prior exact-source 315/typecheck/build receipts reused; no new standalone library gate; broad may execute actual composition tests"
+  }
+}

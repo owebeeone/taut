@@ -1,0 +1,133 @@
+{
+  "actual_library": {
+    "association": "R0 full28 inventory overridden by accepted R1 changed11 hashes; final merged source checked against actual accepted library HEAD",
+    "corrected_library_receipt_hashes": {
+      "dev-docs/examples/typescript-oneof/results-r1/library-build.log": "a9120e106f55b637d79043a28576a95ca418ce7ee638c392c32ec15d649723fa",
+      "dev-docs/examples/typescript-oneof/results-r1/library-tests.log": "05df00cf2b9ea3f6fcf812fe5518103c072f8db148b9bdc1732a7a0ca37ac065",
+      "dev-docs/examples/typescript-oneof/results-r1/library-typecheck.log": "8d0e8ca6face14b38c6ec53924037c0098a0fbeb982ff06383bc756d96a86127"
+    },
+    "corrected_receipt_manifest": "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles-R1.json",
+    "frozen_dependency_lock_sha256": "e110b44300bc75e28489500b7d2165b27414e2c6283853d7e4220b5fc27e06db",
+    "production_files_match_prior_315_typecheck_build_receipt": 28,
+    "scope": "prior exact-source 315/typecheck/build receipts reused; no new standalone library gate; broad may execute actual composition tests",
+    "source_tuple": "1aaeab65e4564a462044d2f5d824cd2f375aae97"
+  },
+  "baseline_failures": [
+    [
+      "test_dev_docs",
+      "test_proto_api_surface_extensions_doc_exists_and_covers_contract"
+    ],
+    [
+      "test_go",
+      "test_generated_go_is_gofmt_clean"
+    ],
+    [
+      "test_go",
+      "test_go_runtime_and_parity_runner_are_gofmt_clean"
+    ]
+  ],
+  "broad_command": [
+    "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+    "-m",
+    "pytest",
+    "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests",
+    "-q",
+    "-m",
+    "not gate",
+    "-p",
+    "no:cacheprovider",
+    "-p",
+    "collection_receipt",
+    "--basetemp",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp",
+    "--junitxml",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\broad-results.xml"
+  ],
+  "broad_exit_code": 1,
+  "broad_tests": 2268,
+  "deselected": 8,
+  "deselections_unclassified": [],
+  "elapsed_seconds": 1213.7,
+  "exact8deselections": true,
+  "failures": [
+    [
+      "test_dev_docs",
+      "test_proto_api_surface_extensions_doc_exists_and_covers_contract"
+    ],
+    [
+      "test_go",
+      "test_go_runtime_and_parity_runner_are_gofmt_clean"
+    ],
+    [
+      "test_go",
+      "test_generated_go_is_gofmt_clean"
+    ]
+  ],
+  "fixed_jvm_help_status": "passed",
+  "go145_selected": true,
+  "go_feature_results": {
+    "failed": 0,
+    "passed": 145,
+    "skipped": 0
+  },
+  "heads_unchanged": true,
+  "new_failures": [],
+  "new_target_collection": {
+    "test_cpp_go_distribution.py": 11,
+    "test_cpp_oneof.py": 88,
+    "test_go_oneof.py": 145,
+    "test_oneof.py": 93,
+    "test_swift.py": 30,
+    "test_swift_distribution.py": 1,
+    "test_swift_oneof.py": 116
+  },
+  "parity_variants": 16,
+  "parity_violations": [],
+  "passed": 2260,
+  "protected_indices_locks_unchanged": true,
+  "selected_count": 2268,
+  "selected_source_counts": {
+    "shape_python": 74,
+    "shape_rust": 62,
+    "shape_ts": 95,
+    "taut": 442,
+    "workspace": 45
+  },
+  "skipped": 5,
+  "source_tuple": {
+    "shape_python": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "shape_rust": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "shape_ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "taut": "c02765930f06cfcb19a522843aa54582db514706",
+    "workspace": "a8f37984471654902149d136b7a13a588346b58f"
+  },
+  "source_unchanged": true,
+  "status_after": {
+    "permitted_untracked_review_evidence": [],
+    "protected_old_untracked_count": 35
+  },
+  "status_before": {
+    "permitted_untracked_review_evidence": [],
+    "protected_old_untracked_count": 35
+  },
+  "swift116_selected": true,
+  "swift_feature_results": {
+    "failed": 0,
+    "passed": 116,
+    "skipped": 0
+  },
+  "tuple_after": {
+    "shape_python": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "shape_rust": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "shape_ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "taut": "c02765930f06cfcb19a522843aa54582db514706",
+    "workspace": "a8f37984471654902149d136b7a13a588346b58f"
+  },
+  "tuple_before": {
+    "shape_python": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "shape_rust": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "shape_ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "taut": "c02765930f06cfcb19a522843aa54582db514706",
+    "workspace": "a8f37984471654902149d136b7a13a588346b58f"
+  }
+}

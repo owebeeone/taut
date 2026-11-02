@@ -1,0 +1,445 @@
+{
+  "baseline_failures": [
+    [
+      "test_dev_docs",
+      "test_proto_api_surface_extensions_doc_exists_and_covers_contract"
+    ],
+    [
+      "test_go",
+      "test_generated_go_is_gofmt_clean"
+    ],
+    [
+      "test_go",
+      "test_go_runtime_and_parity_runner_are_gofmt_clean"
+    ]
+  ],
+  "broad": {
+    "deselected": 8,
+    "executed": 2268,
+    "failed": 3,
+    "passed": 2260,
+    "selected": 2268,
+    "skipped": 5
+  },
+  "enum_metadata_case_results": [
+    {
+      "name": "test_enum_case_namespace_preserves_metadata_named_members[name]",
+      "passed": true
+    },
+    {
+      "name": "test_enum_case_namespace_preserves_metadata_named_members[members]",
+      "passed": true
+    },
+    {
+      "name": "test_enum_case_namespace_preserves_metadata_named_members[options]",
+      "passed": true
+    },
+    {
+      "name": "test_enum_case_namespace_preserves_metadata_named_members[case]",
+      "passed": true
+    },
+    {
+      "name": "test_enum_case_namespace_preserves_metadata_named_members[_definition]",
+      "passed": true
+    },
+    {
+      "name": "test_enum_case_namespace_is_read_only_and_preserves_ordinary_lookup",
+      "passed": true
+    },
+    {
+      "name": "test_enum_case_namespace_rejects_wrong_enum_and_changes_no_generated_api",
+      "passed": true
+    }
+  ],
+  "failures": [
+    [
+      "test_dev_docs",
+      "test_proto_api_surface_extensions_doc_exists_and_covers_contract"
+    ],
+    [
+      "test_go",
+      "test_go_runtime_and_parity_runner_are_gofmt_clean"
+    ],
+    [
+      "test_go",
+      "test_generated_go_is_gofmt_clean"
+    ]
+  ],
+  "feature_results": {
+    "test_bounds": {
+      "failed": 0,
+      "passed": 80,
+      "skipped": 0,
+      "total": 80
+    },
+    "test_cbor": {
+      "failed": 0,
+      "passed": 50,
+      "skipped": 0,
+      "total": 50
+    },
+    "test_cli": {
+      "failed": 0,
+      "passed": 1,
+      "skipped": 0,
+      "total": 1
+    },
+    "test_compat": {
+      "failed": 0,
+      "passed": 24,
+      "skipped": 0,
+      "total": 24
+    },
+    "test_corpus": {
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0,
+      "total": 3
+    },
+    "test_corpus_kit": {
+      "failed": 0,
+      "passed": 7,
+      "skipped": 0,
+      "total": 7
+    },
+    "test_cpp": {
+      "failed": 0,
+      "passed": 21,
+      "skipped": 0,
+      "total": 21
+    },
+    "test_cpp_go_distribution": {
+      "failed": 0,
+      "passed": 11,
+      "skipped": 0,
+      "total": 11
+    },
+    "test_cpp_oneof": {
+      "failed": 0,
+      "passed": 88,
+      "skipped": 0,
+      "total": 88
+    },
+    "test_crdt": {
+      "failed": 0,
+      "passed": 7,
+      "skipped": 0,
+      "total": 7
+    },
+    "test_dev_docs": {
+      "failed": 1,
+      "passed": 0,
+      "skipped": 0,
+      "total": 1
+    },
+    "test_dsl": {
+      "failed": 0,
+      "passed": 54,
+      "skipped": 0,
+      "total": 54
+    },
+    "test_float": {
+      "failed": 0,
+      "passed": 11,
+      "skipped": 0,
+      "total": 11
+    },
+    "test_float_vectors": {
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0,
+      "total": 3
+    },
+    "test_forward_compat": {
+      "failed": 0,
+      "passed": 11,
+      "skipped": 0,
+      "total": 11
+    },
+    "test_glade_chain": {
+      "failed": 0,
+      "passed": 4,
+      "skipped": 0,
+      "total": 4
+    },
+    "test_glade_corpus": {
+      "failed": 0,
+      "passed": 5,
+      "skipped": 0,
+      "total": 5
+    },
+    "test_glade_folds": {
+      "failed": 0,
+      "passed": 5,
+      "skipped": 0,
+      "total": 5
+    },
+    "test_go": {
+      "failed": 2,
+      "passed": 23,
+      "skipped": 0,
+      "total": 25
+    },
+    "test_go_oneof": {
+      "failed": 0,
+      "passed": 145,
+      "skipped": 0,
+      "total": 145
+    },
+    "test_ir_v2": {
+      "failed": 0,
+      "passed": 110,
+      "skipped": 0,
+      "total": 110
+    },
+    "test_java": {
+      "failed": 0,
+      "passed": 22,
+      "skipped": 0,
+      "total": 22
+    },
+    "test_java_oneof": {
+      "failed": 0,
+      "passed": 105,
+      "skipped": 0,
+      "total": 105
+    },
+    "test_js": {
+      "failed": 0,
+      "passed": 20,
+      "skipped": 0,
+      "total": 20
+    },
+    "test_js_oneof": {
+      "failed": 0,
+      "passed": 75,
+      "skipped": 1,
+      "total": 76
+    },
+    "test_js_ts_distribution": {
+      "failed": 0,
+      "passed": 29,
+      "skipped": 0,
+      "total": 29
+    },
+    "test_js_ts_fail_closed": {
+      "failed": 0,
+      "passed": 6,
+      "skipped": 0,
+      "total": 6
+    },
+    "test_jsoncodec": {
+      "failed": 0,
+      "passed": 7,
+      "skipped": 0,
+      "total": 7
+    },
+    "test_jvm_compiler_distribution": {
+      "failed": 0,
+      "passed": 1,
+      "skipped": 0,
+      "total": 1
+    },
+    "test_kotlin": {
+      "failed": 0,
+      "passed": 18,
+      "skipped": 0,
+      "total": 18
+    },
+    "test_kotlin_oneof": {
+      "failed": 0,
+      "passed": 56,
+      "skipped": 0,
+      "total": 56
+    },
+    "test_map": {
+      "failed": 0,
+      "passed": 7,
+      "skipped": 0,
+      "total": 7
+    },
+    "test_map_gen": {
+      "failed": 0,
+      "passed": 4,
+      "skipped": 0,
+      "total": 4
+    },
+    "test_oneof": {
+      "failed": 0,
+      "passed": 93,
+      "skipped": 0,
+      "total": 93
+    },
+    "test_options": {
+      "failed": 0,
+      "passed": 45,
+      "skipped": 0,
+      "total": 45
+    },
+    "test_options_validate": {
+      "failed": 0,
+      "passed": 119,
+      "skipped": 0,
+      "total": 119
+    },
+    "test_parity": {
+      "failed": 0,
+      "passed": 70,
+      "skipped": 3,
+      "total": 73
+    },
+    "test_python_parity": {
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0,
+      "total": 2
+    },
+    "test_python_runtime_distribution": {
+      "failed": 0,
+      "passed": 47,
+      "skipped": 0,
+      "total": 47
+    },
+    "test_razel": {
+      "failed": 0,
+      "passed": 4,
+      "skipped": 0,
+      "total": 4
+    },
+    "test_readme": {
+      "failed": 0,
+      "passed": 1,
+      "skipped": 0,
+      "total": 1
+    },
+    "test_regen": {
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0,
+      "total": 2
+    },
+    "test_release_checks": {
+      "failed": 0,
+      "passed": 15,
+      "skipped": 0,
+      "total": 15
+    },
+    "test_reserved": {
+      "failed": 0,
+      "passed": 5,
+      "skipped": 0,
+      "total": 5
+    },
+    "test_reserved_names": {
+      "failed": 0,
+      "passed": 364,
+      "skipped": 0,
+      "total": 364
+    },
+    "test_resext_vectors": {
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0,
+      "total": 8
+    },
+    "test_rust": {
+      "failed": 0,
+      "passed": 25,
+      "skipped": 1,
+      "total": 26
+    },
+    "test_rust_external_types": {
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0,
+      "total": 8
+    },
+    "test_rust_oneof": {
+      "failed": 0,
+      "passed": 90,
+      "skipped": 0,
+      "total": 90
+    },
+    "test_scaffold": {
+      "failed": 0,
+      "passed": 12,
+      "skipped": 0,
+      "total": 12
+    },
+    "test_shapes": {
+      "failed": 0,
+      "passed": 5,
+      "skipped": 0,
+      "total": 5
+    },
+    "test_swift": {
+      "failed": 0,
+      "passed": 30,
+      "skipped": 0,
+      "total": 30
+    },
+    "test_swift_distribution": {
+      "failed": 0,
+      "passed": 1,
+      "skipped": 0,
+      "total": 1
+    },
+    "test_swift_oneof": {
+      "failed": 0,
+      "passed": 116,
+      "skipped": 0,
+      "total": 116
+    },
+    "test_ts": {
+      "failed": 0,
+      "passed": 14,
+      "skipped": 0,
+      "total": 14
+    },
+    "test_typescript_oneof": {
+      "failed": 0,
+      "passed": 72,
+      "skipped": 0,
+      "total": 72
+    },
+    "test_typescript_review_closure": {
+      "failed": 0,
+      "passed": 83,
+      "skipped": 0,
+      "total": 83
+    },
+    "test_validate": {
+      "failed": 0,
+      "passed": 16,
+      "skipped": 0,
+      "total": 16
+    }
+  },
+  "metadata_policy_deselections": [],
+  "new_failures": [],
+  "only_eight_duplicate_deselections": true,
+  "protected_counts": {
+    "excluded_python_artifacts": 35,
+    "indices": 5,
+    "locks_and_manifests": 47,
+    "user_sources": 5
+  },
+  "raw_before_after_equal": true,
+  "raw_blob_counts": {
+    "shape_python": 74,
+    "shape_rust": 62,
+    "shape_ts": 95,
+    "taut": 460,
+    "workspace": 45
+  },
+  "raw_blob_total": 736,
+  "source_counts": {
+    "shape_python": 74,
+    "shape_rust": 62,
+    "shape_ts": 95,
+    "taut": 442,
+    "workspace": 45
+  },
+  "source_total": 718,
+  "swift_owned_raw_count": 45
+}

@@ -1,0 +1,54 @@
+[
+  {
+    "mode": "package",
+    "validation": false,
+    "result": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\state-raw\\scratch\\probes\\go-receipt-first-cases\\package-False\\go\\cbor.go; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "leftovers": [
+      "cbor.go",
+      "descriptors.go",
+      "ext.go",
+      "paths.go"
+    ]
+  },
+  {
+    "mode": "package",
+    "validation": true,
+    "result": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\state-raw\\scratch\\probes\\go-receipt-first-cases\\package-True\\go\\cbor.go; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "leftovers": [
+      "cbor.go",
+      "descriptors.go",
+      "ext.go",
+      "paths.go",
+      "reports.go",
+      "validation.go"
+    ]
+  },
+  {
+    "mode": null,
+    "validation": false,
+    "result": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\state-raw\\scratch\\probes\\go-receipt-first-cases\\None-False\\go\\cbor.go; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "leftovers": [
+      "cbor.go",
+      "descriptors.go",
+      "ext.go",
+      "paths.go"
+    ]
+  },
+  {
+    "mode": null,
+    "validation": true,
+    "result": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r0\\state-raw\\scratch\\probes\\go-receipt-first-cases\\None-True\\go\\cbor.go; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "leftovers": [
+      "cbor.go",
+      "descriptors.go",
+      "ext.go",
+      "paths.go",
+      "reports.go",
+      "validation.go"
+    ]
+  }
+]

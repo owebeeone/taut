@@ -647,3 +647,58 @@ def test_imported_qualified_engine_helpers_allow_native_fields(tmp_path, package
     binary, _ = executable(tmp_path / 'app', 'import TautFoundation\nlet r=R(' + ','.join(n+':0' for n in fields) + ')\nprecondition(r.isValid() && r.validate().isComplete)\n',
                            [tmp_path / 'swift/api.swift'], [(package, 'TautFoundation')])
     run([binary], roots=[package])
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+@pytest.mark.parametrize('name,placement', [(name, placement)
+    for name in ('Data', 'NSLock', 'ObjectIdentifier', 'AnyObject', 'Void')
+    for placement in ('flat', 'imported')] + [('Void', 'source'), ('Void', 'package')])
+def test_native_helper_type_names_compile_in_each_runtime_scope(tmp_path, package, off_package, name, enabled, placement):
+    record = schema(**{name: Msg(value=F(1, INT))})
+    config = {'swift': {'module': 'TautFoundation'}} if placement != 'flat' else None
+    emit(record, tmp_path, langs=['swift'], services=[], validation=enabled, runtime_bindings=config,
+         runtime_mode=placement if placement in ('source', 'package') else None)
+    owners, sources = [], [tmp_path / 'swift/api.swift']
+    if placement == 'flat':
+        supplied = tmp_path / 'supplied'; supplied.mkdir()
+        for filename, content in canonical_sources(validation=enabled).items():
+            target = supplied / filename; target.write_bytes(content); sources.append(target)
+    else:
+        owner = build_foundation(tmp_path / 'built', validation=enabled, source_directory=tmp_path / 'swift') if placement == 'source' else package if enabled else off_package
+        owners = [(owner, 'TautFoundation')]
+    binary, _ = executable(tmp_path / 'app',
+        'let value = ' + name + '(value: 7)\nprecondition(value.value == 7)\n'
+        'precondition(' + name + '.descriptor.fields.count == 1)\n'
+        + ('precondition(value.isValid() && value.validate().isComplete)\n' if enabled else ''), sources, owners)
+    run([binary], roots=[root for root, _ in owners])
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+@pytest.mark.parametrize('placement', ['source', 'package', 'supplied'])
+@pytest.mark.parametrize('kind', ['message', 'enum'])
+def test_foundation_module_shadow_has_explicit_imported_route(tmp_path, package, off_package, enabled, placement, kind):
+    record = schema(Foundation=Msg(value=F(1, INT))) if kind == 'message' else schema(Enum('Foundation', ok=1))
+    emit(record, tmp_path, langs=['swift'], services=[], validation=enabled,
+         runtime_mode=placement if placement != 'supplied' else None,
+         runtime_bindings={'swift': {'module': 'TautFoundation'}})
+    owner = build_foundation(tmp_path / 'built', validation=enabled, source_directory=tmp_path / 'swift') if placement == 'source' else package if enabled else off_package
+    source = ('let value = Foundation(value: 7)\nprecondition(value.value == 7)\n'
+              if kind == 'message' else 'let value = Foundation.ok\nprecondition(value.rawValue == 1)\n')
+    binary, _ = executable(tmp_path / 'app', source + '_ = Foundation.descriptor\n',
+                           [tmp_path / 'swift/api.swift'], [(owner, 'TautFoundation')])
+    run([binary], roots=[owner])
+
+
+@pytest.mark.parametrize('kind', ['message', 'enum'])
+@pytest.mark.parametrize('name', ['Foundation', 'Swift'])
+def test_foundation_flat_collision_refuses_before_locks(tmp_path, monkeypatch, kind, name):
+    record = schema(**{name: Msg(value=F(1, INT))}) if kind == 'message' else schema(Enum(name, ok=1))
+    attempted = []; original = Path.open
+    def observe(path, *args, **kwargs):
+        if args and args[0] == 'xb': attempted.append(path)
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'open', observe)
+    message = 'Foundation.*explicit imported runtime module' if name == 'Foundation' else 'Swift.*reserved'
+    with pytest.raises(ValueError, match=message):
+        emit(record, tmp_path / 'output', langs=['swift'], services=[])
+    assert attempted == [] and not (tmp_path / 'output').exists()

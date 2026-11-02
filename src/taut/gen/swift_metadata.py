@@ -49,6 +49,9 @@ def preflight(schema, validation, external, runtime_module):
     declared = set(schema.messages) | set(schema.enums)
     if external.keys() - declared: errors.append(f'unknown Swift external types {sorted(external.keys()-declared)}')
     reserved = {runtime_module}
+    if not runtime_module and 'Foundation' in declared:
+        errors.append('Foundation: Swift flat supplied declaration hides the Foundation module used by canonical helpers; '
+                      'bind an explicit imported runtime module (for example TautFoundation) in source/package/supplied mode')
     if not runtime_module:
         # Legacy supplied mode compiles the canonical foundation once in the
         # application module, so these are actual same-module declarations.
@@ -160,7 +163,7 @@ def emit_types(schema, *, forward_compat=False, validation=False, external_types
                     '    func isValid(recursive: Bool = true) -> Bool {',
                     '        ' + r + 'isRecordValid(self, Self.tautBinding, recursive: recursive)', '    }']
         out += ['}']
-    out += ['private enum ' + holder + ' {', '    static let guardOwner: Void = {',
+    out += ['private enum ' + holder + ' {', '    static let guardOwner: () = {',
             '        let wire_evidence: ' + r + 'FoundationEvidence = ' + r + 'requireFoundation(' + q(identity) + ', ' + q(OWNER) + ', 1, 1, ["codec.v1", "descriptors.v1", "oneof.v1"])',
             '        precondition(wire_evidence.owner == "taut.swift.foundation" && wire_evidence.descriptor == 1 && wire_evidence.codec == 1 && Set(["codec.v1", "descriptors.v1", "oneof.v1"]).isSubset(of: wire_evidence.capabilities) && ' + r + 'foundationOwner == wire_evidence.owner && ' + r + 'descriptorContract == 1 && ' + r + 'codecContract == 1 && Set(["codec.v1", "descriptors.v1", "oneof.v1"]).isSubset(of: ' + r + 'foundationCapabilities()), "incompatible actual selected Swift foundation; regenerate/rebind")',
             '        ' + r + 'confirmFoundation(wire_evidence, ' + r + 'foundationOwner, ' + r + 'descriptorContract, ' + r + 'codecContract, ' + r + 'foundationCapabilities())']

@@ -1,0 +1,24 @@
+AssertionError: assert (0, 'D:\\proj..._fc.go\n', '') == (0, '', '')
+  
+  At index 1 diff: 'D:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\glade.go\nD:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\glade_fc.go\nD:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\griplab.go\nD:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\griplab_fc.go\nD:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\parity_...
+  
+  ...Full output truncated (2 lines hidden), use '-vv' to show
+tmp_path = WindowsPath('D:/projects/limbo/swift-oneof-scratch/global-gate-r0/pytest-temp/test_generated_go_is_gofmt_cle0')
+
+    def test_generated_go_is_gofmt_clean(tmp_path):
+        gofmt = shutil.which("gofmt")
+        if gofmt is None:
+            pytest.skip("gofmt not installed")
+        paths = []
+        for name, source in _generated_go().items():
+            paths.append(tmp_path / f"{name}.go")
+            paths[-1].write_text(source)
+        result = subprocess.run([gofmt, "-l", *map(str, paths)], capture_output=True, text=True, check=False)
+>       assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+E       AssertionError: assert (0, 'D:\\proj..._fc.go\n', '') == (0, '', '')
+E         
+E         At index 1 diff: 'D:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\glade.go\nD:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\glade_fc.go\nD:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\griplab.go\nD:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\griplab_fc.go\nD:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\parity_...
+E         
+E         ...Full output truncated (2 lines hidden), use '-vv' to show
+
+..\..\taut-dev\taut\src\tests\test_go.py:483: AssertionError

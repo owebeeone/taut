@@ -1,0 +1,185 @@
+{
+  "source_parent": "c02765930f06cfcb19a522843aa54582db514706",
+  "workspace_parent": "a8f37984471654902149d136b7a13a588346b58f",
+  "files": {
+    "dev-docs/UserEnumCaseIntegration-Receipt.json": {
+      "sha256": "0e1bd4418ee1ca77c9ac86889020184bced1648ccbff47ed556a5ba6e4dcaa53",
+      "size": 8743
+    },
+    "dev-docs/examples/swift-oneof/Conformance.swift": {
+      "sha256": "0d020a5949fdca1f1586e606dbb021ff5350a98fce21c9335c0816a5181dd904",
+      "size": 3417
+    },
+    "dev-docs/examples/swift-oneof/README.md": {
+      "sha256": "b6152b093a3ebd5df20ece38cca7269728108227cc3da354870e5db0726c71c8",
+      "size": 7889
+    },
+    "dev-docs/examples/swift-oneof/content.taut.py": {
+      "sha256": "784f549db4a0e324a7675f3f88e399d623d81738e7358f6225a449e0e349855d",
+      "size": 1185
+    },
+    "dev-docs/examples/swift-oneof/expected.tsv": {
+      "sha256": "02586adf94172f54e92c38809a4426d8e1cc372b70b669e405a5b20efc08b4ec",
+      "size": 1954
+    },
+    "dev-docs/examples/swift-oneof/golden/flat-off.swift": {
+      "sha256": "4acb22327082df4df56459576585a6513d6bdc11a663c57ce1ea1c252396fc58",
+      "size": 5592
+    },
+    "dev-docs/examples/swift-oneof/golden/flat-on.swift": {
+      "sha256": "bbb2aad55ca17c80d53b2f588dd18dee3bc948cfca97b37e66ba71b862a3d2d9",
+      "size": 5862
+    },
+    "dev-docs/examples/swift-oneof/golden/imported-off.swift": {
+      "sha256": "903d561fa6ae3e62e395d95eb8979973e38e00cdff99c02e6f077ee5e0c3a227",
+      "size": 6064
+    },
+    "dev-docs/examples/swift-oneof/golden/imported-on.swift": {
+      "sha256": "4ed0973b335093f29580ec8dd427b97e4bce4bf892ca0fb2804209ae80c11047",
+      "size": 6379
+    },
+    "dev-docs/examples/swift-oneof/run_example.py": {
+      "sha256": "bb197f38d6a80b842246133e2491fc9930e6e377bd77a69352370d7ddeed862c",
+      "size": 4205
+    },
+    "dev-docs/examples/swift-oneof/surface.taut.py": {
+      "sha256": "659edc0bc32858ab15af8a213e4f12758b62d216173a4f1692a97aebec019955",
+      "size": 282
+    },
+    "docs/SWIFT_API.md": {
+      "sha256": "77f53d2c8507a098a7151919204c1dd13364ea0892df2ebcc9a11c3496a1c520",
+      "size": 12457
+    },
+    "pyproject.toml": {
+      "sha256": "411d18e422dc38a0d75f50cad8dc24595cf0a1ad3ec671e6ba7de11de4b7667c",
+      "size": 2155
+    },
+    "src/taut/cli.py": {
+      "sha256": "e99a7caa0c82ac4d625a29031a21e5bb93d81553d5ab8943a4238ff9fb301c09",
+      "size": 16188
+    },
+    "src/taut/corpus/parity_swift.py": {
+      "sha256": "2d1738c2d0aa6e7e04f2a3f545a8729c19f01c3ccc1e84f7eafcbf5b744b8d00",
+      "size": 15080
+    },
+    "src/taut/gen/go_runtime.py": {
+      "sha256": "a49582ab269e78e9158c9b5ee51a1a9fec08fb7699f50645ad55daa4c72d338b",
+      "size": 11314
+    },
+    "src/taut/gen/owned_runtime.py": {
+      "sha256": "eee21a90952e093f3bc4c300aac852e69f90b6ac081f93a812049f3969d5da06",
+      "size": 11145
+    },
+    "src/taut/gen/runtime/swift/descriptors.swift": {
+      "sha256": "d5997603bfdc07665125fe8493d7b6da6357c3ac63746e2e31a96cd7cc5d6992",
+      "size": 19242
+    },
+    "src/taut/gen/runtime/swift/paths.swift": {
+      "sha256": "b703dbae529ff6c48b3aba687abf8080e2acfc39a3cc93ac3be04218e1c39eb2",
+      "size": 1110
+    },
+    "src/taut/gen/runtime/swift/reports.swift": {
+      "sha256": "4d3b3b633e6d21f79a84a07494ed985d3b8617f0e428b765657a31f1b01aaec9",
+      "size": 1350
+    },
+    "src/taut/gen/runtime/swift/validation.swift": {
+      "sha256": "ab9bf32a5e2c4f764093f96a17e87c0c2d90e9e3d16ad708172db64665ec8dc8",
+      "size": 3629
+    },
+    "src/taut/gen/scaffold.py": {
+      "sha256": "7f74895ed686705aba9d6bef0616a781114b0a99c5f6abaa07311d68baff043b",
+      "size": 50700
+    },
+    "src/taut/gen/swift.py": {
+      "sha256": "4559857fba1ee03a627fe4cd548153557cd33328cedd31f88262131518987f5c",
+      "size": 16198
+    },
+    "src/taut/gen/swift_metadata.py": {
+      "sha256": "ddee8a545f38281691e05ef5605ad259b07d5ebc58223c8c15678b22d737ce28",
+      "size": 20007
+    },
+    "src/taut/gen/swift_runtime.py": {
+      "sha256": "bb640c3a01534183d308d52384ed89331f85161b759064d4bca81c551f46e354",
+      "size": 7374
+    },
+    "src/tests/test_cpp_go_distribution.py": {
+      "sha256": "a2a2db878610e015dbd15fba2ec3ac970d2787d9bd9b57e9226ca5f438395451",
+      "size": 6110
+    },
+    "src/tests/test_go_oneof.py": {
+      "sha256": "57e8907a54959d58b1ba98935fbd8ca4bb54d7dc17d82cb3378ade060734c124",
+      "size": 64091
+    },
+    "src/tests/test_swift.py": {
+      "sha256": "eff509092eb9e1a621cc9542a39ac71a292ec1089bee30143bf4545f713e8c60",
+      "size": 71005
+    },
+    "src/tests/test_swift_distribution.py": {
+      "sha256": "8705e85353bbc2337fc5f37960a5f2fa68605d55aeffb881f8cad2e88252cf73",
+      "size": 3892
+    },
+    "src/tests/test_swift_oneof.py": {
+      "sha256": "f962f918df480023d34a945419e9c8ce5f2cf8935cdebf7b78e9735c5f728115",
+      "size": 47344
+    }
+  },
+  "changed_production": [
+    "dev-docs/examples/swift-oneof/golden/flat-off.swift",
+    "dev-docs/examples/swift-oneof/golden/flat-on.swift",
+    "dev-docs/examples/swift-oneof/golden/imported-off.swift",
+    "dev-docs/examples/swift-oneof/golden/imported-on.swift",
+    "docs/SWIFT_API.md",
+    "src/taut/gen/owned_runtime.py",
+    "src/taut/gen/runtime/swift/descriptors.swift",
+    "src/taut/gen/runtime/swift/paths.swift",
+    "src/taut/gen/scaffold.py",
+    "src/taut/gen/swift_metadata.py",
+    "src/tests/test_go_oneof.py",
+    "src/tests/test_swift_oneof.py"
+  ],
+  "protected_user": {
+    "src/taut/facts.py": "586616da9e7eefc011793902a66636c32f2a44b44388750dacc2279ee25dfaca",
+    "src/taut/ir/dsl.py": "717e351c9e3119f910f6fe16136f6bce2481e3f621b92193554bd32131a9293e",
+    "src/tests/test_dsl.py": "205d3922aa8399eadf6affbb53e85fac914c584d0cc80664c235efca0a38ac78",
+    "src/tests/test_ir_v2.py": "17be85b78f8835c37fda6a728e1c376bce297b3eb6cdbb38c100763ba0195107",
+    "src/tests/test_oneof.py": "095f872aea844dbe92593defa4528ca113bc06ffdce280307ebbe7866d5d8b94"
+  },
+  "excluded35": {
+    "dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json": "4e92a8cabe8f5959a4113d8a7f2738a913c1c71ab26c60c34707597549b3b399",
+    "dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json": "f3b639e2bd1ab69b1355e7a9935359dc2f9797bcf899cf4fce7afed19a50c644",
+    "dev-docs/examples/python-oneof/generated/disabled/python/__init__.py": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+    "dev-docs/examples/python-oneof/generated/disabled/python/api.py": "31fbb8d65d4871dbf6a9025cff50f5cb3cc530448f44c327e92c1f8b98064ac7",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py": "ad2bb0a2ddb372ab77e5e7d19873f44804c487c63a22d0c7b99852329b4944af",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py": "e21299bef0b04c86bff376cf6a678f7b8720dc067438d551ffef54b9a95964fe",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py": "69766dfeca243099e7bf7c54f088069f271fa60f61e03d4d916d893d6d38416c",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py": "e473c8532d5840e6f374dca4ead4c3e28726f23ed7c058e84a79f052418cb9fa",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py": "99e5fab316640eb0527e905b194610557d8301210ca61cd72358002d7d10a8fb",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py": "153026e825045eb67883ac9b66b6ac9d4ffd6fbc64c2bc010fa9e973a2271f9e",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py": "8cde71892ed7882b869bd299c13be37223e77e679ce04a59e9994b82dc9bec42",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py": "7577578775f99603032555479e843056a12d8465b5aa439fe7371f4fb76b7347",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py": "bd3d5e2e3d18980a19e4519477c84ad78084f5d2c25af4c5ccca6e8477779022",
+    "dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json": "14a3a65b8314dee620248029963ea92526bae09c5d126f685d29754db8b2f2d0",
+    "dev-docs/examples/python-oneof/generated/package/python/__init__.py": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+    "dev-docs/examples/python-oneof/generated/package/python/api.py": "5bbd3d845613cc9ef6704801c4e976c4900f654b13e33a8ab20d8d312975fa8c",
+    "dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json": "9521b809e235b325be1355485e0b526f6bc19e5a990852735c7198096c22e031",
+    "dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json": "1bdbd28eff437d7a2a7b8d34d5b8f5134968ec3adb154141319ecec9533b6ddf",
+    "dev-docs/examples/python-oneof/generated/source/python/__init__.py": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+    "dev-docs/examples/python-oneof/generated/source/python/api.py": "5bbd3d845613cc9ef6704801c4e976c4900f654b13e33a8ab20d8d312975fa8c",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py": "ad2bb0a2ddb372ab77e5e7d19873f44804c487c63a22d0c7b99852329b4944af",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py": "e21299bef0b04c86bff376cf6a678f7b8720dc067438d551ffef54b9a95964fe",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py": "69766dfeca243099e7bf7c54f088069f271fa60f61e03d4d916d893d6d38416c",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py": "e473c8532d5840e6f374dca4ead4c3e28726f23ed7c058e84a79f052418cb9fa",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/ext.py": "99e5fab316640eb0527e905b194610557d8301210ca61cd72358002d7d10a8fb",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/facts.py": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/rules.py": "153026e825045eb67883ac9b66b6ac9d4ffd6fbc64c2bc010fa9e973a2271f9e",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/validation.py": "eb33734525330f131092c3bda540ef71742b7cd0eb1074e7aa72a92049db8903",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py": "8cde71892ed7882b869bd299c13be37223e77e679ce04a59e9994b82dc9bec42",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py": "7577578775f99603032555479e843056a12d8465b5aa439fe7371f4fb76b7347",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py": "bd3d5e2e3d18980a19e4519477c84ad78084f5d2c25af4c5ccca6e8477779022",
+    "dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl": "7ff8c48266ec3814a4fea75c4afe94f1ffb1e1193c0a9134706ee99ad4f7fd44"
+  },
+  "source_hash": "7be5937d06eab85d3f1b2f579b18cb36b476d3a8cc79de43812675c457f76b49"
+}

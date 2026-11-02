@@ -1,0 +1,40 @@
+{
+  "command": [
+    "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+    "-m",
+    "pytest",
+    "D:/projects/limbo/taut-dev/taut/src/tests/test_swift_oneof.py",
+    "D:/projects/limbo/taut-dev/taut/src/tests/test_swift.py",
+    "-m",
+    "not gate",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\final-swift-temp",
+    "--junitxml",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1\\final-swift.xml"
+  ],
+  "cwd": "D:\\projects\\limbo\\swift-oneof-scratch\\remediation-r1",
+  "exit": 0,
+  "elapsed_seconds": 440.952,
+  "source_inventory_sha256": "48d9bddb268230d07ce50201bb051a3d5c80ca6e48b0959359416f3f431520c6",
+  "source_unchanged": true,
+  "python": "3.13.5 (main, Jul 23 2025, 00:30:06) [MSC v.1944 64 bit (AMD64)]",
+  "executable": "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+  "environment": {
+    "PYTHONPATH": "D:/projects/limbo/taut-dev/taut/src;C:/Users/gianni/AppData/Local/Programs/Python/Python311/Lib/site-packages",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "TEMP": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/tmp",
+    "TMP": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/tmp",
+    "GOCACHE": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/gocache",
+    "GOMODCACHE": "D:/projects/limbo/swift-oneof-scratch/remediation-r1/gomodcache",
+    "XDG_CONFIG_HOME": "D:/projects/limbo/swift-oneof-scratch/gwz-xdg"
+  },
+  "counts": {
+    "tests": 186,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}

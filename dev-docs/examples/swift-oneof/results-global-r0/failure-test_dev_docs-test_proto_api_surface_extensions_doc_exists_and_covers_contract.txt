@@ -1,0 +1,32 @@
+FileNotFoundError: [Errno 2] No such file or directory: 'D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\TautProtoApiSurfaceExtensions.md'
+def test_proto_api_surface_extensions_doc_exists_and_covers_contract():
+        doc = ROOT / "dev-docs" / "TautProtoApiSurfaceExtensions.md"
+>       text = doc.read_text()
+               ^^^^^^^^^^^^^^^
+
+..\..\taut-dev\taut\src\tests\test_dev_docs.py:9: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_abc.py:632: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('D:/projects/limbo/taut-dev/taut/dev-docs/TautProtoApiSurfaceExtensions.md')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: 'D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\TautProtoApiSurfaceExtensions.md'
+
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_local.py:537: FileNotFoundError

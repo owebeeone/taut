@@ -60,7 +60,7 @@ public extension Content {
     static let tautBinding: MessageBinding<Content> = TautSchema_bc49e2b6c6f48811.binding0
 }
 private enum TautSchema_bc49e2b6c6f48811 {
-    static let guardOwner: Void = {
+    static let guardOwner: () = {
         let wire_evidence: FoundationEvidence = requireFoundation("schema_23afcf07d78159aa", "taut.swift.foundation", 1, 1, ["codec.v1", "descriptors.v1", "oneof.v1"])
         precondition(wire_evidence.owner == "taut.swift.foundation" && wire_evidence.descriptor == 1 && wire_evidence.codec == 1 && Set(["codec.v1", "descriptors.v1", "oneof.v1"]).isSubset(of: wire_evidence.capabilities) && foundationOwner == wire_evidence.owner && descriptorContract == 1 && codecContract == 1 && Set(["codec.v1", "descriptors.v1", "oneof.v1"]).isSubset(of: foundationCapabilities()), "incompatible actual selected Swift foundation; regenerate/rebind")
         confirmFoundation(wire_evidence, foundationOwner, descriptorContract, codecContract, foundationCapabilities())

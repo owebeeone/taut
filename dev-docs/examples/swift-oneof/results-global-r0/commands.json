@@ -1,0 +1,36 @@
+{
+  "baseline_failures_remain_enabled": [
+    [
+      "test_dev_docs",
+      "test_proto_api_surface_extensions_doc_exists_and_covers_contract"
+    ],
+    [
+      "test_go",
+      "test_generated_go_is_gofmt_clean"
+    ],
+    [
+      "test_go",
+      "test_go_runtime_and_parity_runner_are_gofmt_clean"
+    ]
+  ],
+  "broad": [
+    "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+    "-m",
+    "pytest",
+    "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests",
+    "-q",
+    "-m",
+    "not gate",
+    "-p",
+    "no:cacheprovider",
+    "-p",
+    "collection_receipt",
+    "--basetemp",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp",
+    "--junitxml",
+    "D:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\broad-results.xml"
+  ],
+  "observation_plugin": "collection_receipt.py; no collection mutation",
+  "parity": "taut.corpus.parity.run_gate(require_all=True,jobs=2)",
+  "policy_deselections": {}
+}

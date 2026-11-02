@@ -1,0 +1,21 @@
+AssertionError: assert (0, 'D:\\proj...ain.go\n', '') == (0, '', '')
+  
+  At index 1 diff: 'D:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_go_runtime_and_parity_run0\\main.go\n' != ''
+  Use -v to get more diff
+tmp_path = WindowsPath('D:/projects/limbo/swift-oneof-scratch/global-gate-r0/pytest-temp/test_go_runtime_and_parity_run0')
+
+    def test_go_runtime_and_parity_runner_are_gofmt_clean(tmp_path):
+        gofmt = shutil.which("gofmt")
+        if gofmt is None:
+            pytest.skip("gofmt not installed")
+        runner = tmp_path / "main.go"
+        runner.write_text(parity_go._source())
+        runtime = sorted(str(p) for p in RUNTIME.glob("*.go"))
+        result = subprocess.run([gofmt, "-l", str(runner), *runtime], capture_output=True, text=True, check=False)
+>       assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+E       AssertionError: assert (0, 'D:\\proj...ain.go\n', '') == (0, '', '')
+E         
+E         At index 1 diff: 'D:\\projects\\limbo\\swift-oneof-scratch\\global-gate-r0\\pytest-temp\\test_go_runtime_and_parity_run0\\main.go\n' != ''
+E         Use -v to get more diff
+
+..\..\taut-dev\taut\src\tests\test_go.py:433: AssertionError

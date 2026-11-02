@@ -19,6 +19,6 @@ public struct PathSegment: Equatable {
     }
     public static func forKey(_ type: String, _ bytes: [UInt8]) -> Self {
         precondition(["str", "int", "bool"].contains(type), "unsupported map key category")
-        return Self("key", nil, nil, type, Data(bytes).base64EncodedString())
+        return Self("key", nil, nil, type, Foundation.Data(bytes).base64EncodedString())
     }
 }

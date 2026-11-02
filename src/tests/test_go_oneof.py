@@ -685,3 +685,295 @@ def test_external_retirement_interruption_stays_fail_closed(tmp_path,package,mon
         assert not (owner/'.taut-go-runtime.json').exists()
         assert json.loads((owner/'.taut-go-outputs.json').read_text())['source_root'] is None
     assert handwritten.read_text()=='keep' and tree(package)==artifact_before
+
+
+def retiring_case(tmp_path, language, validation, separate=False):
+    import importlib
+    profile=importlib.import_module('taut.gen.'+language+'_runtime')
+    record=schema(Record=Msg(value=F(1,INT)))
+    output=tmp_path/'app';owner=tmp_path/'owner' if separate else output/language
+    config={language:{'source_root':str(owner),
+            ('module' if language=='swift' else 'import_path'):
+            'TautFoundation' if language=='swift' else 'foundation.local/runtime'}} if separate else None
+    emit(record,output,langs=[language],services=[],runtime=True,validation=validation,runtime_bindings=config)
+    return profile,record,output,owner
+
+
+def retiring_selection(language, placement):
+    if placement=='flat':return {}
+    return dict(runtime_mode='package' if placement=='package' else None,
+                runtime_bindings={language:{'module' if language=='swift' else 'import_path':
+                                  'TautFoundation' if language=='swift' else 'foundation.local/runtime'}})
+
+
+@pytest.mark.parametrize('language',['go','swift'])
+@pytest.mark.parametrize('old_validation,new_validation',[(False,False),(False,True),(True,False),(True,True)])
+@pytest.mark.parametrize('separate',[False,True])
+@pytest.mark.parametrize('placement',['flat','imported','package'])
+def test_retiring_receipt_first_keeps_physical_root_proof(tmp_path,monkeypatch,language,old_validation,new_validation,separate,placement):
+    import taut.gen.python_runtime as common
+    profile,record,output,owner=retiring_case(tmp_path,language,old_validation,separate)
+    receipt=output/language/('.taut-'+language+'-outputs.json')
+    owner_receipt=owner/('.taut-'+language+'-runtime.json')
+    original=common.apply_outputs
+    def interrupted(writes,deletes):
+        original(writes,set())
+        assert json.loads(receipt.read_text())['retiring_source_roots']==[str(owner.resolve())]
+        assert owner_receipt in deletes
+        owner_receipt.unlink()
+        raise OSError('persisted owner-receipt-first retirement')
+    kwargs=retiring_selection(language,placement)
+    with monkeypatch.context() as context:
+        context.setattr(common,'apply_outputs',interrupted)
+        with pytest.raises(OSError,match='receipt-first'):
+            emit(record,output,langs=[language],services=[],validation=new_validation,**kwargs)
+    before=tree(tmp_path)
+    with pytest.raises(ValueError,match='unknown/handwritten.*runtime'):
+        emit(record,output,langs=[language],services=[],validation=new_validation,**kwargs)
+    assert tree(tmp_path)==before
+    assert not list(tmp_path.rglob('.taut-generation.lock'))
+    assert set(profile.canonical_sources(validation=old_validation)) <= {p.name for p in owner.iterdir()}
+
+
+@pytest.mark.parametrize('language',['go','swift'])
+@pytest.mark.parametrize('old_validation,new_validation',[(False,False),(False,True),(True,False),(True,True)])
+@pytest.mark.parametrize('separate',[False,True])
+@pytest.mark.parametrize('cutoff',range(1,11))
+def test_retiring_default_flat_persisted_cutoffs(tmp_path,monkeypatch,language,old_validation,new_validation,separate,cutoff):
+    profile,record,output,owner=retiring_case(tmp_path,language,old_validation,separate)
+    replace,unlink=os.replace,Path.unlink;count=0;interrupted=False
+    def persisted():
+        nonlocal count
+        count+=1
+        if count==cutoff:raise OSError('persisted default flat cutoff')
+    def replacing(source,destination):
+        replace(source,destination)
+        if Path(destination).name==('.taut-'+language+'-outputs.json') or Path(destination).suffix in ('.go','.swift'):
+            persisted()
+    def deleting(path,*args,**kwargs):
+        existed=path.exists();unlink(path,*args,**kwargs)
+        if existed and path.parent==owner and path.name in {*profile.FILES,'.taut-'+language+'-runtime.json'}:
+            persisted()
+    with monkeypatch.context() as context:
+        context.setattr(os,'replace',replacing);context.setattr(Path,'unlink',deleting)
+        try:emit(record,output,langs=[language],services=[],validation=new_validation)
+        except OSError:interrupted=True
+    before=tree(tmp_path)
+    try:emit(record,output,langs=[language],services=[],validation=new_validation)
+    except ValueError:
+        assert interrupted and tree(tmp_path)==before
+    else:
+        assert all(not (owner/name).exists() for name in profile.FILES)
+        assert not (owner/('.taut-'+language+'-runtime.json')).exists()
+        emit(record,output,langs=[language],services=[],validation=new_validation)
+        data=json.loads((output/language/('.taut-'+language+'-outputs.json')).read_text())
+        assert 'retiring_source_roots' not in data
+    assert not list(tmp_path.rglob('.taut-generation.lock'))
+
+
+@pytest.mark.parametrize('language',['go','swift'])
+def test_retiring_proof_clears_then_nonowning_flat_files_stay_legal(tmp_path,language):
+    profile,record,output,owner=retiring_case(tmp_path,language,True)
+    unrelated=owner/'handwritten.txt';unrelated.write_text('keep')
+    emit(record,output,langs=[language],services=[])
+    receipt=owner/('.taut-'+language+'-outputs.json')
+    assert json.loads(receipt.read_text())['retiring_source_roots']==[str(owner.resolve())]
+    assert all(not (owner/name).exists() for name in profile.FILES)
+    emit(record,output,langs=[language],services=[])
+    assert 'retiring_source_roots' not in json.loads(receipt.read_text())
+    # Clean retirement can return to a positively-owned source before any
+    # caller supplies files, and can retire again without remapping the owner.
+    emit(record,output,langs=[language],services=[],runtime=True,validation=True)
+    emit(record,output,langs=[language],services=[])
+    emit(record,output,langs=[language],services=[])
+    for name,content in profile.canonical_sources(validation=True).items():(owner/name).write_bytes(content)
+    runtime={name:(owner/name).read_bytes() for name in profile.FILES}
+    for enabled in (False,True,False):
+        emit(record,output,langs=[language],services=[],validation=enabled)
+        assert {name:(owner/name).read_bytes() for name in profile.FILES}==runtime
+    # The identical first-time nonowning route is legal without any old owner.
+    fresh=tmp_path/'fresh'/language;fresh.mkdir(parents=True)
+    for name,content in runtime.items():(fresh/name).write_bytes(content)
+    emit(record,fresh.parent,langs=[language],services=[],validation=True)
+    assert {name:(fresh/name).read_bytes() for name in profile.FILES}==runtime
+    assert unrelated.read_text()=='keep'
+
+
+@pytest.mark.parametrize('language',['go','swift'])
+def test_retiring_other_users_engine_and_multiple_prior_roots(tmp_path,language):
+    profile,record,output,owner=retiring_case(tmp_path,language,True,True)
+    config={language:{'source_root':str(owner),'module' if language=='swift' else 'import_path':
+                      'TautFoundation' if language=='swift' else 'foundation.local/runtime'}}
+    other=tmp_path/'other'
+    emit(record,other,langs=[language],services=[],runtime=True,runtime_bindings=config)
+    emit(record,output,langs=[language],services=[])
+    assert all((owner/name).exists() for name in profile.FILES if name not in profile.VALIDATION_FILES)
+    assert all(not (owner/name).exists() for name in profile.VALIDATION_FILES)
+    receipt=output/language/('.taut-'+language+'-outputs.json')
+    assert json.loads(receipt.read_text())['retiring_source_roots']==[str(owner.resolve())]
+    # Two independently complete prior roots are accepted and cleared. Neither
+    # grants ownership of arbitrary files, nor invalidates another source user.
+    empty=tmp_path/'completed';empty.mkdir();(empty/'handwritten.txt').write_text('keep')
+    data=json.loads(receipt.read_text());data['retiring_source_roots'].append(str(empty.resolve()));receipt.write_text(json.dumps(data))
+    before_owner=tree(owner)
+    emit(record,output,langs=[language],services=[])
+    assert 'retiring_source_roots' not in json.loads(receipt.read_text())
+    assert tree(owner)==before_owner and (empty/'handwritten.txt').read_text()=='keep'
+    emit(record,other,langs=[language],services=[])
+    assert all(not (owner/name).exists() for name in profile.FILES)
+
+
+@pytest.mark.parametrize('language',['go','swift'])
+def test_retiring_two_actual_unfinished_moves_keep_both_roots(tmp_path,monkeypatch,language):
+    import taut.gen.python_runtime as common
+    profile,record,output,first=retiring_case(tmp_path,language,True,True)
+    second,third=tmp_path/'second-owner',tmp_path/'third-owner'
+    def config(root):
+        return {language:{'source_root':str(root),'module' if language=='swift' else 'import_path':
+                          'TautFoundation' if language=='swift' else 'foundation.local/runtime'}}
+    original=common.apply_outputs
+    def before_deletion(writes,deletes):
+        original(writes,set())
+        raise OSError('persisted move before any stale deletion')
+    with monkeypatch.context() as context:
+        context.setattr(common,'apply_outputs',before_deletion)
+        with pytest.raises(OSError,match='persisted move'):
+            emit(record,output,langs=[language],services=[],runtime=True,validation=True,runtime_bindings=config(second))
+    receipt=output/language/('.taut-'+language+'-outputs.json')
+    assert json.loads(receipt.read_text())['retiring_source_roots']==[str(first.resolve())]
+    def two_roots(writes,deletes):
+        original(writes,set())
+        assert json.loads(receipt.read_text())['retiring_source_roots']==sorted(map(str,(first.resolve(),second.resolve())))
+        for root in (first,second):
+            owner_receipt=root/('.taut-'+language+'-runtime.json')
+            assert owner_receipt in deletes
+            owner_receipt.unlink()
+        raise OSError('persisted two receipt-first retirements')
+    with monkeypatch.context() as context:
+        context.setattr(common,'apply_outputs',two_roots)
+        with pytest.raises(OSError,match='two receipt-first'):
+            emit(record,output,langs=[language],services=[],runtime=True,validation=True,runtime_bindings=config(third))
+    before=tree(tmp_path)
+    with pytest.raises(ValueError,match='unknown/handwritten.*runtime'):
+        emit(record,output,langs=[language],services=[],runtime=True,validation=True,runtime_bindings=config(third))
+    assert tree(tmp_path)==before
+    assert all((root/name).exists() for root in (first,second) for name in profile.FILES)
+
+
+@pytest.mark.parametrize('language',['go','swift'])
+@pytest.mark.parametrize('problem',['modified','unknown','active_missing','obstructed'])
+def test_retiring_never_weakens_positive_owner_or_active_source_checks(tmp_path,language,problem):
+    profile,record,output,owner=retiring_case(tmp_path,language,True,True)
+    receipt=output/language/('.taut-'+language+'-outputs.json')
+    data=json.loads(receipt.read_text());data['retiring_source_roots']=[str(owner.resolve())]
+    receipt.write_text(json.dumps(data))
+    target=owner/next(iter(profile.FILES))
+    if problem=='modified':target.write_text('handwritten modification')
+    elif problem=='unknown':
+        (owner/('.taut-'+language+'-runtime.json')).unlink()
+        data=json.loads(receipt.read_text());data['source_root']=None;receipt.write_text(json.dumps(data))
+    elif problem=='active_missing':
+        (owner/('.taut-'+language+'-runtime.json')).unlink()
+        for name in profile.FILES:(owner/name).unlink()
+    else:
+        obstacle=tmp_path/'obstacle';obstacle.write_text('not a directory')
+        data['retiring_source_roots']=[str(obstacle.resolve())];receipt.write_text(json.dumps(data))
+    before=tree(tmp_path)
+    with pytest.raises(ValueError):emit(record,output,langs=[language],services=[])
+    assert tree(tmp_path)==before and not list(tmp_path.rglob('.taut-generation.lock'))
+
+
+@pytest.mark.parametrize('language',['go','swift'])
+@pytest.mark.parametrize('problem',['not_list','not_string','relative','duplicate','dot','trailing','reserved'])
+def test_retiring_malformed_provenance_refuses_before_locks(tmp_path,monkeypatch,language,problem):
+    record=schema(Record=Msg(value=F(1,INT)));output=tmp_path/'app'
+    emit(record,output,langs=[language],services=[])
+    root=str((tmp_path/'old').resolve())
+    values={'not_list':root,'not_string':[True],'relative':['relative/owner'],'duplicate':[root,root],
+            'dot':[root+os.sep+'..'+os.sep+'other'],'trailing':[root+'.'],'reserved':[root+os.sep+'NUL']}
+    if os.name!='nt' and problem in ('dot','trailing','reserved'):pytest.skip('Windows raw namespace')
+    receipt=output/language/('.taut-'+language+'-outputs.json');data=json.loads(receipt.read_text())
+    data['retiring_source_roots']=values[problem];receipt.write_text(json.dumps(data))
+    before=tree(tmp_path);attempted=[];original=Path.open
+    def observe(path,*args,**kwargs):
+        if args and args[0]=='xb':attempted.append(path)
+        return original(path,*args,**kwargs)
+    monkeypatch.setattr(Path,'open',observe)
+    with pytest.raises(ValueError,match='retiring'):
+        emit(record,output,langs=[language],services=[])
+    assert attempted==[] and tree(tmp_path)==before
+
+
+@pytest.mark.parametrize('language',['go','swift'])
+def test_retiring_alias_refuses_before_locks(tmp_path,monkeypatch,language):
+    record=schema(Record=Msg(value=F(1,INT)));output=tmp_path/'app'
+    emit(record,output,langs=[language],services=[])
+    real=tmp_path/'old';real.mkdir();alias=tmp_path/'alias'
+    if os.name=='nt':
+        result=subprocess.run(['cmd','/c','mklink','/J',str(alias),str(real)],capture_output=True,text=True)
+        assert result.returncode==0,result.stdout+result.stderr
+    else:alias.symlink_to(real,target_is_directory=True)
+    receipt=output/language/('.taut-'+language+'-outputs.json');data=json.loads(receipt.read_text())
+    data['retiring_source_roots']=[str(alias)];receipt.write_text(json.dumps(data))
+    before=tree(tmp_path);attempted=[];original=Path.open
+    def observe(path,*args,**kwargs):
+        if args and args[0]=='xb':attempted.append(path)
+        return original(path,*args,**kwargs)
+    monkeypatch.setattr(Path,'open',observe)
+    with pytest.raises(ValueError,match='retiring'):
+        emit(record,output,langs=[language],services=[])
+    assert attempted==[] and tree(tmp_path)==before
+
+
+@pytest.mark.parametrize('language',['go','swift'])
+def test_retiring_dangling_canonical_alias_is_a_remnant(tmp_path,language):
+    from taut.gen.python_runtime import _is_alias
+    profile,record,output,owner=retiring_case(tmp_path,language,False)
+    emit(record,output,langs=[language],services=[])
+    receipt=owner/('.taut-'+language+'-outputs.json')
+    assert json.loads(receipt.read_text())['retiring_source_roots']==[str(owner.resolve())]
+    target=tmp_path/'empty-target';target.mkdir();alias=owner/next(iter(profile.FILES))
+    if os.name=='nt':
+        result=subprocess.run(['cmd','/c','mklink','/J',str(alias),str(target)],capture_output=True,text=True)
+        assert result.returncode==0,result.stdout+result.stderr
+    else:alias.symlink_to(target,target_is_directory=True)
+    target.rmdir()
+    assert not alias.exists() and _is_alias(alias)
+    before=tree(tmp_path)
+    with pytest.raises(ValueError,match='unknown/handwritten.*runtime'):
+        emit(record,output,langs=[language],services=[])
+    assert tree(tmp_path)==before and _is_alias(alias)
+
+
+@pytest.mark.parametrize('language',['go','swift'])
+def test_retiring_locked_expansion_and_multi_target_planning(tmp_path,monkeypatch,language):
+    import contextlib
+    import taut.gen.python_runtime as common
+    record=schema(Record=Msg(value=F(1,INT)));output=tmp_path/'app'
+    emit(record,output,langs=[language],services=[])
+    receipt=output/language/('.taut-'+language+'-outputs.json');original=common.output_locks
+    newroot=tmp_path/'not-locked';newroot.mkdir();observed=[]
+    @contextlib.contextmanager
+    def expansion(roots):
+        with original(roots):
+            data=json.loads(receipt.read_text());data['retiring_source_roots']=[str(newroot.resolve())]
+            receipt.write_text(json.dumps(data));observed.append(tree(tmp_path))
+            yield
+    with monkeypatch.context() as context:
+        context.setattr(common,'output_locks',expansion)
+        with pytest.raises(ValueError,match='changed concurrently'):
+            emit(record,output,langs=[language],services=[])
+    # Only the simulated competing receipt write survives; all own locks release.
+    after=tree(tmp_path);before={key:value for key,value in observed[0].items() if not key.endswith('.taut-generation.lock')}
+    assert after==before and not (newroot/'.taut-generation.lock').exists()
+    # A pending orphan in the second target prevents the first target's changes.
+    emit(record,output,langs=['go','swift'],services=[],runtime=True)
+    profile,_,_,owner=retiring_case(tmp_path/'second',language,True)
+    receipt=output/language/('.taut-'+language+'-outputs.json');data=json.loads(receipt.read_text())
+    data['retiring_source_roots']=[str(owner.resolve())];receipt.write_text(json.dumps(data))
+    (owner/('.taut-'+language+'-runtime.json')).unlink()
+    before=tree(tmp_path)
+    order=['swift','go'] if language=='go' else ['go','swift']
+    with pytest.raises(ValueError,match='unknown/handwritten.*runtime'):
+        emit(record,output,langs=order,services=[],runtime=True,validation=True)
+    assert tree(tmp_path)==before
