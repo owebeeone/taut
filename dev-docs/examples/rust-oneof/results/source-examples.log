@@ -1,0 +1,20 @@
+zero: valid=true complete=true fast=true scope=recursive
+false: valid=true complete=true fast=true scope=recursive
+empty text: valid=true complete=true fast=true scope=recursive
+empty list: valid=true complete=true fast=true scope=recursive
+payload-free: valid=true complete=true fast=true scope=recursive
+draft_cbor=a501010265657874726103f604f605f6
+invalid round-trip: valid=false complete=true fast=false scope=recursive
+  taut.oneof.v1 oneof.payload_unexpected at text
+  taut.oneof.v1 oneof.payload_missing at number
+repaired: valid=true complete=true fast=true scope=recursive
+snapshot still has 2 original issues
+child local: valid=true complete=true fast=true scope=local
+child recursive: valid=false complete=true fast=false scope=recursive
+  taut.oneof.v1 oneof.payload_missing at content.number
+virtual plus invalid child: valid=false complete=false fast=false scope=recursive
+  taut.oneof.v1 oneof.payload_missing at content.number
+  taut.oneof.v1 oneof.virtual_deferred at kind
+virtual after child repair: valid=true complete=false fast=false scope=recursive
+  taut.oneof.v1 oneof.virtual_deferred at kind
+descriptor Content: 5 fields, contract 1

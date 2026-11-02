@@ -1,0 +1,17 @@
+{
+  "artifact": "taut-foundation-0.10.0.crate",
+  "files": [
+    "taut-foundation-0.10.0/.cargo_vcs_info.json",
+    "taut-foundation-0.10.0/Cargo.lock",
+    "taut-foundation-0.10.0/Cargo.toml",
+    "taut-foundation-0.10.0/Cargo.toml.orig",
+    "taut-foundation-0.10.0/provenance.json",
+    "taut-foundation-0.10.0/src/cbor.rs",
+    "taut-foundation-0.10.0/src/descriptors.rs",
+    "taut-foundation-0.10.0/src/ext.rs",
+    "taut-foundation-0.10.0/src/lib.rs",
+    "taut-foundation-0.10.0/src/validation.rs"
+  ],
+  "compiler_or_shape_dependency": false,
+  "application_output": "extracted foundation package: codec/descriptors/reports, no compiler or shape engine PASS"
+}

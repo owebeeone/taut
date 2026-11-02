@@ -1,0 +1,6 @@
+warning: manifest has no documentation, homepage or repository
+  |
+  = note: see https://doc.rust-lang.org/cargo/reference/manifest.html#package-metadata for more info
+   Packaging taut-foundation v0.10.0 (D:\projects\limbo\taut-dev\taut\rust\taut-foundation)
+    Packaged 10 files, 55.9KiB (15.3KiB compressed)
+extracted foundation package: codec/descriptors/reports, no compiler or shape engine PASS

@@ -1,0 +1,163 @@
+   Compiling futures-core v0.3.32
+   Compiling taut-foundation v0.10.0 (D:\projects\limbo\taut-dev\taut\rust\taut-foundation)
+   Compiling taut-shape v0.10.0 (D:\projects\limbo\taut-dev\taut-shape-rs\crates\taut-shape)
+   Compiling taut-shape-tool v0.10.0 (D:\projects\limbo\taut-dev\taut-shape-rs\crates\taut-shape-tool)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.42s
+     Running unittests src\lib.rs (D:\projects\limbo\taut-dev\taut-shape-rs\target\debug\deps\taut_shape-a1bfaa8c4dadb2bd.exe)
+
+running 71 tests
+test log::tests::d12_close_is_idempotent_first_terminal_wins ... ok
+test log::tests::d10_max_bytes_counts_raw_payload_and_stops ... ok
+test log::tests::d12_seal_is_idempotent ... ok
+test log::tests::d10_max_records_bounds_batch ... ok
+test log::tests::d10_forward_progress_returns_one_even_if_over_max_bytes ... ok
+test log::tests::d14_timeout_zero_is_immediate_would_block ... ok
+test log::tests::d16_multi_held_release_in_creation_order ... ok
+test log::tests::d14_timeout_absent_holds_until_push ... ok
+test log::tests::close_releases_held_reads_with_closed ... ok
+test log::tests::close_with_error_releases_held_read_failed_and_cancels_timer ... ok
+test log::tests::d14_timeout_positive_holds_and_sets_timer ... ok
+test log::tests::d16_timer_tokens_monotonic_from_one ... ok
+test crdt::tests::permutations_converge_and_equivocation_has_a_stable_winner ... ok
+test crdt::text::tests::text_converges_for_reordered_insert_and_delete ... ok
+test log::tests::d19_late_push_does_not_release_held_reads ... ok
+test log::tests::d19_push_after_close_dropped_head_unchanged_one_diagnostic ... ok
+test log::tests::d19_push_after_failed_dropped_head_unchanged_one_diagnostic ... ok
+test log::tests::d19_push_after_seal_dropped_head_unchanged_one_diagnostic ... ok
+test log::tests::d19_two_late_pushes_emit_two_diagnostics ... ok
+test log::tests::d4_end_stream_drops_held_no_response_cancels_timer ... ok
+test log::tests::d4_end_stream_removes_watermark ... ok
+test log::tests::d4_end_stream_unknown_is_noop ... ok
+test log::tests::d5_new_read_supersedes_held_with_cancel_timer ... ok
+test log::tests::d5_only_one_outstanding_read_answered_on_push ... ok
+test log::tests::d5_supersede_with_new_timer_cancels_old_sets_new ... ok
+test log::tests::d6_close_after_seal_is_a_transition_and_stops_producer ... ok
+test log::tests::d6_close_error_emits_producer_stop_failed ... ok
+test log::tests::d6_close_transition_emits_producer_stop ... ok
+test log::tests::d6_explicit_only_no_producer_stop_on_last_reader ... ok
+test log::tests::d6_last_reader_transition_emits_producer_stop ... ok
+test log::tests::d6_never_read_log_does_not_stop_producer ... ok
+test log::tests::d6_repeated_close_on_terminal_emits_nothing ... ok
+test log::tests::d7_evict_raises_floor ... ok
+test log::tests::d7_min_watermark_tracks_slowest_reader ... ok
+test log::tests::d8_absent_cursor_is_start ... ok
+test log::tests::d8_first_record_seq_is_one ... ok
+test log::tests::d8_start_cursor_is_seq_zero ... ok
+test log::tests::d9_cursor_below_floor_is_expired_next_floor_minus_one ... ok
+test log::tests::d9_cursor_beyond_head_is_expired_next_head ... ok
+test log::tests::end_stream_mid_hold_leaves_other_streams_tailing ... ok
+test log::tests::evict_beyond_head_clamps_floor_to_head_plus_one ... ok
+test log::tests::evict_zero_is_noop ... ok
+test log::tests::multi_held_release_order_independent_of_wake_id ... ok
+test log::tests::probe_close_then_read_retained_data_returns_data ... ok
+test log::tests::probe_cursor_at_floor_minus_one_boundary_below_is_expired ... ok
+test log::tests::probe_end_stream_nonlast_no_producer_stop ... ok
+test log::tests::probe_forward_progress_first_record_over_max_bytes_when_held_released ... ok
+test log::tests::probe_multi_stream_timer_expired_answers_only_owner ... ok
+test log::tests::probe_never_read_close_still_fires_producer_stop_last_reader ... ok
+test log::tests::probe_probe_read_creates_persistent_session_and_reader_count ... ok
+test log::tests::probe_push_after_seal_behavior ... ok
+test log::tests::probe_supersede_data_then_no_persistent_held ... ok
+test log::tests::probe_supersede_with_data_available_cancel_before_response ... ok
+test log::tests::push_wakes_timed_held_read_and_cancels_timer ... ok
+test log::tests::rule1_data_next_cursor_is_last_returned ... ok
+test log::tests::rule1_resume_no_dup_no_skip ... ok
+test log::tests::rule2_caught_up_closed_is_closed ... ok
+test log::tests::rule2_caught_up_failed_carries_error ... ok
+test log::tests::rule2_caught_up_sealed_is_eof ... ok
+test log::tests::rule4_terminal_still_readable_below_head ... ok
+test log::tests::seal_releases_held_reads_with_eof ... ok
+test log::tests::timer_expired_after_supersede_is_noop ... ok
+test log::tests::timer_expired_unknown_token_is_noop ... ok
+test stream::tests::zero_capacity_is_rejected - should panic ... ok
+test value::tests::duplicate_is_idempotent_and_equivocation_does_not_mutate ... ok
+test value::tests::lww_uses_lamport_then_origin ... ok
+test value::tests::reused_same_origin_lamport_uses_sequence ... ok
+test atom::tests::replacement_releases_a_large_held_set_in_creation_order ... ok
+test swmr::tests::snapshot_releases_a_large_held_set_in_creation_order ... ok
+test stream::tests::push_releases_a_large_held_set_in_creation_order ... ok
+test crdt::tests::reverse_chain_drains_iteratively ... ok
+
+test result: ok. 71 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.88s
+
+     Running tests\parity.rs (D:\projects\limbo\taut-dev\taut-shape-rs\target\debug\deps\parity-85bca257642fd213.exe)
+
+running 3 tests
+test runtime_constants_equal_the_bounds_header ... ok
+test int_rows_fit_the_i64_carrier_and_round_trip_through_the_runtime ... ok
+test raw_decode_rows_are_judged_as_taut_judges_rust ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\main.rs (D:\projects\limbo\taut-dev\taut-shape-rs\target\debug\deps\taut_shape_tool-b0f153baa33ed607.exe)
+
+running 25 tests
+test framing::tests::a_length_above_max_frame_bytes_is_refused_before_its_body_is_read ... ok
+test atom_tool::tests::unknown_atom_tag_is_typed_before_dispatch ... ok
+test runtime::tests::registry_names_exactly_the_implemented_engines ... ok
+test framing::tests::raw_tag_is_deferred_to_the_selected_shape_adapter ... ok
+test json::tests::round_trips_object_serialization_with_stable_keys ... ok
+test json::tests::parses_a_corpus_style_read_object ... ok
+test json::tests::base64_round_trips_and_matches_known_vectors ... ok
+test runtime::tests::runtime_contract_is_shape_neutral ... ok
+test runtime::tests::unknown_shape_is_a_typed_diagnostic ... ok
+test script::tests::drain_remaining_flushes_untriggered_tail ... ok
+test script::tests::parses_ordered_injections_and_fires_by_frame_count ... ok
+test node::tests::log_adapter_exposes_timer_and_teardown_effects ... ok
+test script::tests::steps_object_wrapper_and_close_with_error ... ok
+test stream_tool::tests::unknown_stream_tag_is_typed_before_dispatch ... ok
+test swmr_tool::tests::unknown_swmr_tag_is_typed_before_dispatch ... ok
+test value_tool::tests::unknown_value_tag_is_typed_before_dispatch ... ok
+test snapshot_delta_json::all_snapshot_delta_profile_vectors_share_the_swmr_core ... ok
+test value_json::tests::all_value_oracle_vectors_match_whole_transcripts ... ok
+test crdt_json::tests::complete_crdt_mailbox_corpus_matches ... ok
+test atom_json::tests::all_atom_oracle_vectors_match_whole_transcripts ... ok
+test stream_json::tests::all_stream_oracle_vectors_match_whole_transcripts ... ok
+test crdt_json::tests::all_generic_and_text_replica_orders_converge ... ok
+test swmr_json::tests::all_swmr_oracle_vectors_match_whole_transcripts ... ok
+test framing::tests::a_whole_frame_above_max_frame_bytes_is_refused_too ... ok
+test framing::tests::a_frame_of_exactly_max_frame_bytes_is_read ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests\interop.rs (D:\projects\limbo\taut-dev\taut-shape-rs\target\debug\deps\interop-f8ec2b646adc5e6e.exe)
+
+running 2 tests
+test node_serves_client_over_crossed_pipes_with_script_producer ... ok
+test client_side_script_drives_a_plain_node_to_closed ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests\node_cli.rs (D:\projects\limbo\taut-dev\taut-shape-rs\target\debug\deps\node_cli-003bf0c59157e0d9.exe)
+
+running 6 tests
+test frame_length_above_the_cap_exits_3_on_its_prefix ... ok
+test clean_eof_between_frames_exits_0 ... ok
+test malformed_frame_exits_3_without_panicking ... ok
+test held_release_echoes_the_streams_log_id ... ok
+test push_then_read_round_trips_through_real_pipes ... ok
+test unsupported_shape_exits_before_node_or_client_startup ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests\process_globals.rs (D:\projects\limbo\taut-dev\taut-shape-rs\target\debug\deps\process_globals-4babf42126a12db0.exe)
+
+running 1 test
+test no_new_process_global_state ... FAILED
+
+failures:
+
+---- no_new_process_global_state stdout ----
+
+thread 'no_new_process_global_state' (18692) panicked at crates\taut-shape-tool\tests\process_globals.rs:34:5:
+Python was not found; run without arguments to install from the Microsoft Store, or disable this shortcut from Settings > Apps > Advanced app settings > App execution aliases.
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    no_new_process_global_state
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+error: test failed, to rerun pass `-p taut-shape-tool --test process_globals`

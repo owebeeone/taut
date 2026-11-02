@@ -1,0 +1,2 @@
+note: crates/taut-shape/src/parity_vectors.rs is not reached from a crate root; scanned as production
+process-global state guard: 42 files, 1 allowlisted items (0 debt, 1 permanent); nothing new
