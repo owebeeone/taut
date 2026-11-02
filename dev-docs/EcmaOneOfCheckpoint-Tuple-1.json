@@ -1,0 +1,98 @@
+{
+  "acceptance_ledger": "dev-docs/EcmaOneOfCheckpoint-Verdict-1.md",
+  "authority": "committed Authority R1 amendment and merged RemPlan-1; root explicitly authorized scoped local corrected GWZ checkpoint and SAME original reviewers",
+  "correction_counts": {
+    "taut": 40,
+    "taut-shape-ts": 11
+  },
+  "correction_ranges": {
+    "taut": "68c24a899345367f3026372d3c67737751215a0e..57c56d5f7d727eb483ac9fd89c482f6a44f7913e",
+    "taut-shape-ts": "1409634e9b1c8eea0696bf0fee560d5017f34d1f..1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "fe244bc4915acbce58198889feae633f778fe649..f4a2e908933b634edffaf17191359b472e34ff03"
+  },
+  "gates": {
+    "actual_library": "typecheck/build PASS and315tests PASS",
+    "historical_global": "r0 ONLY: all16 green; broad1807pass/4fail/5skip/11deselected exit1 retained; not rerun",
+    "shared": "503passed/1Windows symlink privilege skip; current source hashes identical beforeafter",
+    "typescript": "169passed current-source final run, 83closure/72feature/14legacy"
+  },
+  "inventory": "dev-docs/EcmaOneOfCheckpoint-Inventory-1.json",
+  "previous_tuple": {
+    "taut": {
+      "commit": "68c24a899345367f3026372d3c67737751215a0e",
+      "path": "D:/projects/limbo/taut-dev/taut"
+    },
+    "taut-shape-py": {
+      "commit": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-py"
+    },
+    "taut-shape-rs": {
+      "commit": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-rs"
+    },
+    "taut-shape-ts": {
+      "commit": "1409634e9b1c8eea0696bf0fee560d5017f34d1f",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-ts"
+    },
+    "workspace": {
+      "commit": "fe244bc4915acbce58198889feae633f778fe649",
+      "path": "D:/projects/limbo/taut-dev"
+    }
+  },
+  "prohibited": "publication,push,tag,release,nextbackend,extra reviewer,automatic broad/all16 repeat",
+  "protected": "all five user sources+35excluded old artifacts+unchanged lock and declarations; Python/Rust refs unchanged",
+  "remaining": "No implementation/review work remains for this pair; coordinator owns next pair and any further global gate decision",
+  "remediation": "dev-docs/EcmaOneOfCheckpoint-RemPlan-1.md",
+  "remediation_rounds_used": 1,
+  "reports": {
+    "Code": {
+      "file": "dev-docs/EcmaOneOfCheckpoint-ReviewCode-1.md",
+      "sha256": "59ea9f167568c2a1bded533f9b8c5495b2a6edc56ebc3329d834066213eb6356",
+      "verdict": "GO"
+    },
+    "State": {
+      "file": "dev-docs/EcmaOneOfCheckpoint-ReviewState-1.md",
+      "sha256": "051ac9943e1222d5d53717a4b5c100cc61eab4326b668eff702890e60a5bdba7",
+      "verdict": "GO"
+    }
+  },
+  "review_round": 1,
+  "reviewers": {
+    "Code+Surface": "/root/ecma_code_surface",
+    "State": "/root/ecma_state"
+  },
+  "snapshot": "D:/projects/limbo/ecma-oneof-scratch/frozen-r1/snapshot.json",
+  "snapshot_counts": {
+    "taut": 104,
+    "taut-shape-ts": 28
+  },
+  "snapshot_sha256": "60ec204ce47c6e6c914376e18145b7dc4c8d4aec7d99fdd33cfb3cccb48bbefd",
+  "source_ranges": {
+    "taut": "8c113e36a927cda5c50848f25ab828185080272d..57c56d5f7d727eb483ac9fd89c482f6a44f7913e",
+    "taut-shape-ts": "74597e5e3a1d3845e93644866b97b68080f4bbbe..1aaeab65e4564a462044d2f5d824cd2f375aae97"
+  },
+  "status": "ACCEPTED implementation at this exact reviewed source tuple after originating Code+Surface GO and State GO; only scoped evidence-only landing follows",
+  "tuple": {
+    "taut": {
+      "commit": "57c56d5f7d727eb483ac9fd89c482f6a44f7913e",
+      "path": "D:/projects/limbo/taut-dev/taut"
+    },
+    "taut-shape-py": {
+      "commit": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-py"
+    },
+    "taut-shape-rs": {
+      "commit": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-rs"
+    },
+    "taut-shape-ts": {
+      "commit": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-ts"
+    },
+    "workspace": {
+      "commit": "f4a2e908933b634edffaf17191359b472e34ff03",
+      "path": "D:/projects/limbo/taut-dev"
+    }
+  },
+  "whitespace": "Default cached check flags14 evidence/prompt/report paths for Windows CRLF or retained terminal/Markdown spacing; implementation checks pass both repos. See frozen-r1/taut-cached-whitespace.txt"
+}

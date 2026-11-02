@@ -1,8 +1,11 @@
 # JavaScript/TypeScript checkpoint — merged remediation plan1
 
-Status: **coordinator AUTHORIZED ONE merged correction window for round1**.
-Initial Code+Surface and State both reported NO-GO on the same settled tuple.
-No implementer closure is claimed. Round1 is in progress; maximum2.
+Status: **remediation1 COMPLETE; both originating reviewers reported GO on the
+corrected exact tuple**. All mapped findings were closed by their originators;
+no implementer self-closure. See Verdict-1 and the verbatim ReviewCode-1 and
+ReviewState-1. One of maximum2 remediation rounds was used.
+The historical plan, authorization and pre-checkpoint evidence below remain as
+filed; the closure ledger supersedes their pending next-action/status language.
 
 ## Reviewed object and immutable evidence
 

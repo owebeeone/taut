@@ -1,11 +1,14 @@
 # JavaScript/TypeScript OneOf checkpoint — controlling DRAFT
 
-Status: **REMEDIATION1 candidate; initial committed tuple NO-GO; one bounded
-merged correction window is coordinator-authorized**. No acceptance/publication.
-The initial immutable source is68c24a89/shape-ts1409634e/rootfe244bc4. Its original
-Preparation and r0 global receipts retain their exact attribution. A corrected
-Inventory-1 and canonical originating-reviewer prompts will name the revised
-settled tuple/ranges after the authorized scoped local GWZ checkpoint.
+Status: **accepted at Taut 57c56d5f7d727eb483ac9fd89c482f6a44f7913e,
+shape-ts 1aaeab65e4564a462044d2f5d824cd2f375aae97 and
+workspace f4a2e908933b634edffaf17191359b472e34ff03 after
+ReviewCode-1 and ReviewState-1 reported GO; this accepts the combined JS/TS
+implementation and actual TS library integration only**.
+See Verdict-1 for the complete closure ledger and scope. One merged remediation
+round was used. The initial immutable source 68c24a89/shape-ts1409634e/rootfe244bc4,
+Preparation, initial NO-GO reports and failed r0 global receipts retain their
+historical attribution. No push, tag, release or publication follows.
 
 [Authority](EcmaOneOfCheckpoint-Authority.md) records the operator directive,
 scope and amendments. [Preparation](EcmaOneOfCheckpoint-Preparation.json) records
@@ -234,7 +237,7 @@ interpretation difference is recorded; State owns its original-counterexample
 closure, and Code independently judges the changed boundary. No implementer
 self-closure or claim of unanimous discovery is made.
 
-The original r0 gate is all16GREEN and broad1807passed/4failed/5skipped/11deselected,
+The original r0 gate is all16GREEN and broad 1807passed/4failed/5skipped/11deselected,
 including one NEW help failure beyond baseline3. It is not corrected-source
 evidence. Root directs affected closure/conformance/library/shared-preservation
 checks after this localized patch rather than automatic repeat global execution.
