@@ -40,6 +40,7 @@ import time
 import zipfile
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO
@@ -81,6 +82,9 @@ def source_env() -> dict[str, str]:
     env = os.environ.copy()
     src = str(REPO / "src") + os.pathsep + str(REPO / "scripts")
     env["PYTHONPATH"] = src + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    env['PYTEST_DISABLE_PLUGIN_AUTOLOAD'] = '1'
+    env.pop('PYTEST_ADDOPTS', None)
+    env.pop('PYTEST_PLUGINS', None)
     return env
 
 
@@ -164,7 +168,10 @@ def verify_test_coverage(universe: dict, runs: list[dict]) -> dict:
         if set(run['selected']) != expected or set(run['phases']) != expected:
             raise NotReady('test coverage differs from the exact required platform assignment')
         for name, phases in run['phases'].items():
-            if name in assigned or phases.get('call') != 'passed' or set(phases.values()) != {'passed'}:
+            if (name in assigned or len(phases) != 3
+                    or [event['phase'] for event in phases] != ['setup','call','teardown']
+                    or any(event['outcome'] != 'passed' for event in phases)
+                    or len({event['worker'] for event in phases}) != 1):
                 raise NotReady('test skipped, failed, duplicated or did not execute: '+name)
             assigned[name] = run['host']
     if set(assigned) != set(required):
@@ -188,31 +195,28 @@ def step_tests(version: str, work: Path, out: IO[str]) -> None:
     selection = "not gate"
     if os.name == "nt":
         selection += " and not posix"
-    run([sys.executable, "-m", "pytest", "src/tests", "-q", "-rs", "-p", "no:cacheprovider",
-         '-p', 'xdist.plugin',
+    native = [sys.executable, "-m", "pytest", "src/tests", "-q", "-rs", "-p", "no:cacheprovider",
+         '-p', 'xdist', '--dist=loadfile',
          '-p', 'release_test_ledger', '--release-ledger='+str(native_path), '--release-host=windows',
-         "-n", "auto", "-m", selection, f"--basetemp={work / 'pytest'}", f"--junit-xml={report}"],
-        out=out, env=source_env())
-    skipped = skipped_tests(report)
-    if skipped:
-        raise NotReady(f"{len(skipped)} tests skipped, and a release runs every test; install what "
-                       "they name:\n  " + "\n  ".join(skipped))
+         "-n", "auto", "-m", selection, f"--basetemp={work / 'pytest'}", f"--junit-xml={report}"]
     if os.name == "nt":
         # Both partitions read the same candidate through the WSL mount. Every
         # non-gate case runs exactly once; neither partition may skip a case.
         distro = os.environ.get("TAUT_RELEASE_WSL_DISTRO", "Ubuntu")
         def posix_path(path: Path) -> str:
-            result = subprocess.run(["wsl", "-d", distro, "--", "wslpath", "-a", "-u", str(path)],
+            result = subprocess.run(["wsl", "-d", distro, "--exec", "wslpath", "-a", "-u", path.as_posix()],
                                     capture_output=True, text=True, check=True)
             return result.stdout.strip()
         posix_repo = posix_path(REPO)
         posix_report = work / "pytest-posix.xml"
         posix_ledger = work / 'posix-tests.json'
-        run(["wsl", "-d", distro, "--", "env", f"PYTHONPATH={posix_repo}/src:{posix_repo}/scripts",
+        run(["wsl", "-d", distro, "--exec", "env", '-u', 'PYTEST_ADDOPTS', '-u', 'PYTEST_PLUGINS',
+             f"PYTHONPATH={posix_repo}/src:{posix_repo}/scripts",
              "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1", "PYTHONDONTWRITEBYTECODE=1",
              "TMPDIR=" + posix_path(work), python, "-m", "pytest", posix_repo + "/src/tests",
              "-q", "-rs", "-p", "no:cacheprovider", "-m", "not gate and posix",
              '-p', 'release_test_ledger', '--release-ledger='+posix_path(posix_ledger), '--release-host=posix',
+             '--release-inventory='+posix_path(universe_path),
              "--basetemp=" + posix_path(work / "pytest-posix"),
              "--junit-xml=" + posix_path(posix_report)], out=out)
         skipped = skipped_tests(posix_report)
@@ -220,6 +224,10 @@ def step_tests(version: str, work: Path, out: IO[str]) -> None:
         if not cases or skipped:
             raise NotReady("POSIX partition must execute without skips: " + "; ".join(skipped))
         out.write(f"POSIX partition executed {len(cases)} cases from the same candidate, no skips\n")
+        run(native, out=out, env=source_env())
+        skipped = skipped_tests(report)
+        if skipped:
+            raise NotReady('native release tests skipped: '+'; '.join(skipped))
         load = lambda path: json.loads(path.read_text(encoding='utf-8'))
         coverage = verify_test_coverage(load(universe_path), [load(native_path), load(posix_ledger)])
         (work/'coverage.json').write_text(json.dumps(coverage, indent=2, sort_keys=True)+'\n', encoding='utf-8')
@@ -270,7 +278,13 @@ def step_smoke(version: str, work: Path, out: IO[str]) -> None:
     if not (rust / "rust" / "api.rs").is_file():
         raise NotReady("the wheel's tautc wrote no rust/api.rs")
     from_wheel, from_source = work / "gen-wheel", work / "gen-source"
-    run([tautc, "gen", SMOKE_IR, "-o", from_wheel, "--with-runtime", "--forward-compat"], out=out)
+    run([tautc, "gen", SMOKE_IR, "-o", from_source, "--with-runtime", "--forward-compat"], out=out)
+    # Ownership receipts intentionally bind absolute output paths. Snapshot
+    # these exact bytes, then generate afresh at the same path for a strict
+    # byte-for-byte comparison, including every ownership receipt.
+    if from_source.resolve().parent != work.resolve() or from_wheel.resolve().parent != work.resolve():
+        raise NotReady('smoke snapshot paths must remain inside the owned temporary directory')
+    from_source.rename(from_wheel)
     run([sys.executable, "-m", "taut.cli", "gen", SMOKE_IR, "-o", from_source, "--with-runtime",
          "--forward-compat"], out=out, env=source_env())
     differ = tree_differences(from_wheel, from_source)
@@ -318,7 +332,7 @@ def run_chain(chain: tuple[str, ...], version: str, work: Path) -> ChainResult:
         with path.open("w", encoding="utf-8") as out:
             try:
                 STEP_RUNS[step](version, work, out)
-            except NotReady as problem:
+            except (NotReady, OSError, subprocess.SubprocessError) as problem:
                 return ChainResult(step, str(problem), path)
         log(f"{step}: ok in {time.monotonic() - started:.0f}s")
     return ChainResult(chain[-1], None, work / f"{chain[-1]}.log")
@@ -335,6 +349,21 @@ def selected_steps(parser: argparse.ArgumentParser, only: str | None) -> tuple[s
     if "smoke" in names and "build" not in names:
         parser.error("smoke installs the wheel that build makes: select build too")
     return tuple(step for step in STEPS if step in names)
+
+
+@contextmanager
+def release_work():
+    work = Path(tempfile.mkdtemp(prefix='taut-release-checks-'))
+    try:
+        yield work
+    finally:
+        target = work.resolve()
+        if target.parent != Path(tempfile.gettempdir()).resolve() or not target.name.startswith('taut-release-checks-'):
+            raise NotReady('cleanup target escaped the owned release temporary directory')
+        # Tests deliberately exercise Windows names requiring the extended
+        # path namespace. Keep that spelling during confined cleanup too.
+        spelling = '\\\\?\\'+str(target) if os.name == 'nt' else str(target)
+        shutil.rmtree(spelling)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -354,8 +383,7 @@ def main(argv: list[str] | None = None) -> int:
     evidence = os.environ.get('TAUT_RELEASE_EVIDENCE_DIR')
     if evidence:
         Path(evidence).mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="taut-release-checks-") as tmp:
-        work = Path(tmp)
+    with release_work() as work:
         for stage in stages(steps):
             with ThreadPoolExecutor(max_workers=len(stage)) as pool:
                 results = list(pool.map(lambda chain: run_chain(chain, args.version, work), stage))

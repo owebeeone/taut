@@ -5,9 +5,12 @@ step once, with the release's version."""
 
 import ast
 import importlib.util
+import json
+import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -132,13 +135,57 @@ def test_release_coverage_refuses_incomplete_or_unqualified_execution(damage):
         'wrapper':{'posix':False,'gate':True}}}
     def record(host, name):
         return {'host':host,'tree_hash':'same','exitstatus':0,
-                'selected':{name:{}},'phases':{name:{'setup':'passed','call':'passed','teardown':'passed'}}}
+                'selected':{name:{}},'phases':{name:[{'phase':p,'outcome':'passed','worker':'local'}
+                                                    for p in ('setup','call','teardown')]}}
     runs = [record('windows','native'), record('posix','posix')]
     assert checks.verify_test_coverage(universe,runs)['covered']=={'native':'windows','posix':'posix'}
     if damage=='missing': runs.pop()
     elif damage=='extra': runs[0]['selected']['surprise']={}
-    elif damage=='skip': runs[1]['phases']['posix']['call']='skipped'
+    elif damage=='skip': runs[1]['phases']['posix'][1]['outcome']='skipped'
     elif damage=='failed': runs[1]['exitstatus']=1
     elif damage=='wrong-host': runs[1]['host']='windows'
     elif damage=='wrong-source': runs[1]['tree_hash']='different'
     with pytest.raises(checks.NotReady): checks.verify_test_coverage(universe,runs)
+
+
+@pytest.mark.parametrize('damage',['missing-setup','missing-teardown','repeat-call','twice','failed-then-pass'])
+def test_real_ledger_hooks_preserve_incomplete_and_repeated_execution(damage):
+    spec=importlib.util.spec_from_file_location('ledger_probe',ROOT/'scripts/release_test_ledger.py')
+    plugin=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(plugin)
+    sequence=[('setup','passed'),('call','passed'),('teardown','passed')]
+    if damage=='missing-setup': sequence.pop(0)
+    elif damage=='missing-teardown': sequence.pop()
+    elif damage=='repeat-call': sequence.insert(2,('call','passed'))
+    elif damage=='twice': sequence*=2
+    else: sequence.insert(1,('call','failed'))
+    for phase,outcome in sequence:
+        plugin.pytest_runtest_logreport(SimpleNamespace(nodeid='case',when=phase,outcome=outcome,worker_id='gw0'))
+    run={'host':'windows','tree_hash':'same','exitstatus':0,'selected':{'case':{}},
+         'phases':json.loads(json.dumps(plugin.phases))}
+    universe={'tree_hash':'same','selected':{'case':{'posix':False,'gate':False}}}
+    with pytest.raises(_script().NotReady): _script().verify_test_coverage(universe,[run])
+
+
+@pytest.mark.parametrize('autoload,distribution',[(True,'loadfile'),(False,'loadfile'),(False,'each')])
+def test_xdist_and_ledger_work_in_both_plugin_modes_and_reject_each(tmp_path,autoload,distribution):
+    (tmp_path/'test_probe.py').write_text('def test_once():\n    assert 1 + 1 == 2\n',encoding='utf-8')
+    ledger=tmp_path/'ledger.json'
+    env=os.environ.copy()
+    env['PYTHONPATH']=str(ROOT/'scripts')
+    env.pop('PYTEST_ADDOPTS',None)
+    env.pop('PYTEST_PLUGINS',None)
+    if autoload: env.pop('PYTEST_DISABLE_PLUGIN_AUTOLOAD',None)
+    else: env['PYTEST_DISABLE_PLUGIN_AUTOLOAD']='1'
+    result=subprocess.run([sys.executable,'-m','pytest','test_probe.py','-q','-p','no:cacheprovider',
+                           '-p','xdist','-p','release_test_ledger','-n','2','--dist='+distribution,
+                           '--release-ledger='+str(ledger),'--release-host=windows'],
+                          cwd=tmp_path,env=env,text=True,capture_output=True)
+    assert result.returncode==0,result.stdout+result.stderr
+    record=json.loads(ledger.read_text())
+    universe={'tree_hash':record['tree_hash'],'selected':{
+        name:{'posix':False,'gate':False} for name in record['selected']}}
+    if distribution=='each':
+        with pytest.raises(_script().NotReady): _script().verify_test_coverage(universe,[record])
+    else:
+        assert len(_script().verify_test_coverage(universe,[record])['covered'])==1

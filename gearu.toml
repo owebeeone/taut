@@ -36,4 +36,16 @@ exact_checks = [
 ]
 github_notes = """taut-proto {python_version}
 
+Immutable descriptors and optional explicit oneof validation now cover all nine
+generation targets. Runtime selection is explicit: source, package, or the
+legacy supplied-runtime route; generation does not install dependencies.
+Invalid drafts remain mutable and serializable. Virtual oneof selection remains
+deferred and incomplete. The enum.case accessor preserves metadata-like enum names.
+
+Migration: regenerate schemas and bind every consumer to one compatible nominal
+runtime owner. Rust package consumers use the new taut-foundation 0.11 crate;
+shape engines remain in their separate libraries. Generated API, ownership,
+native ABI and packaging changes are a pre-1.0 minor change; old source/binary
+compatibility is not universal. Constrained IR is version 3; readers accept 1..3.
+
 Publishing this GitHub Release triggers the PyPI Trusted Publishing workflow."""
