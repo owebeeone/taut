@@ -162,6 +162,8 @@ Python path with pytest; `TAUT_RELEASE_WSL_DISTRO` defaults to `Ubuntu`.
 The `posix` marker assigns the three shell/PATH probes and the real symlink
 probe to WSL. All remaining non-`gate` cases run natively, including MSVC,
 Windows junctions and namespace semantics. Neither execution may skip.
+The POSIX partition uses pytest's `sys` capture mode, qualified on the shared
+WSL mount; file-descriptor capture's temporary-file handling fails there.
 The gate first collects every case, records IDs and candidate raw-file hashes,
 then verifies the exact platform union and all setup/call/teardown results.
 `TAUT_RELEASE_EVIDENCE_DIR` retains JSON/XML ledgers and logs outside the candidate.

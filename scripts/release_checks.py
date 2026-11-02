@@ -214,7 +214,7 @@ def step_tests(version: str, work: Path, out: IO[str]) -> None:
              f"PYTHONPATH={posix_repo}/src:{posix_repo}/scripts",
              "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1", "PYTHONDONTWRITEBYTECODE=1",
              "TMPDIR=" + posix_path(work), python, "-m", "pytest", posix_repo + "/src/tests",
-             "-q", "-rs", "-p", "no:cacheprovider", "-m", "not gate and posix",
+             "-q", "-rs", "--capture=sys", "-p", "no:cacheprovider", "-m", "not gate and posix",
              '-p', 'release_test_ledger', '--release-ledger='+posix_path(posix_ledger), '--release-host=posix',
              '--release-inventory='+posix_path(universe_path),
              "--basetemp=" + posix_path(work / "pytest-posix"),
