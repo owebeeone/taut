@@ -494,6 +494,7 @@ def run(forward_compat: bool = False) -> parity.TargetReport:
         runner.write_text(_source())
         binary = work / "parity_runner"
         failed = parity.build(name, [cxx, "-std=c++20", "-I", str(work / TARGET), str(runner),
+                                     str(work / TARGET / "foundation.cpp"),
                                      "-o", str(binary)], cwd=work)
         if failed is not None:
             return failed

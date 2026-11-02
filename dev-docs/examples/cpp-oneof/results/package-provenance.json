@@ -1,0 +1,32 @@
+{
+  "build": "cpp-oneof-reference.1",
+  "capabilities": [
+    "codec.v1",
+    "descriptors.v1",
+    "oneof.v1"
+  ],
+  "codec": 1,
+  "descriptor": 1,
+  "files": {
+    "foundation.cpp": "78934d68fee208771c91467bf86b75a867439c00d62199962472e43d70fff101",
+    "foundation.obj": "93b4b035babc29ac161c014d44f67d128c6f2bed6f71bca28bb3f6a78d2c92a2",
+    "include/taut/cbor.hpp": "dfe9690476d9278aeb0eff6961b68c3a29cc837285ad1ee4529b98e8fdd295f3",
+    "include/taut/descriptors.hpp": "4dc0b2b40ca2ed8459c733898812eeff0db30d637d03a108a33c5fa3bb0669ec",
+    "include/taut/ext.hpp": "db45f51e1018706cfa61466b69e51177e192e29c64ebfaec4be6e2a83be33b66",
+    "include/taut/foundation.hpp": "f65eac9452ea2e76e9e8cc9554490f8c81e8d7cd2e093d7401d361db0f1c782b",
+    "include/taut/reports.hpp": "c60ecfdb93f7029e35b155d69a19f190159fb8b08463d4aec366d843c42a12d1",
+    "include/taut/validation.hpp": "5d39b7d1d1dd106e5e1a6e858b37520dfb5f4c63abb7ed6286f011ed58c56d6a",
+    "taut-foundation.lib": "52e1547dc15ed592655ed09d3057745c8aa5b8b2d0d112274dcd6a09fa26cae1"
+  },
+  "owner": "taut.cpp.foundation",
+  "sources": {
+    "foundation.cpp": "78934d68fee208771c91467bf86b75a867439c00d62199962472e43d70fff101",
+    "taut/cbor.hpp": "dfe9690476d9278aeb0eff6961b68c3a29cc837285ad1ee4529b98e8fdd295f3",
+    "taut/descriptors.hpp": "4dc0b2b40ca2ed8459c733898812eeff0db30d637d03a108a33c5fa3bb0669ec",
+    "taut/ext.hpp": "db45f51e1018706cfa61466b69e51177e192e29c64ebfaec4be6e2a83be33b66",
+    "taut/foundation.hpp": "f65eac9452ea2e76e9e8cc9554490f8c81e8d7cd2e093d7401d361db0f1c782b",
+    "taut/reports.hpp": "c60ecfdb93f7029e35b155d69a19f190159fb8b08463d4aec366d843c42a12d1",
+    "taut/validation.hpp": "5d39b7d1d1dd106e5e1a6e858b37520dfb5f4c63abb7ed6286f011ed58c56d6a"
+  },
+  "validation": true
+}

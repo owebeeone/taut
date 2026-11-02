@@ -1,0 +1,245 @@
+{
+  "date": "2026-11-03 Australia/Sydney",
+  "files": {
+    "dev-docs/examples/cpp-oneof/AllocationFault.cpp": {
+      "sha256": "11bd45b77f72b25a416e2fb7f8787d0a7f43fb8eb8c91798a4bad579a501f2db",
+      "size": 2668
+    },
+    "dev-docs/examples/cpp-oneof/Conformance.cpp": {
+      "sha256": "022b0969e9422685b51217294a430905d6667ce7c0463a737dcf85ec26fe491c",
+      "size": 3284
+    },
+    "dev-docs/examples/cpp-oneof/Example.cpp": {
+      "sha256": "c1c36c54321c12aaa17586dbae6ef8a55cad9d4a5c16144cc3e638ad7908c708",
+      "size": 1134
+    },
+    "dev-docs/examples/cpp-oneof/README.md": {
+      "sha256": "a67f9df11b7aca1ebd00dd166790ec6f80d8426d4d8ca9e84bc50dfc200ee385",
+      "size": 6930
+    },
+    "dev-docs/examples/cpp-oneof/RESULTS.md": {
+      "sha256": "17e63e95323b86d1a2e2406ca7c8ce1f4ac3aff72485af87ca7f4643ba9cfdbf",
+      "size": 7583
+    },
+    "dev-docs/examples/cpp-oneof/content.taut.py": {
+      "sha256": "784f549db4a0e324a7675f3f88e399d623d81738e7358f6225a449e0e349855d",
+      "size": 1185
+    },
+    "dev-docs/examples/cpp-oneof/results/example-api-association.json": {
+      "sha256": "11c4d1f84da0fbf8b1f66c8a71c0271b887d39662eab9dad378833d3a652dd60",
+      "size": 765
+    },
+    "dev-docs/examples/cpp-oneof/results/naming-final.log": {
+      "sha256": "560b1b0bdd9cd0c1252568c7c627d1a9584474c0a69ef1c1388ccf4631c00678",
+      "size": 102
+    },
+    "dev-docs/examples/cpp-oneof/results/naming-final.xml": {
+      "sha256": "c1aa9afe868ab883c1344404b3d5c09e6b0b4bc28787cb584473e844a3e59a0c",
+      "size": 2897
+    },
+    "dev-docs/examples/cpp-oneof/results/normalized-reports.txt": {
+      "sha256": "02586adf94172f54e92c38809a4426d8e1cc372b70b669e405a5b20efc08b4ec",
+      "size": 1954
+    },
+    "dev-docs/examples/cpp-oneof/results/package-provenance.json": {
+      "sha256": "3de6fbc3ee8bd1461a72d91e0f87f41d3733cce971a40bbcd41332be880eafb8",
+      "size": 1765
+    },
+    "dev-docs/examples/cpp-oneof/results/shared-affected-after.json": {
+      "sha256": "4512698b6c87fc7e0b52ba182712ce91b405b1dd88a2fbb45f6392ee920d0df0",
+      "size": 14942
+    },
+    "dev-docs/examples/cpp-oneof/results/shared-affected-before.json": {
+      "sha256": "4512698b6c87fc7e0b52ba182712ce91b405b1dd88a2fbb45f6392ee920d0df0",
+      "size": 14942
+    },
+    "dev-docs/examples/cpp-oneof/results/shared-affected-receipt.json": {
+      "sha256": "2fadb5ebd0f3e5bdbed802f59d79da5933ed8a6e813f46ba8d9f0853cd6c62cc",
+      "size": 4409
+    },
+    "dev-docs/examples/cpp-oneof/results/shared-affected-runner.py": {
+      "sha256": "964948ccccf4faa9977f7b6d1017eb3f64f21b18fec58a2d95bf618b6211db4e",
+      "size": 5085
+    },
+    "dev-docs/examples/cpp-oneof/results/shared-affected.log": {
+      "sha256": "816af8aa94e1896ab170b1d4d5f24fb71cf165d95c2ed4c501b4c0fd434df50c",
+      "size": 193
+    },
+    "dev-docs/examples/cpp-oneof/results/target-gate-receipt.json": {
+      "sha256": "2d121660cb1f995922e46d786528e263aae31df9356de86e20971b077c8f5a3c",
+      "size": 1144
+    },
+    "dev-docs/examples/cpp-oneof/verify_examples.py": {
+      "sha256": "74227a502bafb0103c26425e3e7e98d8d571e5a72b6754c3a7f78a783dc20d9e",
+      "size": 3116
+    },
+    "pyproject.toml": {
+      "sha256": "8996804505c30bcb05a074a0a5022166ce00ec52bd1fba2dadfcf8ceaeb22ec0",
+      "size": 2138
+    },
+    "src/taut/cli.py": {
+      "sha256": "406e471766743c2db617644b8ef90fae166aaeab53247e2fb56d48e538dd9a4d",
+      "size": 15543
+    },
+    "src/taut/corpus/parity_cpp.py": {
+      "sha256": "2dca5981429b9b15fb8f78a82a0a0db6315209ebb1db3033de0c173409dfaf13",
+      "size": 18071
+    },
+    "src/taut/gen/cpp.py": {
+      "sha256": "90474c42e8726388a0dc839b0eec72d2b56ebe5e9134b3d327e8e09c47edbaf3",
+      "size": 32040
+    },
+    "src/taut/gen/cpp_metadata.py": {
+      "sha256": "038b6dce3c75853ef6ba1e294bad9e20ab574b500bbc2d66fa31be21e0538a3f",
+      "size": 13571
+    },
+    "src/taut/gen/cpp_runtime.py": {
+      "sha256": "3db3604f843cffd1c5ec5ba7f6bf9a6788ec41dca30b6df4ac20d014fe7f54d1",
+      "size": 13528
+    },
+    "src/taut/gen/runtime/descriptors.hpp": {
+      "sha256": "4dc0b2b40ca2ed8459c733898812eeff0db30d637d03a108a33c5fa3bb0669ec",
+      "size": 23446
+    },
+    "src/taut/gen/runtime/foundation.cpp": {
+      "sha256": "78934d68fee208771c91467bf86b75a867439c00d62199962472e43d70fff101",
+      "size": 255
+    },
+    "src/taut/gen/runtime/foundation.hpp": {
+      "sha256": "f65eac9452ea2e76e9e8cc9554490f8c81e8d7cd2e093d7401d361db0f1c782b",
+      "size": 790
+    },
+    "src/taut/gen/runtime/reports.hpp": {
+      "sha256": "c60ecfdb93f7029e35b155d69a19f190159fb8b08463d4aec366d843c42a12d1",
+      "size": 7248
+    },
+    "src/taut/gen/runtime/validation.hpp": {
+      "sha256": "5d39b7d1d1dd106e5e1a6e858b37520dfb5f4c63abb7ed6286f011ed58c56d6a",
+      "size": 6623
+    },
+    "src/taut/gen/scaffold.py": {
+      "sha256": "cc7285e1ce34594d773fdc624dd76774edebe79893897f7a30756c7bd7e227d9",
+      "size": 48734
+    },
+    "src/tests/test_cpp.py": {
+      "sha256": "55fad2e63c3cffff9ef219fa0e492c403a9c094f704572499bc8529daff30af5",
+      "size": 74137
+    },
+    "src/tests/test_cpp_go_distribution.py": {
+      "sha256": "d9630bf6083a614e4cf482749347f59646f17edbb3e7979cf7fdd6c32ce2ca08",
+      "size": 6040
+    },
+    "src/tests/test_cpp_oneof.py": {
+      "sha256": "e3e3dde2a5ad20f3e10c42ae195f5a62b2906703c73efe5954bcde5c40a117f0",
+      "size": 29027
+    }
+  },
+  "manifest_self": {
+    "include_in_allowlist": true,
+    "path": "dev-docs/examples/cpp-oneof/results/owned-source.json",
+    "self_hash_omitted": true
+  },
+  "owned_cpp_paths": [
+    "src/taut/gen/cpp.py",
+    "src/taut/gen/cpp_metadata.py",
+    "src/taut/gen/cpp_runtime.py",
+    "src/taut/corpus/parity_cpp.py",
+    "src/tests/test_cpp.py",
+    "src/tests/test_cpp_oneof.py",
+    "src/taut/gen/runtime/foundation.hpp",
+    "src/taut/gen/runtime/foundation.cpp",
+    "src/taut/gen/runtime/descriptors.hpp",
+    "src/taut/gen/runtime/reports.hpp",
+    "src/taut/gen/runtime/validation.hpp"
+  ],
+  "owned_example_receipt_paths": [
+    "dev-docs/examples/cpp-oneof/AllocationFault.cpp",
+    "dev-docs/examples/cpp-oneof/Conformance.cpp",
+    "dev-docs/examples/cpp-oneof/Example.cpp",
+    "dev-docs/examples/cpp-oneof/README.md",
+    "dev-docs/examples/cpp-oneof/RESULTS.md",
+    "dev-docs/examples/cpp-oneof/content.taut.py",
+    "dev-docs/examples/cpp-oneof/results/example-api-association.json",
+    "dev-docs/examples/cpp-oneof/results/naming-final.log",
+    "dev-docs/examples/cpp-oneof/results/naming-final.xml",
+    "dev-docs/examples/cpp-oneof/results/normalized-reports.txt",
+    "dev-docs/examples/cpp-oneof/results/package-provenance.json",
+    "dev-docs/examples/cpp-oneof/results/shared-affected-after.json",
+    "dev-docs/examples/cpp-oneof/results/shared-affected-before.json",
+    "dev-docs/examples/cpp-oneof/results/shared-affected-receipt.json",
+    "dev-docs/examples/cpp-oneof/results/shared-affected-runner.py",
+    "dev-docs/examples/cpp-oneof/results/shared-affected.log",
+    "dev-docs/examples/cpp-oneof/results/target-gate-receipt.json",
+    "dev-docs/examples/cpp-oneof/verify_examples.py"
+  ],
+  "owned_shared_paths": [
+    "pyproject.toml",
+    "src/taut/cli.py",
+    "src/taut/gen/scaffold.py",
+    "src/tests/test_cpp_go_distribution.py"
+  ],
+  "protected_user_files": {
+    "src/taut/facts.py": {
+      "HEAD_sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+      "matches_HEAD": true,
+      "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+      "size": 8202
+    },
+    "src/taut/ir/dsl.py": {
+      "HEAD_sha256": "5b2061584dcd78a3f73d2a757d6b101bacf280c9190f6a068b613eecb55b307d",
+      "matches_HEAD": true,
+      "sha256": "5b2061584dcd78a3f73d2a757d6b101bacf280c9190f6a068b613eecb55b307d",
+      "size": 13760
+    },
+    "src/tests/test_dsl.py": {
+      "HEAD_sha256": "205d3922aa8399eadf6affbb53e85fac914c584d0cc80664c235efca0a38ac78",
+      "matches_HEAD": true,
+      "sha256": "205d3922aa8399eadf6affbb53e85fac914c584d0cc80664c235efca0a38ac78",
+      "size": 13776
+    },
+    "src/tests/test_ir_v2.py": {
+      "HEAD_sha256": "17be85b78f8835c37fda6a728e1c376bce297b3eb6cdbb38c100763ba0195107",
+      "matches_HEAD": true,
+      "sha256": "17be85b78f8835c37fda6a728e1c376bce297b3eb6cdbb38c100763ba0195107",
+      "size": 20104
+    },
+    "src/tests/test_oneof.py": {
+      "HEAD_sha256": "a47cc246e59a2717dc9b182afa9a47860ee48d5085f7e94b5f53ff256f9d4dcd",
+      "matches_HEAD": true,
+      "sha256": "a47cc246e59a2717dc9b182afa9a47860ee48d5085f7e94b5f53ff256f9d4dcd",
+      "size": 22409
+    }
+  },
+  "reused_unchanged_canonical_files": {
+    "src/taut/gen/runtime/cbor.go": {
+      "matches_dispatched_HEAD": true,
+      "sha256": "bb1a741f36de2cdeed45df885b7a7e4ebb5d8cb04403c1d755ba5b0e6f73d8ef",
+      "size": 18039
+    },
+    "src/taut/gen/runtime/cbor.hpp": {
+      "matches_dispatched_HEAD": true,
+      "sha256": "dfe9690476d9278aeb0eff6961b68c3a29cc837285ad1ee4529b98e8fdd295f3",
+      "size": 31089
+    },
+    "src/taut/gen/runtime/ext.go": {
+      "matches_dispatched_HEAD": true,
+      "sha256": "14c0fbb5ca9c1238bff77dc5cc99ed7e541e6695574db4a6514a5031443e1b85",
+      "size": 2420
+    },
+    "src/taut/gen/runtime/ext.hpp": {
+      "matches_dispatched_HEAD": true,
+      "sha256": "db45f51e1018706cfa61466b69e51177e192e29c64ebfaec4be6e2a83be33b66",
+      "size": 7238
+    }
+  },
+  "scope_limits": "Root owns settled broad/full16 parity; no final fullsuite success, review, commit, push or Swift implementation claimed.",
+  "source_association": {
+    "counts_not_additive": true,
+    "examples": "3 native modes + real allocation faults; fresh final normal API bytes identical",
+    "final_naming_gate": "21 passed final narrow reservation correction; raw log/JUnit saved",
+    "final_shared_gate": "88 passed/1 Windows symlink-privilege skip; preserved hashes in shared-affected-before/after",
+    "native_gate": "87 passed before final shared pre-lock and narrow naming preflight corrections; runtime/codec/engine unchanged afterward",
+    "wheel": "Actual wheel source/package native C++ and Go consumers passed before Go late generator-only corrections; canonical runtime bytes unchanged"
+  },
+  "status": "REVIEW-READY / production HOLD; no root pair freeze or acceptance"
+}

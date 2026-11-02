@@ -1,0 +1,71 @@
+{
+  "source-off": [
+    "descriptor-only fields=6 IR=3"
+  ],
+  "source-on": [
+    "missing\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=text",
+    "empty\trecursive\ttrue\ttrue",
+    "extra\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number",
+    "roundtrip\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number",
+    "zero\trecursive\ttrue\ttrue",
+    "false\trecursive\ttrue\ttrue",
+    "empty-list\trecursive\ttrue\ttrue",
+    "payload-free\trecursive\ttrue\ttrue",
+    "bad-tag-child\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=kind\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text",
+    "nonselected-child\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=child\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text",
+    "cycle\trecursive\tfalse\ttrue\tI:validation.ownership_cycle:validation.shape.v1:f=child",
+    "wrapper\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=0/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=1/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YXo=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YmFh/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,AA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,GBg=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,IA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9A==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9Q==/f=text",
+    "local\tlocal\ttrue\ttrue",
+    "virtual-child\trecursive\tfalse\tfalse\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind",
+    "virtual-repaired\trecursive\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind",
+    "virtual-local\tlocal\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind",
+    "independent\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=left\tI:oneof.payload_missing:taut.oneof.v1:f=b",
+    "plain\trecursive\ttrue\ttrue"
+  ],
+  "package-off": [
+    "descriptor-only fields=6 IR=3"
+  ],
+  "package-on": [
+    "missing\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=text",
+    "empty\trecursive\ttrue\ttrue",
+    "extra\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number",
+    "roundtrip\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number",
+    "zero\trecursive\ttrue\ttrue",
+    "false\trecursive\ttrue\ttrue",
+    "empty-list\trecursive\ttrue\ttrue",
+    "payload-free\trecursive\ttrue\ttrue",
+    "bad-tag-child\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=kind\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text",
+    "nonselected-child\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=child\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text",
+    "cycle\trecursive\tfalse\ttrue\tI:validation.ownership_cycle:validation.shape.v1:f=child",
+    "wrapper\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=0/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=1/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YXo=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YmFh/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,AA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,GBg=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,IA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9A==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9Q==/f=text",
+    "local\tlocal\ttrue\ttrue",
+    "virtual-child\trecursive\tfalse\tfalse\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind",
+    "virtual-repaired\trecursive\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind",
+    "virtual-local\tlocal\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind",
+    "independent\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=left\tI:oneof.payload_missing:taut.oneof.v1:f=b",
+    "plain\trecursive\ttrue\ttrue"
+  ],
+  "supplied-off": [
+    "descriptor-only fields=6 IR=3"
+  ],
+  "supplied-on": [
+    "missing\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=text",
+    "empty\trecursive\ttrue\ttrue",
+    "extra\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number",
+    "roundtrip\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number",
+    "zero\trecursive\ttrue\ttrue",
+    "false\trecursive\ttrue\ttrue",
+    "empty-list\trecursive\ttrue\ttrue",
+    "payload-free\trecursive\ttrue\ttrue",
+    "bad-tag-child\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=kind\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text",
+    "nonselected-child\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=child\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text",
+    "cycle\trecursive\tfalse\ttrue\tI:validation.ownership_cycle:validation.shape.v1:f=child",
+    "wrapper\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=0/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=1/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YXo=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YmFh/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,AA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,GBg=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,IA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9A==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9Q==/f=text",
+    "local\tlocal\ttrue\ttrue",
+    "virtual-child\trecursive\tfalse\tfalse\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind",
+    "virtual-repaired\trecursive\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind",
+    "virtual-local\tlocal\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind",
+    "independent\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=left\tI:oneof.payload_missing:taut.oneof.v1:f=b",
+    "plain\trecursive\ttrue\ttrue"
+  ]
+}

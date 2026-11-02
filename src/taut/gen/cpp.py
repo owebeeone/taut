@@ -42,9 +42,11 @@ corpus.build here would be a cycle).
 from __future__ import annotations
 
 import struct
+import re
 from collections.abc import Iterator
 from pathlib import Path
 from types import MappingProxyType
+from contextvars import ContextVar
 
 from ..ir.model import MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from ..ir.options import effective
@@ -131,6 +133,7 @@ def _is_container(t: TypeRef) -> bool:
 
 # Every name a struct takes from outside it, qualified (the module docstring).
 _NS = "::taut::"
+_INDIRECT = ContextVar('cpp_indirect_messages', default=frozenset())
 # The parameters and the value `try_from_cbor` builds: `__` names, like every generated local.
 _BUF = "__b"  # to_cbor's Buf
 _SRC = "__c"  # try_from_cbor's Cbor
@@ -158,7 +161,13 @@ def _literal(schema: Schema, msg) -> bool:
     """Whether `msg`'s struct is a literal type, so its functions can be constexpr. libc++'s
     std::map is not one, so neither is a message that holds a map, directly or in a message:
     a constexpr function that returns one does not compile."""
-    return not _holds_map(schema, MsgRef(msg.name))
+    def indirect(t, seen=frozenset()):
+        if isinstance(t,MsgRef):
+            return t.name in _INDIRECT.get() or (t.name not in seen and any(indirect(f.type,seen|{t.name}) for f in schema.messages[t.name].fields))
+        if isinstance(t,ListOf): return indirect(t.elem,seen)
+        if isinstance(t,MapOf): return indirect(t.value,seen)
+        return False
+    return not _holds_map(schema, MsgRef(msg.name)) and not indirect(MsgRef(msg.name))
 
 
 def _lit(data: bytes) -> str:
@@ -184,6 +193,8 @@ def _base_type(t: TypeRef, ns: str = _NS) -> str:
     if isinstance(t, Scalar):
         return {"int": "long long", "float": "double", "str": "std::string_view", "bytes": "std::string_view", "bool": "bool"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
+        if isinstance(t, MsgRef) and t.name in _INDIRECT.get():
+            return f"std::shared_ptr<{ns}{t.name}>"
         return f"{ns}{t.name}"
     if isinstance(t, ListOf):
         return f"std::vector<{_base_type(t.elem, ns)}>"
@@ -204,6 +215,8 @@ def _encode_scalar(t: TypeRef, expr: str) -> str:
     if isinstance(t, EnumRef):
         return f"{_BUF}.integer(static_cast<long long>({expr}));"
     if isinstance(t, MsgRef):
+        if t.name in _INDIRECT.get():
+            return f"if ({expr}) {{ {expr}->to_cbor({_BUF}); }} else {{ {_BUF}.null_(); }}"
         return f"{expr}.to_cbor({_BUF});"
     raise TypeError(t)
 
@@ -274,7 +287,7 @@ def _try_decode_value(t: TypeRef, acc: str, target: str, ret: str, tmp: str, dep
         return [
             f"    auto {nested} = {_NS}{t.name}::try_from_cbor({acc});",
             f"    {_return_if_failed(nested, ret)}",
-            f"    {target} = {nested}.value;",
+            f"    {target} = " + (f"std::make_shared<{_NS}{t.name}>(std::move({nested}.value));" if t.name in _INDIRECT.get() else f"{nested}.value;"),
         ]
     if isinstance(t, ListOf):
         arr = f"{tmp}_arr"
@@ -351,7 +364,7 @@ def _emit_try_from_cbor(msg, forward_compat: bool = False, literal: bool = False
         f"    if (!__map) {{ return {result}::fail(__map.error); }}",
     ]
     for f in msg.fields:
-        if f.transient:
+        if f.transient or f.virtual:
             continue
         field = f"__field_{f.tag}"
         if not f.optional:
@@ -437,23 +450,66 @@ def _emit_to_cbor(msg, forward_compat: bool = False, literal: bool = False) -> l
     return lines
 
 
-def _emit_types(schema: Schema, forward_compat: bool = False) -> str:
+def _emit_types(schema: Schema, forward_compat: bool = False, *, validation=False,
+                external_types=None, identity=None) -> str:
+    if type(validation) is not bool:
+        raise TypeError('C++ validation option must be Boolean')
+    if identity is not None and (not isinstance(identity,str) or not identity):
+        raise ValueError('C++ schema identity must be a nonempty string')
+    from .cpp_metadata import preflight
+    external_types = dict(external_types or {})
+    preflight(schema, validation, external_types)
+    # Native direct/optional ownership cycles require indirection; acyclic
+    # schemas retain their existing value structs and borrowed codec storage.
+    def refs(t):
+        if isinstance(t, MsgRef): return {t.name}
+        # std::vector/std::map already permit an incomplete element type in
+        # the established projection. Only direct ownership cycles need a pointer.
+        return set()
+    graph={m.name:set().union(*(refs(f.type) for f in m.fields)) for m in schema.messages.values()}
+    def cyclic(name, current, seen):
+        return any(r==name or (r not in seen and cyclic(name,r,seen|{r})) for r in graph.get(current,()))
+    token=_INDIRECT.set(frozenset(n for n in graph if cyclic(n,n,{n})))
+    try:
+        return _emit_types_bound(schema, forward_compat, validation=validation,
+                                 external_types=external_types, identity=identity)
+    finally:
+        _INDIRECT.reset(token)
+
+
+def _emit_types_bound(schema, forward_compat, *, validation, external_types, identity):
+    from .cpp_metadata import emit as emit_metadata
+    holder, metadata = emit_metadata(schema, validation=validation, external_types=external_types, identity=identity, forward_compat=forward_compat)
     has_map = any(_uses_map(f.type) for m in schema.messages.values() for f in m.fields)
     lines = [
         "// GENERATED native C++ types by taut/src/taut/gen/cpp.py — do not edit.",
+        "// generator=cpp-oneof-reference.1; owner=taut.cpp.foundation; descriptor=1; codec=1; adapter=1; capabilities=codec.v1/descriptors.v1/oneof.v1",
         "#pragma once",
         "#include <cstddef>",
+        "#include <cstdio>",
+        "#include <cstdlib>",
         *(["#include <map>"] if has_map else []),
         "#include <optional>",
         "#include <string_view>",
         "#include <utility>",
         "#include <vector>",
+        "#include <memory>",
         '#include "taut/cbor.hpp"',
+        '#include "taut/descriptors.hpp"',
+        *(['#include "taut/validation.hpp"'] if validation else []),
+        *['#include "'+h+'"' for h in sorted({b['header'] for b in external_types.values()})],
         "",
         "namespace taut {",
         "",
     ]
+    for name in schema.messages:
+        if name not in external_types: lines.append(f"struct {name};")
+    lines.append('namespace '+holder+' {')
+    for name in schema.enums:
+        if name not in external_types: lines.append('const EnumDescriptor& enum_'+name+'() noexcept;')
+    lines.append('}')
     for e in schema.enums.values():
+        if e.name in external_types: continue
         lines.append(f"enum class {e.name} : long long {{")
         for member, val in e.members.items():
             lines.append(f"  {_variant(member)} = {val},")
@@ -467,19 +523,56 @@ def _emit_types(schema: Schema, forward_compat: bool = False) -> str:
         lines.append("  }")
         lines.append("}")
         lines.append("")
-    for m in schema.messages.values():
+        lines.append('template<> struct EnumTraits<'+e.name+'> { static const EnumDescriptor& descriptor() noexcept {return '+holder+'::enum_'+e.name+'();} };')
+    for name in external_types:
+        category='CompatibleMessage' if name in schema.messages else 'CompatibleEnum'
+        lines.append('static_assert('+category+'<::taut::'+name+'>,"C++ external '+name+' requires mandatory descriptor/typed adapter contract 1; regenerate/rebind dependency");')
+    # Complete native value dependencies before declaring their owners. Recursive
+    # pointer codecs are defined only after every struct is complete.
+    ordered=[];seen=set()
+    def dependencies(t):
+        if isinstance(t,MsgRef):return {t.name}
+        if isinstance(t,ListOf):return dependencies(t.elem)
+        if isinstance(t,MapOf):return dependencies(t.value)
+        return set()
+    def order(name):
+        if name in seen:return
+        seen.add(name)
+        for f in schema.messages[name].fields:
+            for child in sorted(dependencies(f.type)):
+                if child not in _INDIRECT.get() and child in schema.messages:order(child)
+        ordered.append(schema.messages[name])
+    for name in schema.messages:order(name)
+    pending=[]
+    out_of_line=bool(_INDIRECT.get())
+    for m in ordered:
+        if m.name in external_types: continue
         lines.append(f"struct {m.name} {{")
         for f in m.fields:
+            if f.virtual: continue
             lines.append(f"  {_field_type(f)} {f.name};")
         if forward_compat:
             lines.append(f"  std::vector<std::pair<long long, {_NS}Cbor>> wire_residual;")
         literal = _literal(schema, m)
         lines.extend(_emit_bounds(schema, m))
-        lines.extend(_emit_to_cbor(m, forward_compat, literal))
-        lines.extend(_emit_try_from_cbor(m, forward_compat, literal))
-        lines.extend(_emit_try_decode(m, literal))
+        for method in (_emit_to_cbor(m, forward_compat, literal),
+                       _emit_try_from_cbor(m, forward_compat, literal), _emit_try_decode(m, literal)):
+            if out_of_line:
+                signature=method[0]
+                lines.append(signature.rsplit(' {',1)[0]+';')
+                definition=signature.strip().removeprefix('static ')
+                definition=re.sub(r'\b(to_cbor|try_from_cbor|try_decode)\(',m.name+r'::\1(',definition,count=1)
+                pending.extend(['inline '+definition,*method[1:]])
+            else:lines.extend(method)
+        lines.append('  static const ::taut::MessageDescriptor& descriptor() noexcept;')
+        lines.append('  static const ::taut::SchemaBinding& taut_binding() noexcept;')
+        if validation:
+            lines.append('  ::taut::validation::ValidationReport validate(bool recursive = true) const noexcept;')
+            lines.append('  bool is_valid(bool recursive = true) const noexcept;')
         lines.append("};")
         lines.append("")
+    lines.extend(pending)
+    lines.extend(metadata)
     lines.append("} // namespace taut")
     return "\n".join(lines) + "\n"
 

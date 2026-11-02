@@ -1,0 +1,1641 @@
+{
+  "baseline_failures": [
+    "src/tests/test_dev_docs.py::test_proto_api_surface_extensions_doc_exists_and_covers_contract",
+    "src/tests/test_go.py::test_go_runtime_and_parity_runner_are_gofmt_clean",
+    "src/tests/test_go.py::test_generated_go_is_gofmt_clean"
+  ],
+  "cpp_inventory": {
+    "count": 34,
+    "path": "dev-docs/examples/cpp-oneof/results/owned-source.json",
+    "verified": true
+  },
+  "excluded_old_python_artifacts": {
+    "count": 35,
+    "disposition": "Preserve untouched and never stage",
+    "files": {
+      "dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json": {
+        "sha256": "4e92a8cabe8f5959a4113d8a7f2738a913c1c71ab26c60c34707597549b3b399",
+        "size": 506
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json": {
+        "sha256": "f3b639e2bd1ab69b1355e7a9935359dc2f9797bcf899cf4fce7afed19a50c644",
+        "size": 1373
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/__init__.py": {
+        "sha256": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+        "size": 38
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/api.py": {
+        "sha256": "31fbb8d65d4871dbf6a9025cff50f5cb3cc530448f44c327e92c1f8b98064ac7",
+        "size": 6338
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py": {
+        "sha256": "ad2bb0a2ddb372ab77e5e7d19873f44804c487c63a22d0c7b99852329b4944af",
+        "size": 129
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py": {
+        "sha256": "e21299bef0b04c86bff376cf6a678f7b8720dc067438d551ffef54b9a95964fe",
+        "size": 267
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py": {
+        "sha256": "69766dfeca243099e7bf7c54f088069f271fa60f61e03d4d916d893d6d38416c",
+        "size": 1298
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py": {
+        "sha256": "e473c8532d5840e6f374dca4ead4c3e28726f23ed7c058e84a79f052418cb9fa",
+        "size": 16907
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py": {
+        "sha256": "99e5fab316640eb0527e905b194610557d8301210ca61cd72358002d7d10a8fb",
+        "size": 2289
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py": {
+        "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "size": 8202
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py": {
+        "sha256": "153026e825045eb67883ac9b66b6ac9d4ffd6fbc64c2bc010fa9e973a2271f9e",
+        "size": 2940
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py": {
+        "sha256": "8cde71892ed7882b869bd299c13be37223e77e679ce04a59e9994b82dc9bec42",
+        "size": 11383
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py": {
+        "sha256": "7577578775f99603032555479e843056a12d8465b5aa439fe7371f4fb76b7347",
+        "size": 8827
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py": {
+        "sha256": "bd3d5e2e3d18980a19e4519477c84ad78084f5d2c25af4c5ccca6e8477779022",
+        "size": 6247
+      },
+      "dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json": {
+        "sha256": "14a3a65b8314dee620248029963ea92526bae09c5d126f685d29754db8b2f2d0",
+        "size": 410
+      },
+      "dev-docs/examples/python-oneof/generated/package/python/__init__.py": {
+        "sha256": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+        "size": 38
+      },
+      "dev-docs/examples/python-oneof/generated/package/python/api.py": {
+        "sha256": "5bbd3d845613cc9ef6704801c4e976c4900f654b13e33a8ab20d8d312975fa8c",
+        "size": 8389
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json": {
+        "sha256": "9521b809e235b325be1355485e0b526f6bc19e5a990852735c7198096c22e031",
+        "size": 503
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json": {
+        "sha256": "1bdbd28eff437d7a2a7b8d34d5b8f5134968ec3adb154141319ecec9533b6ddf",
+        "size": 1464
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/__init__.py": {
+        "sha256": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+        "size": 38
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/api.py": {
+        "sha256": "5bbd3d845613cc9ef6704801c4e976c4900f654b13e33a8ab20d8d312975fa8c",
+        "size": 8389
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py": {
+        "sha256": "ad2bb0a2ddb372ab77e5e7d19873f44804c487c63a22d0c7b99852329b4944af",
+        "size": 129
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py": {
+        "sha256": "e21299bef0b04c86bff376cf6a678f7b8720dc067438d551ffef54b9a95964fe",
+        "size": 267
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py": {
+        "sha256": "69766dfeca243099e7bf7c54f088069f271fa60f61e03d4d916d893d6d38416c",
+        "size": 1298
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py": {
+        "sha256": "e473c8532d5840e6f374dca4ead4c3e28726f23ed7c058e84a79f052418cb9fa",
+        "size": 16907
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/ext.py": {
+        "sha256": "99e5fab316640eb0527e905b194610557d8301210ca61cd72358002d7d10a8fb",
+        "size": 2289
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/facts.py": {
+        "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "size": 8202
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/rules.py": {
+        "sha256": "153026e825045eb67883ac9b66b6ac9d4ffd6fbc64c2bc010fa9e973a2271f9e",
+        "size": 2940
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/validation.py": {
+        "sha256": "eb33734525330f131092c3bda540ef71742b7cd0eb1074e7aa72a92049db8903",
+        "size": 10105
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py": {
+        "sha256": "8cde71892ed7882b869bd299c13be37223e77e679ce04a59e9994b82dc9bec42",
+        "size": 11383
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py": {
+        "sha256": "7577578775f99603032555479e843056a12d8465b5aa439fe7371f4fb76b7347",
+        "size": 8827
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py": {
+        "sha256": "bd3d5e2e3d18980a19e4519477c84ad78084f5d2c25af4c5ccca6e8477779022",
+        "size": 6247
+      },
+      "dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl": {
+        "sha256": "7ff8c48266ec3814a4fea75c4afe94f1ffb1e1193c0a9134706ee99ad4f7fd44",
+        "size": 264014
+      }
+    }
+  },
+  "expected_postcheckpoint": "Root-coordinated scoped Taut checkpoint and GWZ workspace capture/commit; readonly shape repository revisions remain unchanged. Exact new SHAs are not invented.",
+  "expected_precheckpoint_tuple": {
+    "taut": "b9f99ac88ec585616ffac8bf4fbc2aaf4535fc16",
+    "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "3a5d103ab09561459ce61c85707b22fd4139f60c"
+  },
+  "freeze_authorization": {
+    "count": 2,
+    "production": "FROZEN; no implementation correction until coherent settled gate and merged original two-axis findings",
+    "push": "No individual push/tag/release; root final reviewed checkpoint push after pair thenSwift accepted",
+    "reviewers": [
+      "Code+Surface",
+      "State"
+    ],
+    "scope": "Exact59 Taut files and managed GWZ workspace receipt; source hashes reconciled before freeze amendment; only Authority/Draft/Preparation status changed",
+    "settled_gate": "Root assigns Go after exact tuple; one broad/full16 gate; reviewers consume complete receipt",
+    "source_thread": "01a19add-ce78-7941-a091-8f3ebddba3d2"
+  },
+  "gates": {
+    "count_policy": "Overlapping totals are not additive",
+    "cpp_examples": {
+      "actual_final_api_byte_identity": "dev-docs/examples/cpp-oneof/results/example-api-association.json",
+      "allocation_faults": true,
+      "modes": [
+        "source",
+        "extracted native package",
+        "supplied"
+      ]
+    },
+    "cpp_final_naming": {
+      "junit": "dev-docs/examples/cpp-oneof/results/naming-final.xml",
+      "log": "dev-docs/examples/cpp-oneof/results/naming-final.log",
+      "result": "21 passed in11.46s; nofail/skip/deselect"
+    },
+    "cpp_native_r0": {
+      "capture_limit": "Observed tool stdout; summary, no fabricated rawlog/before-hash capture",
+      "receipt": "dev-docs/examples/cpp-oneof/results/target-gate-receipt.json",
+      "result": "87 passed in189.13s",
+      "source": "Before final shared prior-owner pre-lock guard + narrow C++ naming preflight correction; runtime/codec/engine unchanged"
+    },
+    "current_global": "NOT RUN; root assigns one settled broad/full16 parity gate after exact tuple",
+    "go_final_focused": {
+      "all_85_run_claimed": false,
+      "examples": "6current source/package/supplied x on/off native executables; final API byte association verified",
+      "final_feature_cases": 85,
+      "fingerprint": "19 passed/65deselected",
+      "unicode_golden_format": "3passed/82deselected"
+    },
+    "go_r0": {
+      "association": "Before per-message forward_compat fingerprint and Unicode literal corrections; not relabeled finalsource",
+      "result": "104 passed/2exact original Windows CRLF failures; no skips/deselects; all80then-new passed"
+    },
+    "shared_final_state": {
+      "association": "Exact final shared driver, preceding only later C++ preflight naming helper correction",
+      "preservation": true,
+      "receipt": "dev-docs/examples/cpp-oneof/results/shared-affected-receipt.json",
+      "result": "88 passed/1 Windows symlink-privilege skip in6.91s",
+      "scope": "Accepted Python/Rust/JVM/ECMA state/transition/namespace and eight-target previous-owner pre-lock reproducer; no native recompile"
+    },
+    "wheel": "Actual built compiler wheel + isolated -I -S source/package C++/Go generation/build/execution passed before Go late generator-only changes; canonical runtime resources unchanged"
+  },
+  "go_inventory": {
+    "allowlist_count_including_manifest": 22,
+    "path": "dev-docs/examples/go-oneof/results/owned-source.json",
+    "verified_all_21_hashes": true
+  },
+  "gwz_status": {
+    "XDG_CONFIG_HOME": "D:/projects/limbo/cpp-go-oneof-scratch/gwz-xdg",
+    "command": [
+      "gwz",
+      "--target",
+      "@root",
+      "--target",
+      "taut",
+      "--target",
+      "taut-shape-py",
+      "--target",
+      "taut-shape-rs",
+      "--target",
+      "taut-shape-ts",
+      "status",
+      "--json"
+    ],
+    "cwd": "D:/projects/limbo/taut-dev",
+    "errors": [],
+    "file_changes": [
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/CppGoOneOfCheckpoint-Authority.md",
+        "workspace_path": "taut/dev-docs/CppGoOneOfCheckpoint-Authority.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/CppGoOneOfCheckpoint-Draft.md",
+        "workspace_path": "taut/dev-docs/CppGoOneOfCheckpoint-Draft.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/CppGoOneOfCheckpoint-Preparation.json",
+        "workspace_path": "taut/dev-docs/CppGoOneOfCheckpoint-Preparation.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/AllocationFault.cpp",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/AllocationFault.cpp",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/Conformance.cpp",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/Conformance.cpp",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/content.taut.py",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/content.taut.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/Example.cpp",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/Example.cpp",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/README.md",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/README.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/RESULTS.md",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/RESULTS.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/example-api-association.json",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/example-api-association.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/naming-final.log",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/naming-final.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/naming-final.xml",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/naming-final.xml",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/normalized-reports.txt",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/normalized-reports.txt",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/owned-source.json",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/owned-source.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/package-provenance.json",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/package-provenance.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/shared-affected-after.json",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/shared-affected-after.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/shared-affected-before.json",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/shared-affected-before.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/shared-affected-receipt.json",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/shared-affected-receipt.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/shared-affected-runner.py",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/shared-affected-runner.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/shared-affected.log",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/shared-affected.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/results/target-gate-receipt.json",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/results/target-gate-receipt.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/cpp-oneof/verify_examples.py",
+        "workspace_path": "taut/dev-docs/examples/cpp-oneof/verify_examples.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/conformance.go",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/conformance.go",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/content.taut.py",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/content.taut.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/goldens/legacy-api.go",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/goldens/legacy-api.go",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/goldens/off.go",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/goldens/off.go",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/goldens/on.go",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/goldens/on.go",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/README.md",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/README.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/RESULTS.md",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/RESULTS.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/results/example-api-association.json",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/results/example-api-association.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/results/fingerprint-r1.log",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/results/fingerprint-r1.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/results/native-example.json",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/results/native-example.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/results/owned-source.json",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/results/owned-source.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/results/target-gate-r0.log",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/results/target-gate-r0.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/results/unicode-r1.log",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/results/unicode-r1.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/go-oneof/run-example.py",
+        "workspace_path": "taut/dev-docs/examples/go-oneof/run-example.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/api.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/api.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/package/python/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/package/python/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/package/python/api.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/package/python/api.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/api.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/api.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/ext.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/ext.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/facts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/facts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/rules.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/rules.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/validation.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/validation.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "pyproject.toml",
+        "workspace_path": "taut/pyproject.toml",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/cli.py",
+        "workspace_path": "taut/src/taut/cli.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/corpus/parity_cpp.py",
+        "workspace_path": "taut/src/taut/corpus/parity_cpp.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/cpp.py",
+        "workspace_path": "taut/src/taut/gen/cpp.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/cpp_metadata.py",
+        "workspace_path": "taut/src/taut/gen/cpp_metadata.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/cpp_runtime.py",
+        "workspace_path": "taut/src/taut/gen/cpp_runtime.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/go.py",
+        "workspace_path": "taut/src/taut/gen/go.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/go_metadata.py",
+        "workspace_path": "taut/src/taut/gen/go_metadata.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/go_runtime.py",
+        "workspace_path": "taut/src/taut/gen/go_runtime.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/descriptors.hpp",
+        "workspace_path": "taut/src/taut/gen/runtime/descriptors.hpp",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/foundation.cpp",
+        "workspace_path": "taut/src/taut/gen/runtime/foundation.cpp",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/foundation.hpp",
+        "workspace_path": "taut/src/taut/gen/runtime/foundation.hpp",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/go/descriptors.go",
+        "workspace_path": "taut/src/taut/gen/runtime/go/descriptors.go",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/go/paths.go",
+        "workspace_path": "taut/src/taut/gen/runtime/go/paths.go",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/go/reports.go",
+        "workspace_path": "taut/src/taut/gen/runtime/go/reports.go",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/go/validation.go",
+        "workspace_path": "taut/src/taut/gen/runtime/go/validation.go",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/reports.hpp",
+        "workspace_path": "taut/src/taut/gen/runtime/reports.hpp",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/validation.hpp",
+        "workspace_path": "taut/src/taut/gen/runtime/validation.hpp",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/scaffold.py",
+        "workspace_path": "taut/src/taut/gen/scaffold.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/tests/test_cpp.py",
+        "workspace_path": "taut/src/tests/test_cpp.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/tests/test_cpp_go_distribution.py",
+        "workspace_path": "taut/src/tests/test_cpp_go_distribution.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/tests/test_cpp_oneof.py",
+        "workspace_path": "taut/src/tests/test_cpp_oneof.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/tests/test_go_oneof.py",
+        "workspace_path": "taut/src/tests/test_go_oneof.py",
+        "worktree_status": "?"
+      }
+    ],
+    "members": [
+      {
+        "error": null,
+        "git_status": {
+          "ahead": null,
+          "behind": null,
+          "branch": "main",
+          "detached": false,
+          "dirty": true,
+          "head": "b9f99ac88ec585616ffac8bf4fbc2aaf4535fc16",
+          "member_id": "mem_taut",
+          "staged": 0,
+          "unstaged": 7,
+          "untracked": 87,
+          "upstream": null
+        },
+        "lock_difference_reasons": [
+          "DirtyWorktree"
+        ],
+        "lock_match": "Differs",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "planned": null,
+        "source_kind": "Git",
+        "state": null,
+        "status": "Ok",
+        "url_resolution": null
+      },
+      {
+        "error": null,
+        "git_status": {
+          "ahead": null,
+          "behind": null,
+          "branch": "main",
+          "detached": false,
+          "dirty": false,
+          "head": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+          "member_id": "mem_taut_shape_py",
+          "staged": 0,
+          "unstaged": 0,
+          "untracked": 0,
+          "upstream": null
+        },
+        "lock_difference_reasons": null,
+        "lock_match": "Matches",
+        "member_id": "mem_taut_shape_py",
+        "member_path": "taut-shape-py",
+        "planned": null,
+        "source_kind": "Git",
+        "state": null,
+        "status": "Ok",
+        "url_resolution": null
+      },
+      {
+        "error": null,
+        "git_status": {
+          "ahead": null,
+          "behind": null,
+          "branch": "main",
+          "detached": false,
+          "dirty": false,
+          "head": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+          "member_id": "mem_taut_shape_rs",
+          "staged": 0,
+          "unstaged": 0,
+          "untracked": 0,
+          "upstream": null
+        },
+        "lock_difference_reasons": null,
+        "lock_match": "Matches",
+        "member_id": "mem_taut_shape_rs",
+        "member_path": "taut-shape-rs",
+        "planned": null,
+        "source_kind": "Git",
+        "state": null,
+        "status": "Ok",
+        "url_resolution": null
+      },
+      {
+        "error": null,
+        "git_status": {
+          "ahead": null,
+          "behind": null,
+          "branch": "main",
+          "detached": false,
+          "dirty": false,
+          "head": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+          "member_id": "mem_taut_shape_ts",
+          "staged": 0,
+          "unstaged": 0,
+          "untracked": 0,
+          "upstream": null
+        },
+        "lock_difference_reasons": null,
+        "lock_match": "Matches",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "planned": null,
+        "source_kind": "Git",
+        "state": null,
+        "status": "Ok",
+        "url_resolution": null
+      }
+    ],
+    "root_status": {
+      "branch": "main",
+      "detached": false,
+      "dirty": false,
+      "head": "3a5d103ab09561459ce61c85707b22fd4139f60c",
+      "staged": 0,
+      "unborn": false,
+      "unstaged": 0,
+      "untracked": 0
+    }
+  },
+  "historical_global": "ECMA r0 fullglobal at68c24a89/rootfe244bc:1807pass/4fail/5skip/11deselect, all16parityGREEN. Three baselinefailures persisted; fourth stale JVM shared-help assertion fixed and focused current tests pass. No claim final-global rerun.",
+  "observed_date": "2026-11-03 Australia/Sydney",
+  "pair_allowlist": {
+    "count": 59,
+    "cpp_shared_count": 34,
+    "files": {
+      "dev-docs/CppGoOneOfCheckpoint-Authority.md": {
+        "sha256": "f187b1775e1974c29078c75d331a4b8eebf3d31e2b7f8fe24719e786aaf48b4a",
+        "size": 8001
+      },
+      "dev-docs/CppGoOneOfCheckpoint-Draft.md": {
+        "sha256": "e24e3b37611fc1c032c0ef1b0d1f9d535d71835e3415af631f19261342ba0991",
+        "size": 13493
+      },
+      "dev-docs/examples/cpp-oneof/AllocationFault.cpp": {
+        "sha256": "11bd45b77f72b25a416e2fb7f8787d0a7f43fb8eb8c91798a4bad579a501f2db",
+        "size": 2668
+      },
+      "dev-docs/examples/cpp-oneof/Conformance.cpp": {
+        "sha256": "022b0969e9422685b51217294a430905d6667ce7c0463a737dcf85ec26fe491c",
+        "size": 3284
+      },
+      "dev-docs/examples/cpp-oneof/Example.cpp": {
+        "sha256": "c1c36c54321c12aaa17586dbae6ef8a55cad9d4a5c16144cc3e638ad7908c708",
+        "size": 1134
+      },
+      "dev-docs/examples/cpp-oneof/README.md": {
+        "sha256": "a67f9df11b7aca1ebd00dd166790ec6f80d8426d4d8ca9e84bc50dfc200ee385",
+        "size": 6930
+      },
+      "dev-docs/examples/cpp-oneof/RESULTS.md": {
+        "sha256": "17e63e95323b86d1a2e2406ca7c8ce1f4ac3aff72485af87ca7f4643ba9cfdbf",
+        "size": 7583
+      },
+      "dev-docs/examples/cpp-oneof/content.taut.py": {
+        "sha256": "784f549db4a0e324a7675f3f88e399d623d81738e7358f6225a449e0e349855d",
+        "size": 1185
+      },
+      "dev-docs/examples/cpp-oneof/results/example-api-association.json": {
+        "sha256": "11c4d1f84da0fbf8b1f66c8a71c0271b887d39662eab9dad378833d3a652dd60",
+        "size": 765
+      },
+      "dev-docs/examples/cpp-oneof/results/naming-final.log": {
+        "sha256": "560b1b0bdd9cd0c1252568c7c627d1a9584474c0a69ef1c1388ccf4631c00678",
+        "size": 102
+      },
+      "dev-docs/examples/cpp-oneof/results/naming-final.xml": {
+        "sha256": "c1aa9afe868ab883c1344404b3d5c09e6b0b4bc28787cb584473e844a3e59a0c",
+        "size": 2897
+      },
+      "dev-docs/examples/cpp-oneof/results/normalized-reports.txt": {
+        "sha256": "02586adf94172f54e92c38809a4426d8e1cc372b70b669e405a5b20efc08b4ec",
+        "size": 1954
+      },
+      "dev-docs/examples/cpp-oneof/results/owned-source.json": {
+        "sha256": "24d128e4dd3d0c4c0595925b76ed3ac660a65f6c975c7ae473cf6b7bfdfef3da",
+        "size": 10522
+      },
+      "dev-docs/examples/cpp-oneof/results/package-provenance.json": {
+        "sha256": "3de6fbc3ee8bd1461a72d91e0f87f41d3733cce971a40bbcd41332be880eafb8",
+        "size": 1765
+      },
+      "dev-docs/examples/cpp-oneof/results/shared-affected-after.json": {
+        "sha256": "4512698b6c87fc7e0b52ba182712ce91b405b1dd88a2fbb45f6392ee920d0df0",
+        "size": 14942
+      },
+      "dev-docs/examples/cpp-oneof/results/shared-affected-before.json": {
+        "sha256": "4512698b6c87fc7e0b52ba182712ce91b405b1dd88a2fbb45f6392ee920d0df0",
+        "size": 14942
+      },
+      "dev-docs/examples/cpp-oneof/results/shared-affected-receipt.json": {
+        "sha256": "2fadb5ebd0f3e5bdbed802f59d79da5933ed8a6e813f46ba8d9f0853cd6c62cc",
+        "size": 4409
+      },
+      "dev-docs/examples/cpp-oneof/results/shared-affected-runner.py": {
+        "sha256": "964948ccccf4faa9977f7b6d1017eb3f64f21b18fec58a2d95bf618b6211db4e",
+        "size": 5085
+      },
+      "dev-docs/examples/cpp-oneof/results/shared-affected.log": {
+        "sha256": "816af8aa94e1896ab170b1d4d5f24fb71cf165d95c2ed4c501b4c0fd434df50c",
+        "size": 193
+      },
+      "dev-docs/examples/cpp-oneof/results/target-gate-receipt.json": {
+        "sha256": "2d121660cb1f995922e46d786528e263aae31df9356de86e20971b077c8f5a3c",
+        "size": 1144
+      },
+      "dev-docs/examples/cpp-oneof/verify_examples.py": {
+        "sha256": "74227a502bafb0103c26425e3e7e98d8d571e5a72b6754c3a7f78a783dc20d9e",
+        "size": 3116
+      },
+      "dev-docs/examples/go-oneof/README.md": {
+        "sha256": "f0e6a0e09848196f979f77a49e1b9b4e52a812358fd6ec04223948d45d2733ee",
+        "size": 9674
+      },
+      "dev-docs/examples/go-oneof/RESULTS.md": {
+        "sha256": "8f879979a2e23b515c822ac5f6d6925b3492a97e3e238784c83d0044c2c416fb",
+        "size": 9777
+      },
+      "dev-docs/examples/go-oneof/conformance.go": {
+        "sha256": "ea17aa14bdb47d85bc5ac1a78276bf6bac03802943cd326a4a474db64ea6676e",
+        "size": 2885
+      },
+      "dev-docs/examples/go-oneof/content.taut.py": {
+        "sha256": "a7801a830ac21150015dcc93c91bea231f5c10fe0c9ffc9d7c8fcc0037d19d31",
+        "size": 1292
+      },
+      "dev-docs/examples/go-oneof/goldens/legacy-api.go": {
+        "sha256": "ac086583cf04fafd31ceceed04ffe450887a39e893979bae82829f5bb32f3ce9",
+        "size": 2040
+      },
+      "dev-docs/examples/go-oneof/goldens/off.go": {
+        "sha256": "6b3d882366baa28357c17afc6b03bbfc70670cf99c9620ab5abc8539055e1ff2",
+        "size": 4991
+      },
+      "dev-docs/examples/go-oneof/goldens/on.go": {
+        "sha256": "032b6b8bd5d48ed54dc688092ec61982ddde9ea3968b87ba3da541fcf08e6f56",
+        "size": 5481
+      },
+      "dev-docs/examples/go-oneof/results/example-api-association.json": {
+        "sha256": "d1d8163e2cff3f93a9692df322707d75377f0775a4bd14e823a140b043127de9",
+        "size": 736
+      },
+      "dev-docs/examples/go-oneof/results/fingerprint-r1.log": {
+        "sha256": "73b43ab30b9fe8846b9dc8990b54b7a7408d9577762a404b8223292e1b475918",
+        "size": 117
+      },
+      "dev-docs/examples/go-oneof/results/native-example.json": {
+        "sha256": "effa70d212ce498f4dbbb57e93273ef385ad00ecb57fd99e04b5ae64d75d0d9c",
+        "size": 6743
+      },
+      "dev-docs/examples/go-oneof/results/owned-source.json": {
+        "sha256": "900a47df353931bf6a705ab2490faf37c41bb0b8f18ce97b505ebf9282d97bcf",
+        "size": 3327
+      },
+      "dev-docs/examples/go-oneof/results/target-gate-r0.log": {
+        "sha256": "67104ccc1d4b71b94d4cfa1ec86cfe1220773cb5a0d128f19d4a438e551bd993",
+        "size": 3109
+      },
+      "dev-docs/examples/go-oneof/results/unicode-r1.log": {
+        "sha256": "f7fb18b13e2a4af7541dff18207e08af45acbb2203d37f259b5dc525342fd891",
+        "size": 115
+      },
+      "dev-docs/examples/go-oneof/run-example.py": {
+        "sha256": "31a05ac5b43a518fb7fe85afee2aa0e0d65966fccfa84aff7703b84b598300d1",
+        "size": 4039
+      },
+      "pyproject.toml": {
+        "sha256": "8996804505c30bcb05a074a0a5022166ce00ec52bd1fba2dadfcf8ceaeb22ec0",
+        "size": 2138
+      },
+      "src/taut/cli.py": {
+        "sha256": "406e471766743c2db617644b8ef90fae166aaeab53247e2fb56d48e538dd9a4d",
+        "size": 15543
+      },
+      "src/taut/corpus/parity_cpp.py": {
+        "sha256": "2dca5981429b9b15fb8f78a82a0a0db6315209ebb1db3033de0c173409dfaf13",
+        "size": 18071
+      },
+      "src/taut/gen/cpp.py": {
+        "sha256": "90474c42e8726388a0dc839b0eec72d2b56ebe5e9134b3d327e8e09c47edbaf3",
+        "size": 32040
+      },
+      "src/taut/gen/cpp_metadata.py": {
+        "sha256": "038b6dce3c75853ef6ba1e294bad9e20ab574b500bbc2d66fa31be21e0538a3f",
+        "size": 13571
+      },
+      "src/taut/gen/cpp_runtime.py": {
+        "sha256": "3db3604f843cffd1c5ec5ba7f6bf9a6788ec41dca30b6df4ac20d014fe7f54d1",
+        "size": 13528
+      },
+      "src/taut/gen/go.py": {
+        "sha256": "39aac13eceefc6e83f8a6b6de407e80cb16e02ebaf697848fd6afb66735aa357",
+        "size": 20779
+      },
+      "src/taut/gen/go_metadata.py": {
+        "sha256": "b92d4a38510234c2fff64b1b5e5c205f60fc871c1489d64e5a3cd689a865ce0f",
+        "size": 21020
+      },
+      "src/taut/gen/go_runtime.py": {
+        "sha256": "b9fcfaaaec78c3bfeb311763f37d2b2931c1988b4ce3ff25c61db1683dffee19",
+        "size": 17298
+      },
+      "src/taut/gen/runtime/descriptors.hpp": {
+        "sha256": "4dc0b2b40ca2ed8459c733898812eeff0db30d637d03a108a33c5fa3bb0669ec",
+        "size": 23446
+      },
+      "src/taut/gen/runtime/foundation.cpp": {
+        "sha256": "78934d68fee208771c91467bf86b75a867439c00d62199962472e43d70fff101",
+        "size": 255
+      },
+      "src/taut/gen/runtime/foundation.hpp": {
+        "sha256": "f65eac9452ea2e76e9e8cc9554490f8c81e8d7cd2e093d7401d361db0f1c782b",
+        "size": 790
+      },
+      "src/taut/gen/runtime/go/descriptors.go": {
+        "sha256": "1563606dc1144461ca9a54fd24a1ddbb1126989366a30aaf62f64036cc62cede",
+        "size": 23619
+      },
+      "src/taut/gen/runtime/go/paths.go": {
+        "sha256": "e32e1e216ef22125ef7f617b8a5756ea68366c0718e58e1ebf01ca31ec0836f2",
+        "size": 2217
+      },
+      "src/taut/gen/runtime/go/reports.go": {
+        "sha256": "744eb2a1da35be8f4fcea71ea80adc7e0f243031ea87702674ccf0827d445051",
+        "size": 2294
+      },
+      "src/taut/gen/runtime/go/validation.go": {
+        "sha256": "3b710ce626a22a08b5e17cb0e6c36561775b85f10592657931875ca31dc5128c",
+        "size": 3943
+      },
+      "src/taut/gen/runtime/reports.hpp": {
+        "sha256": "c60ecfdb93f7029e35b155d69a19f190159fb8b08463d4aec366d843c42a12d1",
+        "size": 7248
+      },
+      "src/taut/gen/runtime/validation.hpp": {
+        "sha256": "5d39b7d1d1dd106e5e1a6e858b37520dfb5f4c63abb7ed6286f011ed58c56d6a",
+        "size": 6623
+      },
+      "src/taut/gen/scaffold.py": {
+        "sha256": "cc7285e1ce34594d773fdc624dd76774edebe79893897f7a30756c7bd7e227d9",
+        "size": 48734
+      },
+      "src/tests/test_cpp.py": {
+        "sha256": "55fad2e63c3cffff9ef219fa0e492c403a9c094f704572499bc8529daff30af5",
+        "size": 74137
+      },
+      "src/tests/test_cpp_go_distribution.py": {
+        "sha256": "d9630bf6083a614e4cf482749347f59646f17edbb3e7979cf7fdd6c32ce2ca08",
+        "size": 6040
+      },
+      "src/tests/test_cpp_oneof.py": {
+        "sha256": "e3e3dde2a5ad20f3e10c42ae195f5a62b2906703c73efe5954bcde5c40a117f0",
+        "size": 29027
+      },
+      "src/tests/test_go_oneof.py": {
+        "sha256": "3b13614285932150809e12530d77a25f17176b07e3f605b1dae1122e5eb44910",
+        "size": 35767
+      }
+    },
+    "go_count": 22,
+    "pair_document_count": 3,
+    "self_hash": "Preparation self hash intentionally omitted; containing settled commit binds it",
+    "taut": [
+      "dev-docs/CppGoOneOfCheckpoint-Authority.md",
+      "dev-docs/CppGoOneOfCheckpoint-Draft.md",
+      "dev-docs/CppGoOneOfCheckpoint-Preparation.json",
+      "dev-docs/examples/cpp-oneof/AllocationFault.cpp",
+      "dev-docs/examples/cpp-oneof/Conformance.cpp",
+      "dev-docs/examples/cpp-oneof/Example.cpp",
+      "dev-docs/examples/cpp-oneof/README.md",
+      "dev-docs/examples/cpp-oneof/RESULTS.md",
+      "dev-docs/examples/cpp-oneof/content.taut.py",
+      "dev-docs/examples/cpp-oneof/results/example-api-association.json",
+      "dev-docs/examples/cpp-oneof/results/naming-final.log",
+      "dev-docs/examples/cpp-oneof/results/naming-final.xml",
+      "dev-docs/examples/cpp-oneof/results/normalized-reports.txt",
+      "dev-docs/examples/cpp-oneof/results/owned-source.json",
+      "dev-docs/examples/cpp-oneof/results/package-provenance.json",
+      "dev-docs/examples/cpp-oneof/results/shared-affected-after.json",
+      "dev-docs/examples/cpp-oneof/results/shared-affected-before.json",
+      "dev-docs/examples/cpp-oneof/results/shared-affected-receipt.json",
+      "dev-docs/examples/cpp-oneof/results/shared-affected-runner.py",
+      "dev-docs/examples/cpp-oneof/results/shared-affected.log",
+      "dev-docs/examples/cpp-oneof/results/target-gate-receipt.json",
+      "dev-docs/examples/cpp-oneof/verify_examples.py",
+      "dev-docs/examples/go-oneof/README.md",
+      "dev-docs/examples/go-oneof/RESULTS.md",
+      "dev-docs/examples/go-oneof/conformance.go",
+      "dev-docs/examples/go-oneof/content.taut.py",
+      "dev-docs/examples/go-oneof/goldens/legacy-api.go",
+      "dev-docs/examples/go-oneof/goldens/off.go",
+      "dev-docs/examples/go-oneof/goldens/on.go",
+      "dev-docs/examples/go-oneof/results/example-api-association.json",
+      "dev-docs/examples/go-oneof/results/fingerprint-r1.log",
+      "dev-docs/examples/go-oneof/results/native-example.json",
+      "dev-docs/examples/go-oneof/results/owned-source.json",
+      "dev-docs/examples/go-oneof/results/target-gate-r0.log",
+      "dev-docs/examples/go-oneof/results/unicode-r1.log",
+      "dev-docs/examples/go-oneof/run-example.py",
+      "pyproject.toml",
+      "src/taut/cli.py",
+      "src/taut/corpus/parity_cpp.py",
+      "src/taut/gen/cpp.py",
+      "src/taut/gen/cpp_metadata.py",
+      "src/taut/gen/cpp_runtime.py",
+      "src/taut/gen/go.py",
+      "src/taut/gen/go_metadata.py",
+      "src/taut/gen/go_runtime.py",
+      "src/taut/gen/runtime/descriptors.hpp",
+      "src/taut/gen/runtime/foundation.cpp",
+      "src/taut/gen/runtime/foundation.hpp",
+      "src/taut/gen/runtime/go/descriptors.go",
+      "src/taut/gen/runtime/go/paths.go",
+      "src/taut/gen/runtime/go/reports.go",
+      "src/taut/gen/runtime/go/validation.go",
+      "src/taut/gen/runtime/reports.hpp",
+      "src/taut/gen/runtime/validation.hpp",
+      "src/taut/gen/scaffold.py",
+      "src/tests/test_cpp.py",
+      "src/tests/test_cpp_go_distribution.py",
+      "src/tests/test_cpp_oneof.py",
+      "src/tests/test_go_oneof.py"
+    ],
+    "unclassified": []
+  },
+  "pending": [
+    "Root explicit pair freeze using these exact byte inventories",
+    "One scoped local GWZ Taut checkpoint plus workspace capture/commit and exact tuple record",
+    "Exactly two peer-blind reviews with Code+Surface and State, combined pair object",
+    "Root-assigned settled broad/full16 parity gate, then merged bounded remediation/original-axis closure if needed"
+  ],
+  "preservation_final_shared_receipt": {
+    "path": "dev-docs/examples/cpp-oneof/results/shared-affected-after.json",
+    "protected_excluded_indices_locks_source_unchanged": true
+  },
+  "process": {
+    "axes": [
+      "Code+Surface",
+      "State"
+    ],
+    "current_round": "initial checkpoint pending; two reviewers not launched",
+    "final_push": "Root only after reviewed C++/Go and Swift acceptance; no individual push/tag/release/publication",
+    "maximum_remediation_rounds": 2,
+    "process_documents_checked": {
+      "D:\\projects\\limbo\\taut-dev\\dev-docs\\AgentProcessRules.md": false,
+      "D:\\projects\\limbo\\taut-dev\\dev-docs\\CurrentProgramCheckpoint.md": false,
+      "D:\\projects\\limbo\\taut-dev\\dev-docs\\GwzProcessOptimization.md": false,
+      "D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\AgentProcessRules.md": false,
+      "D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\CurrentProgramCheckpoint.md": false,
+      "D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\GwzProcessOptimization.md": false
+    },
+    "reviewers_per_revision": 2,
+    "skill": "C:\\Users\\gianni\\.codex\\skills\\review-loop\\SKILL.md",
+    "skill_sha256": "bf33d564e50e50ebc1d17a6ceb620debe18c6d730b86f20f96418da4ee05d96c",
+    "staging": "Freeze preflight verified empty root/member indices; stage exactly59namedTautpaths viaGWZ, inspect disk/index blobs, then local scoped checkpoint; no broad add",
+    "template": "C:\\Users\\gianni\\.codex\\skills\\review-loop\\references\\review-prompt-template.md",
+    "template_sha256": "3b10ae89cf101c6273d34668eaaeaebf7e030a4c132406e0b234a846665eca58"
+  },
+  "repos": {
+    "taut": {
+      "HEAD": "b9f99ac88ec585616ffac8bf4fbc2aaf4535fc16",
+      "branch": "main",
+      "lock_match": "Differs",
+      "path": "D:/projects/limbo/taut-dev/taut",
+      "staged": 0
+    },
+    "taut-shape-py": {
+      "HEAD": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+      "branch": "main",
+      "lock_match": "Matches",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-py",
+      "staged": 0
+    },
+    "taut-shape-rs": {
+      "HEAD": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+      "branch": "main",
+      "lock_match": "Matches",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-rs",
+      "staged": 0
+    },
+    "taut-shape-ts": {
+      "HEAD": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+      "branch": "main",
+      "lock_match": "Matches",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-ts",
+      "staged": 0
+    },
+    "workspace": {
+      "HEAD": "3a5d103ab09561459ce61c85707b22fd4139f60c",
+      "branch": "main",
+      "path": "D:/projects/limbo/taut-dev",
+      "staged": 0
+    }
+  },
+  "reused_unchanged_canonical_files": {
+    "src/taut/gen/runtime/cbor.go": {
+      "matches_dispatched_HEAD": true,
+      "sha256": "bb1a741f36de2cdeed45df885b7a7e4ebb5d8cb04403c1d755ba5b0e6f73d8ef",
+      "size": 18039
+    },
+    "src/taut/gen/runtime/cbor.hpp": {
+      "matches_dispatched_HEAD": true,
+      "sha256": "dfe9690476d9278aeb0eff6961b68c3a29cc837285ad1ee4529b98e8fdd295f3",
+      "size": 31089
+    },
+    "src/taut/gen/runtime/ext.go": {
+      "matches_dispatched_HEAD": true,
+      "sha256": "14c0fbb5ca9c1238bff77dc5cc99ed7e541e6695574db4a6514a5031443e1b85",
+      "size": 2420
+    },
+    "src/taut/gen/runtime/ext.hpp": {
+      "matches_dispatched_HEAD": true,
+      "sha256": "db45f51e1018706cfa61466b69e51177e192e29c64ebfaec4be6e2a83be33b66",
+      "size": 7238
+    }
+  },
+  "settled_review_tuple": null,
+  "status": "ROOT-FROZEN exact59file source inventory; one scoped LOCAL GWZ checkpoint/review authorized; no acceptance",
+  "user_owned_parallel_work": {
+    "monitored_sources": {
+      "src/taut/facts.py": {
+        "HEAD_sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "matches_HEAD": true,
+        "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "size": 8202
+      },
+      "src/taut/ir/dsl.py": {
+        "HEAD_sha256": "5b2061584dcd78a3f73d2a757d6b101bacf280c9190f6a068b613eecb55b307d",
+        "matches_HEAD": true,
+        "sha256": "5b2061584dcd78a3f73d2a757d6b101bacf280c9190f6a068b613eecb55b307d",
+        "size": 13760
+      },
+      "src/tests/test_dsl.py": {
+        "HEAD_sha256": "205d3922aa8399eadf6affbb53e85fac914c584d0cc80664c235efca0a38ac78",
+        "matches_HEAD": true,
+        "sha256": "205d3922aa8399eadf6affbb53e85fac914c584d0cc80664c235efca0a38ac78",
+        "size": 13776
+      },
+      "src/tests/test_ir_v2.py": {
+        "HEAD_sha256": "17be85b78f8835c37fda6a728e1c376bce297b3eb6cdbb38c100763ba0195107",
+        "matches_HEAD": true,
+        "sha256": "17be85b78f8835c37fda6a728e1c376bce297b3eb6cdbb38c100763ba0195107",
+        "size": 20104
+      },
+      "src/tests/test_oneof.py": {
+        "HEAD_sha256": "a47cc246e59a2717dc9b182afa9a47860ee48d5085f7e94b5f53ff256f9d4dcd",
+        "matches_HEAD": true,
+        "sha256": "a47cc246e59a2717dc9b182afa9a47860ee48d5085f7e94b5f53ff256f9d4dcd",
+        "size": 22409
+      }
+    },
+    "status": "USER owns Enum.case authoring patch; excluded, not assumed present, no permanent old metadata-name policy"
+  }
+}

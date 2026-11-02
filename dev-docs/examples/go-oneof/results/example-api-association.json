@@ -1,0 +1,12 @@
+{
+  "executed_output_root": "D:\\projects\\limbo\\go-oneof-scratch\\final-example-r1",
+  "fresh_final_output_root": "D:\\projects\\limbo\\go-oneof-scratch\\current-api-association",
+  "api_sha256": {
+    "source-off": "308a9d6dfe03e280935dd24808b9c9bce378b109e29c19d942d9aa75f96bf203",
+    "source-on": "246c6167ea099b1c4366e3b046a92d6a5f28e3a1dfc4e1f5976f5f0c5d7c8700",
+    "package-off": "76992fb8bcc8c30df376791166d285f18477e9702d82aa83b1102d7bf67a009e",
+    "package-on": "86ab53895d8b9d1c61b1dec07f9c80e275ba6ff589c421b84cdba15810727631",
+    "supplied-off": "76992fb8bcc8c30df376791166d285f18477e9702d82aa83b1102d7bf67a009e",
+    "supplied-on": "86ab53895d8b9d1c61b1dec07f9c80e275ba6ff589c421b84cdba15810727631"
+  }
+}

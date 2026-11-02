@@ -309,9 +309,11 @@ def _cpp_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def cpp_api(schema: Schema, forward_compat: bool = False) -> str:
+def cpp_api(schema: Schema, forward_compat: bool = False, *, validation=False,
+            external_types=None, identity=None) -> str:
     # enums + structs + constexpr to_cbor/from_cbor (+ wire_residual when forward_compat)
-    return _cpp._emit_types(schema, forward_compat)
+    return _cpp._emit_types(schema, forward_compat, validation=validation,
+                            external_types=external_types, identity=identity)
 
 
 def cpp_client(schema: Schema, svc: ServiceDef) -> str:
@@ -405,8 +407,11 @@ def _go_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def go_api(schema: Schema, forward_compat: bool = False) -> str:
-    return _go.emit_types(schema, forward_compat)
+def go_api(schema: Schema, forward_compat: bool = False, *, validation=False,
+           external_types=None, identity=None, runtime_import='') -> str:
+    return _go.emit_types(schema, forward_compat, validation=validation,
+                          external_types=external_types, identity=identity,
+                          runtime_import=runtime_import)
 
 
 def go_client(schema: Schema, svc: ServiceDef) -> str:
@@ -598,6 +603,8 @@ def emit(
     kotlin_external_types: dict | None = None,
     js_external_types: dict | None = None,
     typescript_external_types: dict | None = None,
+    cpp_external_types: dict | None = None,
+    go_external_types: dict | None = None,
 ) -> list[Path]:
     """Generate per-language code from an IR (the engine behind the `tautc` CLI).
 
@@ -626,8 +633,10 @@ def emit(
     `api.{ext}` (types + codec) is always written per language; client/server are
     `client.{ext}` for a lone service, `client_{svc}.{ext}` when several.
     """
-    from .python_runtime import resolve_mode, runtime_binding, plan_outputs, apply_outputs, output_locks
+    from .python_runtime import resolve_mode, runtime_binding, plan_outputs, apply_outputs, output_locks, validate_namespace_path, _is_alias
     from ..rules import check_rules
+    validate_namespace_path(out_dir)
+    out_dir = Path(out_dir)
     mode = resolve_mode(runtime, runtime_mode, validation)
     runtime = mode == "source"
     lang_keys = list(langs) if langs is not None else list(_LANGS)
@@ -635,10 +644,23 @@ def emit(
     if errors:
         raise ValueError("; ".join(errors))
     constrained = any(f.oneof or f.cases for m in schema.messages.values() for f in m.fields)
-    if (validation or constrained) and set(lang_keys) - {"python", "rust", "java", "kotlin", "js", "typescript"}:
-        raise ValueError("oneof/validation supports Python, Rust, Java, Kotlin, JavaScript and TypeScript only; explicitly select supported languages")
-    if mode == "package" and set(lang_keys) - {"python", "rust", "java", "kotlin", "js", "typescript"}:
-        raise ValueError("package runtime binding is implemented for Python, Rust, Java, Kotlin, JavaScript and TypeScript only")
+    supported = {"python", "rust", "java", "kotlin", "js", "typescript", "cpp", "go"}
+    if (validation or constrained) and set(lang_keys) - supported:
+        raise ValueError("oneof/validation supports Python, Rust, Java, Kotlin, JavaScript, TypeScript, C++ and Go only; explicitly select supported languages")
+    if mode == "package" and set(lang_keys) - supported:
+        raise ValueError("package runtime binding is implemented for Python, Rust, Java, Kotlin, JavaScript, TypeScript, C++ and Go only")
+    cpp_binding = None
+    if "cpp" in lang_keys:
+        from .cpp_runtime import binding as resolve_cpp_binding
+        cpp_binding = resolve_cpp_binding(runtime_bindings, out_dir / "cpp", mode, validation=validation)
+    if cpp_external_types is not None and "cpp" not in lang_keys:
+        raise ValueError("C++ external types require a cpp generation target")
+    go_binding = None
+    if "go" in lang_keys:
+        from .go_runtime import binding as resolve_go_binding
+        go_binding = resolve_go_binding(runtime_bindings, out_dir / "go", mode, validation=validation)
+    if go_external_types is not None and "go" not in lang_keys:
+        raise ValueError("Go external types require a go generation target")
     js_binding = None
     if "js" in lang_keys:
         from .js_runtime import binding as resolve_js_binding, verify_artifact as verify_js_artifact
@@ -730,11 +752,18 @@ def emit(
     kotlin_texts = {}
     js_texts = {}
     typescript_texts = {}
+    cpp_texts = {}
+    go_texts = {}
     for lang in lang_keys:
         ext, api_fn, client_fn, server_fn = _LANGS[lang]
         d = out_dir / lang
         api_path = d / f"api.{ext}"
         api_kwargs = {"forward_compat": forward_compat}
+        if lang == "cpp":
+            api_kwargs.update(validation=validation, external_types=cpp_external_types, identity=schema_identity)
+        if lang == "go":
+            api_kwargs.update(validation=validation, external_types=go_external_types,
+                              identity=schema_identity, runtime_import=go_binding[0])
         if lang == "js":
             api_kwargs.update(external_types=js_external_types, validation=validation,
                               identity=schema_identity, runtime_module=js_binding[0])
@@ -774,10 +803,14 @@ def emit(
             js_texts[f"api.{ext}"] = api_text
         elif lang == "typescript":
             typescript_texts[f"api.{ext}"] = api_text
+        elif lang == "cpp":
+            cpp_texts[f"api.{ext}"] = api_text
+        elif lang == "go":
+            go_texts[f"api.{ext}"] = api_text
         else:
             all_writes[api_path] = api_text.encode("utf-8")
         written.append(api_path)
-        if runtime and lang in _RUNTIMES and lang not in ("rust", "java", "kotlin", "js", "typescript"):
+        if runtime and lang in _RUNTIMES and lang not in ("rust", "java", "kotlin", "js", "typescript", "cpp", "go"):
             for rel, resource in _RUNTIMES[lang]:
                 if not _runtime_exists(resource):
                     continue   # e.g. ext.<lang> before Phase 2 — vendored once its file lands
@@ -803,11 +836,29 @@ def emit(
                     js_texts[path.name] = content
                 elif lang == "typescript":
                     typescript_texts[path.name] = content
+                elif lang == "cpp":
+                    cpp_texts[path.name] = content
+                elif lang == "go":
+                    go_texts[path.name] = content
                 else:
                     all_writes[path] = content.encode("utf-8")
                 written.append(path)
     plans = []
     lock_roots = []
+    if "cpp" in lang_keys:
+        from .cpp_runtime import plan_outputs as cpp_plan_outputs, canonical_path as cpp_canonical_path
+        directory = cpp_canonical_path(out_dir / "cpp")
+        source_root, consume_source = cpp_binding
+        lock_roots.extend([directory, source_root])
+        plans.append((directory, source_root, directory / ".taut-cpp-outputs.json", cpp_plan_outputs,
+                      cpp_texts, {"consume_source": consume_source, "external": bool(cpp_external_types)}))
+    if "go" in lang_keys:
+        from .go_runtime import plan_outputs as go_plan_outputs, canonical_path as go_canonical_path
+        directory = go_canonical_path(out_dir / "go")
+        _, source_root, consume_source = go_binding
+        lock_roots.extend([directory, source_root])
+        plans.append((directory, source_root, directory / ".taut-go-outputs.json", go_plan_outputs,
+                      go_texts, {"consume_source": consume_source, "external": bool(go_external_types)}))
     if "js" in lang_keys:
         from .js_runtime import plan_outputs as js_plan_outputs, canonical_path as js_canonical_path
         directory = js_canonical_path(out_dir / "js")
@@ -855,10 +906,17 @@ def emit(
                       kotlin_texts, {"consume_source": consume_source, "external": bool(kotlin_external_types)}))
     import json
     for _, _, previous, _, _, _ in plans:
+        if _is_alias(previous) or (previous.exists() and not previous.is_file()):
+            raise ValueError(f'{previous}: unsafe previous ownership metadata; use a fresh output root or explicit migration')
         if previous.exists():
             prior_root = json.loads(previous.read_text(encoding="utf-8")).get("source_root")
             if prior_root:
-                lock_roots.append(Path(prior_root))
+                validate_namespace_path(prior_root)
+                prior_path = Path(prior_root).absolute()
+                if any(_is_alias(component) or (component.exists() and not component.is_dir())
+                       for component in (prior_path, *prior_path.parents)):
+                    raise ValueError(f'{prior_root}: unsafe/obstructed previous runtime owner; restore it or use a fresh output root')
+                lock_roots.append(prior_path)
     with output_locks(lock_roots):
         deletes = set()
         for directory, source_root, previous, planner, texts, extra in plans:
@@ -882,10 +940,12 @@ def emit_all(schema: Schema, service_name: str, out_dir: Path, *, runtime: bool 
              runtime_mode: str | None = None, validation: bool = False,
              runtime_bindings: dict | None = None, python_external_types=None,
              schema_identity=None, langs=None, rust_external_types=None, java_external_types=None, kotlin_external_types=None,
-             js_external_types=None, typescript_external_types=None) -> list[Path]:
+             js_external_types=None, typescript_external_types=None,
+             cpp_external_types=None, go_external_types=None) -> list[Path]:
     """Back-compat: api + client/server for one service, all languages."""
     return emit(schema, out_dir, services=[service_name], runtime=runtime, runtime_mode=runtime_mode,
                 validation=validation, runtime_bindings=runtime_bindings,
                 python_external_types=python_external_types, schema_identity=schema_identity, langs=langs,
                 rust_external_types=rust_external_types, java_external_types=java_external_types, kotlin_external_types=kotlin_external_types,
-                js_external_types=js_external_types, typescript_external_types=typescript_external_types)
+                js_external_types=js_external_types, typescript_external_types=typescript_external_types,
+                cpp_external_types=cpp_external_types, go_external_types=go_external_types)

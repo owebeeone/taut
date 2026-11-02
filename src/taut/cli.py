@@ -48,6 +48,8 @@ def _split(arg: str | None) -> list[str] | None:
 
 
 def _cmd_gen(args: argparse.Namespace) -> int:
+    from .gen.python_runtime import validate_namespace_path
+    validate_namespace_path(args.out)
     modes = set(args.runtime or [])
     if len(modes) > 1 or (args.with_runtime and "package" in modes):
         raise ValueError("conflicting runtime options; select source or package before generation")
@@ -69,6 +71,8 @@ def _cmd_gen(args: argparse.Namespace) -> int:
         runtime=args.with_runtime, forward_compat=args.forward_compat,
         runtime_mode=next(iter(modes), None), validation=args.with_validation,
         runtime_bindings=(json.loads(Path(args.runtime_bindings).read_text()) if args.runtime_bindings else None),
+        cpp_external_types=(json.loads(Path(args.cpp_external_types).read_text()) if args.cpp_external_types else None),
+        go_external_types=(json.loads(Path(args.go_external_types).read_text()) if args.go_external_types else None),
         js_external_types=(json.loads(Path(args.js_external_types).read_text()) if args.js_external_types else None),
         typescript_external_types=(json.loads(Path(args.typescript_external_types).read_text()) if args.typescript_external_types else None),
         kotlin_external_types=(json.loads(Path(args.kotlin_external_types).read_text()) if args.kotlin_external_types else None),
@@ -169,6 +173,8 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("-s", "--service", help="comma-separated services for client/server stubs (default: all in the IR)")
     g.add_argument("--api-only", action="store_true", help="emit only api (types + encoders/decoders), no client/server")
     g.add_argument("--js-external-types", metavar="JSON_FILE", help="JSON file path mapping schema names to JavaScript {module, export?} dependency bindings (default: none); complete dependency schema and one shared foundation required")
+    g.add_argument("--cpp-external-types", metavar="JSON_FILE", help="JSON file path mapping schema names to C++ header/type/owner/contract bindings (default: none); independently compiled children share one foundation")
+    g.add_argument("--go-external-types", metavar="JSON_FILE", help="JSON file path mapping schema names to Go import/type/owner/contract bindings (default: none); independently built children share one foundation")
     g.add_argument("--typescript-external-types", metavar="JSON_FILE", help="JSON file path mapping schema names to TypeScript {module, export?, data_export?} bindings (default: none); message data_export defaults to ExportFields, enums to Export; complete dependency schema and one shared foundation required")
     g.add_argument("--kotlin-external-types", metavar="JSON_FILE", help="JSON file path mapping schema names to qualified Kotlin dependency types (default: no external mappings); compatible descriptors and shared foundation required")
     g.add_argument("--java-external-types", metavar="JSON_FILE", help="JSON file path containing Java dependency type/owner/contract bindings (default: no external mappings); independently compiled same-package types")
@@ -176,11 +182,11 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--with-runtime", action="store_true",
                    help="compatibility alias for --runtime source; does not enable validation")
     g.add_argument("--runtime", choices=("source", "package"), action="append",
-                   help="runtime distribution (default: application supplies runtime); Python package imports taut-proto; Rust imports taut_foundation; Java/Kotlin consumers supply foundation on their classpath; JavaScript uses local taut-js-foundation or an explicit module; TypeScript uses @owebeeone/taut-shape/foundation; source emits canonical foundations; no install or fallback; repeated values must agree")
+                   help="runtime distribution (default: application supplies runtime); Python package imports taut-proto; Rust imports taut_foundation; Java/Kotlin consumers supply foundation on their classpath; JavaScript uses local taut-js-foundation or an explicit module; TypeScript uses @owebeeone/taut-shape/foundation; C++ uses one taut include/link owner; Go requires an explicit shared import_path for packages; source emits canonical foundations; no install or fallback; repeated values must agree")
     g.add_argument("--with-validation", action="store_true",
-                   help="emit instance validation on every Python/Rust/Java/Kotlin/JavaScript/TypeScript message (default: off; descriptors always emitted); JS/TS/JVM methods: validate/isValid; Python/Rust: validate/is_valid")
+                   help="emit instance validation on every Python/Rust/Java/Kotlin/JavaScript/TypeScript/C++/Go message (default: off; descriptors always emitted); JS/TS/JVM methods: validate/isValid; Python/Rust: validate/is_valid; C++: const noexcept validate/is_valid; Go: Validate/IsValid and WithOptions variants")
     g.add_argument("--runtime-bindings", metavar="JSON_FILE",
-                   help='JSON file path with target-keyed python/rust/java/kotlin/js/typescript bindings (default: canonical owners, descriptor_contract=1, codec_contract=1, codec.v1/descriptors.v1/oneof.v1 capabilities; source_root defaults to target output directory). Keys: owner, source_root, descriptor_contract, codec_contract, capabilities; Python/Rust/Java/JS/TS also accept module; Java accepts optional artifact jar; JS/TS accept optional artifact tgz; TS also validation_module. Python/Java module=taut; Kotlin packages fixed to taut; Rust module defaults to crate (supplied/source) or taut_foundation (package); JS/TS module selects the actual shared foundation, never installs it')
+                   help='JSON file path with target-keyed python/rust/java/kotlin/js/typescript/cpp/go bindings (default: canonical owners, descriptor_contract=1, codec_contract=1, codec.v1/descriptors.v1/oneof.v1 capabilities; source_root defaults to target output directory). Keys: owner, source_root, descriptor_contract, codec_contract, capabilities; Python/Rust/Java/JS/TS also accept module; Java accepts optional artifact jar; JS/TS accept optional artifact tgz; TS also validation_module; C++ artifact is a local include/link package directory; Go import_path names the supplied module and artifact optionally names its local directory. Python/Java module=taut; Kotlin packages fixed to taut; Rust module defaults to crate (supplied/source) or taut_foundation (package); JS/TS module selects the actual shared foundation, never installs it')
     g.add_argument("--python-external-types", metavar="JSON_FILE",
                    help="JSON file path mapping schema names to module.Class for independently generated Python dependencies (default: no external mappings); full dependency schema must be present")
     g.add_argument("--forward-compat", action="store_true",

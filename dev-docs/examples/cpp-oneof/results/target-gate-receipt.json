@@ -1,0 +1,21 @@
+{
+  "command": [
+    "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+    "-m",
+    "pytest",
+    "src/tests/test_cpp.py",
+    "src/tests/test_cpp_oneof.py",
+    "src/tests/test_cpp_go_distribution.py",
+    "-q",
+    "--basetemp",
+    "D:/projects/limbo/cpp-go-oneof-scratch/pytest-settled-cpp"
+  ],
+  "observed_result": "87 passed in 189.13s",
+  "failures": 0,
+  "skips": 0,
+  "deselections": 0,
+  "capture": "Tool session30158 observed stdout; summary receipt, not a raw log or before/after source snapshot",
+  "association": "Pre-final shared prior-owner pre-lock correction and narrow C++ naming preflight fix. Runtime/codec/engine bytes unchanged; final shared88pass/1skip and final naming21pass retain separate source associations. Normal tested examples remain byte-identical to fresh final generator. Additional tests after collection are not relabeled in87; Go late generator-only corrections have owned receipts. Root owns settled broad/all16.",
+  "counts_not_additive": true,
+  "interpreter": "3.13.5 (main, Jul 23 2025, 00:30:06) [MSC v.1944 64 bit (AMD64)]"
+}

@@ -1,6 +1,9 @@
 """Go code generator — native structs + a deterministic-CBOR codec, mirroring the
 Rust/C++/Swift generators. Pairs with the vendored `cbor.go` runtime (emitted by
-`tautc gen --lang go --with-runtime`); both are `package taut`. Go's `Encode`
+`tautc gen --lang go --runtime source`); the default is `package taut`.
+Explicit bindings import one shared application-owned foundation for independent
+schema packages. `go_metadata` adds mandatory immutable descriptors and typed
+adapters around these codec helpers, and opt-in thin validation methods. Go's `Encode`
 sorts map keys, so forward-compat residual just rides along (no merge).
 
 Field/enum names are PascalCased (Go requires capitalized identifiers to export)
@@ -413,7 +416,7 @@ def _emit_typed_decode(schema: Schema, msg: MessageDef) -> list[str]:
 
 
 def _emit_message(schema: Schema, msg: MessageDef, forward_compat: bool = False) -> list[str]:
-    fields = [(_pascal(f.name), _field_type(f)) for f in msg.fields]
+    fields = [(_pascal(f.name), _field_type(f)) for f in msg.fields if not f.virtual]
     if forward_compat:
         fields.append(("WireResidual", "[]KV"))
     out = [f"type {msg.name} struct {{", *_aligned(fields), "}", ""]
@@ -425,14 +428,8 @@ def _emit_message(schema: Schema, msg: MessageDef, forward_compat: bool = False)
     return out
 
 
-def emit_types(schema: Schema, forward_compat: bool = False) -> str:
-    out = ["// GENERATED native Go types + codec — do not edit.",
-           "// Pairs with the vendored cbor.go runtime (same package).",
-           "package taut"]
-    if any(_sorts(f.type) for m in schema.messages.values() for f in m.wire_fields()):
-        out += ["", 'import "sort"']
-    for e in schema.enums.values():
-        out += ["", *_emit_enum(e.name, e.members)]
-    for m in schema.messages.values():
-        out += ["", *_emit_message(schema, m, forward_compat)]
-    return "\n".join(out) + "\n"
+def emit_types(schema: Schema, forward_compat: bool = False, *, validation=False,
+               external_types=None, identity=None, runtime_import='') -> str:
+    from .go_metadata import emit_types as emit
+    return emit(schema, forward_compat=forward_compat, validation=validation,
+                external_types=external_types, identity=identity, runtime_import=runtime_import)

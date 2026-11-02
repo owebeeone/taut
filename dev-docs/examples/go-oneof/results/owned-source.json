@@ -1,0 +1,39 @@
+{
+  "canonical_runtime_source_inventory": {
+    "cbor.go": "cbor.go",
+    "descriptors.go": "go/descriptors.go",
+    "ext.go": "ext.go",
+    "paths.go": "go/paths.go",
+    "reports.go": "go/reports.go",
+    "validation.go": "go/validation.go"
+  },
+  "evidence_limits": "Complete target r0 precedes the per-message forward_compat fingerprint and supplementary Unicode literal corrections. Focused r1 receipts and final API identity association apply to these final bytes. Counts overlap. Root owns settled broad/all16 gate and pair freeze.",
+  "files": {
+    "dev-docs/examples/go-oneof/README.md": "f0e6a0e09848196f979f77a49e1b9b4e52a812358fd6ec04223948d45d2733ee",
+    "dev-docs/examples/go-oneof/RESULTS.md": "8f879979a2e23b515c822ac5f6d6925b3492a97e3e238784c83d0044c2c416fb",
+    "dev-docs/examples/go-oneof/conformance.go": "ea17aa14bdb47d85bc5ac1a78276bf6bac03802943cd326a4a474db64ea6676e",
+    "dev-docs/examples/go-oneof/content.taut.py": "a7801a830ac21150015dcc93c91bea231f5c10fe0c9ffc9d7c8fcc0037d19d31",
+    "dev-docs/examples/go-oneof/goldens/legacy-api.go": "ac086583cf04fafd31ceceed04ffe450887a39e893979bae82829f5bb32f3ce9",
+    "dev-docs/examples/go-oneof/goldens/off.go": "6b3d882366baa28357c17afc6b03bbfc70670cf99c9620ab5abc8539055e1ff2",
+    "dev-docs/examples/go-oneof/goldens/on.go": "032b6b8bd5d48ed54dc688092ec61982ddde9ea3968b87ba3da541fcf08e6f56",
+    "dev-docs/examples/go-oneof/results/example-api-association.json": "d1d8163e2cff3f93a9692df322707d75377f0775a4bd14e823a140b043127de9",
+    "dev-docs/examples/go-oneof/results/fingerprint-r1.log": "73b43ab30b9fe8846b9dc8990b54b7a7408d9577762a404b8223292e1b475918",
+    "dev-docs/examples/go-oneof/results/native-example.json": "effa70d212ce498f4dbbb57e93273ef385ad00ecb57fd99e04b5ae64d75d0d9c",
+    "dev-docs/examples/go-oneof/results/target-gate-r0.log": "67104ccc1d4b71b94d4cfa1ec86cfe1220773cb5a0d128f19d4a438e551bd993",
+    "dev-docs/examples/go-oneof/results/unicode-r1.log": "f7fb18b13e2a4af7541dff18207e08af45acbb2203d37f259b5dc525342fd891",
+    "dev-docs/examples/go-oneof/run-example.py": "31a05ac5b43a518fb7fe85afee2aa0e0d65966fccfa84aff7703b84b598300d1",
+    "src/taut/gen/go.py": "39aac13eceefc6e83f8a6b6de407e80cb16e02ebaf697848fd6afb66735aa357",
+    "src/taut/gen/go_metadata.py": "b92d4a38510234c2fff64b1b5e5c205f60fc871c1489d64e5a3cd689a865ce0f",
+    "src/taut/gen/go_runtime.py": "b9fcfaaaec78c3bfeb311763f37d2b2931c1988b4ce3ff25c61db1683dffee19",
+    "src/taut/gen/runtime/go/descriptors.go": "1563606dc1144461ca9a54fd24a1ddbb1126989366a30aaf62f64036cc62cede",
+    "src/taut/gen/runtime/go/paths.go": "e32e1e216ef22125ef7f617b8a5756ea68366c0718e58e1ebf01ca31ec0836f2",
+    "src/taut/gen/runtime/go/reports.go": "744eb2a1da35be8f4fcea71ea80adc7e0f243031ea87702674ccf0827d445051",
+    "src/taut/gen/runtime/go/validation.go": "3b710ce626a22a08b5e17cb0e6c36561775b85f10592657931875ca31dc5128c",
+    "src/tests/test_go_oneof.py": "3b13614285932150809e12530d77a25f17176b07e3f605b1dae1122e5eb44910"
+  },
+  "reused_unchanged_canonical_files": {
+    "src/taut/gen/runtime/cbor.go": "bb1a741f36de2cdeed45df885b7a7e4ebb5d8cb04403c1d755ba5b0e6f73d8ef",
+    "src/taut/gen/runtime/ext.go": "14c0fbb5ca9c1238bff77dc5cc99ed7e541e6695574db4a6514a5031443e1b85"
+  },
+  "status": "REVIEW-READY / production HOLD"
+}

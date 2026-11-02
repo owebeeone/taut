@@ -45,7 +45,7 @@ include = ["taut*"]
 [tool.setuptools.package-data]
 # Canonical codec/descriptor/report/engine resources; flat JS and TypeScript
 # globs also cover their complete foundation closures (including snapshots).
-"taut.gen.runtime" = ["*.rs", "*.hpp", "*.swift", "*.go", "*.kt", "*.js", "*.java", "typescript/*.ts", "kotlin/*.kt", "java/taut/validation/*.java", "java/taut/validation/descriptors/*.java"]
+"taut.gen.runtime" = ["*.rs", "*.hpp", "*.cpp", "*.swift", "*.go", "*.kt", "*.js", "*.java", "go/*.go", "typescript/*.ts", "kotlin/*.kt", "java/taut/validation/*.java", "java/taut/validation/descriptors/*.java"]
 
 [tool.pytest.ini_options]
 testpaths = ["src/tests"]

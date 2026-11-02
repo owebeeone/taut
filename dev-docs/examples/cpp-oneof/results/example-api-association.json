@@ -1,0 +1,13 @@
+{
+  "fresh_generator": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\final-cpp-api-association",
+  "tested_artifacts": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\cpp-examples-gx6sfg7z",
+  "api_sha256": {
+    "source": "e9e3b56c048f8d04f26c294a16258d9edd8df7afe2d61c0c62b50f78731f2498",
+    "package": "e9e3b56c048f8d04f26c294a16258d9edd8df7afe2d61c0c62b50f78731f2498",
+    "supplied": "e9e3b56c048f8d04f26c294a16258d9edd8df7afe2d61c0c62b50f78731f2498"
+  },
+  "fresh_sha256": "e9e3b56c048f8d04f26c294a16258d9edd8df7afe2d61c0c62b50f78731f2498",
+  "all_equal": true,
+  "interpreter": "3.13.5 (main, Jul 23 2025, 00:30:06) [MSC v.1944 64 bit (AMD64)]",
+  "final_after_naming_fix_sha256": "e9e3b56c048f8d04f26c294a16258d9edd8df7afe2d61c0c62b50f78731f2498"
+}

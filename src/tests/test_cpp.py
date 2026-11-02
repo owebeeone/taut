@@ -58,7 +58,9 @@ def _compile_and_run_cpp(tmp_path: Path, source: str, name: str) -> subprocess.C
     src.write_text(source)
     exe = tmp_path / name
     result = subprocess.run(
-        [compiler, "-std=c++20", "-I", str(tmp_path / "cpp"), str(src), "-o", str(exe)],
+        [compiler, "-std=c++20", "-I", str(tmp_path / "cpp"), str(src),
+         *([str(tmp_path / "cpp" / "foundation.cpp")] if (tmp_path / "cpp" / "foundation.cpp").exists() else []),
+         "-o", str(exe)],
         text=True,
         capture_output=True,
     )
@@ -954,10 +956,11 @@ def test_cpp_reports_a_repeated_bool_map_key_as_text(nested_shapes):
 def test_cpp_generated_scalar_list_float_static_asserts_cxx20(tmp_path):
     compiler = _cpp_compiler()
 
-    runtime_src = Path(cpp_gen.__file__).resolve().parent / "runtime" / "cbor.hpp"
-    include_dir = tmp_path / "taut"
-    include_dir.mkdir()
-    (include_dir / "cbor.hpp").write_text(runtime_src.read_text())
+    from taut.gen.cpp_runtime import canonical_sources
+    for name, data in canonical_sources(validation=False).items():
+        destination=tmp_path/name
+        destination.parent.mkdir(parents=True,exist_ok=True)
+        destination.write_bytes(data)
 
     refs = {
         "scalar-list-floats": (
@@ -976,7 +979,7 @@ def test_cpp_generated_scalar_list_float_static_asserts_cxx20(tmp_path):
 
     exe = tmp_path / "generated_scalar_list_float"
     result = subprocess.run(
-        [compiler, "-std=c++20", "-I", str(tmp_path), str(source), "-o", str(exe)],
+        [compiler, "-std=c++20", "-I", str(tmp_path), str(source), str(tmp_path / "foundation.cpp"), "-o", str(exe)],
         text=True,
         capture_output=True,
     )
@@ -1002,15 +1005,18 @@ def test_cpp_constexpr_corpus_proves_the_golden_corpus(tmp_path):
     assert sorted(re.findall(r'eq_hex\(encode_\w+\(\), "([0-9a-f]+)"\)', corpus)) == \
         sorted(golden[name]["cbor"] for name in refs)
     assert sorted(re.findall(r"taut::(\w+)::try_decode\(", corpus)) == sorted(message for message, _ in refs.values())
-    (tmp_path / "taut").mkdir()
-    (tmp_path / "taut" / "cbor.hpp").write_text((RUNTIME / "cbor.hpp").read_text())
+    from taut.gen.cpp_runtime import canonical_sources
+    for name,data in canonical_sources(validation=False).items():
+        destination=tmp_path/name
+        destination.parent.mkdir(parents=True,exist_ok=True)
+        destination.write_bytes(data)
     (tmp_path / "types.hpp").write_text(cpp_gen._emit_types(schema))
     (tmp_path / "corpus.hpp").write_text(corpus)
     source = tmp_path / "golden_corpus.cpp"
     source.write_text('#include "corpus.hpp"\n\n'
                       f"int main() {{ return taut::corpus::VECTOR_COUNT == {len(refs)} ? 0 : 1; }}\n")
     exe = tmp_path / "golden_corpus"
-    result = subprocess.run([compiler, "-std=c++20", "-I", str(tmp_path), str(source), "-o", str(exe)],
+    result = subprocess.run([compiler, "-std=c++20", "-I", str(tmp_path), str(source), str(tmp_path / "foundation.cpp"), "-o", str(exe)],
                             text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
     assert subprocess.run([str(exe)]).returncode == 0
