@@ -1,0 +1,32 @@
+{
+  "acceptance": "Lane owner separately merges final verdicts; this receipt does not substitute for them",
+  "filing": "SHA256 values supplied by originating reviewers and independently verified before copy; both final full reports remain reviewer testimony",
+  "remediation_round": 1,
+  "reports": {
+    "code": {
+      "byte_length": 17304,
+      "original_reviewer_continued": true,
+      "sha256": "a473786cb225faaf59c9f4fd2ebe9abb3b220c974f9337bc16ab456f4d4e0c76",
+      "source": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\review-r1\\code\\scratch\\final-review-code-1.md",
+      "target": "dev-docs/CppGoOneOfCheckpoint-ReviewCode-1.md",
+      "verbatim_byte_copy": true
+    },
+    "state": {
+      "byte_length": 18896,
+      "original_reviewer_continued": true,
+      "sha256": "4de3754aab5813cde1db000ba018a45ccd039dd559081cd1dc6ed0f6ba1d9415",
+      "source": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\review-r1\\state\\scratch\\final-review-state-1.md",
+      "target": "dev-docs/CppGoOneOfCheckpoint-ReviewState-1.md",
+      "verbatim_byte_copy": true
+    }
+  },
+  "reviewed_tuple": {
+    "taut": "c9c5bb0764bbc5a58c65e649468ed5aa67920ded",
+    "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "1a4d66e05221a1a85e5b4f0fbb10b80befe2b378"
+  },
+  "reviewers_total": 2,
+  "status": "Both original full final R1 reports filed verbatim; no editorial changes"
+}

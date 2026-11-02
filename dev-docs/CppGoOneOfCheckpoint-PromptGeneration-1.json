@@ -1,0 +1,32 @@
+{
+  "canonical_template": "C:\\Users\\gianni\\.codex\\skills\\review-loop\\references\\review-prompt-template.md",
+  "records": {
+    "code": {
+      "original_reviewer_continued": true,
+      "prompt": "dev-docs/CppGoOneOfCheckpoint-PromptCode-1.md",
+      "sha256": "1bd60197ce387db4fc817783ec423c853537c2aba245262c9f291224cd843025",
+      "tuple": {
+        "taut": "c9c5bb0764bbc5a58c65e649468ed5aa67920ded",
+        "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+        "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+        "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+        "workspace": "1a4d66e05221a1a85e5b4f0fbb10b80befe2b378"
+      }
+    },
+    "state": {
+      "original_reviewer_continued": true,
+      "prompt": "dev-docs/CppGoOneOfCheckpoint-PromptState-1.md",
+      "sha256": "1cf51e9d8e49197bbbedfc294a6b842e5c3a42e030b34983b95441ed41f1ec85",
+      "tuple": {
+        "taut": "c9c5bb0764bbc5a58c65e649468ed5aa67920ded",
+        "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+        "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+        "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+        "workspace": "1a4d66e05221a1a85e5b4f0fbb10b80befe2b378"
+      }
+    }
+  },
+  "remediation_round": 1,
+  "reviewers_total": 2,
+  "template_sha256": "3b10ae89cf101c6273d34668eaaeaebf7e030a4c132406e0b234a846665eca58"
+}

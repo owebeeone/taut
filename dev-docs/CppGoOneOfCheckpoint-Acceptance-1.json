@@ -1,0 +1,76 @@
+{
+  "acceptance_scope": "C++/Go native metadata/explicit validation plus authorized shared integration and six merged fixes; excludes Swift/user Enum.case/dependencies/release/push",
+  "accepted_source_tuple": {
+    "taut": "c9c5bb0764bbc5a58c65e649468ed5aa67920ded",
+    "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "1a4d66e05221a1a85e5b4f0fbb10b80befe2b378"
+  },
+  "all_779_reviewed_tracked_files_equal_exact_committed_bytes": true,
+  "evidence_only_allowlist": [
+    "dev-docs/CppGoOneOfCheckpoint-Tuple-1.json",
+    "dev-docs/CppGoOneOfCheckpoint-ReviewSetup-1.json",
+    "dev-docs/CppGoOneOfCheckpoint-PromptCode-1.md",
+    "dev-docs/CppGoOneOfCheckpoint-PromptState-1.md",
+    "dev-docs/CppGoOneOfCheckpoint-PromptGeneration-1.json",
+    "dev-docs/CppGoOneOfCheckpoint-ReviewCode-1.md",
+    "dev-docs/CppGoOneOfCheckpoint-ReviewState-1.md",
+    "dev-docs/CppGoOneOfCheckpoint-ReportFiling-1.json",
+    "dev-docs/CppGoOneOfCheckpoint-Verdict-1.md",
+    "dev-docs/CppGoOneOfCheckpoint-Acceptance-1.json"
+  ],
+  "evidence_sha256": {
+    "dev-docs/CppGoOneOfCheckpoint-PromptCode-1.md": {
+      "sha256": "1bd60197ce387db4fc817783ec423c853537c2aba245262c9f291224cd843025",
+      "size": 17496
+    },
+    "dev-docs/CppGoOneOfCheckpoint-PromptGeneration-1.json": {
+      "sha256": "dd8da507a8763740848ec0bdda347eecc9919aa723f1c3aa4396ee8797ce5ce6",
+      "size": 1446
+    },
+    "dev-docs/CppGoOneOfCheckpoint-PromptState-1.md": {
+      "sha256": "1cf51e9d8e49197bbbedfc294a6b842e5c3a42e030b34983b95441ed41f1ec85",
+      "size": 16292
+    },
+    "dev-docs/CppGoOneOfCheckpoint-ReportFiling-1.json": {
+      "sha256": "3e2e43b5e13a56de404ce7e2c22db2b406b813629cc09d8c11469ad1ee69b2b6",
+      "size": 1563
+    },
+    "dev-docs/CppGoOneOfCheckpoint-ReviewCode-1.md": {
+      "sha256": "a473786cb225faaf59c9f4fd2ebe9abb3b220c974f9337bc16ab456f4d4e0c76",
+      "size": 17304
+    },
+    "dev-docs/CppGoOneOfCheckpoint-ReviewSetup-1.json": {
+      "sha256": "8575b6734bfaca38e103b6671de4205b249c1fbeffe062bf3fb17b04236fee2c",
+      "size": 3796
+    },
+    "dev-docs/CppGoOneOfCheckpoint-ReviewState-1.md": {
+      "sha256": "4de3754aab5813cde1db000ba018a45ccd039dd559081cd1dc6ed0f6ba1d9415",
+      "size": 18896
+    },
+    "dev-docs/CppGoOneOfCheckpoint-Tuple-1.json": {
+      "sha256": "2e24733b3b1ef23f98cf12fb403f6a5a06fd89afa74143d463c364833937cb67",
+      "size": 7847
+    },
+    "dev-docs/CppGoOneOfCheckpoint-Verdict-1.md": {
+      "sha256": "883e5ae54e4250d5c58cbc0f0dda4cb50a45c46fcdb2ad67c41484ff6088927b",
+      "size": 5091
+    }
+  },
+  "filing_record_verified": true,
+  "final_landing_receipt": "Actual final source/workspace SHAs are reported after GWZ commit/capture; no invented future SHA",
+  "gate_association": "FocusedResults-1 at reviewedc9; original complete broad/all16 remains at422 tuple; no extra global gate, thirdreviewer or sourcechange",
+  "open_blocking_findings": 0,
+  "protection": "5user-owned sources+35excluded artifacts+unchanged reference-library revisions and tracked trees; all5indices empty before evidence staging; final root difference restricted to2GWZmanagedreceiptfiles",
+  "remediation_rounds": 1,
+  "reviewed_inventory_sha256": "7d50fc2f4afb9c44800f985cb0f19a3b9d2f0df0937ae823b6366796b8796794",
+  "reviewers_total": 2,
+  "reviews": [
+    "dev-docs/CppGoOneOfCheckpoint-ReviewCode-1.md",
+    "dev-docs/CppGoOneOfCheckpoint-ReviewState-1.md"
+  ],
+  "self_hash": "containing evidence-only commit binds omitted self-hash",
+  "source_test_example_identity": "Every existing file at reviewed source commit unchanged; this landing adds only named10review/acceptance documents",
+  "status": "Accepted C++/Go corrected source at exact reviewed tuple after both original reviewers reported GO; scoped evidence-only landing authorized by coordinator"
+}

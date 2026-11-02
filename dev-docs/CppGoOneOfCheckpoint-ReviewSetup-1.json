@@ -1,0 +1,87 @@
+{
+  "clones": {
+    "code": {
+      "all_repositories_raw_equal": true,
+      "historical_commits": [
+        "4222822320cbb22e376f8b387a963e86aad10ff2",
+        "b9f99ac88ec585616ffac8bf4fbc2aaf4535fc16",
+        "68c24a899345367f3026372d3c67737751215a0e",
+        "57c56d5f7d727eb483ac9fd89c482f6a44f7913e",
+        "1607b6e0b000f607153b2ec20fc244aeb5952744"
+      ],
+      "receipt": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\review-r1\\code\\clone-receipt.json",
+      "receipt_sha256": "01fff56ffa7f8a4c8e002263a5cd462443650da24d0141477833adba50c9c3b0",
+      "tracked_counts": {
+        "taut": 779,
+        "taut-shape-py": 75,
+        "taut-shape-rs": 63,
+        "taut-shape-ts": 96,
+        "workspace": 54
+      },
+      "tracked_oracle_files": [
+        "corpus/ext_vectors.json",
+        "corpus/float_vectors.json",
+        "corpus/glade.golden.json",
+        "corpus/glade.ir.json",
+        "corpus/glade_folds.json",
+        "corpus/glade_hashes.json",
+        "corpus/griplab.golden.json",
+        "corpus/griplab.ir.json",
+        "corpus/parity/allowlist.json",
+        "corpus/parity/bounds.vectors.json",
+        "corpus/parity/gen_vectors.py",
+        "corpus/parity/int.vectors.json",
+        "corpus/parity/malformed.vectors.json",
+        "corpus/resext.ir.json",
+        "corpus/residual_vectors.json"
+      ]
+    },
+    "state": {
+      "all_repositories_raw_equal": true,
+      "historical_commits": [
+        "4222822320cbb22e376f8b387a963e86aad10ff2",
+        "b9f99ac88ec585616ffac8bf4fbc2aaf4535fc16",
+        "68c24a899345367f3026372d3c67737751215a0e",
+        "57c56d5f7d727eb483ac9fd89c482f6a44f7913e",
+        "1607b6e0b000f607153b2ec20fc244aeb5952744"
+      ],
+      "receipt": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\review-r1\\state\\clone-receipt.json",
+      "receipt_sha256": "0941c2fda3029a337e752d1b2964fdb41ecdf7fa96e826f25a743e3e7ed72ee1",
+      "tracked_counts": {
+        "taut": 779,
+        "taut-shape-py": 75,
+        "taut-shape-rs": 63,
+        "taut-shape-ts": 96,
+        "workspace": 54
+      },
+      "tracked_oracle_files": [
+        "corpus/ext_vectors.json",
+        "corpus/float_vectors.json",
+        "corpus/glade.golden.json",
+        "corpus/glade.ir.json",
+        "corpus/glade_folds.json",
+        "corpus/glade_hashes.json",
+        "corpus/griplab.golden.json",
+        "corpus/griplab.ir.json",
+        "corpus/parity/allowlist.json",
+        "corpus/parity/bounds.vectors.json",
+        "corpus/parity/gen_vectors.py",
+        "corpus/parity/int.vectors.json",
+        "corpus/parity/malformed.vectors.json",
+        "corpus/resext.ir.json",
+        "corpus/residual_vectors.json"
+      ]
+    }
+  },
+  "script": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\prepare-clones.py",
+  "settings": "clone-local core.autocrlf=false/core.eol=lf before first checkout; no saved/global change",
+  "setup_attempts": "First status command from scratch had no workspace and stopped before clone; corrected cwd. Initial clone attempt used backslash source paths and exact trust rejected upload-pack; no clone files retained. Forward-slash source spelling then succeeded, every command exit checked. No reviewer launched before successful raw verification. Original failed review/probe evidence unchanged.",
+  "source_tuple": {
+    "taut": "c9c5bb0764bbc5a58c65e649468ed5aa67920ded",
+    "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "1a4d66e05221a1a85e5b4f0fbb10b80befe2b378"
+  },
+  "status": "Both R1clones complete and raw-byte verified BEFORE reviewer dispatch"
+}
