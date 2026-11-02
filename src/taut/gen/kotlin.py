@@ -32,7 +32,7 @@ RESERVED_FIELD_NAMES = MappingProxyType({
 `toCbor` names, and it may not share a name with its companion or another property."""
 
 RESERVED_TYPE_NAMES = MappingProxyType({
-    **dict.fromkeys("Cbor DecodeError".split(), "a runtime type"),
+    **dict.fromkeys("Cbor DecodeError KotlinCodecContract".split(), "a runtime type"),
     **dict.fromkeys("""checkExtTag compareCodePoints doubleToHalfBits extClear extGet hostMap
         negativeInt positiveInt unsignedString""".split(),
                     "a runtime function whose parameters a message's constructor can repeat"),
@@ -70,7 +70,7 @@ def _kt_ty(t: TypeRef) -> str:
         return {"int": "Long", "str": "String", "bytes": "ByteArray",
                 "bool": "Boolean", "float": "Double"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
-        return t.name
+        return _id(t.name)
     if isinstance(t, ListOf):
         return f"List<{_kt_ty(t.elem)}>"
     if isinstance(t, MapOf):
@@ -116,9 +116,9 @@ def _dec(t: TypeRef, expr: str) -> str:
                 "bytes": f"{expr}.bytesVal", "bool": f"{expr}.boolVal",
                 "float": f"{expr}.floatVal"}[t.kind]
     if isinstance(t, EnumRef):
-        return f"{t.name}.fromWire({expr}.intVal)"
+        return f"{_id(t.name)}.fromWire({expr}.intVal)"
     if isinstance(t, MsgRef):
-        return f"{t.name}.fromCbor({expr})"
+        return f"{_id(t.name)}.fromCbor({expr})"
     if isinstance(t, ListOf):
         return f"{expr}.arrVal.map {{ {_dec(t.elem, 'it')} }}"
     if isinstance(t, MapOf):  # entry checks and DuplicateMapKey: the runtime's mapFieldVal
@@ -127,13 +127,14 @@ def _dec(t: TypeRef, expr: str) -> str:
     raise TypeError(t)
 
 
-def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
-    entries = ", ".join(f"{_id(m)}({v})" for m, v in members.items())
+def _emit_enum(name: str, members: dict[str, int], companion_lines=()) -> list[str]:
+    entries = ", ".join(f"{_id(m)}({'Long.MIN_VALUE' if v == -(1 << 63) else str(v) + 'L'})" for m, v in members.items())
     out = [
-        f"enum class {name}(val wire: Long) {{",
+        f"enum class {_id(name)}(val wire: Long) {{",
         f"    {entries};",
         "    companion object {",
-        f"        fun fromWire(v: Long): {name} {{",
+        *companion_lines,
+        f"        fun fromWire(v: Long): {_id(name)} {{",
         "            for (e in values()) if (e.wire == v) return e",
         f'            throw DecodeError.UnknownEnum("{name}", v)',
         "        }",
@@ -151,12 +152,15 @@ def _bounds(schema: Schema, message: str) -> tuple[int, int | None]:
             cast("int | None", effective(schema, "max_encoded_len", message=message)))
 
 
-def _emit_message(msg, bounds: tuple[int, int | None], forward_compat: bool = False) -> list[str]:
+def _emit_message(msg, bounds: tuple[int, int | None], forward_compat: bool = False, *,
+                  companion_lines=(), validation=False) -> list[str]:
     # Kotlin refuses a `data class` without constructor parameters, so a message
     # with no fields is a plain class that keeps value equality.
-    fieldless = not msg.fields and not forward_compat
-    out = [f"{'class' if fieldless else 'data class'} {msg.name}("]
+    fieldless = not any(not f.virtual for f in msg.fields) and not forward_compat
+    out = [f"{'class' if fieldless else 'data class'} {_id(msg.name)}("]
     for f in msg.fields:
+        if f.virtual:
+            continue
         n, ft = _id(f.name), _field_type(f)
         if f.transient:
             out.append(f"    var {n}: {ft} = {'null' if f.optional else _default(f.type)},")
@@ -167,8 +171,11 @@ def _emit_message(msg, bounds: tuple[int, int | None], forward_compat: bool = Fa
     if forward_compat:
         out.append("    var wireResidual: List<Pair<Long, Cbor>> = emptyList(),")
     out.append(") {")
+    if validation:
+        out += ["    fun validate(recursive: Boolean = true): taut.validation.ValidationReport = _TautValidationEngine.validate(Companion.tautBinding().bind(this), recursive)",
+                "    fun isValid(recursive: Boolean = true): Boolean = _TautValidationEngine.isValid(Companion.tautBinding().bind(this), recursive)"]
     if fieldless:
-        out.append(f"    override fun equals(other: Any?): Boolean = other is {msg.name}")
+        out.append(f"    override fun equals(other: Any?): Boolean = other is {_id(msg.name)}")
         out.append("    override fun hashCode(): Int = 0")
     # toCbor. Under forward-compat the known entries meet the residual in `+`, where nothing
     # types them, so they name their type: kotlinc cannot infer T for the empty `listOf()` of a
@@ -189,19 +196,20 @@ def _emit_message(msg, bounds: tuple[int, int | None], forward_compat: bool = Fa
     # OPT-L6). The raw decode is named by its package: inside the companion, `decode` is this one.
     max_depth, max_encoded_len = bounds
     out.append("    companion object {")
+    out.extend(companion_lines)
     out.append(f"        const val MAX_DEPTH: Int = {max_depth}")
     out.append(f"        val MAX_ENCODED_LEN: Int? = {'null' if max_encoded_len is None else max_encoded_len}")
-    out.append(f"        fun decode(bytes: ByteArray): {msg.name} = "
+    out.append(f"        fun decode(bytes: ByteArray): {_id(msg.name)} = "
                "fromCbor(taut.decode(bytes, MAX_DEPTH, MAX_ENCODED_LEN))")
-    out.append(f"        fun fromCbor(c: Cbor): {msg.name} {{")
+    out.append(f"        fun fromCbor(c: Cbor): {_id(msg.name)} {{")
     if not msg.wire_fields():
         # No field reads the input, and a message must still be a map (CD-E5).
         out += ["            if (c.kind != Cbor.MAP) {",
                 '                throw DecodeError.WrongType("map")',
                 "            }"]
-    out.append(f"            return {msg.name}(")
+    out.append(f"            return {_id(msg.name)}(")
     for f in msg.fields:
-        if f.transient:
+        if f.transient or f.virtual:
             continue  # native-only; data-class default applies
         n = _id(f.name)
         if f.optional == MISSING_OK:  # an absent key reads as null, like a present null
@@ -222,12 +230,8 @@ def _emit_message(msg, bounds: tuple[int, int | None], forward_compat: bool = Fa
     return out
 
 
-def emit_types(schema: Schema, forward_compat: bool = False) -> str:
-    out = ["// GENERATED native Kotlin types + codec — do not edit.",
-           "// Pairs with the vendored cbor.kt runtime (same package).",
-           "package taut", ""]
-    for e in schema.enums.values():
-        out += _emit_enum(e.name, e.members) + [""]
-    for m in schema.messages.values():
-        out += _emit_message(m, _bounds(schema, m.name), forward_compat) + [""]
-    return "\n".join(out) + "\n"
+def emit_types(schema: Schema, forward_compat: bool = False, *, validation=False,
+               external_types=None, identity=None) -> str:
+    from .kotlin_metadata import emit_types as emit_metadata_types
+    return emit_metadata_types(schema, forward_compat=forward_compat, validation=validation,
+                               external_types=external_types, identity=identity)

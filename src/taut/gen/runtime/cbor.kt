@@ -9,6 +9,14 @@
 // input bytes `decode` returns a value or throws DecodeError, nothing else.
 package taut
 
+// Foundation identity is attached to the canonical codec, not inferred from an
+// unrelated descriptor build label. Old supplied codecs fail to link this ABI.
+object KotlinCodecContract {
+    val owner = "taut.kotlin.foundation"
+    val codecContract = 1
+    fun identity(value: Cbor): Cbor = value
+}
+
 // The depth bound a raw decode applies where its caller passes none, and the deepest bound any
 // decode applies (TautCheckedDecode.md CD-B1, CD-B3). The parity corpus pins both to taut's.
 const val DEFAULT_MAX_DEPTH: Int = 32

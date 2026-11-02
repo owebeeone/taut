@@ -1,0 +1,35 @@
+Kotlin current-byte combined gate: test_kotlin_oneof.py + test_kotlin.py
+........................................................................ [ 97%]
+..                                                                       [100%]
+74 passed in 362.71s (0:06:02)
+
+Additional mode/provenance golden test (added after combined collection; production unchanged):
+1 passed, 55 deselected in 0.43s
+
+Core/Python reference regression command described in RESULTS.md:
+........................................................................ [  9%]
+........................................................................ [ 18%]
+........................................................................ [ 27%]
+........................................................................ [ 36%]
+........................................................................ [ 45%]
+........................................................................ [ 54%]
+........................................................................ [ 63%]
+........................................................................ [ 73%]
+........................................................................ [ 82%]
+........................................................................ [ 91%]
+....................................................................     [100%]
+788 passed in 9.80s
+
+Final standalone source/package example:
+source:
+oneof.payload_unexpected:text, oneof.payload_missing:number
+repaired=true; snapshotIssues=2; virtualComplete=false
+descriptor=kotlin-oneof-example.Content; fields=5
+
+package:
+oneof.payload_unexpected:text, oneof.payload_missing:number
+repaired=true; snapshotIssues=2; virtualComplete=false
+descriptor=kotlin-oneof-example.Content; fields=5
+
+
+Kotlin1.9/JVM1.8 final example: compiled successfully and produced the same three output lines.

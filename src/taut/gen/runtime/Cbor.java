@@ -27,6 +27,12 @@ import java.util.TreeMap;
 import java.util.function.Function;
 
 public final class Cbor {
+    /** Codec-owned compatibility export: old/split supplied codecs fail before use. */
+    public static void requireContract(String artifact, String owner, int codec) {
+        if (!"taut.java.foundation".equals(owner) || codec != 1) {
+            throw new IllegalArgumentException(artifact + ": incompatible Java codec; required owner=taut.java.foundation, codec=1; regenerate/rebind");
+        }
+    }
     public static final int INT = 0, BYTES = 1, TEXT = 2, ARR = 3, MAP = 4, BOOL = 5, NULL = 6, FLOAT = 7;
     // The depth bound where none is given (CD-B1), and the deepest any call applies (CD-B3).
     public static final int DEFAULT_MAX_DEPTH = 32;
@@ -458,12 +464,12 @@ public final class Cbor {
     }
     private static void enc(Cbor c, List<Byte> out) {
         switch (c.kind) {
-            case INT -> { if (c.i >= 0) head(out, 0, c.i); else head(out, 1, -1 - c.i); }
-            case FLOAT -> encFloat(c.d, out);
-            case BYTES -> { head(out, 2, c.b.length); for (byte x : c.b) out.add(x); }
-            case TEXT -> { byte[] bb = c.s.getBytes(StandardCharsets.UTF_8); head(out, 3, bb.length); for (byte x : bb) out.add(x); }
-            case ARR -> { head(out, 4, c.arr.size()); for (Cbor x : c.arr) enc(x, out); }
-            case MAP -> {
+            case INT: { if (c.i >= 0) head(out, 0, c.i); else head(out, 1, -1 - c.i); break; }
+            case FLOAT: encFloat(c.d, out); break;
+            case BYTES: { head(out, 2, c.b.length); for (byte x : c.b) out.add(x); break; }
+            case TEXT: { byte[] bb = c.s.getBytes(StandardCharsets.UTF_8); head(out, 3, bb.length); for (byte x : bb) out.add(x); break; }
+            case ARR: { head(out, 4, c.arr.size()); for (Cbor x : c.arr) enc(x, out); break; }
+            case MAP: {
                 List<KV> m = new ArrayList<>(c.map);
                 m.sort((a, b2) -> Long.compare(a.k, b2.k)); // ascending keys
                 head(out, 5, m.size());
@@ -472,10 +478,11 @@ public final class Cbor {
                     else head(out, 1, -1 - kv.k);
                     enc(kv.v, out);
                 }
+                break;
             }
-            case BOOL -> out.add((byte) (c.i != 0 ? 0xf5 : 0xf4));
-            case NULL -> out.add((byte) 0xf6);
-            default -> throw new IllegalArgumentException("unknown CBOR kind " + c.kind);
+            case BOOL: out.add((byte) (c.i != 0 ? 0xf5 : 0xf4)); break;
+            case NULL: out.add((byte) 0xf6); break;
+            default: throw new IllegalArgumentException("unknown CBOR kind " + c.kind);
         }
     }
     // One item that fills `data`, under the default depth bound and no length bound.
@@ -542,13 +549,14 @@ public final class Cbor {
     // exempt and use readRaw.
     private static long readArg(byte[] d, int[] off, int info) {
         long v = readRaw(d, off, info);
-        boolean fitsShorter = switch (info) {
-            case 24 -> v < 24;
-            case 25 -> v <= 0xFFL;
-            case 26 -> v <= 0xFFFFL;
-            case 27 -> Long.compareUnsigned(v, 0xFFFFFFFFL) <= 0;
-            default -> false;
-        };
+        boolean fitsShorter;
+        switch (info) {
+            case 24: fitsShorter = v < 24; break;
+            case 25: fitsShorter = v <= 0xFFL; break;
+            case 26: fitsShorter = v <= 0xFFFFL; break;
+            case 27: fitsShorter = Long.compareUnsigned(v, 0xFFFFFFFFL) <= 0; break;
+            default: fitsShorter = false;
+        }
         if (fitsShorter) {
             throw DecodeError.nonCanonicalInt(v);
         }
@@ -591,34 +599,34 @@ public final class Cbor {
         off[0]++;
         int major = initial >> 5, info = initial & 0x1f;
         switch (major) {
-            case 0 -> {
+            case 0: {
                 long n = readArg(d, off, info);
                 if (n < 0) {
                     throw DecodeError.intOverflow(Long.toUnsignedString(n));
                 }
                 return int_(n);
             }
-            case 1 -> {
+            case 1: {
                 long n = readArg(d, off, info);
                 if (n < 0) {
                     throw DecodeError.intOverflow("-" + unsignedStringPlusOne(n));
                 }
                 return int_(-1 - n);
             }
-            case 2 -> {
+            case 2: {
                 int n = readLength(d, off, info);
                 byte[] bb = new byte[n];
                 System.arraycopy(d, off[0], bb, 0, n);
                 off[0] += n;
                 return bytes(bb);
             }
-            case 3 -> {
+            case 3: {
                 int n = readLength(d, off, info);
                 String s = decodeUtf8(d, off[0], n);
                 off[0] += n;
                 return text(s);
             }
-            case 4 -> {
+            case 4: {
                 // Items are read in order. Each takes at least one byte, so a count
                 // beyond the input ends in the error of the first item that fails.
                 long n = readArg(d, off, info);
@@ -629,7 +637,7 @@ public final class Cbor {
                 }
                 return arr(a);
             }
-            case 5 -> {
+            case 5: {
                 long n = readArg(d, off, info);
                 enter(depth, limit);
                 List<KV> m = new ArrayList<>();
@@ -652,7 +660,7 @@ public final class Cbor {
                 }
                 return map(m);
             }
-            case 7 -> {
+            case 7: {
                 if (info == 20) {
                     return bool(false);
                 }
@@ -673,7 +681,7 @@ public final class Cbor {
                 }
                 throw DecodeError.unsupportedInfo(info);
             }
-            default -> throw DecodeError.unsupportedMajor(major);
+            default: throw DecodeError.unsupportedMajor(major);
         }
     }
 }

@@ -1,0 +1,16 @@
+{
+  "outputs": {
+    "source": "oneof.payload_unexpected:text, oneof.payload_missing:number\nrepaired=true; snapshotIssues=2; virtualComplete=false\ndescriptor=kotlin-oneof-example.Content; fields=5\n",
+    "package": "oneof.payload_unexpected:text, oneof.payload_missing:number\nrepaired=true; snapshotIssues=2; virtualComplete=false\ndescriptor=kotlin-oneof-example.Content; fields=5\n"
+  },
+  "canonical": {
+    "cbor.kt": "36baf6c178ea1417c46c6748b3cedbdb59f43085717d5e363b8e93be0a55a3c8",
+    "ext.kt": "66c3b714bfeb57f39ffc8154fd55ea21af62ab2278151402625a5fd783cffc79",
+    "descriptors.kt": "037d20d1447a3324ef4eaadd45a4261d8a9d4b596948240906da54a8689d2073",
+    "validation.kt": "d4b63eade7e51fad82fc0d9ed00c4f2e624cd08e8275bf00bcfa780d64730c43"
+  },
+  "owner": "taut.kotlin.foundation",
+  "descriptor_contract": 1,
+  "codec_contract": 1,
+  "jvm_target": "1.8"
+}

@@ -354,7 +354,7 @@ def run(forward_compat: bool = False) -> parity.TargetReport:
         generated = work / TARGET
         runner = generated / f"{_CLASS}.java"
         runner.write_text(_source())
-        sources = sorted(str(path) for path in generated.glob("*.java"))
+        sources = sorted(str(path) for path in generated.rglob("*.java"))
         classes = work / "classes"
         classes.mkdir()
         failed = parity.build(name, [javac, "-encoding", "UTF-8", "-d", str(classes), *sources],

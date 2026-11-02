@@ -52,9 +52,9 @@ def _cmd_gen(args: argparse.Namespace) -> int:
     if len(modes) > 1 or (args.with_runtime and "package" in modes):
         raise ValueError("conflicting runtime options; select source or package before generation")
     schema = _load(Path(args.ir))
-    # Rust's projection validates its own identifiers, including raw keywords;
-    # Python-specific private/dunder reservations do not constrain a Rust-only run.
-    _validate(schema, "gen", targets=("rust",) if _split(args.lang) == ["rust"] else None)
+    # Validate each explicitly requested target's own projection/reservations.
+    # Python-specific policies do not constrain other language-only generation.
+    _validate(schema, "gen", targets=tuple(_split(args.lang)) if _split(args.lang) else None)
     if args.api_only:
         services: list[str] | None = []
     else:
@@ -69,6 +69,8 @@ def _cmd_gen(args: argparse.Namespace) -> int:
         runtime=args.with_runtime, forward_compat=args.forward_compat,
         runtime_mode=next(iter(modes), None), validation=args.with_validation,
         runtime_bindings=(json.loads(Path(args.runtime_bindings).read_text()) if args.runtime_bindings else None),
+        kotlin_external_types=(json.loads(Path(args.kotlin_external_types).read_text()) if args.kotlin_external_types else None),
+        java_external_types=(json.loads(Path(args.java_external_types).read_text()) if args.java_external_types else None),
         python_external_types=(json.loads(Path(args.python_external_types).read_text()) if args.python_external_types else None),
         rust_external_types=(json.loads(Path(args.rust_external_types).read_text())
                              if args.rust_external_types else None),
@@ -164,6 +166,8 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("-l", "--lang", help="comma-separated targets (default: all): python,typescript,rust,cpp,swift,go,kotlin,js,java")
     g.add_argument("-s", "--service", help="comma-separated services for client/server stubs (default: all in the IR)")
     g.add_argument("--api-only", action="store_true", help="emit only api (types + encoders/decoders), no client/server")
+    g.add_argument("--kotlin-external-types", metavar="JSON", help="name-to-qualified-Kotlin dependency types; compatible mandatory descriptors and shared foundation required")
+    g.add_argument("--java-external-types", metavar="JSON", help="Java dependency typed owner/contract bindings; independently compiled same-package types")
     g.add_argument("--rust-external-types", metavar="JSON", help="name-to-Rust-path map for types owned by a dependency; compose its schema and share its CBOR runtime")
     g.add_argument("--with-runtime", action="store_true",
                    help="compatibility alias for --runtime source; does not enable validation")

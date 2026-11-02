@@ -590,14 +590,16 @@ def test_forward_compat_types_its_lists_so_a_message_without_wire_fields_builds(
     no wire field (BARE: none at all, or only a transient one) emitted under forward-compat, in
     toCbor's known entries and fromCbor's known tags. Both lists name their type; the
     resext harness compiles BARE so, and the gate's kotlin/fc variant the fixture's Empty."""
+    # Mandatory descriptor tables have their own empty metadata collections;
+    # this regression specifically checks the existing codec projection.
     fc = kotlin.emit_types(mk(Msg("Bare"), Msg("Cache", F("hits", 1, INT, transient=True)),
-                              Msg("One", F("n", 1, INT))), forward_compat=True)
+                              Msg("One", F("n", 1, INT))), forward_compat=True).split("private object _TautMetadata_", 1)[0]
     assert fc.count("return Cbor.map(listOf<Pair<Long, Cbor>>() + wireResidual)") == 2
     assert fc.count("wireResidual = c.mapEntries.filter { it.first !in listOf<Long>() },") == 2
     assert "return Cbor.map(listOf<Pair<Long, Cbor>>(1L to Cbor.int(n)) + wireResidual)" in fc
     assert "wireResidual = c.mapEntries.filter { it.first !in listOf<Long>(1L) }," in fc
     assert "listOf()" not in fc
-    plain = kotlin.emit_types(BARE)                  # Cbor.map's parameter types the list
+    plain = kotlin.emit_types(BARE).split("private object _TautMetadata_", 1)[0]  # Cbor.map types the list
     assert plain.count("return Cbor.map(listOf())") == 2 and "listOf<" not in plain
 
 
@@ -683,7 +685,9 @@ def test_each_message_carries_its_bounds_and_a_decode_from_bytes():
         for forward_compat in (False, True):
             source = kotlin.emit_types(schema_, forward_compat=forward_compat)
             for name, (depth, length) in resolved.items():
-                assert _companion(source, name)[:3] == [
+                companion = _companion(source, name)
+                bounds_start = next(i for i, line in enumerate(companion) if "const val MAX_DEPTH:" in line)
+                assert companion[bounds_start:bounds_start+3] == [
                     f"        const val MAX_DEPTH: Int = {depth}",
                     f"        val MAX_ENCODED_LEN: Int? = {'null' if length is None else length}",
                     f"        fun decode(bytes: ByteArray): {name} = "
@@ -764,6 +768,7 @@ def test_kotlin_resext_corpus_and_fuzz_harness_if_kotlinc(tmp_path):
             kotlinc,
             str(ROOT / "src/taut/gen/runtime/cbor.kt"),
             str(ROOT / "src/taut/gen/runtime/ext.kt"),
+            str(ROOT / "src/taut/gen/runtime/kotlin/descriptors.kt"),
             str(api),
             str(bare),
             str(harness),

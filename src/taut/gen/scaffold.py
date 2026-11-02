@@ -451,8 +451,8 @@ def _kt_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def kotlin_api(schema: Schema, forward_compat: bool = False) -> str:
-    return _kotlin.emit_types(schema, forward_compat)
+def kotlin_api(schema: Schema, forward_compat: bool = False, *, validation=False, external_types=None, identity=None) -> str:
+    return _kotlin.emit_types(schema, forward_compat, validation=validation, external_types=external_types, identity=identity)
 
 
 def kotlin_client(schema: Schema, svc: ServiceDef) -> str:
@@ -521,8 +521,8 @@ def _java_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def java_api(schema: Schema, forward_compat: bool = False) -> str:
-    return _java.emit_types(schema, forward_compat)
+def java_api(schema: Schema, forward_compat: bool = False, *, validation=False, external_types=None, identity=None) -> str:
+    return _java.emit_types(schema, forward_compat, validation=validation, external_types=external_types, identity=identity)
 
 
 def java_client(schema: Schema, svc: ServiceDef) -> str:
@@ -594,6 +594,8 @@ def emit(
     runtime_bindings: dict | None = None,
     python_external_types: dict[str, str] | None = None,
     schema_identity: str | None = None,
+    java_external_types: dict | None = None,
+    kotlin_external_types: dict | None = None,
 ) -> list[Path]:
     """Generate per-language code from an IR (the engine behind the `tautc` CLI).
 
@@ -631,10 +633,25 @@ def emit(
     if errors:
         raise ValueError("; ".join(errors))
     constrained = any(f.oneof or f.cases for m in schema.messages.values() for f in m.fields)
-    if (validation or constrained) and set(lang_keys) - {"python", "rust"}:
-        raise ValueError("oneof/validation supports Python and Rust only; explicitly select --lang python,rust")
-    if mode == "package" and set(lang_keys) - {"python", "rust"}:
-        raise ValueError("package runtime binding is implemented for Python and Rust only")
+    if (validation or constrained) and set(lang_keys) - {"python", "rust", "java", "kotlin"}:
+        raise ValueError("oneof/validation supports Python, Rust, Java and Kotlin only; explicitly select supported languages")
+    if mode == "package" and set(lang_keys) - {"python", "rust", "java", "kotlin"}:
+        raise ValueError("package runtime binding is implemented for Python, Rust, Java and Kotlin only")
+    kotlin_binding = None
+    if "kotlin" in lang_keys:
+        from .kotlin_runtime import binding as resolve_kotlin_binding
+        kotlin_binding = resolve_kotlin_binding(runtime_bindings, out_dir / "kotlin", mode)
+    if kotlin_external_types is not None and "kotlin" not in lang_keys:
+        raise ValueError("Kotlin external types require a Kotlin generation target")
+    java_binding = None
+    if "java" in lang_keys:
+        from .java_runtime import binding as resolve_java_binding, verify_artifact
+        java_binding = resolve_java_binding(runtime_bindings, out_dir / "java", mode)
+        artifact = (runtime_bindings or {}).get("java", {}).get("artifact")
+        if artifact:
+            verify_artifact(Path(artifact), validation=validation)
+    if java_external_types is not None and "java" not in lang_keys:
+        raise ValueError("Java external types require a Java generation target")
     rust_binding = None
     if "rust" in lang_keys:
         from .rust_runtime import binding as resolve_rust_binding
@@ -693,6 +710,8 @@ def emit(
     all_writes = {}
     python_texts = {}
     rust_texts = {}
+    java_texts = {}
+    kotlin_texts = {}
     for lang in lang_keys:
         ext, api_fn, client_fn, server_fn = _LANGS[lang]
         d = out_dir / lang
@@ -701,6 +720,10 @@ def emit(
         if lang == "rust":
             api_kwargs.update(external_types=rust_external_types, validation=validation,
                               identity=schema_identity, runtime_path=rust_binding[0])
+        if lang == "kotlin":
+            api_kwargs.update(validation=validation, external_types=kotlin_external_types, identity=schema_identity)
+        if lang == "java":
+            api_kwargs.update(validation=validation, external_types=java_external_types, identity=schema_identity)
         if lang == "python":
             api_kwargs.update(validation=validation, external_types=python_external_types, identity=schema_identity)
         api_text = api_fn(schema, **api_kwargs)
@@ -708,10 +731,14 @@ def emit(
             python_texts[f"api.{ext}"] = api_text
         elif lang == "rust":
             rust_texts[f"api.{ext}"] = api_text
+        elif lang == "java":
+            java_texts[f"api.{ext}"] = api_text
+        elif lang == "kotlin":
+            kotlin_texts[f"api.{ext}"] = api_text
         else:
             all_writes[api_path] = api_text.encode("utf-8")
         written.append(api_path)
-        if runtime and lang in _RUNTIMES and lang != "rust":
+        if runtime and lang in _RUNTIMES and lang not in ("rust", "java", "kotlin"):
             for rel, resource in _RUNTIMES[lang]:
                 if not _runtime_exists(resource):
                     continue   # e.g. ext.<lang> before Phase 2 — vendored once its file lands
@@ -728,6 +755,10 @@ def emit(
                     python_texts[path.name] = content
                 elif lang == "rust":
                     rust_texts[path.name] = content
+                elif lang == "java":
+                    java_texts[path.name] = content
+                elif lang == "kotlin":
+                    kotlin_texts[path.name] = content
                 else:
                     all_writes[path] = content.encode("utf-8")
                 written.append(path)
@@ -750,6 +781,20 @@ def emit(
         lock_roots.extend([directory, source_root])
         plans.append((directory, source_root, directory / ".taut-rust-outputs.json", rust_plan_outputs,
                       rust_texts, {"consume_source": consume_source, "external": bool(rust_external_types)}))
+    if "java" in lang_keys:
+        from .java_runtime import plan_outputs as java_plan_outputs, canonical_path
+        directory = canonical_path(out_dir / "java")
+        _, source_root, consume_source = java_binding
+        lock_roots.extend([directory, source_root])
+        plans.append((directory, source_root, directory / ".taut-java-outputs.json", java_plan_outputs,
+                      java_texts, {"consume_source": consume_source, "external": bool(java_external_types)}))
+    if "kotlin" in lang_keys:
+        from .kotlin_runtime import plan_outputs as kotlin_plan_outputs, canonical_path
+        directory = canonical_path(out_dir / "kotlin")
+        source_root, consume_source = kotlin_binding
+        lock_roots.extend([directory, source_root])
+        plans.append((directory, source_root, directory / ".taut-kotlin-outputs.json", kotlin_plan_outputs,
+                      kotlin_texts, {"consume_source": consume_source, "external": bool(kotlin_external_types)}))
     import json
     for _, _, previous, _, _, _ in plans:
         if previous.exists():
@@ -778,9 +823,9 @@ def emit(
 def emit_all(schema: Schema, service_name: str, out_dir: Path, *, runtime: bool = False,
              runtime_mode: str | None = None, validation: bool = False,
              runtime_bindings: dict | None = None, python_external_types=None,
-             schema_identity=None, langs=None, rust_external_types=None) -> list[Path]:
+             schema_identity=None, langs=None, rust_external_types=None, java_external_types=None, kotlin_external_types=None) -> list[Path]:
     """Back-compat: api + client/server for one service, all languages."""
     return emit(schema, out_dir, services=[service_name], runtime=runtime, runtime_mode=runtime_mode,
                 validation=validation, runtime_bindings=runtime_bindings,
                 python_external_types=python_external_types, schema_identity=schema_identity, langs=langs,
-                rust_external_types=rust_external_types)
+                rust_external_types=rust_external_types, java_external_types=java_external_types, kotlin_external_types=kotlin_external_types)

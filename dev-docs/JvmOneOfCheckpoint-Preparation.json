@@ -1,0 +1,198 @@
+{
+  "status": "PREPARATION ONLY; not a settled review object; no staging/commit/review launch authorized yet",
+  "observed_date": "2026-11-02 Australia/Sydney",
+  "repos": {
+    "workspace": {
+      "path": "D:\\projects\\limbo\\taut-dev",
+      "HEAD": "f703be38c4b09a2597cdecd5fdf192877eb15b97",
+      "branch": "main",
+      "staged_paths": []
+    },
+    "taut": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut",
+      "HEAD": "1607b6e0b000f607153b2ec20fc244aeb5952744",
+      "branch": "main",
+      "staged_paths": []
+    },
+    "taut-shape-py": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut-shape-py",
+      "HEAD": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+      "branch": "main",
+      "staged_paths": []
+    },
+    "taut-shape-rs": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut-shape-rs",
+      "HEAD": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+      "branch": "main",
+      "staged_paths": []
+    }
+  },
+  "process": {
+    "skill": "C:/Users/gianni/.codex/skills/review-loop/SKILL.md",
+    "skill_sha256": "bf33d564e50e50ebc1d17a6ceb620debe18c6d730b86f20f96418da4ee05d96c",
+    "prompt_template": "C:/Users/gianni/.codex/skills/review-loop/references/review-prompt-template.md",
+    "prompt_template_sha256": "3b10ae89cf101c6273d34668eaaeaebf7e030a4c132406e0b234a846665eca58",
+    "reviewers_per_revision": 2,
+    "axes": [
+      "Code+Surface",
+      "State"
+    ],
+    "maximum_remediation_rounds": 2
+  },
+  "taut_tracked_changed_paths": [
+    "pyproject.toml",
+    "src/taut/cli.py",
+    "src/taut/corpus/parity_java.py",
+    "src/taut/gen/java.py",
+    "src/taut/gen/kotlin.py",
+    "src/taut/gen/runtime/Cbor.java",
+    "src/taut/gen/runtime/cbor.kt",
+    "src/taut/gen/scaffold.py",
+    "src/tests/test_java.py",
+    "src/tests/test_kotlin.py",
+    "src/tests/test_reserved_names.py"
+  ],
+  "java_owned_candidates": [
+    "dev-docs/examples/java-oneof/AdapterProbe.java",
+    "dev-docs/examples/java-oneof/Conformance.java",
+    "dev-docs/examples/java-oneof/INTEGRATION.md",
+    "dev-docs/examples/java-oneof/README.md",
+    "dev-docs/examples/java-oneof/RESULTS.md",
+    "dev-docs/examples/java-oneof/content.taut.py",
+    "dev-docs/examples/java-oneof/disabled.golden.java",
+    "dev-docs/examples/java-oneof/enabled.golden.java",
+    "dev-docs/examples/java-oneof/owned-files.json",
+    "dev-docs/examples/java-oneof/results/adapter-probe.log",
+    "dev-docs/examples/java-oneof/results/contract-supplement.log",
+    "dev-docs/examples/java-oneof/results/disabled.log",
+    "dev-docs/examples/java-oneof/results/examples.log",
+    "dev-docs/examples/java-oneof/results/feature-regression.log",
+    "dev-docs/examples/java-oneof/results/feature-tests.log",
+    "dev-docs/examples/java-oneof/results/final-target-gate.log",
+    "dev-docs/examples/java-oneof/results/package-provenance.json",
+    "dev-docs/examples/java-oneof/results/package-reports.tsv",
+    "dev-docs/examples/java-oneof/results/reference-regression.log",
+    "dev-docs/examples/java-oneof/results/runtime-inventory.json",
+    "dev-docs/examples/java-oneof/results/source-reports.tsv",
+    "dev-docs/examples/java-oneof/verify_examples.py",
+    "pyproject.toml",
+    "src/taut/cli.py",
+    "src/taut/corpus/parity_java.py",
+    "src/taut/gen/java.py",
+    "src/taut/gen/java_metadata.py",
+    "src/taut/gen/java_runtime.py",
+    "src/taut/gen/runtime/Cbor.java",
+    "src/taut/gen/runtime/java/taut/validation/ConfigurationException.java",
+    "src/taut/gen/runtime/java/taut/validation/DeferredCheck.java",
+    "src/taut/gen/runtime/java/taut/validation/PathSegment.java",
+    "src/taut/gen/runtime/java/taut/validation/ValidationEngine.java",
+    "src/taut/gen/runtime/java/taut/validation/ValidationIssue.java",
+    "src/taut/gen/runtime/java/taut/validation/ValidationReport.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ConstraintDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/EnumDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/FieldBinding.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/FieldDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ImmutableBytes.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/MessageAdapter.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/MessageDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/OneOfDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/RuntimeContract.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/SchemaBinding.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/SchemaDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/Snapshots.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/Traversal.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/TypeDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ValueAdapter.java",
+    "src/taut/gen/scaffold.py",
+    "src/tests/test_java.py",
+    "src/tests/test_java_oneof.py",
+    "src/tests/test_jvm_compiler_distribution.py",
+    "src/tests/test_reserved_names.py"
+  ],
+  "kotlin_candidates_PENDING_executor_confirmation": [
+    "dev-docs/examples/kotlin-oneof/AdapterProbe.kt",
+    "dev-docs/examples/kotlin-oneof/Example.kt",
+    "dev-docs/examples/kotlin-oneof/INTEGRATION.md",
+    "dev-docs/examples/kotlin-oneof/README.md",
+    "dev-docs/examples/kotlin-oneof/results.json",
+    "dev-docs/examples/kotlin-oneof/run-example.py",
+    "src/taut/gen/kotlin.py",
+    "src/taut/gen/kotlin_metadata.py",
+    "src/taut/gen/kotlin_package.py",
+    "src/taut/gen/kotlin_runtime.py",
+    "src/taut/gen/runtime/cbor.kt",
+    "src/taut/gen/runtime/kotlin/descriptors.kt",
+    "src/taut/gen/runtime/kotlin/validation.kt",
+    "src/tests/test_kotlin.py",
+    "src/tests/test_kotlin_oneof.py"
+  ],
+  "user_owned_enum_accessor_work": {
+    "status": "pending incoming user patch; excluded from pair allowlist",
+    "monitored_sources_at_preparation": {
+      "src/taut/ir/dsl.py": {
+        "sha256": "5b2061584dcd78a3f73d2a757d6b101bacf280c9190f6a068b613eecb55b307d",
+        "matches_HEAD": true
+      },
+      "src/taut/facts.py": {
+        "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "matches_HEAD": true
+      },
+      "src/tests/test_oneof.py": {
+        "sha256": "a47cc246e59a2717dc9b182afa9a47860ee48d5085f7e94b5f53ff256f9d4dcd",
+        "matches_HEAD": true
+      }
+    }
+  },
+  "excluded_untracked_paths_at_preparation": [
+    "dev-docs/JvmOneOfCheckpoint-Authority.md",
+    "dev-docs/JvmOneOfCheckpoint-Draft.md",
+    "dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json",
+    "dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json",
+    "dev-docs/examples/python-oneof/generated/disabled/python/__init__.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/api.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py",
+    "dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json",
+    "dev-docs/examples/python-oneof/generated/package/python/__init__.py",
+    "dev-docs/examples/python-oneof/generated/package/python/api.py",
+    "dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json",
+    "dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json",
+    "dev-docs/examples/python-oneof/generated/source/python/__init__.py",
+    "dev-docs/examples/python-oneof/generated/source/python/api.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/ext.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/facts.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/rules.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/validation.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py",
+    "dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl"
+  ],
+  "commit_approval": "await BOTH REVIEW-READY plus coordinator explicit freeze and precise allowlist; local GWZ only; no push/tag/release/publication",
+  "baseline_failures": [
+    "src/tests/test_dev_docs.py::test_proto_api_surface_extensions_doc_exists_and_covers_contract",
+    "src/tests/test_go.py::test_go_runtime_and_parity_runner_are_gofmt_clean",
+    "src/tests/test_go.py::test_generated_go_is_gofmt_clean"
+  ],
+  "pending": [
+    "Kotlin final RESULTS/owned-file list and receipts",
+    "coordinator reconciliation of user Enum.case patch and current HEAD",
+    "coordinator explicit pair freeze/precise allowlist",
+    "scoped local GWZ checkpoint and exact committed review tuple",
+    "canonical-template reviewer prompt generation and two peer-blind reviews"
+  ]
+}

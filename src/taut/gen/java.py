@@ -52,6 +52,7 @@ RESERVED_TYPE_NAMES = MappingProxyType({
         Math Object RuntimeException String System""".split(),
                     "a java.lang class the code names, which a class of the package shadows"),
     "java": "the package the code names java.util's classes through",
+    "taut": "the foundation package the descriptor projection names",
 })
 """Message and enum names Java cannot take in `package taut`, which api.java shares with its
 runtime (`Cbor.java`, `Ext.java`): a class the runtime declares there, a class of java.lang the
@@ -59,13 +60,25 @@ code or runtime names, and `java`. A class of the package shadows java.lang's bu
 the runtime imports by name."""
 
 
+
+_KEYWORDS = frozenset("abstract assert boolean break byte case catch char class const continue default do double else enum extends final finally float for goto if implements import instanceof int interface long native new package private protected public return short static strictfp super switch synchronized this throw throws transient try void volatile while true false null _".split())
+def _field_name(name):
+    return name + "_" if name in _KEYWORDS else name
+
+def _type_name(name):
+    return name + "_" if name in _KEYWORDS or name in {"var", "yield", "record", "sealed", "permits"} else name
+
+
+def _enum_member(name):
+    return _field_name(name.upper())
+
 def _java_ty(t: TypeRef, boxed: bool = False) -> str:
     if isinstance(t, Scalar):
         prim = {"int": "long", "str": "String", "bytes": "byte[]", "bool": "boolean", "float": "double"}[t.kind]
         box = {"int": "Long", "str": "String", "bytes": "byte[]", "bool": "Boolean", "float": "Double"}[t.kind]
         return box if boxed else prim
     if isinstance(t, (EnumRef, MsgRef)):
-        return t.name
+        return _type_name(t.name)
     if isinstance(t, ListOf):
         return f"java.util.List<{_java_ty(t.elem, boxed=True)}>"
     if isinstance(t, MapOf):
@@ -95,15 +108,15 @@ def _enc(t: TypeRef, expr: str, depth: int = 0) -> str:
         return f"{expr}.toCbor()"
     e = _param(depth)
     if isinstance(t, ListOf):
-        return f"Cbor.arr({expr}.stream().map({e} -> {_enc(t.elem, e, depth + 1)}).toList())"
+        return f"Cbor.arr({expr}.stream().map({e} -> {_enc(t.elem, e, depth + 1)}).collect(java.util.stream.Collectors.collectingAndThen(java.util.stream.Collectors.toList(), java.util.Collections::unmodifiableList)))"
     if isinstance(t, MapOf):  # ascending keys: an int or bool by value, a str by code point
         if isinstance(t.key, Scalar) and t.key.kind == "str":
             entries = f"Cbor.sortedByCodePoint({expr})"
         else:
             entries = f"new java.util.TreeMap<>({expr})"
         return (f"Cbor.arr({entries}.entrySet().stream().map({e} -> "
-                f"Cbor.map(java.util.List.of(new KV(1, {_enc(t.key, f'{e}.getKey()', depth + 1)}), "
-                f"new KV(2, {_enc(t.value, f'{e}.getValue()', depth + 1)})))).toList())")
+                f"Cbor.map(java.util.Collections.unmodifiableList(java.util.Arrays.asList(new KV(1, {_enc(t.key, f'{e}.getKey()', depth + 1)}), "
+                f"new KV(2, {_enc(t.value, f'{e}.getValue()', depth + 1)}))))).collect(java.util.stream.Collectors.collectingAndThen(java.util.stream.Collectors.toList(), java.util.Collections::unmodifiableList)))")
     raise TypeError(t)
 
 
@@ -113,12 +126,12 @@ def _dec(t: TypeRef, expr: str, depth: int = 0) -> str:
                 "bytes": f"{expr}.asBytes()", "bool": f"{expr}.asBool()",
                 "float": f"{expr}.asFloat()"}[t.kind]
     if isinstance(t, EnumRef):
-        return f"{t.name}.fromWire({expr}.asInt())"
+        return f"{_type_name(t.name)}.fromWire({expr}.asInt())"
     if isinstance(t, MsgRef):
-        return f"{t.name}.fromCbor({expr})"
+        return f"{_type_name(t.name)}.fromCbor({expr})"
     e = _param(depth)
     if isinstance(t, ListOf):
-        return f"{expr}.asArray().stream().map({e} -> {_dec(t.elem, e, depth + 1)}).toList()"
+        return f"{expr}.asArray().stream().map({e} -> {_dec(t.elem, e, depth + 1)}).collect(java.util.stream.Collectors.collectingAndThen(java.util.stream.Collectors.toList(), java.util.Collections::unmodifiableList))"
     if isinstance(t, MapOf):  # entry maps: keys 1 and 2 checked first, a repeated key refused
         return (f"Cbor.decodeMap({expr}, {e} -> {_dec(t.key, f'{e}.get(1)', depth + 1)}, "
                 f"{e} -> {_dec(t.value, f'{e}.get(2)', depth + 1)})")
@@ -126,14 +139,14 @@ def _dec(t: TypeRef, expr: str, depth: int = 0) -> str:
 
 
 def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
-    consts = ", ".join(f"{m.upper()}({v})" for m, v in members.items())
+    consts = ", ".join(f"{_enum_member(m)}({v})" for m, v in members.items())
     return [
         f"enum {name} {{",
         f"    {consts};",
         "    final long wire;",
         f"    {name}(long $w) {{ this.wire = $w; }}",
         f"    static {name} fromWire(long $v) {{",
-        "        for (var $e : values()) {",
+        f"        for ({name} $e : values()) {{",
         "            if ($e.wire == $v) {",
         "                return $e;",
         "            }",
@@ -146,7 +159,7 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
 
 def _codec(msg) -> str:
     """The class that holds `msg`'s codec. `$` keeps its name from any message's."""
-    return f"{msg.name}$Codec"
+    return f"{_type_name(msg.name)}$Codec"
 
 
 def _emit_message(schema: Schema, msg, forward_compat: bool = False) -> list[str]:
@@ -154,17 +167,19 @@ def _emit_message(schema: Schema, msg, forward_compat: bool = False) -> list[str
     call its codec. The bounds' values are literals, so they name nothing a field can hide."""
     max_depth = effective(schema, "max_depth", message=msg.name)
     max_encoded_len = effective(schema, "max_encoded_len", message=msg.name)
-    out = [f"class {msg.name} {{"]
+    out = [f"class {_type_name(msg.name)} {{"]
     for f in msg.fields:
-        out.append(f"    public {_field_type(f)} {f.name};")
+        if f.virtual:
+            continue
+        out.append(f"    public {_field_type(f)} {_field_name(f.name)};")
     if forward_compat:
         out.append("    public java.util.List<KV> wireResidual = new java.util.ArrayList<>();")
     out.append(f"    static final int MAX_DEPTH = {max_depth};")
     out.append(f"    static final Integer MAX_ENCODED_LEN = "
                f"{'null' if max_encoded_len is None else max_encoded_len};")
     out.append(f"    Cbor toCbor() {{ return {_codec(msg)}.toCbor(this); }}")
-    out.append(f"    static {msg.name} fromCbor(Cbor $c) {{ return {_codec(msg)}.fromCbor($c); }}")
-    out.append(f"    static {msg.name} decode(byte[] $bytes) {{ return {_codec(msg)}.decode($bytes); }}")
+    out.append(f"    static {_type_name(msg.name)} fromCbor(Cbor $c) {{ return {_codec(msg)}.fromCbor($c); }}")
+    out.append(f"    static {_type_name(msg.name)} decode(byte[] $bytes) {{ return {_codec(msg)}.decode($bytes); }}")
     out.append("}")
     return out
 
@@ -173,10 +188,10 @@ def _emit_codec(msg, forward_compat: bool = False) -> list[str]:
     """The message's codec, a class beside it, where none of its fields is in scope."""
     codec = _codec(msg)
     out = [f"final class {codec} {{", f"    private {codec}() {{}}"]
-    out.append(f"    static Cbor toCbor({msg.name} $self) {{")
-    out.append("        var $m = new java.util.ArrayList<KV>();")
+    out.append(f"    static Cbor toCbor({_type_name(msg.name)} $self) {{")
+    out.append("        java.util.ArrayList<KV> $m = new java.util.ArrayList<KV>();")
     for f in msg.wire_fields():
-        value = f"$self.{f.name}"
+        value = f"$self.{_field_name(f.name)}"
         if f.optional:
             enc = f"{value} != null ? {_enc(f.type, value)} : Cbor.NUL"
         else:
@@ -186,23 +201,23 @@ def _emit_codec(msg, forward_compat: bool = False) -> list[str]:
         out.append("        $m.addAll($self.wireResidual);")  # Cbor.encode sorts -> canonical
     out.append("        return Cbor.map($m);")
     out.append("    }")
-    out.append(f"    static {msg.name} fromCbor(Cbor $c) {{")
+    out.append(f"    static {_type_name(msg.name)} fromCbor(Cbor $c) {{")
     # A message is a map even when it has no field to read (CD-E5).
     out.append("        if ($c.kind != Cbor.MAP) {")
     out.append("            throw Cbor.DecodeError.wrongType(\"map\");")
     out.append("        }")
-    out.append(f"        {msg.name} $v = new {msg.name}();")
+    out.append(f"        {_type_name(msg.name)} $v = new {_type_name(msg.name)}();")
     for f in msg.fields:
-        if f.transient:
+        if f.transient or f.virtual:
             continue  # native-only; left at Java default
         if f.optional == MISSING_OK:  # an absent key reads as null, like a present null
             out.append(f"        {{ Cbor $f = $c.getOpt({f.tag}); "
-                       f"$v.{f.name} = ($f == null || $f.isNull()) ? null : {_dec(f.type, '$f')}; }}")
+                       f"$v.{_field_name(f.name)} = ($f == null || $f.isNull()) ? null : {_dec(f.type, '$f')}; }}")
         elif f.optional:
             out.append(f"        {{ Cbor $f = $c.get({f.tag}); "
-                       f"$v.{f.name} = $f.isNull() ? null : {_dec(f.type, '$f')}; }}")
+                       f"$v.{_field_name(f.name)} = $f.isNull() ? null : {_dec(f.type, '$f')}; }}")
         else:
-            out.append(f"        $v.{f.name} = {_dec(f.type, f'$c.get({f.tag})')};")
+            out.append(f"        $v.{_field_name(f.name)} = {_dec(f.type, f'$c.get({f.tag})')};")
     if forward_compat:  # every entry whose key no field has
         known = " && ".join(f"$kv.k != {f.tag}" for f in msg.wire_fields())
         out.append("        for (KV $kv : $c.mapEntries()) {")
@@ -215,20 +230,15 @@ def _emit_codec(msg, forward_compat: bool = False) -> list[str]:
     out.append("        return $v;")
     out.append("    }")
     # Bytes rooted at the message, under its bounds (CD-B3): the raw decode, then fromCbor.
-    out.append(f"    static {msg.name} decode(byte[] $bytes) {{")
-    out.append(f"        return fromCbor(Cbor.decode($bytes, {msg.name}.MAX_DEPTH, {msg.name}.MAX_ENCODED_LEN));")
+    out.append(f"    static {_type_name(msg.name)} decode(byte[] $bytes) {{")
+    out.append(f"        return fromCbor(Cbor.decode($bytes, {_type_name(msg.name)}.MAX_DEPTH, {_type_name(msg.name)}.MAX_ENCODED_LEN));")
     out.append("    }")
     out.append("}")
     return out
 
 
-def emit_types(schema: Schema, forward_compat: bool = False) -> str:
-    out = ["// GENERATED native Java types + codec — do not edit. Pairs with Cbor.java.",
-           "// Each message's codec is its own class, <Message>$Codec, where no field hides a name.",
-           "package taut;", ""]
-    for e in schema.enums.values():
-        out += _emit_enum(e.name, e.members) + [""]
-    for m in schema.messages.values():
-        out += _emit_message(schema, m, forward_compat) + [""]
-        out += _emit_codec(m, forward_compat) + [""]
-    return "\n".join(out) + "\n"
+def emit_types(schema: Schema, forward_compat: bool = False, *, validation=False,
+               external_types=None, identity=None) -> str:
+    from .java_metadata import emit_types as emit_metadata
+    return emit_metadata(schema, forward_compat=forward_compat, validation=validation,
+                         external_types=external_types, identity=identity)

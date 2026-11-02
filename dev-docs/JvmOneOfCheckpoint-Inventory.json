@@ -1,0 +1,477 @@
+{
+  "status": "coordinator-authorized Java/Kotlin pair source freeze; committed object is the commit containing this file",
+  "baseline": {
+    "workspace": {
+      "path": "D:\\projects\\limbo\\taut-dev",
+      "HEAD": "f703be38c4b09a2597cdecd5fdf192877eb15b97",
+      "branch": "main",
+      "staged_paths": []
+    },
+    "taut": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut",
+      "HEAD": "1607b6e0b000f607153b2ec20fc244aeb5952744",
+      "branch": "main",
+      "staged_paths": []
+    },
+    "taut-shape-py": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut-shape-py",
+      "HEAD": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+      "branch": "main",
+      "staged_paths": []
+    },
+    "taut-shape-rs": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut-shape-rs",
+      "HEAD": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+      "branch": "main",
+      "staged_paths": []
+    }
+  },
+  "allowlist": [
+    "dev-docs/JvmOneOfCheckpoint-Authority.md",
+    "dev-docs/JvmOneOfCheckpoint-Draft.md",
+    "dev-docs/JvmOneOfCheckpoint-Inventory.json",
+    "dev-docs/JvmOneOfCheckpoint-Preparation.json",
+    "dev-docs/JvmOneOfCheckpoint-WheelGate.log",
+    "dev-docs/examples/java-oneof/AdapterProbe.java",
+    "dev-docs/examples/java-oneof/Conformance.java",
+    "dev-docs/examples/java-oneof/INTEGRATION.md",
+    "dev-docs/examples/java-oneof/README.md",
+    "dev-docs/examples/java-oneof/RESULTS.md",
+    "dev-docs/examples/java-oneof/content.taut.py",
+    "dev-docs/examples/java-oneof/disabled.golden.java",
+    "dev-docs/examples/java-oneof/enabled.golden.java",
+    "dev-docs/examples/java-oneof/owned-files.json",
+    "dev-docs/examples/java-oneof/results/adapter-probe.log",
+    "dev-docs/examples/java-oneof/results/contract-supplement.log",
+    "dev-docs/examples/java-oneof/results/disabled.log",
+    "dev-docs/examples/java-oneof/results/examples.log",
+    "dev-docs/examples/java-oneof/results/feature-regression.log",
+    "dev-docs/examples/java-oneof/results/feature-tests.log",
+    "dev-docs/examples/java-oneof/results/final-target-gate.log",
+    "dev-docs/examples/java-oneof/results/package-provenance.json",
+    "dev-docs/examples/java-oneof/results/package-reports.tsv",
+    "dev-docs/examples/java-oneof/results/reference-regression.log",
+    "dev-docs/examples/java-oneof/results/runtime-inventory.json",
+    "dev-docs/examples/java-oneof/results/source-reports.tsv",
+    "dev-docs/examples/java-oneof/verify_examples.py",
+    "dev-docs/examples/kotlin-oneof/AdapterProbe.kt",
+    "dev-docs/examples/kotlin-oneof/Example.kt",
+    "dev-docs/examples/kotlin-oneof/INTEGRATION.md",
+    "dev-docs/examples/kotlin-oneof/README.md",
+    "dev-docs/examples/kotlin-oneof/RESULTS.md",
+    "dev-docs/examples/kotlin-oneof/results.json",
+    "dev-docs/examples/kotlin-oneof/run-example.py",
+    "dev-docs/examples/kotlin-oneof/test-results.txt",
+    "pyproject.toml",
+    "src/taut/cli.py",
+    "src/taut/corpus/parity_java.py",
+    "src/taut/gen/java.py",
+    "src/taut/gen/java_metadata.py",
+    "src/taut/gen/java_runtime.py",
+    "src/taut/gen/kotlin.py",
+    "src/taut/gen/kotlin_metadata.py",
+    "src/taut/gen/kotlin_package.py",
+    "src/taut/gen/kotlin_runtime.py",
+    "src/taut/gen/runtime/Cbor.java",
+    "src/taut/gen/runtime/cbor.kt",
+    "src/taut/gen/runtime/java/taut/validation/ConfigurationException.java",
+    "src/taut/gen/runtime/java/taut/validation/DeferredCheck.java",
+    "src/taut/gen/runtime/java/taut/validation/PathSegment.java",
+    "src/taut/gen/runtime/java/taut/validation/ValidationEngine.java",
+    "src/taut/gen/runtime/java/taut/validation/ValidationIssue.java",
+    "src/taut/gen/runtime/java/taut/validation/ValidationReport.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ConstraintDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/EnumDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/FieldBinding.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/FieldDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ImmutableBytes.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/MessageAdapter.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/MessageDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/OneOfDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/RuntimeContract.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/SchemaBinding.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/SchemaDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/Snapshots.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/Traversal.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/TypeDescriptor.java",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ValueAdapter.java",
+    "src/taut/gen/runtime/kotlin/descriptors.kt",
+    "src/taut/gen/runtime/kotlin/validation.kt",
+    "src/taut/gen/scaffold.py",
+    "src/tests/test_java.py",
+    "src/tests/test_java_oneof.py",
+    "src/tests/test_jvm_compiler_distribution.py",
+    "src/tests/test_kotlin.py",
+    "src/tests/test_kotlin_oneof.py",
+    "src/tests/test_reserved_names.py"
+  ],
+  "java_count": 55,
+  "kotlin_count": 17,
+  "files": {
+    "dev-docs/JvmOneOfCheckpoint-Authority.md": {
+      "sha256": "e6af4ab2f016bf283d55224136f2ccd8e2cb2c5b0519c9a3ab6a0e032675afef",
+      "size": 8366
+    },
+    "dev-docs/JvmOneOfCheckpoint-Draft.md": {
+      "sha256": "169a51d5511ab50d4bd0a202d464c19af10bc1205626ffd2a36a028d3a838e7d",
+      "size": 13502
+    },
+    "dev-docs/JvmOneOfCheckpoint-Preparation.json": {
+      "sha256": "f2e01c12b28b4ab7b85f7141b24b43a1914ca8141f752354ae442cfb77dd2a87",
+      "size": 10326
+    },
+    "dev-docs/JvmOneOfCheckpoint-WheelGate.log": {
+      "sha256": "23b8133d2099c4e9063e0abe63afb4368afed436ac4e851663ec8cabb1918f6b",
+      "size": 101
+    },
+    "dev-docs/examples/java-oneof/AdapterProbe.java": {
+      "sha256": "d62abece1d30e3e394073d8b482644efea6606738e5f87047abaa7b5fbf44fb8",
+      "size": 1797
+    },
+    "dev-docs/examples/java-oneof/Conformance.java": {
+      "sha256": "67df6e39a4a8172019ee6d83cc37967d9fd3e62a30082996718097b887cc8030",
+      "size": 6336
+    },
+    "dev-docs/examples/java-oneof/INTEGRATION.md": {
+      "sha256": "115aeba34a5e444a90161ccb41d6af393aa4caa3a25a58cf317c47dfc223bc04",
+      "size": 6734
+    },
+    "dev-docs/examples/java-oneof/README.md": {
+      "sha256": "b4329e47940d995dbde19fa1540b42dd7f784e7f178235af94550bab419f9225",
+      "size": 1578
+    },
+    "dev-docs/examples/java-oneof/RESULTS.md": {
+      "sha256": "b044ce1054ab0c7eec41f23876013239a59a35603a88da172d8d9129d7a405c9",
+      "size": 4925
+    },
+    "dev-docs/examples/java-oneof/content.taut.py": {
+      "sha256": "784f549db4a0e324a7675f3f88e399d623d81738e7358f6225a449e0e349855d",
+      "size": 1185
+    },
+    "dev-docs/examples/java-oneof/disabled.golden.java": {
+      "sha256": "5de008f9f58515ff98f5b9d632869245390922f5bda43c452072fa16cdb0a647",
+      "size": 32585
+    },
+    "dev-docs/examples/java-oneof/enabled.golden.java": {
+      "sha256": "c19d5103f64c281360156f7814005de8b395198e26f760291d54da44f629add5",
+      "size": 36164
+    },
+    "dev-docs/examples/java-oneof/owned-files.json": {
+      "sha256": "2e4e74e6c08848d719c5ca2c020c4eb37030ff3dda69ccbd6cd49d68e4330a9e",
+      "size": 3184
+    },
+    "dev-docs/examples/java-oneof/results/adapter-probe.log": {
+      "sha256": "8263afd8aed64f50ed71353dc49e60f6da4417bb5a6d38a50437eda1a235edcf",
+      "size": 26
+    },
+    "dev-docs/examples/java-oneof/results/contract-supplement.log": {
+      "sha256": "f74e11def6a849913454939f604c166e66b8e1123007a8103325b9f3d18b8c8b",
+      "size": 115
+    },
+    "dev-docs/examples/java-oneof/results/disabled.log": {
+      "sha256": "11f42bb65cb1bdd6d605fa9be0344d809d679086e7b37ca990debee59c035107",
+      "size": 9
+    },
+    "dev-docs/examples/java-oneof/results/examples.log": {
+      "sha256": "63a679db87ac3228bf0a7c98265f3a2e9a2bfd10150a893b8f179bd738228be0",
+      "size": 125
+    },
+    "dev-docs/examples/java-oneof/results/feature-regression.log": {
+      "sha256": "ba61b01229c066fe64539a1330cbba29e3c0316ad956905351e4d09aed852ea5",
+      "size": 208
+    },
+    "dev-docs/examples/java-oneof/results/feature-tests.log": {
+      "sha256": "44ba895e3fe3c8f3171eb06ee35ed13bb625b070e0bf8120338a4df97a37ac91",
+      "size": 193
+    },
+    "dev-docs/examples/java-oneof/results/final-target-gate.log": {
+      "sha256": "5812c8f22474c4060eaf7e3b310d9e0115ea6df9479d6b3c7e25bf5980e54fa4",
+      "size": 195
+    },
+    "dev-docs/examples/java-oneof/results/package-provenance.json": {
+      "sha256": "d90a2914e9a50048fa913dc539705f2ff70678873af08c25bbe5ab352f793704",
+      "size": 6759
+    },
+    "dev-docs/examples/java-oneof/results/package-reports.tsv": {
+      "sha256": "02586adf94172f54e92c38809a4426d8e1cc372b70b669e405a5b20efc08b4ec",
+      "size": 1954
+    },
+    "dev-docs/examples/java-oneof/results/reference-regression.log": {
+      "sha256": "289c072cb6c9c4b1947975a3229efd706c66a8c8e02278c56e53d3543311c08f",
+      "size": 761
+    },
+    "dev-docs/examples/java-oneof/results/runtime-inventory.json": {
+      "sha256": "f93cdaa35574126d3bbce13d8adc351cd490618dce67ade55a9f73ec1f509118",
+      "size": 2670
+    },
+    "dev-docs/examples/java-oneof/results/source-reports.tsv": {
+      "sha256": "02586adf94172f54e92c38809a4426d8e1cc372b70b669e405a5b20efc08b4ec",
+      "size": 1954
+    },
+    "dev-docs/examples/java-oneof/verify_examples.py": {
+      "sha256": "c70da232b334e00518a0d00b090d23bae57f5ca1984b0f7a9ef49d13812e82b0",
+      "size": 3503
+    },
+    "dev-docs/examples/kotlin-oneof/AdapterProbe.kt": {
+      "sha256": "368f8fd497cb80cf6782c1fe61fd83e640b66c1ef4a23c720cbffe6ae2c80873",
+      "size": 1414
+    },
+    "dev-docs/examples/kotlin-oneof/Example.kt": {
+      "sha256": "63f4611026614b5ea97815b357a3157ca8fbffc6a9e0d2d103b85551f1f4338f",
+      "size": 899
+    },
+    "dev-docs/examples/kotlin-oneof/INTEGRATION.md": {
+      "sha256": "49bf7a3f28f6bb46f538ae24809b4b32b2ded852d14187a5463bdf173d9e8d01",
+      "size": 3045
+    },
+    "dev-docs/examples/kotlin-oneof/README.md": {
+      "sha256": "22f8605ae13906ef8978ced683b98288fad6201777eee5bb6292c5eaf9424f53",
+      "size": 5685
+    },
+    "dev-docs/examples/kotlin-oneof/RESULTS.md": {
+      "sha256": "fdbc22b2bc12482a69fa6e7d934477d5c3e239db92b163d0f30d714b1b1d4b08",
+      "size": 7691
+    },
+    "dev-docs/examples/kotlin-oneof/results.json": {
+      "sha256": "28b15b4900adba652e1ddcaf1d24d58ef561d4adc25962b1e6f76a96691cab54",
+      "size": 887
+    },
+    "dev-docs/examples/kotlin-oneof/run-example.py": {
+      "sha256": "c0303641eb5e3abcc07e2ceddaaff5ecb64cf3bcc31aa8d80fb048fcf9907d89",
+      "size": 2351
+    },
+    "dev-docs/examples/kotlin-oneof/test-results.txt": {
+      "sha256": "d3c297ff7bc36ae8a4838fc9d08b10fcc6ee78beefb4118cefbc9aaf4445527d",
+      "size": 1884
+    },
+    "pyproject.toml": {
+      "sha256": "9b16c639c626a1d289876c3bfa548815ac1054fa9ea54952035568f7af40fcf9",
+      "size": 2040
+    },
+    "src/taut/cli.py": {
+      "sha256": "4c923eebd1cc0fbe1a21d8b51de2b6307789af7adb87dacfadbc19d354d072f5",
+      "size": 12683
+    },
+    "src/taut/corpus/parity_java.py": {
+      "sha256": "35324e349da2b7979ff75f9e853fc8ba973c784e15672fd175c01fa921ee800a",
+      "size": 15096
+    },
+    "src/taut/gen/java.py": {
+      "sha256": "d6477a0654cc527f79e63d161898f06fcbc7c36db619ffb84ed330e1dd55d096",
+      "size": 13077
+    },
+    "src/taut/gen/java_metadata.py": {
+      "sha256": "1d3d746c5a5e13c401c63e20a00c24235ff6af6eec8e38be4cba549cc0c03bd9",
+      "size": 13860
+    },
+    "src/taut/gen/java_runtime.py": {
+      "sha256": "d67c03be5cfc21622ac2e16193ca925c5ab7993a9f91533494ca24e0c1cf25a2",
+      "size": 13841
+    },
+    "src/taut/gen/kotlin.py": {
+      "sha256": "40356d3c9e600505e28af60584b3ecac93df95911b078c33ceeb89efb96ef665",
+      "size": 11903
+    },
+    "src/taut/gen/kotlin_metadata.py": {
+      "sha256": "e60039c74ebf216543faf584b390acc1222cee152eabb015723c72b6f9468557",
+      "size": 12717
+    },
+    "src/taut/gen/kotlin_package.py": {
+      "sha256": "4cd543bd7c16dc4af3fd9af6e5158f2edc9c3823ecb28be9f3468077d03a8119",
+      "size": 2781
+    },
+    "src/taut/gen/kotlin_runtime.py": {
+      "sha256": "3e215995fde5c363878a4c7ef9cb67e2c1b79b7825c81d2c0324cb30a1a23a83",
+      "size": 9147
+    },
+    "src/taut/gen/runtime/Cbor.java": {
+      "sha256": "b7a4c0d85e3fde9e72426820e4e1751d541441f5068d20de2cae210496bfcc9a",
+      "size": 27505
+    },
+    "src/taut/gen/runtime/cbor.kt": {
+      "sha256": "36baf6c178ea1417c46c6748b3cedbdb59f43085717d5e363b8e93be0a55a3c8",
+      "size": 19760
+    },
+    "src/taut/gen/runtime/java/taut/validation/ConfigurationException.java": {
+      "sha256": "33a1c62e787097f8513167e7af841bd89cf7d6c2aad3ff1a7f39878c217ec610",
+      "size": 333
+    },
+    "src/taut/gen/runtime/java/taut/validation/DeferredCheck.java": {
+      "sha256": "3af27978aabbf45c46a4c3bb88ceb3ee412f2973a4cf2aff0f0f4116e67fb2fc",
+      "size": 775
+    },
+    "src/taut/gen/runtime/java/taut/validation/PathSegment.java": {
+      "sha256": "6059c26e10348a2728c619122ab640fa6f75205ec210a2abdf77be5b1298f3f6",
+      "size": 2002
+    },
+    "src/taut/gen/runtime/java/taut/validation/ValidationEngine.java": {
+      "sha256": "6e712fee16e9f0f69d4bcd797e99c70cc67490c22cc6eab2f1811790547e424e",
+      "size": 4356
+    },
+    "src/taut/gen/runtime/java/taut/validation/ValidationIssue.java": {
+      "sha256": "138f35360edc6658ea46d0efced78542c83bb9ad65f029932c31c2613cdcaf94",
+      "size": 743
+    },
+    "src/taut/gen/runtime/java/taut/validation/ValidationReport.java": {
+      "sha256": "f6748b6ce6bdb046f5e3b5ba6fea7f9fae1971ae39f5a8d4581bc85487002541",
+      "size": 996
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ConstraintDescriptor.java": {
+      "sha256": "c345aa2365c15325687d7e1a6dd0019c07f33f066c78400c7d2e72e7677f846c",
+      "size": 489
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/EnumDescriptor.java": {
+      "sha256": "b7d903678c9f81fc100950bd281715cfc3402b55fefa0e65dd9e020193b8e6ec",
+      "size": 1223
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/FieldBinding.java": {
+      "sha256": "a5a76efc7f7186c346ba98598df61c667f7f8fbaa38eb95dc4dc94c7c4edbd31",
+      "size": 1408
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/FieldDescriptor.java": {
+      "sha256": "d378517ea1a0fe7c136934f95ee210e0ca02385cb4fab728af4b5487d61e4d29",
+      "size": 1580
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ImmutableBytes.java": {
+      "sha256": "8ca3187940e6131e62c501c5d0b44801f6a89ee30a39ae3cc1e3d5ee14ddda2f",
+      "size": 313
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/MessageAdapter.java": {
+      "sha256": "482c298371c008f361d36ac23436f305503678517766cef0bb1e7d37e6995d69",
+      "size": 4336
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/MessageDescriptor.java": {
+      "sha256": "a3d812b9d161a5aeef6eb6d6a0591464ac00851c49e8286f5e002a04d21503db",
+      "size": 2597
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/OneOfDescriptor.java": {
+      "sha256": "2a458146e9fdfb2b499ba3ec9844116e5e75aab353bc70c70c56dd39c41fb065",
+      "size": 1033
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/RuntimeContract.java": {
+      "sha256": "524400e16da93213b83dca017146abc5c4c462c18ca7fe8325587a29588d3c56",
+      "size": 883
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/SchemaBinding.java": {
+      "sha256": "54c5d418976162f08e02e572e1a47ef68f318f9b2c5463286b5dc2cf012fabad",
+      "size": 1951
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/SchemaDescriptor.java": {
+      "sha256": "ccef82dba86198204d27901a8bff6e9ddd75331413c9a870f1838ab6a73f8d55",
+      "size": 1671
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/Snapshots.java": {
+      "sha256": "3f81e37b28a9ba822c99d885d0914b57a91514b0061db7a7efcf465a9c8588bf",
+      "size": 2389
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/Traversal.java": {
+      "sha256": "78cc6b59beccde6b2770e73cbf2c8d042a6afa4911e3452bf760d9a078d7cc5b",
+      "size": 510
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/TypeDescriptor.java": {
+      "sha256": "61a1cc7f65e3eba75cf5dba3ebd22a9fff1ba12c31919e5ec01a897d962c892d",
+      "size": 2163
+    },
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ValueAdapter.java": {
+      "sha256": "e9c70bca056d78a9655f83659910d64dbf4e0a8e92756db29b4e8c1911e3cb74",
+      "size": 4971
+    },
+    "src/taut/gen/runtime/kotlin/descriptors.kt": {
+      "sha256": "037d20d1447a3324ef4eaadd45a4261d8a9d4b596948240906da54a8689d2073",
+      "size": 13622
+    },
+    "src/taut/gen/runtime/kotlin/validation.kt": {
+      "sha256": "d4b63eade7e51fad82fc0d9ed00c4f2e624cd08e8275bf00bcfa780d64730c43",
+      "size": 5806
+    },
+    "src/taut/gen/scaffold.py": {
+      "sha256": "05594e6acd2b69c5963330538489b65cce27e94045a09b8018c0b6ce1750932f",
+      "size": 40058
+    },
+    "src/tests/test_java.py": {
+      "sha256": "202423e2919bd5cc7b0c1c15086b7bda681a5f2a1ed2dc5ad34417bd895ec2b1",
+      "size": 64864
+    },
+    "src/tests/test_java_oneof.py": {
+      "sha256": "f96754caaaf13802e006b65847ec5bb484fc89be97d6cfac4d75449ad8b89fbb",
+      "size": 30741
+    },
+    "src/tests/test_jvm_compiler_distribution.py": {
+      "sha256": "f0f082101699f23195591a83b89477b97993ca7f8f1db896eb596e2e85d6a1b5",
+      "size": 3449
+    },
+    "src/tests/test_kotlin.py": {
+      "sha256": "a5ff0232b271d4b1f7d6cd7f1fba391650cdb1b4c95f2d211e057b50c404bc98",
+      "size": 58537
+    },
+    "src/tests/test_kotlin_oneof.py": {
+      "sha256": "e84837e6254a235e9a91b9fd1ad803a39b215308e44036dfae7098db4be22470",
+      "size": 44100
+    },
+    "src/tests/test_reserved_names.py": {
+      "sha256": "a467d58b16cd233b92383f41d1fea1214dc7383a2173daa5b5587e97ce113377",
+      "size": 9454
+    }
+  },
+  "self_hash": "excluded to avoid self-reference",
+  "user_sources_verified_unchanged": {
+    "src/taut/ir/dsl.py": {
+      "sha256": "5b2061584dcd78a3f73d2a757d6b101bacf280c9190f6a068b613eecb55b307d",
+      "matches_HEAD": true
+    },
+    "src/taut/facts.py": {
+      "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+      "matches_HEAD": true
+    },
+    "src/tests/test_oneof.py": {
+      "sha256": "a47cc246e59a2717dc9b182afa9a47860ee48d5085f7e94b5f53ff256f9d4dcd",
+      "matches_HEAD": true
+    }
+  },
+  "excluded_untracked_paths": [
+    "dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json",
+    "dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json",
+    "dev-docs/examples/python-oneof/generated/disabled/python/__init__.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/api.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py",
+    "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py",
+    "dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json",
+    "dev-docs/examples/python-oneof/generated/package/python/__init__.py",
+    "dev-docs/examples/python-oneof/generated/package/python/api.py",
+    "dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json",
+    "dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json",
+    "dev-docs/examples/python-oneof/generated/source/python/__init__.py",
+    "dev-docs/examples/python-oneof/generated/source/python/api.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/ext.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/facts.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/rules.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/validation.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py",
+    "dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py",
+    "dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl"
+  ],
+  "staged_before_freeze": [],
+  "user_enum_case_status": "parallel user-owned patch not present; excluded; preserve arriving changes",
+  "production_policy": "HOLD unless coordinated concrete failing gate or merged reviewer remediation",
+  "review_axes": [
+    "Code+Surface",
+    "State"
+  ],
+  "reviewer_cap": 2,
+  "global_gate": "coordinator assigns Kotlin ONE broad+all16parity run after exact commit; both verdicts must consume completed results"
+}

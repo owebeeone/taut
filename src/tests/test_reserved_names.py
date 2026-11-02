@@ -77,7 +77,7 @@ def test_an_error_names_the_name_the_target_and_why():
     ("Probe.wireResidual", "field", field_named("wireResidual"), {"go", "java", "js", "kotlin"}),
     ("Default", "message", schema(Msg("Default", F("n", 1, INT))), {"go", "rust"}),
     ("enum Default", "enum", schema(Enum("Default", a=0)), {"rust"}),
-    ("taut", "message", schema(Msg("taut", F("n", 1, INT))), {"kotlin"}),
+    ("taut", "message", schema(Msg("taut", F("n", 1, INT))), {"kotlin", "java"}),
     ("Cbor", "message", schema(Msg("Cbor", F("n", 1, INT))),
      {"cpp", "go", "java", "kotlin", "rust", "swift"}),
     ("DecodeError", "message", schema(Msg("DecodeError", F("n", 1, INT))),

@@ -298,7 +298,7 @@ def _run_harness(work: Path, schema, harness: str, source: str, args: list[str],
     (java_dir / f"{harness}.java").write_text(textwrap.dedent(source).strip() + "\n")
     classes = work / "classes"
     classes.mkdir()
-    sources = sorted(str(path) for path in java_dir.glob("*.java"))
+    sources = sorted(str(path) for path in java_dir.rglob("*.java"))
     build = subprocess.run([javac, "-encoding", "UTF-8", "-d", str(classes), *sources],
                            cwd=work, capture_output=True, text=True)
     assert build.returncode == 0, build.stdout + build.stderr
@@ -954,11 +954,11 @@ def test_float_scalar_codegen_shape():
     assert "public java.util.Map<Long, Double> by_id;" in s
     assert "$m.add(new KV(1, Cbor.float_($self.x)));" in s
     assert "$m.add(new KV(2, $self.maybe != null ? Cbor.float_($self.maybe) : Cbor.NUL));" in s
-    assert "Cbor.arr($self.xs.stream().map($e -> Cbor.float_($e)).toList())" in s
+    assert "Cbor.arr($self.xs.stream().map($e -> Cbor.float_($e)).collect(java.util.stream.Collectors.collectingAndThen(java.util.stream.Collectors.toList(), java.util.Collections::unmodifiableList)))" in s
     assert "new KV(2, Cbor.float_($e.getValue()))" in s
     assert "$v.x = $c.get(1).asFloat();" in s
     assert "$v.maybe = $f.isNull() ? null : $f.asFloat();" in s
-    assert "$c.get(3).asArray().stream().map($e -> $e.asFloat()).toList()" in s
+    assert "$c.get(3).asArray().stream().map($e -> $e.asFloat()).collect(java.util.stream.Collectors.collectingAndThen(java.util.stream.Collectors.toList(), java.util.Collections::unmodifiableList))" in s
     assert "$e -> $e.get(2).asFloat()" in s
 
 
@@ -1002,7 +1002,9 @@ def test_java_declares_only_dollar_names_and_message_classes_only_delegate(forwa
         for name in schema.messages:
             body = _class_body(source, f"class {name}")
             fields = [line for line in body if line.startswith("    public ") and line.endswith(";")]
-            assert body[len(fields):] == [
+            metadata = [line for line in body if " descriptor()" in line or " $adapter()" in line]
+            assert len(metadata) == 2
+            assert [line for line in body[len(fields):] if line not in metadata] == [
                 *_bounds_lines(schema, name),
                 f"    Cbor toCbor() {{ return {name}$Codec.toCbor(this); }}",
                 f"    static {name} fromCbor(Cbor $c) {{ return {name}$Codec.fromCbor($c); }}",
@@ -1120,8 +1122,7 @@ def test_java_missing_ok_reads_an_absent_key_as_null(tmp_path):
     harness.write_text(textwrap.dedent(MISSING_OK_HARNESS).strip() + "\n")
     classes = tmp_path / "classes"
     classes.mkdir()
-    subprocess.run([javac, "-d", str(classes), str(java_dir / "Cbor.java"), str(java_dir / "api.java"),
-                    str(harness)], check=True, cwd=ROOT, capture_output=True, text=True)
+    subprocess.run([javac, "-d", str(classes), *sorted(str(p) for p in java_dir.rglob("*.java"))], check=True, cwd=ROOT, capture_output=True, text=True)
     run = subprocess.run([java_bin, "-cp", str(classes), "taut.MissingOkHarness"],
                          check=True, cwd=ROOT, capture_output=True, text=True)
     assert dict(line.split("\t") for line in run.stdout.splitlines()) == {
@@ -1148,8 +1149,7 @@ def java_shapes(tmp_path_factory):
     harness.write_text(textwrap.dedent(SHAPES_HARNESS).strip() + "\n")
     classes = work / "classes"
     classes.mkdir()
-    build = subprocess.run([javac, "-encoding", "UTF-8", "-d", str(classes), str(java_dir / "Cbor.java"),
-                            str(java_dir / "api.java"), str(harness)],
+    build = subprocess.run([javac, "-encoding", "UTF-8", "-d", str(classes), *sorted(str(p) for p in java_dir.rglob("*.java"))],
                            cwd=work, capture_output=True, text=True)
     assert build.returncode == 0, build.stdout + build.stderr
     run = subprocess.run([java_bin, "-cp", str(classes), "taut.ShapesHarness",
@@ -1191,10 +1191,7 @@ def test_java_resext_runtime_parity_invalid_cases_public_access_and_fuzz(tmp_pat
         javac,
         "-d",
         str(classes),
-        str(java_dir / "Cbor.java"),
-        str(java_dir / "Ext.java"),
-        str(java_dir / "api.java"),
-        str(harness),
+        *sorted(str(p) for p in java_dir.rglob("*.java")),
     ], check=True, cwd=ROOT, capture_output=True, text=True)
 
     parity = subprocess.run([
