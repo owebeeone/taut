@@ -28,7 +28,7 @@ import json
 import math
 from typing import Any
 
-from ..ir.model import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
+from ..facts import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from . import codec
 
 
@@ -56,7 +56,11 @@ def _to_json(schema: Schema, tref: TypeRef, value: Any) -> Any:
         return {_key_str(k): _to_json(schema, tref.value, v) for k, v in value.items()}
     if isinstance(tref, MsgRef):
         msg = schema.messages[tref.name]
-        return {f.name: _to_json(schema, f.type, value.get(f.name)) for f in msg.wire_fields()}
+        for f in msg.wire_fields():
+            if f.oneof is not None and value.get(f.name) is None:
+                raise TypeError(f"{msg.name}.{f.name}: nonvirtual discriminator is required")
+        return {f.name: _to_json(schema, f.type, value.get(f.name)) for f in msg.wire_fields()
+                if not f.cases or value.get(f.name) is not None}
     raise TypeError(f"unknown type ref {tref!r}")
 
 
@@ -96,6 +100,12 @@ def _from_json(schema: Schema, tref: TypeRef, jv: Any) -> Any:
     if isinstance(tref, MsgRef):
         msg = schema.messages[tref.name]
         obj = jv or {}
+        for f in msg.wire_fields():
+            if f.oneof is not None:
+                if f.name not in obj:
+                    raise codec.DecodeError("MissingKey", key=f.name)
+                if obj[f.name] is None:
+                    raise codec.DecodeError("WrongType", expected="enum")
         return {f.name: _from_json(schema, f.type, obj.get(f.name)) for f in msg.wire_fields()}
     raise TypeError(f"unknown type ref {tref!r}")
 

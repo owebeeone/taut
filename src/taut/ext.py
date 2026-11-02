@@ -17,8 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .ir.model import Schema
-from .ir.shapes import BAND_START
+from .facts import Schema, BAND_START
 from .wire import cbor, codec
 
 

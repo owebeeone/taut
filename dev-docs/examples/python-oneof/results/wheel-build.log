@@ -1,0 +1,300 @@
+* Getting build dependencies for wheel...
+running egg_info
+writing src\taut_proto.egg-info\PKG-INFO
+writing dependency_links to src\taut_proto.egg-info\dependency_links.txt
+writing entry points to src\taut_proto.egg-info\entry_points.txt
+writing top-level names to src\taut_proto.egg-info\top_level.txt
+[11/02/26 18:05:42] ERROR    listing git files failed - pretending   _git.py:36
+                             there aren't any                                  
+reading manifest file 'src\taut_proto.egg-info\SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'src\taut_proto.egg-info\SOURCES.txt'
+* Building wheel...
+running bdist_wheel
+running build
+running build_py
+copying src\taut\cli.py -> build\lib\taut
+copying src\taut\contracts.py -> build\lib\taut
+copying src\taut\descriptors.py -> build\lib\taut
+copying src\taut\ext.py -> build\lib\taut
+copying src\taut\facts.py -> build\lib\taut
+copying src\taut\rules.py -> build\lib\taut
+copying src\taut\validation.py -> build\lib\taut
+copying src\taut\_runtime_version.py -> build\lib\taut
+copying src\taut\_version.py -> build\lib\taut
+copying src\taut\__init__.py -> build\lib\taut
+copying src\taut\corpus\build.py -> build\lib\taut\corpus
+copying src\taut\corpus\float_build.py -> build\lib\taut\corpus
+copying src\taut\corpus\glade_build.py -> build\lib\taut\corpus
+copying src\taut\corpus\kit.py -> build\lib\taut\corpus
+copying src\taut\corpus\parity.py -> build\lib\taut\corpus
+copying src\taut\corpus\parity_cpp.py -> build\lib\taut\corpus
+copying src\taut\corpus\parity_go.py -> build\lib\taut\corpus
+copying src\taut\corpus\parity_java.py -> build\lib\taut\corpus
+copying src\taut\corpus\parity_js.py -> build\lib\taut\corpus
+copying src\taut\corpus\parity_kotlin.py -> build\lib\taut\corpus
+copying src\taut\corpus\parity_rust.py -> build\lib\taut\corpus
+copying src\taut\corpus\parity_swift.py -> build\lib\taut\corpus
+copying src\taut\corpus\parity_typescript.py -> build\lib\taut\corpus
+copying src\taut\corpus\resext_build.py -> build\lib\taut\corpus
+copying src\taut\corpus\synth.py -> build\lib\taut\corpus
+copying src\taut\corpus\toolchains.py -> build\lib\taut\corpus
+copying src\taut\corpus\__init__.py -> build\lib\taut\corpus
+copying src\taut\crdt\engine.py -> build\lib\taut\crdt
+copying src\taut\crdt\glade_chain.py -> build\lib\taut\crdt
+copying src\taut\crdt\glade_fold.py -> build\lib\taut\crdt
+copying src\taut\crdt\__init__.py -> build\lib\taut\crdt
+copying src\taut\gen\cpp.py -> build\lib\taut\gen
+copying src\taut\gen\go.py -> build\lib\taut\gen
+copying src\taut\gen\java.py -> build\lib\taut\gen
+copying src\taut\gen\js.py -> build\lib\taut\gen
+copying src\taut\gen\kotlin.py -> build\lib\taut\gen
+copying src\taut\gen\names.py -> build\lib\taut\gen
+copying src\taut\gen\python.py -> build\lib\taut\gen
+copying src\taut\gen\python_runtime.py -> build\lib\taut\gen
+copying src\taut\gen\rust.py -> build\lib\taut\gen
+copying src\taut\gen\rust_external.py -> build\lib\taut\gen
+copying src\taut\gen\scaffold.py -> build\lib\taut\gen
+copying src\taut\gen\swift.py -> build\lib\taut\gen
+copying src\taut\gen\__init__.py -> build\lib\taut\gen
+copying src\taut\ir\compat.py -> build\lib\taut\ir
+copying src\taut\ir\dsl.py -> build\lib\taut\ir
+copying src\taut\ir\export.py -> build\lib\taut\ir
+copying src\taut\ir\load.py -> build\lib\taut\ir
+copying src\taut\ir\model.py -> build\lib\taut\ir
+copying src\taut\ir\options.py -> build\lib\taut\ir
+copying src\taut\ir\shapes.py -> build\lib\taut\ir
+copying src\taut\ir\validate.py -> build\lib\taut\ir
+copying src\taut\ir\__init__.py -> build\lib\taut\ir
+copying src\taut\shapes\__init__.py -> build\lib\taut\shapes
+copying src\taut\wire\cbor.py -> build\lib\taut\wire
+copying src\taut\wire\codec.py -> build\lib\taut\wire
+copying src\taut\wire\jsoncodec.py -> build\lib\taut\wire
+copying src\taut\wire\__init__.py -> build\lib\taut\wire
+copying src\taut\gen\runtime\__init__.py -> build\lib\taut\gen\runtime
+running egg_info
+writing src\taut_proto.egg-info\PKG-INFO
+writing dependency_links to src\taut_proto.egg-info\dependency_links.txt
+writing entry points to src\taut_proto.egg-info\entry_points.txt
+writing top-level names to src\taut_proto.egg-info\top_level.txt
+[11/02/26 18:05:44] ERROR    listing git files failed - pretending   _git.py:36
+                             there aren't any                                  
+reading manifest file 'src\taut_proto.egg-info\SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'src\taut_proto.egg-info\SOURCES.txt'
+copying src\taut\gen\runtime\Cbor.java -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\Ext.java -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\cbor.go -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\cbor.hpp -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\cbor.js -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\cbor.kt -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\cbor.swift -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\cbor_bounds_test.go -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\cbor_fail_closed.rs -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\cbor_float_test.go -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\ext.go -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\ext.hpp -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\ext.js -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\ext.kt -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\ext.rs -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\ext.swift -> build\lib\taut\gen\runtime
+copying src\taut\gen\runtime\typescript\cbor.ts -> build\lib\taut\gen\runtime\typescript
+copying src\taut\gen\runtime\typescript\codec.ts -> build\lib\taut\gen\runtime\typescript
+copying src\taut\gen\runtime\typescript\ext.ts -> build\lib\taut\gen\runtime\typescript
+copying src\taut\gen\runtime\typescript\schema.ts -> build\lib\taut\gen\runtime\typescript
+copying src\taut\gen\runtime\typescript\taut_client.ts -> build\lib\taut\gen\runtime\typescript
+copying src\taut\gen\runtime\typescript\cbor.ts -> build\lib\taut\gen\runtime\typescript
+copying src\taut\gen\runtime\typescript\codec.ts -> build\lib\taut\gen\runtime\typescript
+copying src\taut\gen\runtime\typescript\ext.ts -> build\lib\taut\gen\runtime\typescript
+copying src\taut\gen\runtime\typescript\schema.ts -> build\lib\taut\gen\runtime\typescript
+copying src\taut\gen\runtime\typescript\taut_client.ts -> build\lib\taut\gen\runtime\typescript
+warning: build_py: byte-compiling is disabled, skipping.
+
+installing to build\bdist.win-amd64\wheel
+running install
+running install_lib
+creating build\bdist.win-amd64\wheel
+creating build\bdist.win-amd64\wheel\taut
+copying build\lib\taut\cli.py -> build\bdist.win-amd64\wheel\.\taut
+copying build\lib\taut\contracts.py -> build\bdist.win-amd64\wheel\.\taut
+creating build\bdist.win-amd64\wheel\taut\corpus
+copying build\lib\taut\corpus\build.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\float_build.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\glade_build.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\kit.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\parity.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\parity_cpp.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\parity_go.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\parity_java.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\parity_js.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\parity_kotlin.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\parity_rust.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\parity_swift.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\parity_typescript.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\resext_build.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\synth.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\toolchains.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+copying build\lib\taut\corpus\__init__.py -> build\bdist.win-amd64\wheel\.\taut\corpus
+creating build\bdist.win-amd64\wheel\taut\crdt
+copying build\lib\taut\crdt\engine.py -> build\bdist.win-amd64\wheel\.\taut\crdt
+copying build\lib\taut\crdt\glade_chain.py -> build\bdist.win-amd64\wheel\.\taut\crdt
+copying build\lib\taut\crdt\glade_fold.py -> build\bdist.win-amd64\wheel\.\taut\crdt
+copying build\lib\taut\crdt\__init__.py -> build\bdist.win-amd64\wheel\.\taut\crdt
+copying build\lib\taut\descriptors.py -> build\bdist.win-amd64\wheel\.\taut
+copying build\lib\taut\ext.py -> build\bdist.win-amd64\wheel\.\taut
+copying build\lib\taut\facts.py -> build\bdist.win-amd64\wheel\.\taut
+creating build\bdist.win-amd64\wheel\taut\gen
+copying build\lib\taut\gen\cpp.py -> build\bdist.win-amd64\wheel\.\taut\gen
+copying build\lib\taut\gen\go.py -> build\bdist.win-amd64\wheel\.\taut\gen
+copying build\lib\taut\gen\java.py -> build\bdist.win-amd64\wheel\.\taut\gen
+copying build\lib\taut\gen\js.py -> build\bdist.win-amd64\wheel\.\taut\gen
+copying build\lib\taut\gen\kotlin.py -> build\bdist.win-amd64\wheel\.\taut\gen
+copying build\lib\taut\gen\names.py -> build\bdist.win-amd64\wheel\.\taut\gen
+copying build\lib\taut\gen\python.py -> build\bdist.win-amd64\wheel\.\taut\gen
+copying build\lib\taut\gen\python_runtime.py -> build\bdist.win-amd64\wheel\.\taut\gen
+creating build\bdist.win-amd64\wheel\taut\gen\runtime
+copying build\lib\taut\gen\runtime\cbor.go -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\cbor.hpp -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\Cbor.java -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\cbor.js -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\cbor.kt -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\cbor.swift -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\cbor_bounds_test.go -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\cbor_fail_closed.rs -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\cbor_float_test.go -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\ext.go -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\ext.hpp -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\Ext.java -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\ext.js -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\ext.kt -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\ext.rs -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\runtime\ext.swift -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+creating build\bdist.win-amd64\wheel\taut\gen\runtime\typescript
+copying build\lib\taut\gen\runtime\typescript\cbor.ts -> build\bdist.win-amd64\wheel\.\taut\gen\runtime\typescript
+copying build\lib\taut\gen\runtime\typescript\codec.ts -> build\bdist.win-amd64\wheel\.\taut\gen\runtime\typescript
+copying build\lib\taut\gen\runtime\typescript\ext.ts -> build\bdist.win-amd64\wheel\.\taut\gen\runtime\typescript
+copying build\lib\taut\gen\runtime\typescript\schema.ts -> build\bdist.win-amd64\wheel\.\taut\gen\runtime\typescript
+copying build\lib\taut\gen\runtime\typescript\taut_client.ts -> build\bdist.win-amd64\wheel\.\taut\gen\runtime\typescript
+copying build\lib\taut\gen\runtime\__init__.py -> build\bdist.win-amd64\wheel\.\taut\gen\runtime
+copying build\lib\taut\gen\rust.py -> build\bdist.win-amd64\wheel\.\taut\gen
+copying build\lib\taut\gen\rust_external.py -> build\bdist.win-amd64\wheel\.\taut\gen
+copying build\lib\taut\gen\scaffold.py -> build\bdist.win-amd64\wheel\.\taut\gen
+copying build\lib\taut\gen\swift.py -> build\bdist.win-amd64\wheel\.\taut\gen
+copying build\lib\taut\gen\__init__.py -> build\bdist.win-amd64\wheel\.\taut\gen
+creating build\bdist.win-amd64\wheel\taut\ir
+copying build\lib\taut\ir\compat.py -> build\bdist.win-amd64\wheel\.\taut\ir
+copying build\lib\taut\ir\dsl.py -> build\bdist.win-amd64\wheel\.\taut\ir
+copying build\lib\taut\ir\export.py -> build\bdist.win-amd64\wheel\.\taut\ir
+copying build\lib\taut\ir\load.py -> build\bdist.win-amd64\wheel\.\taut\ir
+copying build\lib\taut\ir\model.py -> build\bdist.win-amd64\wheel\.\taut\ir
+copying build\lib\taut\ir\options.py -> build\bdist.win-amd64\wheel\.\taut\ir
+copying build\lib\taut\ir\shapes.py -> build\bdist.win-amd64\wheel\.\taut\ir
+copying build\lib\taut\ir\validate.py -> build\bdist.win-amd64\wheel\.\taut\ir
+copying build\lib\taut\ir\__init__.py -> build\bdist.win-amd64\wheel\.\taut\ir
+copying build\lib\taut\rules.py -> build\bdist.win-amd64\wheel\.\taut
+creating build\bdist.win-amd64\wheel\taut\shapes
+copying build\lib\taut\shapes\__init__.py -> build\bdist.win-amd64\wheel\.\taut\shapes
+copying build\lib\taut\validation.py -> build\bdist.win-amd64\wheel\.\taut
+creating build\bdist.win-amd64\wheel\taut\wire
+copying build\lib\taut\wire\cbor.py -> build\bdist.win-amd64\wheel\.\taut\wire
+copying build\lib\taut\wire\codec.py -> build\bdist.win-amd64\wheel\.\taut\wire
+copying build\lib\taut\wire\jsoncodec.py -> build\bdist.win-amd64\wheel\.\taut\wire
+copying build\lib\taut\wire\__init__.py -> build\bdist.win-amd64\wheel\.\taut\wire
+copying build\lib\taut\_runtime_version.py -> build\bdist.win-amd64\wheel\.\taut
+copying build\lib\taut\_version.py -> build\bdist.win-amd64\wheel\.\taut
+copying build\lib\taut\__init__.py -> build\bdist.win-amd64\wheel\.\taut
+warning: install_lib: byte-compiling is disabled, skipping.
+
+running install_egg_info
+Copying src\taut_proto.egg-info to build\bdist.win-amd64\wheel\.\taut_proto-0.10.0+python.oneof.reference.1-py3.13.egg-info
+running install_scripts
+creating build\bdist.win-amd64\wheel\taut_proto-0.10.0+python.oneof.reference.1.dist-info\WHEEL
+creating 'D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\python-oneof\\package-artifacts\\.tmp-135tw9k6\\taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl' and adding 'build\\bdist.win-amd64\\wheel' to it
+adding 'taut/__init__.py'
+adding 'taut/_runtime_version.py'
+adding 'taut/_version.py'
+adding 'taut/cli.py'
+adding 'taut/contracts.py'
+adding 'taut/descriptors.py'
+adding 'taut/ext.py'
+adding 'taut/facts.py'
+adding 'taut/rules.py'
+adding 'taut/validation.py'
+adding 'taut/corpus/__init__.py'
+adding 'taut/corpus/build.py'
+adding 'taut/corpus/float_build.py'
+adding 'taut/corpus/glade_build.py'
+adding 'taut/corpus/kit.py'
+adding 'taut/corpus/parity.py'
+adding 'taut/corpus/parity_cpp.py'
+adding 'taut/corpus/parity_go.py'
+adding 'taut/corpus/parity_java.py'
+adding 'taut/corpus/parity_js.py'
+adding 'taut/corpus/parity_kotlin.py'
+adding 'taut/corpus/parity_rust.py'
+adding 'taut/corpus/parity_swift.py'
+adding 'taut/corpus/parity_typescript.py'
+adding 'taut/corpus/resext_build.py'
+adding 'taut/corpus/synth.py'
+adding 'taut/corpus/toolchains.py'
+adding 'taut/crdt/__init__.py'
+adding 'taut/crdt/engine.py'
+adding 'taut/crdt/glade_chain.py'
+adding 'taut/crdt/glade_fold.py'
+adding 'taut/gen/__init__.py'
+adding 'taut/gen/cpp.py'
+adding 'taut/gen/go.py'
+adding 'taut/gen/java.py'
+adding 'taut/gen/js.py'
+adding 'taut/gen/kotlin.py'
+adding 'taut/gen/names.py'
+adding 'taut/gen/python.py'
+adding 'taut/gen/python_runtime.py'
+adding 'taut/gen/rust.py'
+adding 'taut/gen/rust_external.py'
+adding 'taut/gen/scaffold.py'
+adding 'taut/gen/swift.py'
+adding 'taut/gen/runtime/Cbor.java'
+adding 'taut/gen/runtime/Ext.java'
+adding 'taut/gen/runtime/__init__.py'
+adding 'taut/gen/runtime/cbor.go'
+adding 'taut/gen/runtime/cbor.hpp'
+adding 'taut/gen/runtime/cbor.js'
+adding 'taut/gen/runtime/cbor.kt'
+adding 'taut/gen/runtime/cbor.swift'
+adding 'taut/gen/runtime/cbor_bounds_test.go'
+adding 'taut/gen/runtime/cbor_fail_closed.rs'
+adding 'taut/gen/runtime/cbor_float_test.go'
+adding 'taut/gen/runtime/ext.go'
+adding 'taut/gen/runtime/ext.hpp'
+adding 'taut/gen/runtime/ext.js'
+adding 'taut/gen/runtime/ext.kt'
+adding 'taut/gen/runtime/ext.rs'
+adding 'taut/gen/runtime/ext.swift'
+adding 'taut/gen/runtime/typescript/cbor.ts'
+adding 'taut/gen/runtime/typescript/codec.ts'
+adding 'taut/gen/runtime/typescript/ext.ts'
+adding 'taut/gen/runtime/typescript/schema.ts'
+adding 'taut/gen/runtime/typescript/taut_client.ts'
+adding 'taut/ir/__init__.py'
+adding 'taut/ir/compat.py'
+adding 'taut/ir/dsl.py'
+adding 'taut/ir/export.py'
+adding 'taut/ir/load.py'
+adding 'taut/ir/model.py'
+adding 'taut/ir/options.py'
+adding 'taut/ir/shapes.py'
+adding 'taut/ir/validate.py'
+adding 'taut/shapes/__init__.py'
+adding 'taut/wire/__init__.py'
+adding 'taut/wire/cbor.py'
+adding 'taut/wire/codec.py'
+adding 'taut/wire/jsoncodec.py'
+adding 'taut_proto-0.10.0+python.oneof.reference.1.dist-info/licenses/LICENSE'
+adding 'taut_proto-0.10.0+python.oneof.reference.1.dist-info/METADATA'
+adding 'taut_proto-0.10.0+python.oneof.reference.1.dist-info/WHEEL'
+adding 'taut_proto-0.10.0+python.oneof.reference.1.dist-info/entry_points.txt'
+adding 'taut_proto-0.10.0+python.oneof.reference.1.dist-info/top_level.txt'
+adding 'taut_proto-0.10.0+python.oneof.reference.1.dist-info/RECORD'
+removing build\bdist.win-amd64\wheel
+Successfully built taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl

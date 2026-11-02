@@ -246,8 +246,8 @@ def test_version_1_refuses_a_key_version_2_added(where, key):
 
 # --- the version (OPT-I1) ---------------------------------------------------------------------
 
-@pytest.mark.parametrize("version", [0, 3, -1, None, "2", 2.0, True])
-def test_load_refuses_any_version_but_1_and_2(version):
+@pytest.mark.parametrize("version", [0, 4, -1, None, "2", 2.0, True])
+def test_load_refuses_unsupported_versions(version):
     ir = schema_json(_job_schema())
     ir["version"] = version
     with pytest.raises(ValueError, match=r"unsupported IR version .*: this taut reads versions 1 and 2"):

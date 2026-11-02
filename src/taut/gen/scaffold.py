@@ -105,26 +105,10 @@ def _py_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def python_api(schema: Schema, forward_compat: bool = False) -> str:
-    out = ['"""GENERATED native Python types — do not edit."""',
-           "from __future__ import annotations",
-           "from dataclasses import dataclass",
-           "from enum import Enum", ""]
-    for e in schema.enums.values():
-        out.append(f"class {e.name}(Enum):")
-        for m, v in e.members.items():
-            out.append(f"    {m} = {v}")
-        out.append("")
-    for m in schema.messages.values():
-        out.append("@dataclass(slots=True)")
-        out.append(f"class {m.name}:")
-        if not m.fields:
-            out.append("    pass")
-        for f in m.fields:
-            ann = f"{_py_ty(f.type)} | None" if f.optional else _py_ty(f.type)
-            out.append(f"    {f.name}: {ann}")
-        out.append("")
-    return "\n".join(out) + "\n"
+def python_api(schema: Schema, forward_compat: bool = False, *, validation=False,
+               external_types=None, identity=None) -> str:
+    from .python import emit_types
+    return emit_types(schema, validation=validation, external_types=external_types, identity=identity)
 
 
 def python_client(schema: Schema, svc: ServiceDef) -> str:
@@ -619,6 +603,11 @@ def emit(
     runtime: bool = False,
     forward_compat: bool = False,
     rust_external_types: dict[str, str] | None = None,
+    runtime_mode: str | None = None,
+    validation: bool = False,
+    runtime_bindings: dict | None = None,
+    python_external_types: dict[str, str] | None = None,
+    schema_identity: str | None = None,
 ) -> list[Path]:
     """Generate per-language code from an IR (the engine behind the `tautc` CLI).
 
@@ -647,7 +636,21 @@ def emit(
     `api.{ext}` (types + codec) is always written per language; client/server are
     `client.{ext}` for a lone service, `client_{svc}.{ext}` when several.
     """
+    from .python_runtime import resolve_mode, runtime_binding, plan_outputs, apply_outputs, output_locks
+    from ..rules import check_rules
+    mode = resolve_mode(runtime, runtime_mode, validation)
+    runtime = mode == "source"
     lang_keys = list(langs) if langs is not None else list(_LANGS)
+    errors = check_rules(schema)
+    if errors:
+        raise ValueError("; ".join(errors))
+    constrained = any(f.oneof or f.cases for m in schema.messages.values() for f in m.fields)
+    if (validation or constrained) and set(lang_keys) - {"python"}:
+        raise ValueError("oneof/validation reference batch supports Python only; explicitly select --lang python")
+    if mode == "package" and set(lang_keys) - {"python", "rust"}:
+        raise ValueError("package runtime binding is implemented for Python only")
+    if mode == "package" and "rust" in lang_keys and not rust_external_types:
+        raise ValueError("Rust package mode requires an explicitly supplied external owner")
     if rust_external_types is not None:
         from .rust_external import imports
 
@@ -690,46 +693,85 @@ def emit(
     if lacking:
         raise ValueError("this schema declares options a requested target does not implement, "
                          f"so its code would ignore them: {'; '.join(lacking)}")
+    if "python" in lang_keys:
+        from ..ir.validate import validate_or_raise
+        validate_or_raise(schema)
     svc_names = list(services) if services is not None else list(schema.services)
     missing = [s for s in svc_names if s not in schema.services]
     if missing:
         raise ValueError(f"unknown service(s) {missing}; known: {sorted(schema.services)}")
     multi = len(svc_names) > 1
     written: list[Path] = []
+    all_writes = {}
+    python_texts = {}
     for lang in lang_keys:
         ext, api_fn, client_fn, server_fn = _LANGS[lang]
         d = out_dir / lang
-        d.mkdir(parents=True, exist_ok=True)
         api_path = d / f"api.{ext}"
         api_kwargs = {"forward_compat": forward_compat}
         if lang == "rust":
             api_kwargs["external_types"] = rust_external_types
+        if lang == "python":
+            api_kwargs.update(validation=validation, external_types=python_external_types, identity=schema_identity)
         api_text = api_fn(schema, **api_kwargs)
-        api_path.write_text(api_text)
+        if lang == "python":
+            python_texts[f"api.{ext}"] = api_text
+        else:
+            all_writes[api_path] = api_text.encode("utf-8")
         written.append(api_path)
         if runtime and lang in _RUNTIMES:
             for rel, resource in _RUNTIMES[lang]:
                 if not _runtime_exists(resource):
                     continue   # e.g. ext.<lang> before Phase 2 — vendored once its file lands
                 rt_path = d / rel
-                rt_path.parent.mkdir(parents=True, exist_ok=True)
-                rt_path.write_text(_runtime_source(resource))
+                all_writes[rt_path] = _runtime_source(resource).encode("utf-8")
                 written.append(rt_path)
         for sname in svc_names:
             svc = schema.services[sname]
             suffix = f"_{sname}" if multi else ""
             for stem, fn in (("client", client_fn), ("server", server_fn)):
                 path = d / f"{stem}{suffix}.{ext}"
-                path.write_text(fn(schema, svc))
+                content = fn(schema, svc)
+                if lang == "python":
+                    python_texts[path.name] = content
+                else:
+                    all_writes[path] = content.encode("utf-8")
                 written.append(path)
-    if "python" in lang_keys and svc_names:
+    if "python" in lang_keys:
         # Python output is a package (client/server use relative imports).
         init = out_dir / "python" / "__init__.py"
-        init.write_text("from .api import *  # noqa: F401,F403\n")
+        python_texts["__init__.py"] = "from .api import *  # noqa: F401,F403\n"
         written.append(init)
+        source_root = runtime_binding(runtime_bindings, out_dir / "python")
+        directory = (out_dir / "python").resolve()
+        lock_roots = [directory, source_root]
+        import json
+        previous = directory / ".taut-python-outputs.json"
+        if previous.exists():
+            prior_root = json.loads(previous.read_text(encoding="utf-8")).get("source_root")
+            if prior_root:
+                lock_roots.append(Path(prior_root))
+        with output_locks(lock_roots):
+            if previous.exists():
+                locked_prior = json.loads(previous.read_text(encoding="utf-8")).get("source_root")
+                if locked_prior and Path(locked_prior).resolve() not in {p.resolve() for p in lock_roots}:
+                    raise ValueError("output ownership changed concurrently; rerun generation to lock its new runtime owner")
+            writes, deletes = plan_outputs(directory, python_texts, mode=mode, validation=validation,
+                                           source_root=source_root,
+                                           consume_source="source_root" in (runtime_bindings or {}).get("python", {}))
+            all_writes.update(writes)
+            apply_outputs(all_writes, deletes)
+            written.extend(p for p in writes if p not in {directory / n for n in python_texts})
+    else:
+        apply_outputs(all_writes, ())
     return written
 
 
-def emit_all(schema: Schema, service_name: str, out_dir: Path) -> list[Path]:
+def emit_all(schema: Schema, service_name: str, out_dir: Path, *, runtime: bool = False,
+             runtime_mode: str | None = None, validation: bool = False,
+             runtime_bindings: dict | None = None, python_external_types=None,
+             schema_identity=None, langs=None) -> list[Path]:
     """Back-compat: api + client/server for one service, all languages."""
-    return emit(schema, out_dir, services=[service_name])
+    return emit(schema, out_dir, services=[service_name], runtime=runtime, runtime_mode=runtime_mode,
+                validation=validation, runtime_bindings=runtime_bindings,
+                python_external_types=python_external_types, schema_identity=schema_identity, langs=langs)

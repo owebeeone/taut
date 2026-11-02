@@ -30,6 +30,7 @@ from .model import (
     ServiceDef,
     TypeRef,
     is_presence,
+    OneOfRule, CaseRule, EnumMemberRef,
 )
 from .options import OptionValue, check_value
 from .options import option as option   # re-exported: .taut.py modules import DSL names from here
@@ -114,6 +115,10 @@ def Enum(*args, **members: int) -> EnumDef:
     if not all(isinstance(value, OptionValue) for value in option_values):
         raise TypeError("Enum expects Enum(name, *options, **members) or Enum(*options, **members)")
     where = f"enum {name!r}" if name else "an enum"
+    for member in members:
+        if member in ("name", "members", "options"):
+            raise ValueError(f"{where}: member {member!r} is reserved by the enum-definition metadata namespace; "
+                             "choose a distinct member name before using the referenceable Enum DSL")
     return EnumDef(name=name, members=dict(members),
                    options=_declared_options(option_values, where))
 
@@ -142,6 +147,30 @@ def Map(key: TypeRef, value: TypeRef) -> MapOf:
     return MapOf(key, value)
 
 
+@dataclasses.dataclass(frozen=True)
+class _OneOf:
+    enum: EnumDef
+    virtual: bool
+    exhaustive: bool
+
+
+def OneOf(enum: EnumDef, *, virtual: bool = False, exhaustive: bool = False) -> _OneOf:
+    if not isinstance(enum, EnumDef) or not enum.name:
+        raise TypeError("OneOf requires a named Enum")
+    if type(virtual) is not bool or type(exhaustive) is not bool:
+        raise TypeError("OneOf virtual and exhaustive must be Boolean")
+    return _OneOf(enum, virtual, exhaustive)
+
+
+def Case(**selection: EnumMemberRef) -> CaseRule:
+    if len(selection) != 1:
+        raise TypeError("Case requires one controlling field and qualified enum member")
+    control, member = next(iter(selection.items()))
+    if not isinstance(member, EnumMemberRef):
+        raise TypeError("Case requires a qualified enum member")
+    return CaseRule(control, member.enum, member.member)
+
+
 def F(
     *args,
     optional: bool | str = False,
@@ -150,7 +179,7 @@ def F(
 ) -> FieldDef:
     """A field: `F(name, tag, type)` or `F(tag, type)`, then any option values (OPT-L2)."""
     end = len(args)
-    while end > 0 and isinstance(args[end - 1], OptionValue):
+    while end > 0 and isinstance(args[end - 1], (OptionValue, CaseRule)):
         end -= 1
     fixed, option_values = args[:end], args[end:]
     if len(fixed) == 3 and isinstance(fixed[0], str):
@@ -165,8 +194,19 @@ def F(
     if not is_presence(optional):
         raise TypeError(f"optional must be False, True or MISSING_OK, not {optional!r}")
     where = f"field {name!r}" if name else f"the field with tag {tag}"
+    cases = tuple(v for v in option_values if isinstance(v, CaseRule))
+    option_values = tuple(v for v in option_values if isinstance(v, OptionValue))
+    oneof = None
+    if isinstance(type, _OneOf):
+        oneof = OneOfRule(type.enum.name, type.virtual, type.exhaustive)
+        type = EnumRef(type.enum.name)
+    if isinstance(type, EnumDef):
+        type = EnumRef(type.name)
+    if cases:
+        optional = True
     return FieldDef(name=name, tag=tag, type=type, optional=optional, transient=transient,
-                    merge=merge, options=_declared_options(option_values, where))
+                    merge=merge, options=_declared_options(option_values, where),
+                    oneof=oneof, cases=cases)
 
 
 def Msg(*args, reserved=(), next_id: int | None = None, **named_fields) -> MessageDef:
@@ -244,6 +284,8 @@ def extension(message: str, *, tag: int) -> ExtensionDef:
 
 def _resolve(tref: TypeRef, enum_names: set[str]) -> TypeRef:
     """Author writes Ref(name) for both enums and messages; resolve enum refs."""
+    if isinstance(tref, EnumDef):
+        return EnumRef(tref.name)
     if isinstance(tref, MsgRef):
         return EnumRef(tref.name) if tref.name in enum_names else tref
     if isinstance(tref, ListOf):
@@ -284,6 +326,9 @@ def schema(*decls, **named_decls) -> Schema:
             checked_decls.append(decl)
     file_options = _declared_options(option_values, "schema(...)")
     decls = tuple(checked_decls) + named_declarations
+    names = [d.name for d in decls if isinstance(d, (EnumDef, MessageDef, ServiceDef))]
+    if len(names) != len(set(names)):
+        raise ValueError("duplicate schema declaration name; enums, messages and services need distinct identities")
     enums = {d.name: d for d in decls if isinstance(d, EnumDef)}
     enum_names = set(enums)
     messages = {}

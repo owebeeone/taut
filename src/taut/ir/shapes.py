@@ -294,4 +294,4 @@ def register_shape(name: str, spec: ShapeSpec, *, implementation_capability: str
 # Tag-space partition: app fields use tags below the band; infrastructure
 # extensions (side-channels) use tags at/above it. Keeps app evolution and infra
 # piggybacking from ever colliding.
-BAND_START: int = 1 << 20  # 1048576
+from ..facts import BAND_START  # canonical runtime constant

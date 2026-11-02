@@ -1,0 +1,21 @@
+int vectors: 11    malformed vectors: 47    bounds vectors: 30
+
+target      status       pass fail skip/type  observed
+rust        gated          85    0         3  GREEN
+rust/fc     gated          85    0         3  GREEN
+python      gated          88    0         0  GREEN
+typescript  gated          88    0         0  GREEN
+js          gated          88    0         0  GREEN
+js/fc       gated          88    0         0  GREEN
+cpp         gated          85    0         3  GREEN
+cpp/fc      gated          85    0         3  GREEN
+swift       gated          85    0         3  GREEN
+swift/fc    gated          85    0         3  GREEN
+go          gated          85    0         3  GREEN
+go/fc       gated          85    0         3  GREEN
+kotlin      gated          85    0         3  GREEN
+kotlin/fc   gated          85    0         3  GREEN
+java        gated          85    0         3  GREEN
+java/fc     gated          85    0         3  GREEN
+
+governance: clean (no gated target failing, no green target allowlisted; every selected target ran)

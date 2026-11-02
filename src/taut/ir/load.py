@@ -36,11 +36,12 @@ from .model import (
     Schema,
     ServiceDef,
     TypeRef,
+    OneOfRule, CaseRule,
 )
 from .options import OPTIONS, check_value, effective_map
 
 # The IR versions this taut reads (OPT-I1).
-IR_VERSIONS = (1, 2)
+IR_VERSIONS = (1, 2, 3)
 
 # The wire options that Python's runtime codec, `taut.wire`, implements (OPT-F4): both bound its
 # decode (TautCheckedDecode.md). An IR whose `effective` names any other wire option is refused.
@@ -186,7 +187,10 @@ def schema_from_json(data: dict) -> Schema:
     """Inverse of export.schema_json — load a Schema from the neutral IR JSON."""
     if not isinstance(data, dict):
         raise ValueError(f"a taut IR is a JSON object, not {type(data).__name__}")
-    v2 = _version(data) == 2
+    version = _version(data)
+    v2 = version >= 2
+    if version < 3 and any("oneof" in f or "cases" in f for m in data["messages"] for f in m["fields"]):
+        raise ValueError("oneof/cases require constraint IR version 3; re-export schema")
     enums = {}
     for e in data["enums"]:
         where = f"enum {e['name']}"
@@ -204,7 +208,9 @@ def schema_from_json(data: dict) -> Schema:
         fields = tuple(
             FieldDef(f["name"], f["tag"], _typeref_from_json(f["type"]), f["optional"],
                      f["transient"], f.get("merge"),
-                     _declared(f, f"field {m['name']}.{f['name']}", v2))
+                     _declared(f, f"field {m['name']}.{f['name']}", v2),
+                     OneOfRule(**f["oneof"]) if "oneof" in f else None,
+                     tuple(CaseRule(**c) for c in f.get("cases", ())))
             for f in m["fields"]
         )
         messages[m["name"]] = MessageDef(
@@ -237,4 +243,8 @@ def schema_from_json(data: dict) -> Schema:
         _check_effective(data, schema, None, "the file")
         for m in data["messages"]:
             _check_effective(m, schema, m["name"], f"message {m['name']}")
+    from ..rules import check_rules
+    errors = check_rules(schema)
+    if errors:
+        raise ValueError("; ".join(errors))
     return schema

@@ -21,8 +21,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from ..ir.model import MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
-from ..ir.options import effective
+from ..facts import MISSING_OK, EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef, wire_effective as effective
 from . import cbor
 
 DecodeError = cbor.DecodeError

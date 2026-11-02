@@ -1,0 +1,4 @@
+Runtime mode: disabled; descriptors are shared static metadata, not dataclass fields.
+Descriptor: schema_9c886c43d8695c4e.Content ['1:kind/required', '2:text/nullable', '3:number/nullable', '4:flag/nullable', '5:items/nullable']
+Valid number JSON: {"kind":"number","number":"42"}
+Validation methods absent; descriptor/codec queries work with no validation engine.

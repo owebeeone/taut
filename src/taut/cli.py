@@ -48,6 +48,9 @@ def _split(arg: str | None) -> list[str] | None:
 
 
 def _cmd_gen(args: argparse.Namespace) -> int:
+    modes = set(args.runtime or [])
+    if len(modes) > 1 or (args.with_runtime and "package" in modes):
+        raise ValueError("conflicting runtime options; select source or package before generation")
     schema = _load(Path(args.ir))
     _validate(schema, "gen")  # never generate from incoherent IR
     if args.api_only:
@@ -62,6 +65,9 @@ def _cmd_gen(args: argparse.Namespace) -> int:
     written = scaffold.emit(
         schema, Path(args.out), langs=_split(args.lang), services=services,
         runtime=args.with_runtime, forward_compat=args.forward_compat,
+        runtime_mode=next(iter(modes), None), validation=args.with_validation,
+        runtime_bindings=(json.loads(Path(args.runtime_bindings).read_text()) if args.runtime_bindings else None),
+        python_external_types=(json.loads(Path(args.python_external_types).read_text()) if args.python_external_types else None),
         rust_external_types=(json.loads(Path(args.rust_external_types).read_text())
                              if args.rust_external_types else None),
     )
@@ -158,7 +164,15 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--api-only", action="store_true", help="emit only api (types + encoders/decoders), no client/server")
     g.add_argument("--rust-external-types", metavar="JSON", help="name-to-Rust-path map for types owned by a dependency; compose its schema and share its CBOR runtime")
     g.add_argument("--with-runtime", action="store_true",
-                   help="also emit the vendored runtime (CBOR codec and extension helpers) for every target that has one, so the output is self-contained")
+                   help="compatibility alias for --runtime source; does not enable validation")
+    g.add_argument("--runtime", choices=("source", "package"), action="append",
+                   help="runtime distribution (default: application supplies runtime); Python source emits one shared taut foundation, package imports compatible taut-proto; repeated values must agree")
+    g.add_argument("--with-validation", action="store_true",
+                   help="emit explicit validate/is_valid methods on every Python message (default: off; descriptors always emitted)")
+    g.add_argument("--runtime-bindings", metavar="JSON",
+                   help='target-keyed runtime bindings JSON; Python keys: owner, module (taut), source_root, descriptor_contract, codec_contract, capabilities')
+    g.add_argument("--python-external-types", metavar="JSON",
+                   help="schema-name to module.Class mapping for independently generated Python dependencies; full dependency schema must be present")
     g.add_argument("--forward-compat", action="store_true",
                    help="generated types keep unknown/newer tags and re-encode them (every generated target; required if the IR has extensions; python and typescript always keep them)")
     g.add_argument("--fail-closed", action="store_true",

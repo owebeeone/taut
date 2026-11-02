@@ -1,0 +1,23 @@
+{
+  "wheel": "taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl",
+  "wheel_sha256": "7ff8c48266ec3814a4fea75c4afe94f1ffb1e1193c0a9134706ee99ad4f7fd44",
+  "canonical_file_hashes": {
+    "__init__.py": "ad2bb0a2ddb372ab77e5e7d19873f44804c487c63a22d0c7b99852329b4944af",
+    "_runtime_version.py": "e21299bef0b04c86bff376cf6a678f7b8720dc067438d551ffef54b9a95964fe",
+    "contracts.py": "69766dfeca243099e7bf7c54f088069f271fa60f61e03d4d916d893d6d38416c",
+    "facts.py": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+    "rules.py": "153026e825045eb67883ac9b66b6ac9d4ffd6fbc64c2bc010fa9e973a2271f9e",
+    "descriptors.py": "e473c8532d5840e6f374dca4ead4c3e28726f23ed7c058e84a79f052418cb9fa",
+    "wire/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "wire/cbor.py": "8cde71892ed7882b869bd299c13be37223e77e679ce04a59e9994b82dc9bec42",
+    "wire/codec.py": "7577578775f99603032555479e843056a12d8465b5aa439fe7371f4fb76b7347",
+    "wire/jsoncodec.py": "bd3d5e2e3d18980a19e4519477c84ad78084f5d2c25af4c5ccca6e8477779022",
+    "ext.py": "99e5fab316640eb0527e905b194610557d8301210ca61cd72358002d7d10a8fb",
+    "validation.py": "eb33734525330f131092c3bda540ef71742b7cd0eb1074e7aa72a92049db8903"
+  },
+  "runtime_files_matched": 12,
+  "same_behavior_scope_rows": 16,
+  "compiler_imports_blocked": true,
+  "library_actual_type_identity": true,
+  "source_digest": "3dd141a8433aaef152a285327d8091870a2eb3865eba7f8cb3cc78c70f901bd2"
+}

@@ -1,0 +1,55 @@
+........................................................................ [  5%]
+........................................................................ [ 10%]
+.................................................F...................... [ 15%]
+........................................................................ [ 20%]
+..............FF........................................................ [ 26%]
+........................................................................ [ 31%]
+........................................................................ [ 36%]
+........................................................................ [ 41%]
+........................................................................ [ 46%]
+........................................................................ [ 52%]
+........................................................................ [ 57%]
+.............................sss........................................ [ 62%]
+........................................................................ [ 67%]
+........................................................................ [ 72%]
+........................................................................ [ 78%]
+........................................................................ [ 83%]
+........................................................................ [ 88%]
+..........................................................s............. [ 93%]
+........................................................................ [ 98%]
+..............                                                           [100%]
+================================== FAILURES ===================================
+______ test_proto_api_surface_extensions_doc_exists_and_covers_contract _______
+taut-dev\taut\src\tests\test_dev_docs.py:9: in test_proto_api_surface_extensions_doc_exists_and_covers_contract
+    text = doc.read_text()
+           ^^^^^^^^^^^^^^^
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_abc.py:632: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_local.py:537: in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: 'D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\TautProtoApiSurfaceExtensions.md'
+______________ test_go_runtime_and_parity_runner_are_gofmt_clean ______________
+taut-dev\taut\src\tests\test_go.py:433: in test_go_runtime_and_parity_runner_are_gofmt_clean
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+E   AssertionError: assert (0, 'D:\\proj...ain.go\n', '') == (0, '', '')
+E     
+E     At index 1 diff: 'D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\python-oneof\\scratch\\pytest-of-gianni\\pytest-10\\test_go_runtime_and_parity_run0\\main.go\n' != ''
+E     Use -v to get more diff
+______________________ test_generated_go_is_gofmt_clean _______________________
+taut-dev\taut\src\tests\test_go.py:483: in test_generated_go_is_gofmt_clean
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+E   AssertionError: assert (0, 'D:\\proj..._fc.go\n', '') == (0, '', '')
+E     
+E     At index 1 diff: 'D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\python-oneof\\scratch\\pytest-of-gianni\\pytest-10\\test_generated_go_is_gofmt_cle0\\glade.go\nD:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\python-oneof\\scratch\\pytest-of-gianni\\pytest-10\\test_generated_go_is_gofmt_cle0\\glade_fc.go\nD:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\python-oneof\\scratch\\pytest-of-gianni\\pytest-10\\test_generated_go_is_gofmt_cle0\\griplab.go\nD:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\python-oneof\\scratch\\pytest-of-gianni\\pytest-10\\test_ge...
+E     
+E     ...Full output truncated (2 lines hidden), use '-vv' to show
+=========================== short test summary info ===========================
+FAILED taut-dev\taut\src\tests\test_dev_docs.py::test_proto_api_surface_extensions_doc_exists_and_covers_contract
+FAILED taut-dev\taut\src\tests\test_go.py::test_go_runtime_and_parity_runner_are_gofmt_clean
+FAILED taut-dev\taut\src\tests\test_go.py::test_generated_go_is_gofmt_clean
+3 failed, 1375 passed, 4 skipped, 8 deselected in 324.53s (0:05:24)

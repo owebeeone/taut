@@ -67,7 +67,10 @@ _RESERVED: tuple[tuple[str, Mapping[str, str], Mapping[str, str], Callable[[str]
 
 
 def validate(schema: Schema) -> list[str]:
-    errors: list[str] = []
+    from ..rules import check_rules
+    errors: list[str] = check_rules(schema)
+    if set(schema.enums) & set(schema.messages):
+        errors.append("enum/message name collision in schema namespace")
 
     def check_ref(t: TypeRef, ctx: str) -> None:
         if isinstance(t, Scalar):
@@ -93,6 +96,8 @@ def validate(schema: Schema) -> list[str]:
 
     # --- messages ---
     for m in schema.messages.values():
+        if len({f.name for f in m.fields}) != len(m.fields):
+            errors.append(f"{m.name}: duplicate field name")
         tags: set[int] = set()
         reserved_tags = set(m.reserved_tags)
         reserved_names = set(m.reserved_names)

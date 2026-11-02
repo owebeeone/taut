@@ -94,11 +94,17 @@ def _diff_enums(old: Schema, new: Schema, out: list[Change]) -> None:
 
 
 def _diff_messages(old: Schema, new: Schema, out: list[Change]) -> None:
+    def constraints(message):
+        return {f.name: (f.oneof, tuple(sorted((c.controlling_field, c.enum, c.member) for c in f.cases)))
+                for f in message.fields if f.oneof is not None or f.cases}
+
     for name, om in old.messages.items():
         nm = new.messages.get(name)
         if nm is None:
             out.append(Change("breaking", f"message {name} removed"))
             continue
+        if constraints(om) != constraints(nm):
+            out.append(Change("breaking", f"{name} oneof constraints/projection changed"))
         old_by_tag = {f.tag: f for f in om.wire_fields()}
         new_by_tag = {f.tag: f for f in nm.wire_fields()}
         new_by_name = {f.name: f for f in nm.wire_fields()}

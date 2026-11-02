@@ -1,0 +1,189 @@
+{
+  "head": "2cfee5d6156b0179066dc4eed70f60cde489a422",
+  "missing_document": {
+    "path": "dev-docs/TautProtoApiSurfaceExtensions.md",
+    "absent_in_head": true,
+    "cat_file_exit": 128,
+    "cat_file_stderr": "fatal: path 'dev-docs/TautProtoApiSurfaceExtensions.md' does not exist in 'HEAD'"
+  },
+  "unchanged_sources": {
+    "src/tests/test_dev_docs.py": {
+      "same_source": true,
+      "head_sha256": "0d8a8193b25192f874f4028591e8cc8df1a54bfad9d38ec9b5a66ada0a2a1052",
+      "working_sha256": "0d8a8193b25192f874f4028591e8cc8df1a54bfad9d38ec9b5a66ada0a2a1052",
+      "git_diff_empty": true
+    },
+    "src/tests/test_go.py": {
+      "same_source": true,
+      "head_sha256": "060a71a117e68e1707a5dc35965b021c78b824bab374de234b710d8c727a6bfc",
+      "working_sha256": "060a71a117e68e1707a5dc35965b021c78b824bab374de234b710d8c727a6bfc",
+      "git_diff_empty": true
+    },
+    "src/taut/gen/go.py": {
+      "same_source": true,
+      "head_sha256": "41dbdcd06778ae2e417f2e4b61c3a6911743ba8b766f4c9f98986ab46781e79f",
+      "working_sha256": "41dbdcd06778ae2e417f2e4b61c3a6911743ba8b766f4c9f98986ab46781e79f",
+      "git_diff_empty": true
+    },
+    "src/taut/corpus/parity_go.py": {
+      "same_source": true,
+      "head_sha256": "ef79dbfb7aa8b85cd70d11d953794872be8838bdd670b44f3a55673bda39edc5",
+      "working_sha256": "ef79dbfb7aa8b85cd70d11d953794872be8838bdd670b44f3a55673bda39edc5",
+      "git_diff_empty": true
+    },
+    "src/tests/test_java.py": {
+      "same_source": true,
+      "head_sha256": "3816fd749f02cfe89578facf433d5dcf2cb84fdc37c9fcc6f95f297f3fe46226",
+      "working_sha256": "3816fd749f02cfe89578facf433d5dcf2cb84fdc37c9fcc6f95f297f3fe46226",
+      "git_diff_empty": true
+    },
+    "src/taut/gen/java.py": {
+      "same_source": true,
+      "head_sha256": "c88261e676f11b1311f27b0541522c222278c10104aa77ee6d52ac3a8e83eea5",
+      "working_sha256": "c88261e676f11b1311f27b0541522c222278c10104aa77ee6d52ac3a8e83eea5",
+      "git_diff_empty": true
+    },
+    "src/taut/gen/runtime/Cbor.java": {
+      "same_source": true,
+      "head_sha256": "c677455684b53b2365399fafddc41861104850262b529ba07add12be5ccde8c4",
+      "working_sha256": "c677455684b53b2365399fafddc41861104850262b529ba07add12be5ccde8c4",
+      "git_diff_empty": true
+    },
+    "src/tests/test_rust.py": {
+      "same_source": true,
+      "head_sha256": "77ed308976047abb2ab08ead77803552039cd94df7519a3de0f37c6ebd92ec43",
+      "working_sha256": "77ed308976047abb2ab08ead77803552039cd94df7519a3de0f37c6ebd92ec43",
+      "git_diff_empty": true
+    },
+    "src/taut/gen/runtime/cbor.go": {
+      "same_source": true,
+      "head_sha256": "bb1a741f36de2cdeed45df885b7a7e4ebb5d8cb04403c1d755ba5b0e6f73d8ef",
+      "working_sha256": "bb1a741f36de2cdeed45df885b7a7e4ebb5d8cb04403c1d755ba5b0e6f73d8ef",
+      "git_diff_empty": true
+    },
+    "src/taut/gen/runtime/cbor_bounds_test.go": {
+      "same_source": true,
+      "head_sha256": "e15c01b796a9da98680633b97a284a15287d8a1c5c96338a625dd92a0c6b8815",
+      "working_sha256": "e15c01b796a9da98680633b97a284a15287d8a1c5c96338a625dd92a0c6b8815",
+      "git_diff_empty": true
+    },
+    "src/taut/gen/runtime/cbor_float_test.go": {
+      "same_source": true,
+      "head_sha256": "21c37e8743ed8cd6556766189577aabe6eecdfcc600b73150383b0c213ab6f9e",
+      "working_sha256": "21c37e8743ed8cd6556766189577aabe6eecdfcc600b73150383b0c213ab6f9e",
+      "git_diff_empty": true
+    },
+    "src/taut/gen/runtime/ext.go": {
+      "same_source": true,
+      "head_sha256": "14c0fbb5ca9c1238bff77dc5cc99ed7e541e6695574db4a6514a5031443e1b85",
+      "working_sha256": "14c0fbb5ca9c1238bff77dc5cc99ed7e541e6695574db4a6514a5031443e1b85",
+      "git_diff_empty": true
+    }
+  },
+  "isolated_head_test_exit": 1,
+  "isolated_head_result": "3 failed (same missing doc and two gofmt tests)",
+  "line_ending_probe": {
+    "deep": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "deep_fc": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "float": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "float_fc": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "glade": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "glade_fc": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "griplab": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "griplab_fc": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "keys": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "keys_fc": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "parity_int": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "parity_int_fc": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "presence": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "presence_fc": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "razel": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "razel_fc": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "resext": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "resext_fc": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    },
+    "runner": {
+      "default_gofmt_lists_file": true,
+      "default_has_crlf": true,
+      "same_source_lf_gofmt_clean": true
+    }
+  },
+  "java_baseline_result": "1 failed, original HEAD test without UTF-8 Java stdout override",
+  "git_original_environment": {
+    "exit": 128,
+    "stderr": "fatal: detected dubious ownership in repository at 'D:/projects/limbo/taut-dev/taut'\n'D:/projects/limbo/taut-dev/taut' is owned by:\n\tBUILTIN/Administrators (S-1-5-32-544)\nbut the current user is:\n\tMAGENTA/gianni (S-1-5-21-2748472898-1817171792-147888465-1001)\nTo add an exception for this directory, call:\n\n\tgit config --global --add safe.directory D:/projects/limbo/taut-dev/taut\n"
+  },
+  "corrected_environment_result": "2 passed (Java encoding and Rust Git-tag test)",
+  "note": "Baseline archive is disposable under Limbo; no original source was reset or edited."
+}

@@ -1,0 +1,8 @@
+{
+  "reviewed_digest": "3dd141a8433aaef152a285327d8091870a2eb3865eba7f8cb3cc78c70f901bd2",
+  "commit_snapshot_digest": "f72b5bcf607a108a45706dcab42f28f7da8e8a823937a051b98970ddb37a0298",
+  "changed_files": [
+    "taut-dev/taut/dev-docs/examples/python-oneof/README.md"
+  ],
+  "reason": "Explicit operator instruction to correct stale authorization: scoped commits and separately owned Rust are now authorized; seven other backends, pushes, tags, releases remain deferred. No production code changed."
+}

@@ -1,0 +1,32 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+_____________________ test_java_decode_error_key_is_text ______________________
+src\tests\test_java.py:1081: in test_java_decode_error_key_is_text
+    assert dict(line.split("\t") for line in out.splitlines()) == {
+                                             ^^^^^^^^^^^^^^
+E   AttributeError: 'NoneType' object has no attribute 'splitlines'
+============================== warnings summary ===============================
+dev-docs/examples/python-oneof/scratch/baseline-head/src/tests/test_java.py::test_java_decode_error_key_is_text
+  C:\Users\gianni\AppData\Local\Programs\Python\Python311\Lib\site-packages\_pytest\threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-7 (_readerthread)
+  
+  Traceback (most recent call last):
+    File "C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\threading.py", line 1043, in _bootstrap_inner
+      self.run()
+      ~~~~~~~~^^
+    File "C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\threading.py", line 994, in run
+      self._target(*self._args, **self._kwargs)
+      ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\subprocess.py", line 1615, in _readerthread
+      buffer.append(fh.read())
+                    ~~~~~~~^^
+    File "<frozen codecs>", line 325, in decode
+  UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe9 in position 188: invalid continuation byte
+  
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED src\tests\test_java.py::test_java_decode_error_key_is_text - Attribute...
+1 failed, 1 warning in 2.17s

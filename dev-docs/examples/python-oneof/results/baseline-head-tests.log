@@ -1,0 +1,36 @@
+FFF                                                                      [100%]
+================================== FAILURES ===================================
+______ test_proto_api_surface_extensions_doc_exists_and_covers_contract _______
+src\tests\test_dev_docs.py:9: in test_proto_api_surface_extensions_doc_exists_and_covers_contract
+    text = doc.read_text()
+           ^^^^^^^^^^^^^^^
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_abc.py:632: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_local.py:537: in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: 'D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\python-oneof\\scratch\\baseline-head\\dev-docs\\TautProtoApiSurfaceExtensions.md'
+______________ test_go_runtime_and_parity_runner_are_gofmt_clean ______________
+src\tests\test_go.py:433: in test_go_runtime_and_parity_runner_are_gofmt_clean
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+E   AssertionError: assert (0, 'D:\\proj...ain.go\n', '') == (0, '', '')
+E     
+E     At index 1 diff: 'D:\\projects\\limbo\\toolchain-readiness-2026-11-02\\tmp\\pytest-of-gianni\\pytest-10\\test_go_runtime_and_parity_run0\\main.go\n' != ''
+E     Use -v to get more diff
+______________________ test_generated_go_is_gofmt_clean _______________________
+src\tests\test_go.py:483: in test_generated_go_is_gofmt_clean
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+E   AssertionError: assert (0, 'D:\\proj..._fc.go\n', '') == (0, '', '')
+E     
+E     At index 1 diff: 'D:\\projects\\limbo\\toolchain-readiness-2026-11-02\\tmp\\pytest-of-gianni\\pytest-10\\test_generated_go_is_gofmt_cle0\\glade.go\nD:\\projects\\limbo\\toolchain-readiness-2026-11-02\\tmp\\pytest-of-gianni\\pytest-10\\test_generated_go_is_gofmt_cle0\\glade_fc.go\nD:\\projects\\limbo\\toolchain-readiness-2026-11-02\\tmp\\pytest-of-gianni\\pytest-10\\test_generated_go_is_gofmt_cle0\\griplab.go\nD:\\projects\\limbo\\toolchain-readiness-2026-11-02\\tmp\\pytest-of-gianni\\pytest-10\\test_generated_go_is_gofmt_cle0\\griplab_fc.go\nD:\\projects\\limbo\\toolchain-readiness-2026-1...
+E     
+E     ...Full output truncated (2 lines hidden), use '-vv' to show
+=========================== short test summary info ===========================
+FAILED src\tests\test_dev_docs.py::test_proto_api_surface_extensions_doc_exists_and_covers_contract
+FAILED src\tests\test_go.py::test_go_runtime_and_parity_runner_are_gofmt_clean
+FAILED src\tests\test_go.py::test_generated_go_is_gofmt_clean - AssertionErro...
+3 failed in 0.71s

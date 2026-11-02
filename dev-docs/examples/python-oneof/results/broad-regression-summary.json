@@ -1,0 +1,35 @@
+{
+  "original_broad_command": "python -m pytest taut-dev/taut/src/tests -q -m \"not gate\"",
+  "original_broad_outcome": {
+    "passed": 1339,
+    "failed": 5,
+    "skipped": 4,
+    "deselected": 8,
+    "warnings": 1,
+    "seconds": 349.1
+  },
+  "feature_cases_included_in_broad_passes": 94,
+  "later_feature_cases_verified_separately": 128,
+  "core_final_regression_passed": 809,
+  "shape_library_tests_passed": 190,
+  "codec_parity_variants_green": 16,
+  "non_additive_note": "Final broad1375 includes all128 feature and selected core cases. Initial1339 included94 earlier feature cases and is superseded, not additive.",
+  "baseline_evidence": "baseline-evidence.json",
+  "corrected_environment_tests": "2 passed (Java stdout encoding + Git ownership Rust-tag query)",
+  "outstanding_original_tests": [
+    "test_dev_docs.py::test_proto_api_surface_extensions_doc_exists_and_covers_contract",
+    "test_go.py::test_go_runtime_and_parity_runner_are_gofmt_clean",
+    "test_go.py::test_generated_go_is_gofmt_clean"
+  ],
+  "new_feature_failures_outstanding": 0,
+  "full_suite_green": false,
+  "final_broad_outcome": {
+    "passed": 1375,
+    "failed": 3,
+    "skipped": 4,
+    "deselected": 8,
+    "seconds": 324.53
+  },
+  "feature_cases_included_in_final_broad_passes": 128,
+  "source_digest": "3dd141a8433aaef152a285327d8091870a2eb3865eba7f8cb3cc78c70f901bd2"
+}

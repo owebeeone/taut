@@ -1,0 +1,14 @@
+{
+  "old_digest": "af9f2516f0dcbf45853fb6ade39d207c7a84b6b282975bffa8fdd385b59cc996",
+  "new_digest": "3294c812442cfd09d618e8e63d7587932c43cf26dcffbc73125c835654982135",
+  "changed_files": [
+    "taut-dev/taut/dev-docs/examples/python-oneof/README.md",
+    "taut-dev/taut/src/taut/descriptors.py",
+    "taut-dev/taut/src/taut/gen/python.py",
+    "taut-dev/taut/src/taut/gen/python_runtime.py",
+    "taut-dev/taut/src/taut/ir/compat.py",
+    "taut-dev/taut/src/taut/ir/dsl.py",
+    "taut-dev/taut/src/tests/test_oneof.py",
+    "taut-dev/taut/src/tests/test_python_runtime_distribution.py"
+  ]
+}

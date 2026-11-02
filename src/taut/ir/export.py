@@ -54,7 +54,7 @@ def _method_json(m: MethodDef) -> dict:
 def schema_json(schema: Schema) -> dict:
     # Option maps are copied, so that editing the document leaves the frozen model alone.
     return {
-        "version": IR_VERSION,
+        "version": 3 if any(f.oneof or f.cases for m in schema.messages.values() for f in m.fields) else IR_VERSION,
         "options": dict(schema.options),
         "effective": effective_map(schema),
         "shapes": {name: spec.to_json() for name, spec in SHAPES.items()},
@@ -84,6 +84,10 @@ def schema_json(schema: Schema) -> dict:
                         "optional": f.optional,
                         "transient": f.transient,
                         "merge": f.merge,
+                        **({"oneof": {"enum": f.oneof.enum, "virtual": f.oneof.virtual,
+                                       "exhaustive": f.oneof.exhaustive}} if f.oneof else {}),
+                        **({"cases": [{"controlling_field": c.controlling_field, "enum": c.enum,
+                                       "member": c.member} for c in f.cases]} if f.cases else {}),
                     }
                     for f in m.fields
                 ],

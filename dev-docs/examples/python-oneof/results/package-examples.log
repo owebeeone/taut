@@ -1,0 +1,27 @@
+Runtime mode: package; descriptors are shared static metadata, not dataclass fields.
+Descriptor: schema_9c886c43d8695c4e.Content ['1:kind/required', '2:text/nullable', '3:number/nullable', '4:flag/nullable', '5:items/nullable']
+Valid number JSON: {"kind":"number","number":"42"}
+Valid number: valid=True complete=True fast=True scope=recursive; issues=[]; deferred=[]
+Missing selected: valid=False complete=True fast=False scope=recursive; issues=['oneof.payload_missing@number']; deferred=[]
+Extra nonselected: valid=False complete=True fast=False scope=recursive; issues=['oneof.payload_unexpected@text']; deferred=[]
+
+Presence (each validates and keeps its JSON value):
+  number {"kind":"number","number":"0"}
+  flag {"flag":false,"kind":"flag"}
+  text {"kind":"text","text":""}
+  items {"items":[],"kind":"items"}
+  empty {"kind":"empty"}
+
+Mutable draft -> serialize -> repair -> explicit validation:
+Draft: valid=False complete=True fast=False scope=recursive; issues=['oneof.payload_unexpected@text', 'oneof.payload_missing@number']; deferred=[]
+Draft JSON: {"kind":"number","text":"extra"} ; dense CBOR fields: 5
+Repaired: valid=True complete=True fast=True scope=recursive; issues=[]; deferred=[]
+Earlier immutable report still has 2 issues.
+
+Owned child scopes and deferred virtual rules:
+Envelope local: valid=True complete=True fast=True scope=local; issues=[]; deferred=[]
+Envelope recursive: valid=False complete=True fast=False scope=recursive; issues=['oneof.payload_missing@content.text']; deferred=[]
+Virtual + bad child: valid=False complete=False fast=False scope=recursive; issues=['oneof.payload_missing@content.text']; deferred=['oneof.virtual_deferred']
+Virtual + repaired child: valid=True complete=False fast=False scope=recursive; issues=[]; deferred=['oneof.virtual_deferred']
+Virtual JSON: {"content":{"kind":"text","text":"fixed"}}
+Application completed without compiler, authoring loader, build tooling or shape engines.
