@@ -35,10 +35,10 @@ def _load(path: Path):
     return load_schema(path)
 
 
-def _validate(schema, cmd: str) -> None:
+def _validate(schema, cmd: str, *, targets=None) -> None:
     """Refuse an invalid schema, then print lint's warnings to stderr; a warning never fails a
     command (TautOptions.md OPT-L4)."""
-    validate_or_raise(schema)
+    validate_or_raise(schema, targets=targets)
     for warning in lint(schema):
         print(f"tautc {cmd}: warning: {warning}", file=sys.stderr)
 
@@ -52,7 +52,9 @@ def _cmd_gen(args: argparse.Namespace) -> int:
     if len(modes) > 1 or (args.with_runtime and "package" in modes):
         raise ValueError("conflicting runtime options; select source or package before generation")
     schema = _load(Path(args.ir))
-    _validate(schema, "gen")  # never generate from incoherent IR
+    # Rust's projection validates its own identifiers, including raw keywords;
+    # Python-specific private/dunder reservations do not constrain a Rust-only run.
+    _validate(schema, "gen", targets=("rust",) if _split(args.lang) == ["rust"] else None)
     if args.api_only:
         services: list[str] | None = []
     else:
@@ -166,11 +168,11 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--with-runtime", action="store_true",
                    help="compatibility alias for --runtime source; does not enable validation")
     g.add_argument("--runtime", choices=("source", "package"), action="append",
-                   help="runtime distribution (default: application supplies runtime); Python source emits one shared taut foundation, package imports compatible taut-proto; repeated values must agree")
+                   help="runtime distribution (default: application supplies runtime); Python package imports taut-proto; Rust package imports taut_foundation; source emits canonical foundation modules; repeated values must agree")
     g.add_argument("--with-validation", action="store_true",
-                   help="emit explicit validate/is_valid methods on every Python message (default: off; descriptors always emitted)")
+                   help="emit explicit validate/is_valid instance methods on every Python/Rust message (default: off; descriptors always emitted)")
     g.add_argument("--runtime-bindings", metavar="JSON",
-                   help='target-keyed runtime bindings JSON; Python keys: owner, module (taut), source_root, descriptor_contract, codec_contract, capabilities')
+                   help='target-keyed runtime bindings JSON; Python/Rust keys: owner, module, source_root, descriptor_contract, codec_contract, capabilities; Python module=taut, Rust default=crate (supplied/source) or taut_foundation (package)')
     g.add_argument("--python-external-types", metavar="JSON",
                    help="schema-name to module.Class mapping for independently generated Python dependencies; full dependency schema must be present")
     g.add_argument("--forward-compat", action="store_true",

@@ -12,3 +12,8 @@ tests/.uv-venvs/
 tests/actual_test_results/
 scratch/
 *-old.py
+/rust/taut-foundation/target/
+/rust/taut-foundation/Cargo.lock
+/dev-docs/examples/rust-oneof/generated/
+/dev-docs/examples/rust-oneof/scratch/
+/dev-docs/examples/rust-oneof/package-artifacts/

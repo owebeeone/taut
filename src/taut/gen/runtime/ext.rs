@@ -13,7 +13,8 @@
 //! tag below the extension band is the caller's error, not the input's, so
 //! each panics on one, before it reads the host.
 
-use crate::cbor::{encode, try_decode_with, Cbor, DecodeError, MAX_DEPTH_CEILING};
+use alloc::vec::Vec;
+use super::cbor::{encode, try_decode_with, Cbor, DecodeError, MAX_DEPTH_CEILING};
 
 const BAND_START: i64 = 1 << 20;
 

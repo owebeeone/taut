@@ -43,7 +43,7 @@ _RUNTIMES: dict[str, list[tuple[str, str]]] = {
         ("ext.ts", "typescript/ext.ts"),
     ],
     # use crate::cbor / crate::ext; the fail-closed runtime, Rust's only one, vendored as `cbor.rs`
-    "rust":   [("cbor.rs", "cbor_fail_closed.rs"), ("ext.rs", "ext.rs")],
+    "rust":   [("cbor.rs", "cbor_fail_closed.rs"), ("descriptors.rs", "descriptors.rs"), ("ext.rs", "ext.rs")],
     "cpp":    [("taut/cbor.hpp", "cbor.hpp"), ("taut/ext.hpp", "ext.hpp")],
     "swift":  [("cbor.swift", "cbor.swift"), ("ext.swift", "ext.swift")],
     "go":     [("cbor.go", "cbor.go"), ("ext.go", "ext.go")],
@@ -254,25 +254,11 @@ def _rs_ty(t: TypeRef | None) -> str:
 
 
 def rust_api(schema: Schema, forward_compat: bool = False,
-             external_types: dict[str, str] | None = None) -> str:
-    from .rust_external import imports
-
-    external_imports = imports(schema, external_types)
-    external = external_types or {}
-    # Decode is fail-closed: it returns the runtime's typed error type.
-    out = ["// GENERATED native Rust types + codec — do not edit.", "#![allow(dead_code)]",
-           "use crate::cbor::{Cbor, DecodeError};"]
-    out.extend(external_imports)
-    out.append("")
-    # Bounded decode: the file's bounds, and each message's with its typed `decode`.
-    out += _rust._emit_file_bounds(schema) + [""]
-    for e in schema.enums.values():
-        if e.name not in external:
-            out += _rust._emit_enum(e.name, e.members) + [""]
-    for m in schema.messages.values():
-        if m.name not in external:
-            out += _rust._emit_message(m, schema, forward_compat) + [""]
-    return "\n".join(out).rstrip() + "\n"
+             external_types: dict[str, str] | None = None, *, validation=False,
+             identity=None, runtime_path="crate") -> str:
+    from .rust_metadata import emit_types
+    return emit_types(schema, forward_compat=forward_compat, external_types=external_types,
+                      validation=validation, identity=identity, runtime_path=runtime_path)
 
 
 def rust_client(schema: Schema, svc: ServiceDef) -> str:
@@ -645,12 +631,14 @@ def emit(
     if errors:
         raise ValueError("; ".join(errors))
     constrained = any(f.oneof or f.cases for m in schema.messages.values() for f in m.fields)
-    if (validation or constrained) and set(lang_keys) - {"python"}:
-        raise ValueError("oneof/validation reference batch supports Python only; explicitly select --lang python")
+    if (validation or constrained) and set(lang_keys) - {"python", "rust"}:
+        raise ValueError("oneof/validation supports Python and Rust only; explicitly select --lang python,rust")
     if mode == "package" and set(lang_keys) - {"python", "rust"}:
-        raise ValueError("package runtime binding is implemented for Python only")
-    if mode == "package" and "rust" in lang_keys and not rust_external_types:
-        raise ValueError("Rust package mode requires an explicitly supplied external owner")
+        raise ValueError("package runtime binding is implemented for Python and Rust only")
+    rust_binding = None
+    if "rust" in lang_keys:
+        from .rust_runtime import binding as resolve_rust_binding
+        rust_binding = resolve_rust_binding(runtime_bindings, out_dir / "rust", mode)
     if rust_external_types is not None:
         from .rust_external import imports
 
@@ -660,10 +648,10 @@ def emit(
     unknown = [l for l in lang_keys if l not in _LANGS]
     if unknown:
         raise ValueError(f"unknown lang(s) {unknown}; known: {sorted(_LANGS)}")
-    if runtime and rust_external_types:
+    if runtime and rust_external_types and (not rust_binding[2] or rust_binding[0] == "crate"):
         raise ValueError(
             "external Rust types cannot be generated with runtime=True: "
-            "the owner crate must supply the shared runtime"
+            "the owner crate must supply the shared runtime; bind its module and existing source_root"
         )
     _GENERATED = {"rust", "cpp", "swift", "go", "kotlin", "js", "java"}
     if schema.extensions and not forward_compat and (_GENERATED & set(lang_keys)):
@@ -704,22 +692,26 @@ def emit(
     written: list[Path] = []
     all_writes = {}
     python_texts = {}
+    rust_texts = {}
     for lang in lang_keys:
         ext, api_fn, client_fn, server_fn = _LANGS[lang]
         d = out_dir / lang
         api_path = d / f"api.{ext}"
         api_kwargs = {"forward_compat": forward_compat}
         if lang == "rust":
-            api_kwargs["external_types"] = rust_external_types
+            api_kwargs.update(external_types=rust_external_types, validation=validation,
+                              identity=schema_identity, runtime_path=rust_binding[0])
         if lang == "python":
             api_kwargs.update(validation=validation, external_types=python_external_types, identity=schema_identity)
         api_text = api_fn(schema, **api_kwargs)
         if lang == "python":
             python_texts[f"api.{ext}"] = api_text
+        elif lang == "rust":
+            rust_texts[f"api.{ext}"] = api_text
         else:
             all_writes[api_path] = api_text.encode("utf-8")
         written.append(api_path)
-        if runtime and lang in _RUNTIMES:
+        if runtime and lang in _RUNTIMES and lang != "rust":
             for rel, resource in _RUNTIMES[lang]:
                 if not _runtime_exists(resource):
                     continue   # e.g. ext.<lang> before Phase 2 — vendored once its file lands
@@ -734,9 +726,13 @@ def emit(
                 content = fn(schema, svc)
                 if lang == "python":
                     python_texts[path.name] = content
+                elif lang == "rust":
+                    rust_texts[path.name] = content
                 else:
                     all_writes[path] = content.encode("utf-8")
                 written.append(path)
+    plans = []
+    lock_roots = []
     if "python" in lang_keys:
         # Python output is a package (client/server use relative imports).
         init = out_dir / "python" / "__init__.py"
@@ -744,34 +740,47 @@ def emit(
         written.append(init)
         source_root = runtime_binding(runtime_bindings, out_dir / "python")
         directory = (out_dir / "python").resolve()
-        lock_roots = [directory, source_root]
-        import json
-        previous = directory / ".taut-python-outputs.json"
+        lock_roots.extend([directory, source_root])
+        plans.append((directory, source_root, directory / ".taut-python-outputs.json", plan_outputs,
+                      python_texts, {"consume_source": "source_root" in (runtime_bindings or {}).get("python", {})}))
+    if "rust" in lang_keys:
+        from .rust_runtime import plan_outputs as rust_plan_outputs
+        directory = (out_dir / "rust").absolute()
+        _, source_root, consume_source = rust_binding
+        lock_roots.extend([directory, source_root])
+        plans.append((directory, source_root, directory / ".taut-rust-outputs.json", rust_plan_outputs,
+                      rust_texts, {"consume_source": consume_source, "external": bool(rust_external_types)}))
+    import json
+    for _, _, previous, _, _, _ in plans:
         if previous.exists():
             prior_root = json.loads(previous.read_text(encoding="utf-8")).get("source_root")
             if prior_root:
                 lock_roots.append(Path(prior_root))
-        with output_locks(lock_roots):
+    with output_locks(lock_roots):
+        deletes = set()
+        for directory, source_root, previous, planner, texts, extra in plans:
             if previous.exists():
                 locked_prior = json.loads(previous.read_text(encoding="utf-8")).get("source_root")
                 if locked_prior and Path(locked_prior).resolve() not in {p.resolve() for p in lock_roots}:
                     raise ValueError("output ownership changed concurrently; rerun generation to lock its new runtime owner")
-            writes, deletes = plan_outputs(directory, python_texts, mode=mode, validation=validation,
-                                           source_root=source_root,
-                                           consume_source="source_root" in (runtime_bindings or {}).get("python", {}))
+            writes, stale = planner(directory, texts, mode=mode, validation=validation,
+                                    source_root=source_root, **extra)
+            conflicts = set(writes) & set(all_writes)
+            if conflicts:
+                raise ValueError(f"conflicting generated output owners: {sorted(map(str, conflicts))}")
             all_writes.update(writes)
-            apply_outputs(all_writes, deletes)
-            written.extend(p for p in writes if p not in {directory / n for n in python_texts})
-    else:
-        apply_outputs(all_writes, ())
+            deletes.update(stale)
+            written.extend(p for p in writes if p not in {directory / n for n in texts})
+        apply_outputs(all_writes, deletes)
     return written
 
 
 def emit_all(schema: Schema, service_name: str, out_dir: Path, *, runtime: bool = False,
              runtime_mode: str | None = None, validation: bool = False,
              runtime_bindings: dict | None = None, python_external_types=None,
-             schema_identity=None, langs=None) -> list[Path]:
+             schema_identity=None, langs=None, rust_external_types=None) -> list[Path]:
     """Back-compat: api + client/server for one service, all languages."""
     return emit(schema, out_dir, services=[service_name], runtime=runtime, runtime_mode=runtime_mode,
                 validation=validation, runtime_bindings=runtime_bindings,
-                python_external_types=python_external_types, schema_identity=schema_identity, langs=langs)
+                python_external_types=python_external_types, schema_identity=schema_identity, langs=langs,
+                rust_external_types=rust_external_types)

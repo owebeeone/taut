@@ -66,7 +66,7 @@ _RESERVED: tuple[tuple[str, Mapping[str, str], Mapping[str, str], Callable[[str]
 )
 
 
-def validate(schema: Schema) -> list[str]:
+def validate(schema: Schema, *, targets=None) -> list[str]:
     from ..rules import check_rules
     errors: list[str] = check_rules(schema)
     if set(schema.enums) & set(schema.messages):
@@ -186,7 +186,7 @@ def validate(schema: Schema) -> list[str]:
                     check_ref(t, f"{ctx} out[{slot}]")
 
     # --- names some generator cannot take (step E1a) ---
-    errors.extend(_reserved_name_errors(schema))
+    errors.extend(_reserved_name_errors(schema, targets=targets))
 
     # --- options (OPT-L4) ---
     errors.extend(_declaration_errors(schema))
@@ -195,7 +195,7 @@ def validate(schema: Schema) -> list[str]:
     return errors
 
 
-def _reserved_name_errors(schema: Schema) -> list[str]:
+def _reserved_name_errors(schema: Schema, *, targets=None) -> list[str]:
     """One error per field, message or enum whose name some target cannot take, in the schema's
     order, naming each such target and why (`_RESERVED`)."""
     names: dict[tuple[str, str], dict[str, str]] = {}   # (where, kind) -> target -> why
@@ -205,6 +205,8 @@ def _reserved_name_errors(schema: Schema) -> list[str]:
     names.update(((f"enum {e.name}", "enum"), {}) for e in schema.enums.values())
 
     for target, fields, types, spell, clashes in _RESERVED:
+        if targets is not None and target not in targets:
+            continue
         for m in schema.messages.values():
             if m.name in types:
                 names[(m.name, "message")].setdefault(target, types[m.name])
@@ -234,8 +236,8 @@ def _reserving(by: dict[str, str]) -> str:
     return "; ".join(parts)
 
 
-def validate_or_raise(schema: Schema) -> None:
-    errors = validate(schema)
+def validate_or_raise(schema: Schema, *, targets=None) -> None:
+    errors = validate(schema, targets=targets)
     if errors:
         raise ValueError("invalid IR:\n  " + "\n  ".join(errors))
 

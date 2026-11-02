@@ -88,8 +88,17 @@ def _encode_ref(t: TypeRef, e: str) -> str:
     raise TypeError(t)
 
 
-def _field_type(f: FieldDef) -> str:
+def _field_name(name: str) -> str:
+    from .rust_external import _KEYWORDS
+    if name in {"self", "Self", "super", "crate", "_"}:
+        raise ValueError(f"Rust field {name!r} cannot be projected as an identifier")
+    return "r#" + name if name in _KEYWORDS else name
+
+
+def _field_type(f: FieldDef, *, boxed: bool = False) -> str:
     base = _rust_type(f.type)
+    if boxed:
+        base = f"Box<{base}>"
     return f"Option<{base}>" if f.optional else base
 
 
@@ -227,10 +236,11 @@ def _emit_file_bounds(schema: Schema) -> list[str]:
             *_bound_consts(schema, None, "")]
 
 
-def _emit_message(msg, schema: Schema, forward_compat: bool = False) -> list[str]:
+def _emit_message(msg, schema: Schema, forward_compat: bool = False, *, boxed_fields=frozenset()) -> list[str]:
     out = ["#[derive(Clone, Debug, PartialEq, Default)]", f"pub struct {msg.name} {{"]
     for f in msg.fields:
-        out.append(f"    pub {f.name}: {_field_type(f)},")
+        if not f.virtual:
+            out.append(f"    pub {_field_name(f.name)}: {_field_type(f, boxed=f.name in boxed_fields)},")
     if forward_compat:
         # unknown/newer-version fields, preserved verbatim (empty when none):
         # (map-key, value) pairs, the keys `i64` CBOR field tags.
@@ -242,9 +252,9 @@ def _emit_message(msg, schema: Schema, forward_compat: bool = False) -> list[str
     pairs = []
     for f in msg.wire_fields():
         if f.optional:
-            enc = f"match &self.{f.name} {{ Some(v) => {_encode_optional(f.type, 'v')}, None => Cbor::Null }}"
+            enc = f"match &self.{_field_name(f.name)} {{ Some(v) => {_encode_optional(f.type, 'v')}, None => Cbor::Null }}"
         else:
-            enc = _encode(f.type, f"self.{f.name}")
+            enc = _encode(f.type, f"self.{_field_name(f.name)}")
         pairs.append((f.tag, enc))
     # to_cbor (wire fields only; re-emits residual when forward-compat)
     out.append("    pub fn to_cbor(&self) -> Cbor {")
@@ -261,7 +271,7 @@ def _emit_message(msg, schema: Schema, forward_compat: bool = False) -> list[str
             out.append(f"            ({tag}, {enc}),")
         out.append("        ])")
     out.append("    }")
-    out += _from_cbor(msg, forward_compat)
+    out += _from_cbor(msg, forward_compat, boxed_fields=boxed_fields)
     # The typed entry point from bytes: the raw decode under this root's bounds, then from_cbor.
     out += ["    pub fn decode(bytes: &[u8]) -> Result<Self, DecodeError> {",
             "        Self::from_cbor(&crate::cbor::try_decode_with(bytes, Self::MAX_DEPTH, Self::MAX_ENCODED_LEN)?)",
@@ -270,7 +280,7 @@ def _emit_message(msg, schema: Schema, forward_compat: bool = False) -> list[str
     return out
 
 
-def _from_cbor(msg, forward_compat: bool) -> list[str]:
+def _from_cbor(msg, forward_compat: bool, *, boxed_fields=frozenset()) -> list[str]:
     """Fail-closed `from_cbor`: returns `Result<Self, DecodeError>`, propagates
     a typed error with `?` on every missing key / wrong type / unknown enum
     arm / short field, and never panics on any input."""
@@ -279,6 +289,8 @@ def _from_cbor(msg, forward_compat: bool) -> list[str]:
         out.append('        if !c.is_map() { return Err(DecodeError::WrongType { expected: "map" }); }')
     out.append("        Ok(Self {")
     for f in msg.fields:
+        if f.virtual:
+            continue
         if f.transient:
             dec = "Default::default()"
         elif f.optional:
@@ -290,7 +302,9 @@ def _from_cbor(msg, forward_compat: bool) -> list[str]:
                        f"if v.is_null() {{ None }} else {{ Some({_decode_try(f.type, 'v')}) }} }}")
         else:
             dec = _decode_try(f.type, f"c.try_get({f.tag})?")
-        out.append(f"            {f.name}: {dec},")
+        if f.name in boxed_fields:
+            dec = f"({dec}).map(Box::new)" if f.optional else f"Box::new({dec})"
+        out.append(f"            {_field_name(f.name)}: {dec},")
     if forward_compat:
         known = [str(f.tag) for f in msg.wire_fields()]
         pred = f"!matches!(*t, {' | '.join(known)})" if known else "true"
@@ -301,18 +315,8 @@ def _from_cbor(msg, forward_compat: bool) -> list[str]:
 
 
 def _emit(schema: Schema, golden: dict) -> str:
-    lines = [
-        "// GENERATED from taut/ir + corpus by taut/src/taut/gen/rust.py — do not edit.",
-        "#![allow(dead_code)]",
-        "use crate::cbor::{Cbor, DecodeError};",
-        "",
-        *_emit_file_bounds(schema),
-        "",
-    ]
-    for e in schema.enums.values():
-        lines += _emit_enum(e.name, e.members) + [""]
-    for m in schema.messages.values():
-        lines += _emit_message(m, schema) + [""]
+    from .rust_metadata import emit_types
+    lines = emit_types(schema).rstrip().splitlines()
 
     # roundtrip dispatcher: bytes -> typed struct -> bytes, fail-closed like the
     # package codegen (scaffold.rust_api), whose message decoders it shares.

@@ -1,0 +1,17 @@
+[package]
+name = "taut-foundation"
+version = "0.10.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+description = "Taut no_std + alloc codec, descriptor and explicit validation foundation"
+publish = false
+
+[features]
+default = []
+validation = []
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[workspace]

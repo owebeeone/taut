@@ -1,0 +1,24 @@
+{
+  "codec_contract": 1,
+  "descriptor_contract": 1,
+  "generator_build": "rust-oneof-reference.1",
+  "owner": "taut.rust.foundation",
+  "sources": {
+    "src/cbor.rs": {
+      "canonical": "src/taut/gen/runtime/cbor_fail_closed.rs",
+      "sha256": "a159c6c15f5f48fbd8ecef7db5256be8f8dbbb6c283b88fba49a036e92f3f467"
+    },
+    "src/descriptors.rs": {
+      "canonical": "src/taut/gen/runtime/descriptors.rs",
+      "sha256": "02f07c0118ca3bc163af80a4f99d65d0147edef4a885a39a59a91b0d7523192e"
+    },
+    "src/ext.rs": {
+      "canonical": "src/taut/gen/runtime/ext.rs",
+      "sha256": "63dce2584dd35332f647b614e12823ea1cfb02766d9bfbb692e2c59675864504"
+    },
+    "src/validation.rs": {
+      "canonical": "src/taut/gen/runtime/validation.rs",
+      "sha256": "fc6de6ea2295ad57f08e9b38ffc0f7fa178ed0d32686ec7d4284504235413402"
+    }
+  }
+}

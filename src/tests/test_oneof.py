@@ -63,7 +63,8 @@ def test_flags_require_actual_booleans(flag, bad):
 
 @pytest.mark.parametrize("case", ["unknown_control", "ordinary_control", "wrong_enum", "duplicate",
                                   "multiple_controls", "exhaustive", "empty", "optional_tag"])
-def test_schema_rejections(case, tmp_path):
+@pytest.mark.parametrize("language", ["python", "rust"])
+def test_schema_rejections(case, tmp_path, language):
     e, other = Enum("Choice", a=0, b=1), Enum("OtherChoice", a=0)
     controls = {"tag": F(1, OneOf(e))}
     payloads = {"data": F(3, STR, Case(tag=e.a))}
@@ -88,7 +89,7 @@ def test_schema_rejections(case, tmp_path):
     s = schema(e, other, Record=Msg(**controls, **payloads))
     assert validate(s)
     with pytest.raises(ValueError):
-        emit(s, tmp_path, langs=["python"])
+        emit(s, tmp_path, langs=[language])
     assert not list(tmp_path.iterdir())
 
 

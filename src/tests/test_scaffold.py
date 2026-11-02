@@ -58,7 +58,7 @@ def test_emit_refuses_a_target_lacking_a_declared_option_before_writing(tmp_path
         scaffold.emit(_tree(), tmp_path, langs=["rust", "go"], services=[])
     assert list(tmp_path.iterdir()) == []   # nothing written, not even rust's
     written = scaffold.emit(_tree(), tmp_path, langs=["rust"], services=[])   # rust has it
-    assert [p.relative_to(tmp_path).as_posix() for p in written] == ["rust/api.rs"]
+    assert [p.relative_to(tmp_path).as_posix() for p in written] == ["rust/api.rs", "rust/.taut-rust-outputs.json"]
 
 
 @pytest.mark.parametrize("declared", [

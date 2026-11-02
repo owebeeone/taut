@@ -615,7 +615,10 @@ def test_the_legacy_codec_is_gone(tmp_path):
     scaffold.emit(_FC, generated, langs=["rust"], services=[], runtime=True)
     api = (generated / "rust" / "api.rs").read_text()
     assert "pub fn from_cbor(c: &Cbor) -> Result<Self, DecodeError>" in api
-    assert "DEPRECATED" not in api and "panic!" not in api
+    # New mandatory metadata can diagnose incompatible configurations. The codec
+    # remains fail-closed on malformed input, independently of descriptor checks.
+    codec_api = api.split("// Generator build", 1)[0]
+    assert "DEPRECATED" not in api and "panic!" not in codec_api
     runtime = (generated / "rust" / "cbor.rs").read_text()
     assert runtime == CBOR_RS.read_text()
     assert "pub fn try_decode" in runtime
@@ -1934,7 +1937,8 @@ def test_glade_build_writes_the_fail_closed_codec_and_runtime(tmp_path, monkeypa
     crate.mkdir(parents=True)
     glade_build.emit_rust(glade_schema, corpus, tag="v9.8.7")
     src = crate / "src"
-    assert sorted(p.name for p in src.iterdir()) == ["cbor.rs", "generated.rs"]
+    assert sorted(p.name for p in src.iterdir()) == ["cbor.rs", "descriptors.rs", "generated.rs"]
+    assert (src / "descriptors.rs").read_bytes() == CBOR_RS.with_name("descriptors.rs").read_bytes()
     header = glade_build.header("v9.8.7")
     assert header.startswith("// taut v9.8.7 wrote this file:")
     assert "`PYTHONPATH=src python3 -m taut.corpus.glade_build`" in header

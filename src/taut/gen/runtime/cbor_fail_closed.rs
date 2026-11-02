@@ -37,6 +37,11 @@ use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+/// Mandatory shared descriptor foundation; the owning CBOR module fixes its
+/// nominal identity across independently generated schemas and re-exporters.
+#[path = "descriptors.rs"]
+pub mod descriptors;
+
 /// The depth bound where the caller gives none: 32 nested arrays and maps
 /// decode, and the 33rd is [`DecodeError::TooDeep`] (CD-B1). taut's
 /// `DEFAULT_MAX_DEPTH`, the `max_depth` option's default.

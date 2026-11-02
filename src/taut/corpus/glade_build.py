@@ -140,6 +140,9 @@ def emit_rust(schema: Schema, corpus: dict[str, dict], tag: str | None = None) -
     GLADE_RS_DIR.mkdir(parents=True, exist_ok=True)
     (GLADE_RS_DIR / "generated.rs").write_text(lines + rust_gen._emit(schema, corpus))
     (GLADE_RS_DIR / "cbor.rs").write_text(lines + RUNTIME_CBOR_RS.read_text())
+    # Metadata is mandatory in every newly emitted Rust message. It shares the
+    # cbor owner's module identity; consumers need no additional root module.
+    (GLADE_RS_DIR / "descriptors.rs").write_bytes(RUNTIME_CBOR_RS.with_name("descriptors.rs").read_bytes())
 
 
 def main() -> None:
