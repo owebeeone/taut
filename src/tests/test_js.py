@@ -49,14 +49,14 @@ def test_emits_classes_enums_and_codec():
     s = js.emit_types(RAZEL)
     assert 'require("./cbor.js")' in s
     assert "class BuildResult {" in s
-    assert "const BuildStatus = Object.freeze({" in s
+    assert "const BuildStatus = Object.freeze(Object.fromEntries([" in s
     assert "toCbor() {" in s
     assert "static fromCbor(c) {" in s
-    assert "module.exports = {" in s
+    assert "module.exports = Object.freeze(Object.fromEntries([" in s
 
 
 def test_optional_is_nullable():
-    assert "this.message != null ?" in js.emit_types(RAZEL)
+    assert 'this["message"] != null ?' in js.emit_types(RAZEL)
 
 
 def test_forward_compat_residual():
@@ -68,11 +68,11 @@ def test_forward_compat_residual():
 def test_float_scalar_shape():
     s = js.emit_types(FLOATY)
     assert "CFloat" in s
-    assert "[1, CFloat(this.x)]" in s
-    assert "CArr(this.xs.map((e) => CFloat(e)))" in s
+    assert '[1, CFloat(this["x"])]' in s
+    assert 'CArr(this["xs"].map((e) => CFloat(e)))' in s
     assert "CMap([[1, CInt(k)], [2, CFloat(v)]])" in s
-    assert "v.x = expectFloat(cget(c, 1));" in s
-    assert "v.xs = expectArray(cget(c, 2)).map((e) => expectFloat(e));" in s
+    assert 'v["x"] = expectFloat(cget(c, 1));' in s
+    assert 'v["xs"] = expectArray(cget(c, 2)).map((e) => expectFloat(e));' in s
 
 
 def test_js_i64_bigint_and_fail_closed_parity(tmp_path):

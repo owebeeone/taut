@@ -1,0 +1,183 @@
+........................................................................ [ 91%]
+......F                                                                  [100%]
+================================== FAILURES ===================================
+_ test_typescript_client_fails_a_call_or_stream_whose_payload_does_not_decode_if_node _
+
+tmp_path = WindowsPath('D:/projects/limbo/typescript-oneof-scratch/pytest-final/test_typescript_client_fails_a0')
+
+    def test_typescript_client_fails_a_call_or_stream_whose_payload_does_not_decode_if_node(tmp_path):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("node not available")
+    
+        s = _service_schema()
+        ts_dir = _emit_ts(s, tmp_path, "svc.ir.json")
+        assert codec.encode(s, "Item", {"n": 5}).hex() == "a10105"
+        with pytest.raises(codec.DecodeError) as err:
+            codec.decode(s, "Item", bytes.fromhex("a1016178"))  # n is text: the payload used below
+        assert (err.value.tag, err.value.payload) == ("WrongType", {"expected": "int"})
+    
+        harness = ts_dir / "client.test.ts"
+        harness.write_text(
+            """
+    import test from "node:test";
+    import assert from "node:assert/strict";
+    import { readFileSync } from "node:fs";
+    import { loadSchema } from "./schema.ts";
+    import { tautClient } from "./taut_client.ts";
+    
+    const schema = loadSchema(JSON.parse(readFileSync("svc.ir.json", "utf8")));
+    const GOOD = Buffer.from("a10105", "hex").toString("base64"); // { n: 5 }
+    const BAD = Buffer.from("a1016178", "hex").toString("base64"); // n is text: WrongType{int}
+    
+    // A WebSocket stand-in: it opens at once, keeps what the client sends, and delivers a frame
+    // through the client's onmessage, which must return whatever the frame holds.
+    class FakeSocket {
+      static last: FakeSocket;
+      sent: any[] = [];
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((e: { data: string }) => void) | null = null;
+    
+      constructor(_url: string) {
+        FakeSocket.last = this;
+        queueMicrotask(() => this.onopen?.());
+      }
+    
+      send(data: string): void {
+        this.sent.push(JSON.parse(data));
+      }
+    
+      close(): void {}
+    
+      deliver(env: Record<string, unknown>): void {
+        assert.doesNotThrow(() => this.onmessage!({ data: JSON.stringify(env) }), JSON.stringify(env));
+      }
+    }
+    (globalThis as any).WebSocket = FakeSocket;
+    
+    async function connect() {
+      const client = await tautClient.connect("ws://test", schema);
+      return { client, ws: FakeSocket.last };
+    }
+    
+    // How `p` stands once pending work has run: resolved, rejected or still pending.
+    function settled(p: Promise<unknown>): Promise<any> {
+      return Promise.race([
+        p.then((value) => ({ state: "resolved", value }), (error) => ({ state: "rejected", error })),
+        new Promise((resolve) => setTimeout(() => resolve({ state: "pending" }), 20)),
+      ]);
+    }
+    
+    test("a response that does not decode rejects its call with the DecodeError itself", async () => {
+      const { client, ws } = await connect();
+      const call = client.call("get", { id: 1n });
+      ws.deliver({ messageId: ws.sent[0].messageId, kind: "response", payload: { value: BAD } });
+      const out = await settled(call);
+      assert.equal(out.state, "rejected");
+      assert.equal(out.error.name, "DecodeError");
+      assert.equal(out.error.tag, "WrongType");
+      assert.equal(out.error.expected, "int");
+    });
+    
+    test("a response that decodes still resolves its call, and a server error still rejects it", async () => {
+      const { client, ws } = await connect();
+      const ok = client.call("get", { id: 1n });
+      const failed = client.call("get", { id: 2n });
+      ws.deliver({ messageId: ws.sent[0].messageId, kind: "response", payload: { value: GOOD } });
+      ws.deliver({ messageId: ws.sent[1].messageId, kind: "error", error: { code: "gone", message: "no such item" } });
+      assert.deepEqual(await ok, { n: 5n });
+      await assert.rejects(failed, { name: "Error", message: "no such item" });
+    });
+    
+    test("an event that does not decode ends its stream, as unsubscribing does, and goes to onError", async () => {
+      const { client, ws } = await connect();
+      const events: unknown[] = [];
+      const errors: any[] = [];
+      const stop = client.subscribe("watch", { id: 1n }, (event, value) => events.push([event, value]),
+        (error) => errors.push(error));
+      const { streamId } = ws.sent[0];
+      const event = (value: string) => ({ messageId: "e", kind: "stream-event", streamId, event: "append", payload: { value } });
+      ws.deliver(event(GOOD));
+      ws.deliver(event(BAD));
+      ws.deliver(event(GOOD)); // after the end: not delivered
+      stop(); // already ended: the server is not told twice
+      assert.deepEqual(events, [["append", { n: 5n }]]);
+      assert.equal(errors.length, 1);
+      assert.equal(errors[0].name, "DecodeError");
+      assert.equal(errors[0].tag, "WrongType");
+      assert.deepEqual(ws.sent.slice(1).map((m: any) => [m.method, m.streamId]), [["$unsubscribe", streamId]]);
+    });
+    
+    test("without onError, an event that does not decode still ends its stream and escapes nowhere", async () => {
+      const { client, ws } = await connect();
+      const events: unknown[] = [];
+      client.subscribe("watch", { id: 1n }, (event, value) => events.push([event, value]));
+      const { streamId } = ws.sent[0];
+      ws.deliver({ messageId: "e", kind: "stream-event", streamId, event: "append", payload: { value: BAD } });
+      ws.deliver({ messageId: "e", kind: "stream-event", streamId, event: "append", payload: { value: GOOD } });
+      assert.deepEqual(events, []);
+      assert.deepEqual(ws.sent.slice(1).map((m: any) => m.method), ["$unsubscribe"]);
+    });
+    """.lstrip()
+        )
+>       _run_node_tests(node, ts_dir, harness)
+
+src\tests\test_ts.py:1446: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+node = 'C:\\Program Files\\nodejs\\node.EXE'
+ts_dir = WindowsPath('D:/projects/limbo/typescript-oneof-scratch/pytest-final/test_typescript_client_fails_a0/typescript')
+harness = WindowsPath('D:/projects/limbo/typescript-oneof-scratch/pytest-final/test_typescript_client_fails_a0/typescript/client.test.ts')
+
+    def _run_node_tests(node: str, ts_dir: Path, harness: Path) -> None:
+        result = subprocess.run(
+            [node, "--experimental-strip-types", "--test", harness.name],
+            cwd=ts_dir,
+            text=True,
+            capture_output=True,
+        )
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: node:internal/modules/esm/resolve:272
+E             throw new ERR_MODULE_NOT_FOUND(
+E                   ^
+E         
+E         Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'D:\projects\limbo\typescript-oneof-scratch\pytest-final\test_typescript_client_fails_a0\typescript\taut_client.ts' imported from D:\projects\limbo\typescript-oneof-scratch\pytest-final\test_typescript_client_fails_a0\typescript\client.test.ts
+E             at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+E             at moduleResolve (node:internal/modules/esm/resolve:879:10)
+E             at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+E             at #cachedDefaultResolve (node:internal/modules/esm/loader:705:20)
+E             at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:725:38)
+E             at ModuleLoader.resolveSync (node:internal/modules/esm/loader:763:56)
+E             at #resolve (node:internal/modules/esm/loader:687:17)
+E             at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:607:35)
+E             at ModuleJob.syncLink (node:internal/modules/esm/module_job:276:33)
+E             at ModuleJob.link (node:internal/modules/esm/module_job:381:17) {
+E           code: 'ERR_MODULE_NOT_FOUND',
+E           url: 'file:///D:/projects/limbo/typescript-oneof-scratch/pytest-final/test_typescript_client_fails_a0/typescript/taut_client.ts'
+E         }
+E         
+E         Node.js v24.22.0
+E         ✖ client.test.ts (116.7098ms)
+E         ℹ tests 1
+E         ℹ suites 0
+E         ℹ pass 0
+E         ℹ fail 1
+E         ℹ cancelled 0
+E         ℹ skipped 0
+E         ℹ todo 0
+E         ℹ duration_ms 123.8637
+E         
+E         ✖ failing tests:
+E         
+E         test at client.test.ts:1:1
+E         ✖ client.test.ts (116.7098ms)
+E           'test failed'
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['C:\\Program Files\\nodejs\\node.EXE', '--experimental-strip-types', '--test', 'client.test.ts'...3.8637\n\n✖ failing tests:\n\ntest at client.test.ts:1:1\n✖ client.test.ts (116.7098ms)\n  'test failed'\n", stderr='').returncode
+
+src\tests\test_ts.py:434: AssertionError
+=========================== short test summary info ===========================
+FAILED src/tests/test_ts.py::test_typescript_client_fails_a_call_or_stream_whose_payload_does_not_decode_if_node
+1 failed, 78 passed in 30.84s

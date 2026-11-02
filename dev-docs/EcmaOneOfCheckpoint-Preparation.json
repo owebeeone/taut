@@ -1,0 +1,2700 @@
+{
+  "baseline_failures": [
+    "src/tests/test_dev_docs.py::test_proto_api_surface_extensions_doc_exists_and_covers_contract",
+    "src/tests/test_go.py::test_go_runtime_and_parity_runner_are_gofmt_clean",
+    "src/tests/test_go.py::test_generated_go_is_gofmt_clean"
+  ],
+  "excluded_old_python_artifacts": {
+    "count": 35,
+    "disposition": "preserve untouched, never stage generated bundles/ownership receipts or old wheel",
+    "files": {
+      "dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json": {
+        "sha256": "4e92a8cabe8f5959a4113d8a7f2738a913c1c71ab26c60c34707597549b3b399",
+        "size": 506
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json": {
+        "sha256": "f3b639e2bd1ab69b1355e7a9935359dc2f9797bcf899cf4fce7afed19a50c644",
+        "size": 1373
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/__init__.py": {
+        "sha256": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+        "size": 38
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/api.py": {
+        "sha256": "31fbb8d65d4871dbf6a9025cff50f5cb3cc530448f44c327e92c1f8b98064ac7",
+        "size": 6338
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py": {
+        "sha256": "ad2bb0a2ddb372ab77e5e7d19873f44804c487c63a22d0c7b99852329b4944af",
+        "size": 129
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py": {
+        "sha256": "e21299bef0b04c86bff376cf6a678f7b8720dc067438d551ffef54b9a95964fe",
+        "size": 267
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py": {
+        "sha256": "69766dfeca243099e7bf7c54f088069f271fa60f61e03d4d916d893d6d38416c",
+        "size": 1298
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py": {
+        "sha256": "e473c8532d5840e6f374dca4ead4c3e28726f23ed7c058e84a79f052418cb9fa",
+        "size": 16907
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py": {
+        "sha256": "99e5fab316640eb0527e905b194610557d8301210ca61cd72358002d7d10a8fb",
+        "size": 2289
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py": {
+        "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "size": 8202
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py": {
+        "sha256": "153026e825045eb67883ac9b66b6ac9d4ffd6fbc64c2bc010fa9e973a2271f9e",
+        "size": 2940
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py": {
+        "sha256": "8cde71892ed7882b869bd299c13be37223e77e679ce04a59e9994b82dc9bec42",
+        "size": 11383
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py": {
+        "sha256": "7577578775f99603032555479e843056a12d8465b5aa439fe7371f4fb76b7347",
+        "size": 8827
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py": {
+        "sha256": "bd3d5e2e3d18980a19e4519477c84ad78084f5d2c25af4c5ccca6e8477779022",
+        "size": 6247
+      },
+      "dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json": {
+        "sha256": "14a3a65b8314dee620248029963ea92526bae09c5d126f685d29754db8b2f2d0",
+        "size": 410
+      },
+      "dev-docs/examples/python-oneof/generated/package/python/__init__.py": {
+        "sha256": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+        "size": 38
+      },
+      "dev-docs/examples/python-oneof/generated/package/python/api.py": {
+        "sha256": "5bbd3d845613cc9ef6704801c4e976c4900f654b13e33a8ab20d8d312975fa8c",
+        "size": 8389
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json": {
+        "sha256": "9521b809e235b325be1355485e0b526f6bc19e5a990852735c7198096c22e031",
+        "size": 503
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json": {
+        "sha256": "1bdbd28eff437d7a2a7b8d34d5b8f5134968ec3adb154141319ecec9533b6ddf",
+        "size": 1464
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/__init__.py": {
+        "sha256": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+        "size": 38
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/api.py": {
+        "sha256": "5bbd3d845613cc9ef6704801c4e976c4900f654b13e33a8ab20d8d312975fa8c",
+        "size": 8389
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py": {
+        "sha256": "ad2bb0a2ddb372ab77e5e7d19873f44804c487c63a22d0c7b99852329b4944af",
+        "size": 129
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py": {
+        "sha256": "e21299bef0b04c86bff376cf6a678f7b8720dc067438d551ffef54b9a95964fe",
+        "size": 267
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py": {
+        "sha256": "69766dfeca243099e7bf7c54f088069f271fa60f61e03d4d916d893d6d38416c",
+        "size": 1298
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py": {
+        "sha256": "e473c8532d5840e6f374dca4ead4c3e28726f23ed7c058e84a79f052418cb9fa",
+        "size": 16907
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/ext.py": {
+        "sha256": "99e5fab316640eb0527e905b194610557d8301210ca61cd72358002d7d10a8fb",
+        "size": 2289
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/facts.py": {
+        "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "size": 8202
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/rules.py": {
+        "sha256": "153026e825045eb67883ac9b66b6ac9d4ffd6fbc64c2bc010fa9e973a2271f9e",
+        "size": 2940
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/validation.py": {
+        "sha256": "eb33734525330f131092c3bda540ef71742b7cd0eb1074e7aa72a92049db8903",
+        "size": 10105
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py": {
+        "sha256": "8cde71892ed7882b869bd299c13be37223e77e679ce04a59e9994b82dc9bec42",
+        "size": 11383
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py": {
+        "sha256": "7577578775f99603032555479e843056a12d8465b5aa439fe7371f4fb76b7347",
+        "size": 8827
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py": {
+        "sha256": "bd3d5e2e3d18980a19e4519477c84ad78084f5d2c25af4c5ccca6e8477779022",
+        "size": 6247
+      },
+      "dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl": {
+        "sha256": "7ff8c48266ec3814a4fea75c4afe94f1ffb1e1193c0a9134706ee99ad4f7fd44",
+        "size": 264014
+      }
+    }
+  },
+  "freeze_authorization": {
+    "extra_js_receipt": "InitialJS36 plus final authorized service-correction receipt results/prefreeze-service-gate.log =37; no extra production component",
+    "operations": "Exact73Taut+28shape-ts local GWZ checkpoint, managed root receipt, then exactly2combined peer-blind Code+Surface/State reviewers; root assigns TS one settled global gate",
+    "production": "HOLD; no edits during reviews/gate except coordinated merged correction window",
+    "prohibited": "push,tag,release,registry publication,next backend,extra reviewer",
+    "source": "Coordinator explicit ROOT PAIR FREEZE AUTHORIZATION,2November2026"
+  },
+  "frozen_pair_allowlist": {
+    "counts": {
+      "taut": 73,
+      "taut-shape-ts": 28
+    },
+    "files": {
+      "taut": [
+        "dev-docs/EcmaOneOfCheckpoint-Authority.md",
+        "dev-docs/EcmaOneOfCheckpoint-Draft.md",
+        "dev-docs/EcmaOneOfCheckpoint-Preparation.json",
+        "dev-docs/examples/js-oneof/INTEGRATION.md",
+        "dev-docs/examples/js-oneof/README.md",
+        "dev-docs/examples/js-oneof/RESULTS.md",
+        "dev-docs/examples/js-oneof/conformance.js",
+        "dev-docs/examples/js-oneof/content.taut.py",
+        "dev-docs/examples/js-oneof/disabled.golden.js",
+        "dev-docs/examples/js-oneof/enabled.golden.js",
+        "dev-docs/examples/js-oneof/example.js",
+        "dev-docs/examples/js-oneof/owned-files.json",
+        "dev-docs/examples/js-oneof/results/canonical-inventory.json",
+        "dev-docs/examples/js-oneof/results/disabled.log",
+        "dev-docs/examples/js-oneof/results/examples.log",
+        "dev-docs/examples/js-oneof/results/native-preservation.log",
+        "dev-docs/examples/js-oneof/results/package-example.log",
+        "dev-docs/examples/js-oneof/results/package-provenance.json",
+        "dev-docs/examples/js-oneof/results/package-reports.tsv",
+        "dev-docs/examples/js-oneof/results/prefreeze-service-gate.log",
+        "dev-docs/examples/js-oneof/results/shared-path-preservation.log",
+        "dev-docs/examples/js-oneof/results/source-example.log",
+        "dev-docs/examples/js-oneof/results/source-reports.tsv",
+        "dev-docs/examples/js-oneof/results/target-gate.log",
+        "dev-docs/examples/js-oneof/verify_examples.py",
+        "dev-docs/examples/typescript-oneof/README.md",
+        "dev-docs/examples/typescript-oneof/RESULTS.md",
+        "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles.json",
+        "dev-docs/examples/typescript-oneof/content.taut.py",
+        "dev-docs/examples/typescript-oneof/main.ts",
+        "dev-docs/examples/typescript-oneof/results/example-results.json",
+        "dev-docs/examples/typescript-oneof/results/example.log",
+        "dev-docs/examples/typescript-oneof/results/library-build.log",
+        "dev-docs/examples/typescript-oneof/results/library-tests.log",
+        "dev-docs/examples/typescript-oneof/results/library-typecheck.log",
+        "dev-docs/examples/typescript-oneof/results/target-tests-before-data-projection.log",
+        "dev-docs/examples/typescript-oneof/results/target-tests-before-data-projection.xml",
+        "dev-docs/examples/typescript-oneof/results/target-tests-before-residual.log",
+        "dev-docs/examples/typescript-oneof/results/target-tests-before-residual.xml",
+        "dev-docs/examples/typescript-oneof/results/target-tests-failed-first.log",
+        "dev-docs/examples/typescript-oneof/results/target-tests-failed-first.xml",
+        "dev-docs/examples/typescript-oneof/results/target-tests.log",
+        "dev-docs/examples/typescript-oneof/results/target-tests.xml",
+        "dev-docs/examples/typescript-oneof/run-example.py",
+        "pyproject.toml",
+        "src/taut/cli.py",
+        "src/taut/gen/js.py",
+        "src/taut/gen/js_metadata.py",
+        "src/taut/gen/js_runtime.py",
+        "src/taut/gen/python_runtime.py",
+        "src/taut/gen/runtime/cbor.js",
+        "src/taut/gen/runtime/js-contracts.js",
+        "src/taut/gen/runtime/js-descriptors.js",
+        "src/taut/gen/runtime/js-reports.js",
+        "src/taut/gen/runtime/js-validation.js",
+        "src/taut/gen/runtime/typescript/cbor.ts",
+        "src/taut/gen/runtime/typescript/codec.ts",
+        "src/taut/gen/runtime/typescript/descriptors.ts",
+        "src/taut/gen/runtime/typescript/foundation.ts",
+        "src/taut/gen/runtime/typescript/jsoncodec.ts",
+        "src/taut/gen/runtime/typescript/reports.ts",
+        "src/taut/gen/runtime/typescript/schema.ts",
+        "src/taut/gen/runtime/typescript/snapshots.ts",
+        "src/taut/gen/runtime/typescript/validation.ts",
+        "src/taut/gen/scaffold.py",
+        "src/taut/gen/typescript_metadata.py",
+        "src/taut/gen/typescript_package.py",
+        "src/taut/gen/typescript_runtime.py",
+        "src/tests/test_js.py",
+        "src/tests/test_js_oneof.py",
+        "src/tests/test_js_ts_distribution.py",
+        "src/tests/test_ts.py",
+        "src/tests/test_typescript_oneof.py"
+      ],
+      "taut-shape-ts": [
+        ".gitignore",
+        "README.md",
+        "foundation-src/cbor.ts",
+        "foundation-src/codec.ts",
+        "foundation-src/descriptors.ts",
+        "foundation-src/ext.ts",
+        "foundation-src/foundation.ts",
+        "foundation-src/jsoncodec.ts",
+        "foundation-src/provenance.json",
+        "foundation-src/reports.ts",
+        "foundation-src/schema.ts",
+        "foundation-src/snapshots.ts",
+        "foundation-src/validation.ts",
+        "package.json",
+        "scripts/build-foundation.mjs",
+        "scripts/vendor-foundation.py",
+        "src/framing.ts",
+        "src/taut/cbor.ts",
+        "src/taut/codec.ts",
+        "src/taut/gen/shape_atom.ts",
+        "src/taut/gen/shape_crdt.ts",
+        "src/taut/gen/shape_log.ts",
+        "src/taut/gen/shape_stream.ts",
+        "src/taut/gen/shape_swmr.ts",
+        "src/taut/gen/shape_value.ts",
+        "src/taut/jsoncodec.ts",
+        "src/taut/schema.ts",
+        "tests/foundation.test.ts"
+      ]
+    },
+    "hashes_excluding_preparation_self": {
+      "taut": {
+        "dev-docs/EcmaOneOfCheckpoint-Authority.md": {
+          "sha256": "5bac6911268a92e928ab8f6d1470c2b76d732fda65cd9b40adbe2451bf964a1e",
+          "size": 10605
+        },
+        "dev-docs/EcmaOneOfCheckpoint-Draft.md": {
+          "sha256": "d5f26ad05811563e8719a6fac768691188522754e720d1f7ca26bbb5654f6b6a",
+          "size": 14962
+        },
+        "dev-docs/examples/js-oneof/INTEGRATION.md": {
+          "sha256": "3ec3b70c0fd67b2e40c6560355329cd1e6a998c62709581f9cf62ab160dc0a02",
+          "size": 4097
+        },
+        "dev-docs/examples/js-oneof/README.md": {
+          "sha256": "ac7907428a8ff572b3cdd95724c76f15de7063aaf221cf36325103dec5e7dc77",
+          "size": 1980
+        },
+        "dev-docs/examples/js-oneof/RESULTS.md": {
+          "sha256": "7911f32b7d053f0dab8f11e4eac52ad9b1aae05e82bd6d2f0c326e0c24f41b16",
+          "size": 6024
+        },
+        "dev-docs/examples/js-oneof/conformance.js": {
+          "sha256": "f0c1ea0fc75c78e617fedd03bddc79fb430b61d9c2d00db266473ce7a6de97e7",
+          "size": 1980
+        },
+        "dev-docs/examples/js-oneof/content.taut.py": {
+          "sha256": "784f549db4a0e324a7675f3f88e399d623d81738e7358f6225a449e0e349855d",
+          "size": 1185
+        },
+        "dev-docs/examples/js-oneof/disabled.golden.js": {
+          "sha256": "af725d6616993d979273bfc70fc9f2d845842c259a7e0434cbf637174802b6a1",
+          "size": 17015
+        },
+        "dev-docs/examples/js-oneof/enabled.golden.js": {
+          "sha256": "f0bfa35cf6d6611c84ca4c942dfde0003b208695bdc2d5fe63bc08d3365ee34e",
+          "size": 18527
+        },
+        "dev-docs/examples/js-oneof/example.js": {
+          "sha256": "c184c73ea141f5e6ac31d6241022cbded027cfe7c591bf3beebb0ebea5b8237e",
+          "size": 1064
+        },
+        "dev-docs/examples/js-oneof/owned-files.json": {
+          "sha256": "a8e144e12acbd14ec212777d9ec748df247127055f68b2f9660ae59700d5a0be",
+          "size": 2027
+        },
+        "dev-docs/examples/js-oneof/results/canonical-inventory.json": {
+          "sha256": "9e2ca86129d2609d3bddc6aa687f0666cf74d529b0d163b51b2c4127644273ba",
+          "size": 517
+        },
+        "dev-docs/examples/js-oneof/results/disabled.log": {
+          "sha256": "1c115da1fcb58c61b7a47b588a40e73608753fa8fa3356ed7fdc6de98bc57a27",
+          "size": 30
+        },
+        "dev-docs/examples/js-oneof/results/examples.log": {
+          "sha256": "e1bd13e925120a810e438d4dc29c9f3b82f0e8dc6c6d66348896c4e30dfd519f",
+          "size": 149
+        },
+        "dev-docs/examples/js-oneof/results/native-preservation.log": {
+          "sha256": "5873eacb223c9611abaf201f41c9eb0a768710f316e635c804b1fd9e31bd1b37",
+          "size": 197
+        },
+        "dev-docs/examples/js-oneof/results/package-example.log": {
+          "sha256": "86b52ca5120cbc3251d44033460deb37e2ceed65b43dcfa1f55d57ac231c863e",
+          "size": 271
+        },
+        "dev-docs/examples/js-oneof/results/package-provenance.json": {
+          "sha256": "677c4fa9670d71cf0c70601100484ed2dbca3bd9b10f2a6cc800e343c6f001d3",
+          "size": 860
+        },
+        "dev-docs/examples/js-oneof/results/package-reports.tsv": {
+          "sha256": "02586adf94172f54e92c38809a4426d8e1cc372b70b669e405a5b20efc08b4ec",
+          "size": 1954
+        },
+        "dev-docs/examples/js-oneof/results/prefreeze-service-gate.log": {
+          "sha256": "daecc5c9d2408bb108da899b7884d8605739aac73be1173871798bf448c837e1",
+          "size": 600
+        },
+        "dev-docs/examples/js-oneof/results/shared-path-preservation.log": {
+          "sha256": "e1cc315735bb96c1ece5429e090117ccba06052eb7abdbfae31b43c9e1ae4486",
+          "size": 117
+        },
+        "dev-docs/examples/js-oneof/results/source-example.log": {
+          "sha256": "86b52ca5120cbc3251d44033460deb37e2ceed65b43dcfa1f55d57ac231c863e",
+          "size": 271
+        },
+        "dev-docs/examples/js-oneof/results/source-reports.tsv": {
+          "sha256": "02586adf94172f54e92c38809a4426d8e1cc372b70b669e405a5b20efc08b4ec",
+          "size": 1954
+        },
+        "dev-docs/examples/js-oneof/results/target-gate.log": {
+          "sha256": "74c16611e770d71f11900736c41e3ba37953c528fbc4fb8705bd3d5b6ca71f5a",
+          "size": 600
+        },
+        "dev-docs/examples/js-oneof/verify_examples.py": {
+          "sha256": "6c7c75c70fed6ef6accfa2200dd2718a75f9233c2fa19c53418dedcac74d5f66",
+          "size": 3390
+        },
+        "dev-docs/examples/typescript-oneof/README.md": {
+          "sha256": "978287fa4241473637251bc1978c1394a423319eeab6e7fb013158d1258a6949",
+          "size": 9481
+        },
+        "dev-docs/examples/typescript-oneof/RESULTS.md": {
+          "sha256": "d87482a6266cf3b07dc2097b8514e47eb565b4b11058b00e916916a5a35a6ce3",
+          "size": 6535
+        },
+        "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles.json": {
+          "sha256": "9c7d578b01b30a36458d885432e0d5babb0225b2ac94b27455da8f12e5b568c1",
+          "size": 7738
+        },
+        "dev-docs/examples/typescript-oneof/content.taut.py": {
+          "sha256": "0896ace4cdd43402b7195fe7fe80586b45c6e98060a80a558747ea8e1e3c8696",
+          "size": 382
+        },
+        "dev-docs/examples/typescript-oneof/main.ts": {
+          "sha256": "dd00f9b9f3c7bc54270da1ce65480c1a9b815e4ef9d9695342f1cf07d1ee9324",
+          "size": 1335
+        },
+        "dev-docs/examples/typescript-oneof/results/example-results.json": {
+          "sha256": "9d0edce7ba28480d658d7d75311915aa721a6e150579bee89c8556cdfae75626",
+          "size": 1094
+        },
+        "dev-docs/examples/typescript-oneof/results/example.log": {
+          "sha256": "9d0edce7ba28480d658d7d75311915aa721a6e150579bee89c8556cdfae75626",
+          "size": 1094
+        },
+        "dev-docs/examples/typescript-oneof/results/library-build.log": {
+          "sha256": "a9120e106f55b637d79043a28576a95ca418ce7ee638c392c32ec15d649723fa",
+          "size": 209
+        },
+        "dev-docs/examples/typescript-oneof/results/library-tests.log": {
+          "sha256": "02f4f1b70dca4dcc097f8f5d4e25a05b5d730ee5c84735e2be804da5ac46925b",
+          "size": 18142
+        },
+        "dev-docs/examples/typescript-oneof/results/library-typecheck.log": {
+          "sha256": "8d0e8ca6face14b38c6ec53924037c0098a0fbeb982ff06383bc756d96a86127",
+          "size": 192
+        },
+        "dev-docs/examples/typescript-oneof/results/target-tests-before-data-projection.log": {
+          "sha256": "b73d016781aa8463448c5a49c81d6e4067317b0d4222fdd2a743bc7c4256334b",
+          "size": 183
+        },
+        "dev-docs/examples/typescript-oneof/results/target-tests-before-data-projection.xml": {
+          "sha256": "bdb2e65edd490ee5972dd99f9f46990dbe9cf2e0f5b6934be4c9e6819b0b90a1",
+          "size": 10439
+        },
+        "dev-docs/examples/typescript-oneof/results/target-tests-before-residual.log": {
+          "sha256": "bf5fc644434eeb8da51e2d0c28862a4a680532779fe576b2952b4fb8a2ed1381",
+          "size": 183
+        },
+        "dev-docs/examples/typescript-oneof/results/target-tests-before-residual.xml": {
+          "sha256": "18892c7722fb40d474c308f735f4a8d22a5c7b50f187c34f78c56f13959a6237",
+          "size": 11127
+        },
+        "dev-docs/examples/typescript-oneof/results/target-tests-failed-first.log": {
+          "sha256": "f0f6d3597b2fcaf2fada14d31b1909b42aa94766e0ca38168f73767d213a9b13",
+          "size": 9395
+        },
+        "dev-docs/examples/typescript-oneof/results/target-tests-failed-first.xml": {
+          "sha256": "06f5761452b1571b13f039c04e09c6099053741c845603d2ce8329dd6cbd3bdb",
+          "size": 21434
+        },
+        "dev-docs/examples/typescript-oneof/results/target-tests.log": {
+          "sha256": "66c4967d002054a5595f7de1ad3d8f26a41294b8baf5a28b9c67a1d4f69472d4",
+          "size": 183
+        },
+        "dev-docs/examples/typescript-oneof/results/target-tests.xml": {
+          "sha256": "1f3163f25689837abf00be901629e2bfa4b95b1c960fa9d40b41c1fbc9f5b0d0",
+          "size": 11410
+        },
+        "dev-docs/examples/typescript-oneof/run-example.py": {
+          "sha256": "b2f3d2a89da3d33a8cea865099fbb5b2eed6c4046e90fc3a3d845776a33999a6",
+          "size": 2203
+        },
+        "pyproject.toml": {
+          "sha256": "0721c2edf19a82311ebdfdbb209e6afedc7082f3951784085d504460f0ce148b",
+          "size": 2118
+        },
+        "src/taut/cli.py": {
+          "sha256": "48e6c77c57158a8c846fb0a86d11c665861ad4f3b11fa81b17fecdd5cecf96e3",
+          "size": 14391
+        },
+        "src/taut/gen/js.py": {
+          "sha256": "4ee50371d04aa5ab3b44d86435b514e331390ac2545c762bab9225133c8e69e9",
+          "size": 10124
+        },
+        "src/taut/gen/js_metadata.py": {
+          "sha256": "2d00310ed5e85b98a6ec64b5dbde1220667e6a6f10869694bc1c66c2d295b0eb",
+          "size": 9679
+        },
+        "src/taut/gen/js_runtime.py": {
+          "sha256": "e69cc28c3130df67b08df18b749c95a1c3b6488058c43efdeb474d975cd941e0",
+          "size": 14105
+        },
+        "src/taut/gen/python_runtime.py": {
+          "sha256": "a66611ac4f4ec084ce854a1f3a29755e3eb24ffca98a0a204fc8489747b0af63",
+          "size": 13465
+        },
+        "src/taut/gen/runtime/cbor.js": {
+          "sha256": "b558c494a54396b511f7e938a69ff860739b29eb3e32e13f2358bb5ea083c0ef",
+          "size": 21894
+        },
+        "src/taut/gen/runtime/js-contracts.js": {
+          "sha256": "68c1fea6011e6311c1af79277ba7bd6611b16a80d756cb581c2e91b109ec50b0",
+          "size": 1176
+        },
+        "src/taut/gen/runtime/js-descriptors.js": {
+          "sha256": "027df05287667f641d4d68413903fc8b84d2d5171bc34cf949e96914e70f9d26",
+          "size": 8723
+        },
+        "src/taut/gen/runtime/js-reports.js": {
+          "sha256": "c53d94a3cd082a027570751ee7340b52d99f38911086aa7bbe2c9c71e21f0196",
+          "size": 2837
+        },
+        "src/taut/gen/runtime/js-validation.js": {
+          "sha256": "58b2cff4ac47fa292005ac93039546e48c9cdf30eb10590a26729eb6ae1c12e4",
+          "size": 6888
+        },
+        "src/taut/gen/runtime/typescript/cbor.ts": {
+          "sha256": "4a98c2476c09efc647da13a838e05e46af28733b93d5d9fe0bb8b86d9a6ba74c",
+          "size": 18024
+        },
+        "src/taut/gen/runtime/typescript/codec.ts": {
+          "sha256": "bb658127b49e332fe589dd89f3e8e0e06d9b5605d8a27458451cea75cc18ee8e",
+          "size": 10326
+        },
+        "src/taut/gen/runtime/typescript/descriptors.ts": {
+          "sha256": "e071cd1f20ec0a01569162980b45f8b4507e8468098735cec0818ef6a4c36e29",
+          "size": 12079
+        },
+        "src/taut/gen/runtime/typescript/foundation.ts": {
+          "sha256": "4d9f9247ac8540208fa05b3bddfe45e59d81fc576e60043761e740095dcb0a08",
+          "size": 328
+        },
+        "src/taut/gen/runtime/typescript/jsoncodec.ts": {
+          "sha256": "514a6f44696be7ec7d100e16452045a6ad72b9a1e521471cacb13a1f4eb26bf3",
+          "size": 7700
+        },
+        "src/taut/gen/runtime/typescript/reports.ts": {
+          "sha256": "5a22e5bf9d426808d561951490d17caf83df1543c60884ad47f307cff612af83",
+          "size": 3752
+        },
+        "src/taut/gen/runtime/typescript/schema.ts": {
+          "sha256": "4ac5faa18610c76ad6acde1c1ec4363d0ec304652ce76f216dd22b245353fc90",
+          "size": 9279
+        },
+        "src/taut/gen/runtime/typescript/snapshots.ts": {
+          "sha256": "c2b6bfdcfb55859868af3134d5b922894a9bbe8e3d656204272335ba74948faa",
+          "size": 818
+        },
+        "src/taut/gen/runtime/typescript/validation.ts": {
+          "sha256": "c7b9b7d231338af6b510766e96d8635bf1e5c69b920c28c275f0ec262492bdc0",
+          "size": 5250
+        },
+        "src/taut/gen/scaffold.py": {
+          "sha256": "2a3a56609d4c7362e954661706e5fe210b7d675414bef221cba781a8ea2c002c",
+          "size": 44934
+        },
+        "src/taut/gen/typescript_metadata.py": {
+          "sha256": "1a47f0d440b71a983459becf056d10556308886acef1780246c98920599a2958",
+          "size": 13972
+        },
+        "src/taut/gen/typescript_package.py": {
+          "sha256": "a57bd09f0ab50eb6603978b839dde7aaf49dd01e86ddaeb40d66cd0686e032c6",
+          "size": 5488
+        },
+        "src/taut/gen/typescript_runtime.py": {
+          "sha256": "c7967909082fd9736d3dcce4a17f96e7834aec655b83b567c4244519357a176d",
+          "size": 10501
+        },
+        "src/tests/test_js.py": {
+          "sha256": "e42c4e7f16aae38c0f03f731856210e229b570dd7d7bba283928b6c74c28e032",
+          "size": 41771
+        },
+        "src/tests/test_js_oneof.py": {
+          "sha256": "5c93f21fe9c6195274dfa92789279280df049c106bc96df1b82b38db8865334b",
+          "size": 33786
+        },
+        "src/tests/test_js_ts_distribution.py": {
+          "sha256": "4d274a156adef920e87194a231587a7b49d80bf3504f1d33f76e29b351db7ba5",
+          "size": 12646
+        },
+        "src/tests/test_ts.py": {
+          "sha256": "ec8eb0e56be49aabba69dfa87742ac8d81849f98c04652fd20d6366efde59c12",
+          "size": 59941
+        },
+        "src/tests/test_typescript_oneof.py": {
+          "sha256": "7c61ff7e02d69f93a07515aa0a0e393882f8a7a4c5807e3a2632bffd64bd6425",
+          "size": 38577
+        }
+      },
+      "taut-shape-ts": {
+        ".gitignore": {
+          "sha256": "2aaf9a8dad88a00dd99456fffb380ac719085943128772d79b6f65956c107dbc",
+          "size": 46
+        },
+        "README.md": {
+          "sha256": "452d44f51e3f3f01e534e4b36f6ec232918072b20c1eeca1dc5e258614ae6d6a",
+          "size": 10251
+        },
+        "foundation-src/cbor.ts": {
+          "sha256": "4a98c2476c09efc647da13a838e05e46af28733b93d5d9fe0bb8b86d9a6ba74c",
+          "size": 18024
+        },
+        "foundation-src/codec.ts": {
+          "sha256": "bb658127b49e332fe589dd89f3e8e0e06d9b5605d8a27458451cea75cc18ee8e",
+          "size": 10326
+        },
+        "foundation-src/descriptors.ts": {
+          "sha256": "e071cd1f20ec0a01569162980b45f8b4507e8468098735cec0818ef6a4c36e29",
+          "size": 12079
+        },
+        "foundation-src/ext.ts": {
+          "sha256": "6c08845312c6f7bd5ee07be490b1397747de61846c0d663357c9df3af58e9391",
+          "size": 2108
+        },
+        "foundation-src/foundation.ts": {
+          "sha256": "4d9f9247ac8540208fa05b3bddfe45e59d81fc576e60043761e740095dcb0a08",
+          "size": 328
+        },
+        "foundation-src/jsoncodec.ts": {
+          "sha256": "514a6f44696be7ec7d100e16452045a6ad72b9a1e521471cacb13a1f4eb26bf3",
+          "size": 7700
+        },
+        "foundation-src/provenance.json": {
+          "sha256": "33f510ac401fd421fb85d8fb219c5b947fedeebda4797e213cdfc7b865d8f38a",
+          "size": 1022
+        },
+        "foundation-src/reports.ts": {
+          "sha256": "5a22e5bf9d426808d561951490d17caf83df1543c60884ad47f307cff612af83",
+          "size": 3752
+        },
+        "foundation-src/schema.ts": {
+          "sha256": "4ac5faa18610c76ad6acde1c1ec4363d0ec304652ce76f216dd22b245353fc90",
+          "size": 9279
+        },
+        "foundation-src/snapshots.ts": {
+          "sha256": "c2b6bfdcfb55859868af3134d5b922894a9bbe8e3d656204272335ba74948faa",
+          "size": 818
+        },
+        "foundation-src/validation.ts": {
+          "sha256": "c7b9b7d231338af6b510766e96d8635bf1e5c69b920c28c275f0ec262492bdc0",
+          "size": 5250
+        },
+        "package.json": {
+          "sha256": "a5570126a9dbdaa713e73061c3ad50ff2d1166b3a9a4eb0060109dfb146493a8",
+          "size": 1963
+        },
+        "scripts/build-foundation.mjs": {
+          "sha256": "df2f40373f189bdb48f2d076c3a25e87812723834c3c61e1b896469056807a8d",
+          "size": 3732
+        },
+        "scripts/vendor-foundation.py": {
+          "sha256": "76a604f8de5bbd6d65e4724a6e517fc2ae80a52f4af7178c600951a141c8c08f",
+          "size": 1649
+        },
+        "src/framing.ts": {
+          "sha256": "7f4e045d6e1f3c1807c24e600ee146cd4a1816cf65f11859020e79726b2d95ea",
+          "size": 14248
+        },
+        "src/taut/cbor.ts": {
+          "sha256": "3b4a35e8e16f9ec38d9a2937df9f6a057228db21b35f6edb122f208cd07d4ec6",
+          "size": 110
+        },
+        "src/taut/codec.ts": {
+          "sha256": "fe0e9347c308d5afedfa00b1c9f6773cdca9ce8b5a8ab7924406100e892d518d",
+          "size": 111
+        },
+        "src/taut/gen/shape_atom.ts": {
+          "sha256": "0b9a28a17e509b93c56a2642abaab29fae3739ad1c6117fd8217903df6cc9db2",
+          "size": 27333
+        },
+        "src/taut/gen/shape_crdt.ts": {
+          "sha256": "a9202876ce208ef51315a548849eba19868521ea47551ed1b95bab99d407b58e",
+          "size": 25632
+        },
+        "src/taut/gen/shape_log.ts": {
+          "sha256": "3f6fec72fc765fe9d26277ee184acf19e39509723b9e0b7f0f514b8d8d20af5c",
+          "size": 28975
+        },
+        "src/taut/gen/shape_stream.ts": {
+          "sha256": "b5a9902cdd1d8142f3aa52fbe6b35b4f47a3e800fde938cf40afbfa963c89fa8",
+          "size": 27540
+        },
+        "src/taut/gen/shape_swmr.ts": {
+          "sha256": "ca3f149ca88058f8d6b019e9c30419515646ca8130abfbc122b6df084099d20e",
+          "size": 35871
+        },
+        "src/taut/gen/shape_value.ts": {
+          "sha256": "9ade1c3ad8b2dc71d4424264bd27dfd7e8b77a96b934427f58c84c8a1eebd5b6",
+          "size": 13024
+        },
+        "src/taut/jsoncodec.ts": {
+          "sha256": "92f057c3cd5ccac1e40cecb98d9e7d62324c9d175ec28dbd021a2a4689bfd587",
+          "size": 115
+        },
+        "src/taut/schema.ts": {
+          "sha256": "040d5c95c05addde29c39eeee5c18eedc99e963b57e6217145c83f85b2575a5e",
+          "size": 112
+        },
+        "tests/foundation.test.ts": {
+          "sha256": "4fa613063f174e6061c86e51482744817d938c218b88e243ba7be37b135678f4",
+          "size": 1261
+        }
+      }
+    },
+    "scope_check": "Every observed changed/untracked path is exactly allowlisted or among35hashed preexisting Python exclusions; no unknown production paths; root and reference repos/index clean",
+    "self_hash": "Excluded to avoid self-reference; actual committed blob/index and immutable external snapshot include it"
+  },
+  "gwz_status": {
+    "command": [
+      "gwz",
+      "--target",
+      "@root",
+      "--target",
+      "taut",
+      "--target",
+      "taut-shape-ts",
+      "--target",
+      "taut-shape-py",
+      "--target",
+      "taut-shape-rs",
+      "status",
+      "--json"
+    ],
+    "cwd": "D:/projects/limbo/taut-dev",
+    "errors": [],
+    "file_changes": [
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/EcmaOneOfCheckpoint-Authority.md",
+        "workspace_path": "taut/dev-docs/EcmaOneOfCheckpoint-Authority.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/EcmaOneOfCheckpoint-Draft.md",
+        "workspace_path": "taut/dev-docs/EcmaOneOfCheckpoint-Draft.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/EcmaOneOfCheckpoint-Preparation.json",
+        "workspace_path": "taut/dev-docs/EcmaOneOfCheckpoint-Preparation.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/conformance.js",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/conformance.js",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/content.taut.py",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/content.taut.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/disabled.golden.js",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/disabled.golden.js",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/enabled.golden.js",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/enabled.golden.js",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/example.js",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/example.js",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/INTEGRATION.md",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/INTEGRATION.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/owned-files.json",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/owned-files.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/README.md",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/README.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/RESULTS.md",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/RESULTS.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/canonical-inventory.json",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/canonical-inventory.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/disabled.log",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/disabled.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/examples.log",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/examples.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/native-preservation.log",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/native-preservation.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/package-example.log",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/package-example.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/package-provenance.json",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/package-provenance.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/package-reports.tsv",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/package-reports.tsv",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/prefreeze-service-gate.log",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/prefreeze-service-gate.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/shared-path-preservation.log",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/shared-path-preservation.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/source-example.log",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/source-example.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/source-reports.tsv",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/source-reports.tsv",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/results/target-gate.log",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/results/target-gate.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/js-oneof/verify_examples.py",
+        "workspace_path": "taut/dev-docs/examples/js-oneof/verify_examples.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/api.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/api.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/package/python/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/package/python/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/package/python/api.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/package/python/api.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/api.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/api.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/ext.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/ext.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/facts.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/facts.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/rules.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/rules.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/validation.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/validation.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl",
+        "workspace_path": "taut/dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/content.taut.py",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/content.taut.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/main.ts",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/main.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/README.md",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/README.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/RESULTS.md",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/RESULTS.md",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/example-results.json",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/example-results.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/example.log",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/example.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/library-build.log",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/library-build.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/library-tests.log",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/library-tests.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/library-typecheck.log",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/library-typecheck.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/target-tests-before-data-projection.log",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/target-tests-before-data-projection.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/target-tests-before-data-projection.xml",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/target-tests-before-data-projection.xml",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/target-tests-before-residual.log",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/target-tests-before-residual.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/target-tests-before-residual.xml",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/target-tests-before-residual.xml",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/target-tests-failed-first.log",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/target-tests-failed-first.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/target-tests-failed-first.xml",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/target-tests-failed-first.xml",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/target-tests.log",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/target-tests.log",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/results/target-tests.xml",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/results/target-tests.xml",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/run-example.py",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/run-example.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles.json",
+        "workspace_path": "taut/dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "pyproject.toml",
+        "workspace_path": "taut/pyproject.toml",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/cli.py",
+        "workspace_path": "taut/src/taut/cli.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/js.py",
+        "workspace_path": "taut/src/taut/gen/js.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/js_metadata.py",
+        "workspace_path": "taut/src/taut/gen/js_metadata.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/js_runtime.py",
+        "workspace_path": "taut/src/taut/gen/js_runtime.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/python_runtime.py",
+        "workspace_path": "taut/src/taut/gen/python_runtime.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/cbor.js",
+        "workspace_path": "taut/src/taut/gen/runtime/cbor.js",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/js-contracts.js",
+        "workspace_path": "taut/src/taut/gen/runtime/js-contracts.js",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/js-descriptors.js",
+        "workspace_path": "taut/src/taut/gen/runtime/js-descriptors.js",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/js-reports.js",
+        "workspace_path": "taut/src/taut/gen/runtime/js-reports.js",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/js-validation.js",
+        "workspace_path": "taut/src/taut/gen/runtime/js-validation.js",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/typescript/cbor.ts",
+        "workspace_path": "taut/src/taut/gen/runtime/typescript/cbor.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/typescript/codec.ts",
+        "workspace_path": "taut/src/taut/gen/runtime/typescript/codec.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/typescript/descriptors.ts",
+        "workspace_path": "taut/src/taut/gen/runtime/typescript/descriptors.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/typescript/foundation.ts",
+        "workspace_path": "taut/src/taut/gen/runtime/typescript/foundation.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/typescript/jsoncodec.ts",
+        "workspace_path": "taut/src/taut/gen/runtime/typescript/jsoncodec.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/typescript/reports.ts",
+        "workspace_path": "taut/src/taut/gen/runtime/typescript/reports.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/typescript/schema.ts",
+        "workspace_path": "taut/src/taut/gen/runtime/typescript/schema.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/typescript/snapshots.ts",
+        "workspace_path": "taut/src/taut/gen/runtime/typescript/snapshots.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/runtime/typescript/validation.ts",
+        "workspace_path": "taut/src/taut/gen/runtime/typescript/validation.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/scaffold.py",
+        "workspace_path": "taut/src/taut/gen/scaffold.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/typescript_metadata.py",
+        "workspace_path": "taut/src/taut/gen/typescript_metadata.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/typescript_package.py",
+        "workspace_path": "taut/src/taut/gen/typescript_package.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/typescript_runtime.py",
+        "workspace_path": "taut/src/taut/gen/typescript_runtime.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/tests/test_js.py",
+        "workspace_path": "taut/src/tests/test_js.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/tests/test_js_oneof.py",
+        "workspace_path": "taut/src/tests/test_js_oneof.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/tests/test_js_ts_distribution.py",
+        "workspace_path": "taut/src/tests/test_js_ts_distribution.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/tests/test_ts.py",
+        "workspace_path": "taut/src/tests/test_ts.py",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "original_repo_path": null,
+        "repo_path": "src/tests/test_typescript_oneof.py",
+        "workspace_path": "taut/src/tests/test_typescript_oneof.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": ".gitignore",
+        "workspace_path": "taut-shape-ts/.gitignore",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "foundation-src/cbor.ts",
+        "workspace_path": "taut-shape-ts/foundation-src/cbor.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "foundation-src/codec.ts",
+        "workspace_path": "taut-shape-ts/foundation-src/codec.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "foundation-src/descriptors.ts",
+        "workspace_path": "taut-shape-ts/foundation-src/descriptors.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "foundation-src/ext.ts",
+        "workspace_path": "taut-shape-ts/foundation-src/ext.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "foundation-src/foundation.ts",
+        "workspace_path": "taut-shape-ts/foundation-src/foundation.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "foundation-src/jsoncodec.ts",
+        "workspace_path": "taut-shape-ts/foundation-src/jsoncodec.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "foundation-src/provenance.json",
+        "workspace_path": "taut-shape-ts/foundation-src/provenance.json",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "foundation-src/reports.ts",
+        "workspace_path": "taut-shape-ts/foundation-src/reports.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "foundation-src/schema.ts",
+        "workspace_path": "taut-shape-ts/foundation-src/schema.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "foundation-src/snapshots.ts",
+        "workspace_path": "taut-shape-ts/foundation-src/snapshots.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "foundation-src/validation.ts",
+        "workspace_path": "taut-shape-ts/foundation-src/validation.ts",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "package.json",
+        "workspace_path": "taut-shape-ts/package.json",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "README.md",
+        "workspace_path": "taut-shape-ts/README.md",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "scripts/build-foundation.mjs",
+        "workspace_path": "taut-shape-ts/scripts/build-foundation.mjs",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "scripts/vendor-foundation.py",
+        "workspace_path": "taut-shape-ts/scripts/vendor-foundation.py",
+        "worktree_status": "?"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "src/framing.ts",
+        "workspace_path": "taut-shape-ts/src/framing.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "src/taut/cbor.ts",
+        "workspace_path": "taut-shape-ts/src/taut/cbor.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "src/taut/codec.ts",
+        "workspace_path": "taut-shape-ts/src/taut/codec.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/shape_atom.ts",
+        "workspace_path": "taut-shape-ts/src/taut/gen/shape_atom.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/shape_crdt.ts",
+        "workspace_path": "taut-shape-ts/src/taut/gen/shape_crdt.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/shape_log.ts",
+        "workspace_path": "taut-shape-ts/src/taut/gen/shape_log.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/shape_stream.ts",
+        "workspace_path": "taut-shape-ts/src/taut/gen/shape_stream.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/shape_swmr.ts",
+        "workspace_path": "taut-shape-ts/src/taut/gen/shape_swmr.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "src/taut/gen/shape_value.ts",
+        "workspace_path": "taut-shape-ts/src/taut/gen/shape_value.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "src/taut/jsoncodec.ts",
+        "workspace_path": "taut-shape-ts/src/taut/jsoncodec.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "src/taut/schema.ts",
+        "workspace_path": "taut-shape-ts/src/taut/schema.ts",
+        "worktree_status": "M"
+      },
+      {
+        "index_status": " ",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "original_repo_path": null,
+        "repo_path": "tests/foundation.test.ts",
+        "workspace_path": "taut-shape-ts/tests/foundation.test.ts",
+        "worktree_status": "?"
+      }
+    ],
+    "members": [
+      {
+        "error": null,
+        "git_status": {
+          "ahead": null,
+          "behind": null,
+          "branch": "main",
+          "detached": false,
+          "dirty": true,
+          "head": "8c113e36a927cda5c50848f25ab828185080272d",
+          "member_id": "mem_taut",
+          "staged": 0,
+          "unstaged": 11,
+          "untracked": 97,
+          "upstream": null
+        },
+        "lock_difference_reasons": [
+          "DirtyWorktree"
+        ],
+        "lock_match": "Differs",
+        "member_id": "mem_taut",
+        "member_path": "taut",
+        "planned": null,
+        "source_kind": "Git",
+        "state": null,
+        "status": "Ok",
+        "url_resolution": null
+      },
+      {
+        "error": null,
+        "git_status": {
+          "ahead": null,
+          "behind": null,
+          "branch": "main",
+          "detached": false,
+          "dirty": true,
+          "head": "74597e5e3a1d3845e93644866b97b68080f4bbbe",
+          "member_id": "mem_taut_shape_ts",
+          "staged": 0,
+          "unstaged": 14,
+          "untracked": 14,
+          "upstream": null
+        },
+        "lock_difference_reasons": [
+          "DirtyWorktree"
+        ],
+        "lock_match": "Differs",
+        "member_id": "mem_taut_shape_ts",
+        "member_path": "taut-shape-ts",
+        "planned": null,
+        "source_kind": "Git",
+        "state": null,
+        "status": "Ok",
+        "url_resolution": null
+      },
+      {
+        "error": null,
+        "git_status": {
+          "ahead": null,
+          "behind": null,
+          "branch": "main",
+          "detached": false,
+          "dirty": false,
+          "head": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+          "member_id": "mem_taut_shape_py",
+          "staged": 0,
+          "unstaged": 0,
+          "untracked": 0,
+          "upstream": null
+        },
+        "lock_difference_reasons": null,
+        "lock_match": "Matches",
+        "member_id": "mem_taut_shape_py",
+        "member_path": "taut-shape-py",
+        "planned": null,
+        "source_kind": "Git",
+        "state": null,
+        "status": "Ok",
+        "url_resolution": null
+      },
+      {
+        "error": null,
+        "git_status": {
+          "ahead": null,
+          "behind": null,
+          "branch": "main",
+          "detached": false,
+          "dirty": false,
+          "head": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+          "member_id": "mem_taut_shape_rs",
+          "staged": 0,
+          "unstaged": 0,
+          "untracked": 0,
+          "upstream": null
+        },
+        "lock_difference_reasons": null,
+        "lock_match": "Matches",
+        "member_id": "mem_taut_shape_rs",
+        "member_path": "taut-shape-rs",
+        "planned": null,
+        "source_kind": "Git",
+        "state": null,
+        "status": "Ok",
+        "url_resolution": null
+      }
+    ],
+    "note": "Ownership setup is an exact-path process-local XDG config under Limbo, no global trust change and no gwz.conf mutation.",
+    "process_local_XDG_CONFIG_HOME": "D:/projects/limbo/ecma-oneof-scratch/gwz-xdg",
+    "root_status": {
+      "branch": "main",
+      "detached": false,
+      "dirty": false,
+      "head": "c511e7aaa6754bade75c8eea50ae46501ff863f3",
+      "staged": 0,
+      "unborn": false,
+      "unstaged": 0,
+      "untracked": 0
+    }
+  },
+  "historical_global_scope": "JVM initial source92c6894d/root07b5853c:1620 passes,3 proven baseline failures,4 skips,8 deselections,all16codec variants GREEN. Focused JVM closure at8682555a. Never relabel as ECMA current-source evidence.",
+  "javascript_confirmed_allowlist": {
+    "count": 37,
+    "files": {
+      "dev-docs/examples/js-oneof/INTEGRATION.md": {
+        "sha256": "3ec3b70c0fd67b2e40c6560355329cd1e6a998c62709581f9cf62ab160dc0a02",
+        "size": 4097
+      },
+      "dev-docs/examples/js-oneof/README.md": {
+        "sha256": "ac7907428a8ff572b3cdd95724c76f15de7063aaf221cf36325103dec5e7dc77",
+        "size": 1980
+      },
+      "dev-docs/examples/js-oneof/RESULTS.md": {
+        "sha256": "7911f32b7d053f0dab8f11e4eac52ad9b1aae05e82bd6d2f0c326e0c24f41b16",
+        "size": 6024
+      },
+      "dev-docs/examples/js-oneof/conformance.js": {
+        "sha256": "f0c1ea0fc75c78e617fedd03bddc79fb430b61d9c2d00db266473ce7a6de97e7",
+        "size": 1980
+      },
+      "dev-docs/examples/js-oneof/content.taut.py": {
+        "sha256": "784f549db4a0e324a7675f3f88e399d623d81738e7358f6225a449e0e349855d",
+        "size": 1185
+      },
+      "dev-docs/examples/js-oneof/disabled.golden.js": {
+        "sha256": "af725d6616993d979273bfc70fc9f2d845842c259a7e0434cbf637174802b6a1",
+        "size": 17015
+      },
+      "dev-docs/examples/js-oneof/enabled.golden.js": {
+        "sha256": "f0bfa35cf6d6611c84ca4c942dfde0003b208695bdc2d5fe63bc08d3365ee34e",
+        "size": 18527
+      },
+      "dev-docs/examples/js-oneof/example.js": {
+        "sha256": "c184c73ea141f5e6ac31d6241022cbded027cfe7c591bf3beebb0ebea5b8237e",
+        "size": 1064
+      },
+      "dev-docs/examples/js-oneof/owned-files.json": {
+        "sha256": "a8e144e12acbd14ec212777d9ec748df247127055f68b2f9660ae59700d5a0be",
+        "size": 2027
+      },
+      "dev-docs/examples/js-oneof/results/canonical-inventory.json": {
+        "sha256": "9e2ca86129d2609d3bddc6aa687f0666cf74d529b0d163b51b2c4127644273ba",
+        "size": 517
+      },
+      "dev-docs/examples/js-oneof/results/disabled.log": {
+        "sha256": "1c115da1fcb58c61b7a47b588a40e73608753fa8fa3356ed7fdc6de98bc57a27",
+        "size": 30
+      },
+      "dev-docs/examples/js-oneof/results/examples.log": {
+        "sha256": "e1bd13e925120a810e438d4dc29c9f3b82f0e8dc6c6d66348896c4e30dfd519f",
+        "size": 149
+      },
+      "dev-docs/examples/js-oneof/results/native-preservation.log": {
+        "sha256": "5873eacb223c9611abaf201f41c9eb0a768710f316e635c804b1fd9e31bd1b37",
+        "size": 197
+      },
+      "dev-docs/examples/js-oneof/results/package-example.log": {
+        "sha256": "86b52ca5120cbc3251d44033460deb37e2ceed65b43dcfa1f55d57ac231c863e",
+        "size": 271
+      },
+      "dev-docs/examples/js-oneof/results/package-provenance.json": {
+        "sha256": "677c4fa9670d71cf0c70601100484ed2dbca3bd9b10f2a6cc800e343c6f001d3",
+        "size": 860
+      },
+      "dev-docs/examples/js-oneof/results/package-reports.tsv": {
+        "sha256": "02586adf94172f54e92c38809a4426d8e1cc372b70b669e405a5b20efc08b4ec",
+        "size": 1954
+      },
+      "dev-docs/examples/js-oneof/results/prefreeze-service-gate.log": {
+        "sha256": "daecc5c9d2408bb108da899b7884d8605739aac73be1173871798bf448c837e1",
+        "size": 600
+      },
+      "dev-docs/examples/js-oneof/results/shared-path-preservation.log": {
+        "sha256": "e1cc315735bb96c1ece5429e090117ccba06052eb7abdbfae31b43c9e1ae4486",
+        "size": 117
+      },
+      "dev-docs/examples/js-oneof/results/source-example.log": {
+        "sha256": "86b52ca5120cbc3251d44033460deb37e2ceed65b43dcfa1f55d57ac231c863e",
+        "size": 271
+      },
+      "dev-docs/examples/js-oneof/results/source-reports.tsv": {
+        "sha256": "02586adf94172f54e92c38809a4426d8e1cc372b70b669e405a5b20efc08b4ec",
+        "size": 1954
+      },
+      "dev-docs/examples/js-oneof/results/target-gate.log": {
+        "sha256": "74c16611e770d71f11900736c41e3ba37953c528fbc4fb8705bd3d5b6ca71f5a",
+        "size": 600
+      },
+      "dev-docs/examples/js-oneof/verify_examples.py": {
+        "sha256": "6c7c75c70fed6ef6accfa2200dd2718a75f9233c2fa19c53418dedcac74d5f66",
+        "size": 3390
+      },
+      "pyproject.toml": {
+        "sha256": "0721c2edf19a82311ebdfdbb209e6afedc7082f3951784085d504460f0ce148b",
+        "size": 2118
+      },
+      "src/taut/cli.py": {
+        "sha256": "48e6c77c57158a8c846fb0a86d11c665861ad4f3b11fa81b17fecdd5cecf96e3",
+        "size": 14391
+      },
+      "src/taut/gen/js.py": {
+        "sha256": "4ee50371d04aa5ab3b44d86435b514e331390ac2545c762bab9225133c8e69e9",
+        "size": 10124
+      },
+      "src/taut/gen/js_metadata.py": {
+        "sha256": "2d00310ed5e85b98a6ec64b5dbde1220667e6a6f10869694bc1c66c2d295b0eb",
+        "size": 9679
+      },
+      "src/taut/gen/js_runtime.py": {
+        "sha256": "e69cc28c3130df67b08df18b749c95a1c3b6488058c43efdeb474d975cd941e0",
+        "size": 14105
+      },
+      "src/taut/gen/python_runtime.py": {
+        "sha256": "a66611ac4f4ec084ce854a1f3a29755e3eb24ffca98a0a204fc8489747b0af63",
+        "size": 13465
+      },
+      "src/taut/gen/runtime/cbor.js": {
+        "sha256": "b558c494a54396b511f7e938a69ff860739b29eb3e32e13f2358bb5ea083c0ef",
+        "size": 21894
+      },
+      "src/taut/gen/runtime/js-contracts.js": {
+        "sha256": "68c1fea6011e6311c1af79277ba7bd6611b16a80d756cb581c2e91b109ec50b0",
+        "size": 1176
+      },
+      "src/taut/gen/runtime/js-descriptors.js": {
+        "sha256": "027df05287667f641d4d68413903fc8b84d2d5171bc34cf949e96914e70f9d26",
+        "size": 8723
+      },
+      "src/taut/gen/runtime/js-reports.js": {
+        "sha256": "c53d94a3cd082a027570751ee7340b52d99f38911086aa7bbe2c9c71e21f0196",
+        "size": 2837
+      },
+      "src/taut/gen/runtime/js-validation.js": {
+        "sha256": "58b2cff4ac47fa292005ac93039546e48c9cdf30eb10590a26729eb6ae1c12e4",
+        "size": 6888
+      },
+      "src/taut/gen/scaffold.py": {
+        "sha256": "2a3a56609d4c7362e954661706e5fe210b7d675414bef221cba781a8ea2c002c",
+        "size": 44934
+      },
+      "src/tests/test_js.py": {
+        "sha256": "e42c4e7f16aae38c0f03f731856210e229b570dd7d7bba283928b6c74c28e032",
+        "size": 41771
+      },
+      "src/tests/test_js_oneof.py": {
+        "sha256": "5c93f21fe9c6195274dfa92789279280df049c106bc96df1b82b38db8865334b",
+        "size": 33786
+      },
+      "src/tests/test_js_ts_distribution.py": {
+        "sha256": "4d274a156adef920e87194a231587a7b49d80bf3504f1d33f76e29b351db7ba5",
+        "size": 12646
+      }
+    },
+    "initial_count": 36,
+    "source": "dev-docs/examples/js-oneof/owned-files.json"
+  },
+  "javascript_evidence": {
+    "count_policy": "Overlapping runs never added. Corrected500 focused run covers final JS/shared service bytes; TS own finishing evidence/readiness pending.",
+    "environment": "readiness activation; stable CPython3.13.5 + existing Python311 pure site-packages reused; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1; real Node/tsc",
+    "example_command": "python dev-docs/examples/js-oneof/verify_examples.py",
+    "focused": {
+      "log": "dev-docs/examples/js-oneof/results/prefreeze-service-gate.log",
+      "note": "Four added nested positive/negative tsc and actual codec plain-data service cases; original496 receipt retained",
+      "result": "500 passed,1 skipped",
+      "tests": [
+        "src/tests/test_js_oneof.py",
+        "src/tests/test_js_ts_distribution.py",
+        "src/tests/test_js.py",
+        "src/tests/test_scaffold.py",
+        "src/tests/test_cli.py",
+        "src/tests/test_reserved_names.py"
+      ]
+    },
+    "focused_before_service_correction": {
+      "log": "dev-docs/examples/js-oneof/results/target-gate.log",
+      "result": "496 passed,1 skipped",
+      "tests": [
+        "src/tests/test_js_oneof.py",
+        "src/tests/test_js_ts_distribution.py",
+        "src/tests/test_js.py",
+        "src/tests/test_scaffold.py",
+        "src/tests/test_cli.py",
+        "src/tests/test_reserved_names.py"
+      ]
+    },
+    "native_preservation": {
+      "filter": "not enum_authoring_metadata_namespace_is_reserved_early",
+      "log": "dev-docs/examples/js-oneof/results/native-preservation.log",
+      "result": "95 passed,3 deselected",
+      "tests": [
+        "src/tests/test_oneof.py",
+        "src/tests/test_rust_oneof.py::test_native_behavior_both_distributions_and_supplied",
+        "src/tests/test_java_oneof.py::test_reference_behavior_real_java8",
+        "src/tests/test_kotlin_oneof.py::test_native_behavior_source_package_supplied"
+      ]
+    },
+    "shared_path_preservation": {
+      "filter": "namespace or physical or junction or equivalent or shared_users or shared_source_users or obstructed or safe_transitions or repeated_runtime or explicit_consumer or source_request",
+      "log": "dev-docs/examples/js-oneof/results/shared-path-preservation.log",
+      "result": "40 passed,281 deselected",
+      "tests": [
+        "src/tests/test_python_runtime_distribution.py",
+        "src/tests/test_rust_oneof.py",
+        "src/tests/test_java_oneof.py",
+        "src/tests/test_kotlin_oneof.py",
+        "src/tests/test_js_ts_distribution.py"
+      ]
+    },
+    "status": "executor REVIEW-READY after authorized prefreeze service-data correction; production HOLD"
+  },
+  "observed_date": "2026-11-02 Australia/Sydney",
+  "pending": [
+    "Scoped local GWZ staging with exact index/disk validation,then membercheckpoint and generated workspace receipt",
+    "Record committed exact tuple and full baseline-to-source ranges; generate canonical-template pair prompts",
+    "Exactly2peer-blind reviewers,Code+Surface andState; root assignsTS one settled global integration gate",
+    "Final verdicts must consume completed integration evidence; no source edits absent merged correction window"
+  ],
+  "preservation_recheck": "All35excluded artifact hashes,five monitored user sources and frozen dependency lock unchanged from preparation; all5indices empty; reference repos/root clean.",
+  "process": {
+    "axes": [
+      "Code+Surface",
+      "State"
+    ],
+    "current_round": "initial,not launched",
+    "freeze_authorization": "Explicit coordinator pair freeze received; exact scopes reconciled",
+    "maximum_remediation_rounds": 2,
+    "prompt_template": "C:/Users/gianni/.codex/skills/review-loop/references/review-prompt-template.md",
+    "prompt_template_sha256": "3b10ae89cf101c6273d34668eaaeaebf7e030a4c132406e0b234a846665eca58",
+    "reviewers_per_revision": 2,
+    "skill": "C:/Users/gianni/.codex/skills/review-loop/SKILL.md",
+    "skill_sha256": "bf33d564e50e50ebc1d17a6ceb620debe18c6d730b86f20f96418da4ee05d96c",
+    "snapshot_root": "D:/projects/limbo/ecma-oneof-scratch/frozen-r0",
+    "staging": "EMPTY at frozen inventory creation; stage only exact list then verify disk/index hashes"
+  },
+  "reference_only_repositories": {
+    "observed_changed_paths": {
+      "taut-shape-py": [],
+      "taut-shape-rs": []
+    },
+    "taut-shape-py": {
+      "HEAD": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+      "branch": "main",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-py",
+      "staged_paths": []
+    },
+    "taut-shape-rs": {
+      "HEAD": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+      "branch": "main",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-rs",
+      "staged_paths": []
+    }
+  },
+  "repos": {
+    "taut": {
+      "HEAD": "8c113e36a927cda5c50848f25ab828185080272d",
+      "branch": "main",
+      "path": "D:/projects/limbo/taut-dev/taut",
+      "staged_paths": []
+    },
+    "taut-shape-py": {
+      "HEAD": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+      "branch": "main",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-py",
+      "staged_paths": []
+    },
+    "taut-shape-rs": {
+      "HEAD": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+      "branch": "main",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-rs",
+      "staged_paths": []
+    },
+    "taut-shape-ts": {
+      "HEAD": "74597e5e3a1d3845e93644866b97b68080f4bbbe",
+      "branch": "main",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-ts",
+      "staged_paths": []
+    },
+    "workspace": {
+      "HEAD": "c511e7aaa6754bade75c8eea50ae46501ff863f3",
+      "branch": "main",
+      "path": "D:/projects/limbo/taut-dev",
+      "staged_paths": []
+    }
+  },
+  "review_preparation_documents": {
+    "files": [
+      "dev-docs/EcmaOneOfCheckpoint-Authority.md",
+      "dev-docs/EcmaOneOfCheckpoint-Draft.md",
+      "dev-docs/EcmaOneOfCheckpoint-Preparation.json"
+    ],
+    "hashes_excluding_self": {
+      "dev-docs/EcmaOneOfCheckpoint-Authority.md": {
+        "sha256": "5bac6911268a92e928ab8f6d1470c2b76d732fda65cd9b40adbe2451bf964a1e",
+        "size": 10605
+      },
+      "dev-docs/EcmaOneOfCheckpoint-Draft.md": {
+        "sha256": "d5f26ad05811563e8719a6fac768691188522754e720d1f7ca26bbb5654f6b6a",
+        "size": 14962
+      }
+    }
+  },
+  "shape_ts_frozen_dependency_setup": {
+    "allowed": "Already declared frozen test dev dependencies only; no generator/application installation or fallback",
+    "declared_dependency_maps_equal_HEAD": true,
+    "excluded_ignored_build_roots": [
+      "node_modules/",
+      "dist/",
+      "foundation/",
+      "*.tsbuildinfo"
+    ],
+    "lock": {
+      "HEAD_sha256": "e110b44300bc75e28489500b7d2165b27414e2c6283853d7e4220b5fc27e06db",
+      "matches_HEAD": true,
+      "sha256": "e110b44300bc75e28489500b7d2165b27414e2c6283853d7e4220b5fc27e06db",
+      "size": 906
+    }
+  },
+  "shared_service_projection": {
+    "driver": "ts_client/ts_server receive keyword-only validation/external_types; only TS dispatch forwards them",
+    "exports": "enabled local message NameFields; disabled Name interface + NameFields alias; external ExportFields imported as logical Name by default, explicit data_export supported",
+    "helper": "taut.gen.typescript_metadata.data_type(t, *, validation=False, external_types=None, namespace=api)",
+    "proof": "shared27 cases passed; updated focused500 passes/one symlink skip; decoded nested roots/children/lists/maps plain data; tsc rejects their instance-method use"
+  },
+  "status": "FROZEN SOURCE INVENTORY; root authorized scoped local GWZ checkpoint; commit containing this file is source object; acceptance pending exactly2reviews",
+  "typescript_allowlists": {
+    "canonical_shape_foundation_bytes_verified": true,
+    "declared_production_hashes_verified": true,
+    "shape_ts_count": 28,
+    "source": "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles.json",
+    "source_hash": {
+      "sha256": "9c7d578b01b30a36458d885432e0d5babb0225b2ac94b27455da8f12e5b568c1",
+      "size": 7738
+    },
+    "status": "executor REVIEW-READY,HOLD; exact signed-off lists and declared hashes verified from TypeScript-OwnedFiles.json",
+    "taut": {
+      "dev-docs/examples/typescript-oneof/README.md": {
+        "sha256": "978287fa4241473637251bc1978c1394a423319eeab6e7fb013158d1258a6949",
+        "size": 9481
+      },
+      "dev-docs/examples/typescript-oneof/RESULTS.md": {
+        "sha256": "d87482a6266cf3b07dc2097b8514e47eb565b4b11058b00e916916a5a35a6ce3",
+        "size": 6535
+      },
+      "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles.json": {
+        "sha256": "9c7d578b01b30a36458d885432e0d5babb0225b2ac94b27455da8f12e5b568c1",
+        "size": 7738
+      },
+      "dev-docs/examples/typescript-oneof/content.taut.py": {
+        "sha256": "0896ace4cdd43402b7195fe7fe80586b45c6e98060a80a558747ea8e1e3c8696",
+        "size": 382
+      },
+      "dev-docs/examples/typescript-oneof/main.ts": {
+        "sha256": "dd00f9b9f3c7bc54270da1ce65480c1a9b815e4ef9d9695342f1cf07d1ee9324",
+        "size": 1335
+      },
+      "dev-docs/examples/typescript-oneof/results/example-results.json": {
+        "sha256": "9d0edce7ba28480d658d7d75311915aa721a6e150579bee89c8556cdfae75626",
+        "size": 1094
+      },
+      "dev-docs/examples/typescript-oneof/results/example.log": {
+        "sha256": "9d0edce7ba28480d658d7d75311915aa721a6e150579bee89c8556cdfae75626",
+        "size": 1094
+      },
+      "dev-docs/examples/typescript-oneof/results/library-build.log": {
+        "sha256": "a9120e106f55b637d79043a28576a95ca418ce7ee638c392c32ec15d649723fa",
+        "size": 209
+      },
+      "dev-docs/examples/typescript-oneof/results/library-tests.log": {
+        "sha256": "02f4f1b70dca4dcc097f8f5d4e25a05b5d730ee5c84735e2be804da5ac46925b",
+        "size": 18142
+      },
+      "dev-docs/examples/typescript-oneof/results/library-typecheck.log": {
+        "sha256": "8d0e8ca6face14b38c6ec53924037c0098a0fbeb982ff06383bc756d96a86127",
+        "size": 192
+      },
+      "dev-docs/examples/typescript-oneof/results/target-tests-before-data-projection.log": {
+        "sha256": "b73d016781aa8463448c5a49c81d6e4067317b0d4222fdd2a743bc7c4256334b",
+        "size": 183
+      },
+      "dev-docs/examples/typescript-oneof/results/target-tests-before-data-projection.xml": {
+        "sha256": "bdb2e65edd490ee5972dd99f9f46990dbe9cf2e0f5b6934be4c9e6819b0b90a1",
+        "size": 10439
+      },
+      "dev-docs/examples/typescript-oneof/results/target-tests-before-residual.log": {
+        "sha256": "bf5fc644434eeb8da51e2d0c28862a4a680532779fe576b2952b4fb8a2ed1381",
+        "size": 183
+      },
+      "dev-docs/examples/typescript-oneof/results/target-tests-before-residual.xml": {
+        "sha256": "18892c7722fb40d474c308f735f4a8d22a5c7b50f187c34f78c56f13959a6237",
+        "size": 11127
+      },
+      "dev-docs/examples/typescript-oneof/results/target-tests-failed-first.log": {
+        "sha256": "f0f6d3597b2fcaf2fada14d31b1909b42aa94766e0ca38168f73767d213a9b13",
+        "size": 9395
+      },
+      "dev-docs/examples/typescript-oneof/results/target-tests-failed-first.xml": {
+        "sha256": "06f5761452b1571b13f039c04e09c6099053741c845603d2ce8329dd6cbd3bdb",
+        "size": 21434
+      },
+      "dev-docs/examples/typescript-oneof/results/target-tests.log": {
+        "sha256": "66c4967d002054a5595f7de1ad3d8f26a41294b8baf5a28b9c67a1d4f69472d4",
+        "size": 183
+      },
+      "dev-docs/examples/typescript-oneof/results/target-tests.xml": {
+        "sha256": "1f3163f25689837abf00be901629e2bfa4b95b1c960fa9d40b41c1fbc9f5b0d0",
+        "size": 11410
+      },
+      "dev-docs/examples/typescript-oneof/run-example.py": {
+        "sha256": "b2f3d2a89da3d33a8cea865099fbb5b2eed6c4046e90fc3a3d845776a33999a6",
+        "size": 2203
+      },
+      "src/taut/gen/runtime/typescript/cbor.ts": {
+        "sha256": "4a98c2476c09efc647da13a838e05e46af28733b93d5d9fe0bb8b86d9a6ba74c",
+        "size": 18024
+      },
+      "src/taut/gen/runtime/typescript/codec.ts": {
+        "sha256": "bb658127b49e332fe589dd89f3e8e0e06d9b5605d8a27458451cea75cc18ee8e",
+        "size": 10326
+      },
+      "src/taut/gen/runtime/typescript/descriptors.ts": {
+        "sha256": "e071cd1f20ec0a01569162980b45f8b4507e8468098735cec0818ef6a4c36e29",
+        "size": 12079
+      },
+      "src/taut/gen/runtime/typescript/foundation.ts": {
+        "sha256": "4d9f9247ac8540208fa05b3bddfe45e59d81fc576e60043761e740095dcb0a08",
+        "size": 328
+      },
+      "src/taut/gen/runtime/typescript/jsoncodec.ts": {
+        "sha256": "514a6f44696be7ec7d100e16452045a6ad72b9a1e521471cacb13a1f4eb26bf3",
+        "size": 7700
+      },
+      "src/taut/gen/runtime/typescript/reports.ts": {
+        "sha256": "5a22e5bf9d426808d561951490d17caf83df1543c60884ad47f307cff612af83",
+        "size": 3752
+      },
+      "src/taut/gen/runtime/typescript/schema.ts": {
+        "sha256": "4ac5faa18610c76ad6acde1c1ec4363d0ec304652ce76f216dd22b245353fc90",
+        "size": 9279
+      },
+      "src/taut/gen/runtime/typescript/snapshots.ts": {
+        "sha256": "c2b6bfdcfb55859868af3134d5b922894a9bbe8e3d656204272335ba74948faa",
+        "size": 818
+      },
+      "src/taut/gen/runtime/typescript/validation.ts": {
+        "sha256": "c7b9b7d231338af6b510766e96d8635bf1e5c69b920c28c275f0ec262492bdc0",
+        "size": 5250
+      },
+      "src/taut/gen/typescript_metadata.py": {
+        "sha256": "1a47f0d440b71a983459becf056d10556308886acef1780246c98920599a2958",
+        "size": 13972
+      },
+      "src/taut/gen/typescript_package.py": {
+        "sha256": "a57bd09f0ab50eb6603978b839dde7aaf49dd01e86ddaeb40d66cd0686e032c6",
+        "size": 5488
+      },
+      "src/taut/gen/typescript_runtime.py": {
+        "sha256": "c7967909082fd9736d3dcce4a17f96e7834aec655b83b567c4244519357a176d",
+        "size": 10501
+      },
+      "src/tests/test_ts.py": {
+        "sha256": "ec8eb0e56be49aabba69dfa87742ac8d81849f98c04652fd20d6366efde59c12",
+        "size": 59941
+      },
+      "src/tests/test_typescript_oneof.py": {
+        "sha256": "7c61ff7e02d69f93a07515aa0a0e393882f8a7a4c5807e3a2632bffd64bd6425",
+        "size": 38577
+      }
+    },
+    "taut-shape-ts": {
+      ".gitignore": {
+        "sha256": "2aaf9a8dad88a00dd99456fffb380ac719085943128772d79b6f65956c107dbc",
+        "size": 46
+      },
+      "README.md": {
+        "sha256": "452d44f51e3f3f01e534e4b36f6ec232918072b20c1eeca1dc5e258614ae6d6a",
+        "size": 10251
+      },
+      "foundation-src/cbor.ts": {
+        "sha256": "4a98c2476c09efc647da13a838e05e46af28733b93d5d9fe0bb8b86d9a6ba74c",
+        "size": 18024
+      },
+      "foundation-src/codec.ts": {
+        "sha256": "bb658127b49e332fe589dd89f3e8e0e06d9b5605d8a27458451cea75cc18ee8e",
+        "size": 10326
+      },
+      "foundation-src/descriptors.ts": {
+        "sha256": "e071cd1f20ec0a01569162980b45f8b4507e8468098735cec0818ef6a4c36e29",
+        "size": 12079
+      },
+      "foundation-src/ext.ts": {
+        "sha256": "6c08845312c6f7bd5ee07be490b1397747de61846c0d663357c9df3af58e9391",
+        "size": 2108
+      },
+      "foundation-src/foundation.ts": {
+        "sha256": "4d9f9247ac8540208fa05b3bddfe45e59d81fc576e60043761e740095dcb0a08",
+        "size": 328
+      },
+      "foundation-src/jsoncodec.ts": {
+        "sha256": "514a6f44696be7ec7d100e16452045a6ad72b9a1e521471cacb13a1f4eb26bf3",
+        "size": 7700
+      },
+      "foundation-src/provenance.json": {
+        "sha256": "33f510ac401fd421fb85d8fb219c5b947fedeebda4797e213cdfc7b865d8f38a",
+        "size": 1022
+      },
+      "foundation-src/reports.ts": {
+        "sha256": "5a22e5bf9d426808d561951490d17caf83df1543c60884ad47f307cff612af83",
+        "size": 3752
+      },
+      "foundation-src/schema.ts": {
+        "sha256": "4ac5faa18610c76ad6acde1c1ec4363d0ec304652ce76f216dd22b245353fc90",
+        "size": 9279
+      },
+      "foundation-src/snapshots.ts": {
+        "sha256": "c2b6bfdcfb55859868af3134d5b922894a9bbe8e3d656204272335ba74948faa",
+        "size": 818
+      },
+      "foundation-src/validation.ts": {
+        "sha256": "c7b9b7d231338af6b510766e96d8635bf1e5c69b920c28c275f0ec262492bdc0",
+        "size": 5250
+      },
+      "package.json": {
+        "sha256": "a5570126a9dbdaa713e73061c3ad50ff2d1166b3a9a4eb0060109dfb146493a8",
+        "size": 1963
+      },
+      "scripts/build-foundation.mjs": {
+        "sha256": "df2f40373f189bdb48f2d076c3a25e87812723834c3c61e1b896469056807a8d",
+        "size": 3732
+      },
+      "scripts/vendor-foundation.py": {
+        "sha256": "76a604f8de5bbd6d65e4724a6e517fc2ae80a52f4af7178c600951a141c8c08f",
+        "size": 1649
+      },
+      "src/framing.ts": {
+        "sha256": "7f4e045d6e1f3c1807c24e600ee146cd4a1816cf65f11859020e79726b2d95ea",
+        "size": 14248
+      },
+      "src/taut/cbor.ts": {
+        "sha256": "3b4a35e8e16f9ec38d9a2937df9f6a057228db21b35f6edb122f208cd07d4ec6",
+        "size": 110
+      },
+      "src/taut/codec.ts": {
+        "sha256": "fe0e9347c308d5afedfa00b1c9f6773cdca9ce8b5a8ab7924406100e892d518d",
+        "size": 111
+      },
+      "src/taut/gen/shape_atom.ts": {
+        "sha256": "0b9a28a17e509b93c56a2642abaab29fae3739ad1c6117fd8217903df6cc9db2",
+        "size": 27333
+      },
+      "src/taut/gen/shape_crdt.ts": {
+        "sha256": "a9202876ce208ef51315a548849eba19868521ea47551ed1b95bab99d407b58e",
+        "size": 25632
+      },
+      "src/taut/gen/shape_log.ts": {
+        "sha256": "3f6fec72fc765fe9d26277ee184acf19e39509723b9e0b7f0f514b8d8d20af5c",
+        "size": 28975
+      },
+      "src/taut/gen/shape_stream.ts": {
+        "sha256": "b5a9902cdd1d8142f3aa52fbe6b35b4f47a3e800fde938cf40afbfa963c89fa8",
+        "size": 27540
+      },
+      "src/taut/gen/shape_swmr.ts": {
+        "sha256": "ca3f149ca88058f8d6b019e9c30419515646ca8130abfbc122b6df084099d20e",
+        "size": 35871
+      },
+      "src/taut/gen/shape_value.ts": {
+        "sha256": "9ade1c3ad8b2dc71d4424264bd27dfd7e8b77a96b934427f58c84c8a1eebd5b6",
+        "size": 13024
+      },
+      "src/taut/jsoncodec.ts": {
+        "sha256": "92f057c3cd5ccac1e40cecb98d9e7d62324c9d175ec28dbd021a2a4689bfd587",
+        "size": 115
+      },
+      "src/taut/schema.ts": {
+        "sha256": "040d5c95c05addde29c39eeee5c18eedc99e963b57e6217145c83f85b2575a5e",
+        "size": 112
+      },
+      "tests/foundation.test.ts": {
+        "sha256": "4fa613063f174e6061c86e51482744817d938c218b88e243ba7be37b135678f4",
+        "size": 1261
+      }
+    },
+    "taut_count": 33,
+    "unclassified_shape_ts_paths": [],
+    "unclassified_taut_paths": []
+  },
+  "typescript_evidence": {
+    "actual_library": {
+      "logs": {
+        "library-build.log": {
+          "sha256": "a9120e106f55b637d79043a28576a95ca418ce7ee638c392c32ec15d649723fa",
+          "size": 209
+        },
+        "library-tests.log": {
+          "sha256": "02f4f1b70dca4dcc097f8f5d4e25a05b5d730ee5c84735e2be804da5ac46925b",
+          "size": 18142
+        },
+        "library-typecheck.log": {
+          "sha256": "8d0e8ca6face14b38c6ec53924037c0098a0fbeb982ff06383bc756d96a86127",
+          "size": 192
+        }
+      },
+      "tests": "315 passed,0fail,0skip"
+    },
+    "count_policy": "Do not add overlapping target/library/shared totals. Failed-first/pre-data/pre-residual logs retain original labels.",
+    "examples": "source/package identical; actual library packed/extracted mixed-owner compositions",
+    "library_scope": "pnpm typecheck/build includingCLI with frozen declaredTypeScript5.9.2/@types/node24.3.0/undici7.10;315tests,0fail/skip",
+    "residual": "Native __unknown__ Map retained by reference outside portable descriptors; exact collision-only preflight; real unknown-tag decode/construct/reencode proof",
+    "results": "dev-docs/examples/typescript-oneof/RESULTS.md",
+    "source_manifest": "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles.json",
+    "status": "executor final REVIEW-READY; declared production hashes verified; current86target/315library evidence confirmed",
+    "target": {
+      "log": "dev-docs/examples/typescript-oneof/results/target-tests.log",
+      "receipt": {
+        "sha256": "66c4967d002054a5595f7de1ad3d8f26a41294b8baf5a28b9c67a1d4f69472d4",
+        "size": 183
+      },
+      "result": "86 passed in32.11s"
+    },
+    "target_scope": "72feature in test_typescript_oneof.py+14legacy in test_ts.py; one clean86run; stablePython3.13.5,tsc7.0.2,Node24.22.0"
+  },
+  "user_owned_parallel_work": {
+    "monitored_sources": {
+      "src/taut/facts.py": {
+        "HEAD_sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "matches_HEAD": true,
+        "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "size": 8202
+      },
+      "src/taut/ir/dsl.py": {
+        "HEAD_sha256": "5b2061584dcd78a3f73d2a757d6b101bacf280c9190f6a068b613eecb55b307d",
+        "matches_HEAD": true,
+        "sha256": "5b2061584dcd78a3f73d2a757d6b101bacf280c9190f6a068b613eecb55b307d",
+        "size": 13760
+      },
+      "src/tests/test_dsl.py": {
+        "HEAD_sha256": "205d3922aa8399eadf6affbb53e85fac914c584d0cc80664c235efca0a38ac78",
+        "matches_HEAD": true,
+        "sha256": "205d3922aa8399eadf6affbb53e85fac914c584d0cc80664c235efca0a38ac78",
+        "size": 13776
+      },
+      "src/tests/test_ir_v2.py": {
+        "HEAD_sha256": "17be85b78f8835c37fda6a728e1c376bce297b3eb6cdbb38c100763ba0195107",
+        "matches_HEAD": true,
+        "sha256": "17be85b78f8835c37fda6a728e1c376bce297b3eb6cdbb38c100763ba0195107",
+        "size": 20104
+      },
+      "src/tests/test_oneof.py": {
+        "HEAD_sha256": "a47cc246e59a2717dc9b182afa9a47860ee48d5085f7e94b5f53ff256f9d4dcd",
+        "matches_HEAD": true,
+        "sha256": "a47cc246e59a2717dc9b182afa9a47860ee48d5085f7e94b5f53ff256f9d4dcd",
+        "size": 22409
+      }
+    },
+    "status": "Enum.case is user-owned/excluded; do not assume patch present or make old reservation permanent"
+  }
+}

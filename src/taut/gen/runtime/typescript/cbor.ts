@@ -14,6 +14,7 @@
 // (CD-B1, CD-B3). The parity corpus pins both to taut's (TautOptions.md OPT-L1).
 export const DEFAULT_MAX_DEPTH = 32;
 export const MAX_DEPTH_CEILING = 128;
+export const CborContract = Object.freeze({owner:"taut.typescript.foundation",contract:1,projection:"typescript.cbor.v1"});
 
 export class CborFloat {
   readonly value: number;

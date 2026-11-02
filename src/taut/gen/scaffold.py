@@ -172,37 +172,35 @@ def _ts_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def ts_api(schema: Schema, forward_compat: bool = False) -> str:
-    out = ["// GENERATED native TypeScript types — do not edit.", ""]
-    for e in schema.enums.values():
-        members = " | ".join(f'"{m}"' for m in e.members)
-        out.append(f"export type {e.name} = {members};")
-    out.append("")
-    for m in schema.messages.values():
-        out.append(f"export interface {m.name} {{")
-        for f in m.fields:
-            ty = f"{_ts_ty(f.type)} | null" if f.optional else _ts_ty(f.type)
-            out.append(f"  {f.name}: {ty};")
-        out.append("}")
-        out.append("")
-    return "\n".join(out) + "\n"
+def ts_api(schema: Schema, forward_compat: bool = False, *, validation=False,
+           external_types=None, identity=None, runtime_module='./foundation.ts',
+           validation_module='./validation.ts') -> str:
+    from .typescript_metadata import emit_types
+    return emit_types(schema, forward_compat=forward_compat, validation=validation,
+                      external_types=external_types, identity=identity,
+                      runtime_module=runtime_module, validation_module=validation_module)
 
 
-def ts_client(schema: Schema, svc: ServiceDef) -> str:
+def _ts_api_ty(t, *, validation=False, external_types=None):
+    from .typescript_metadata import data_type
+    return data_type(t, validation=validation, external_types=external_types, namespace='api')
+
+
+def ts_client(schema: Schema, svc: ServiceDef, *, validation=False, external_types=None) -> str:
     out = ["// GENERATED typed client over the generic tautClient (call/subscribe).",
-           'import type { tautClient } from "./taut_client.ts";',
            "import type * as api from \"./api.ts\";", "",
+           'type $TautTransport = { call(method: string, args?: Record<string, unknown>): Promise<unknown>; subscribe(method: string, args: Record<string, unknown>, onEvent: (event: string, value: unknown) => void): () => void };',
            f"export class {svc.name}Client {{",
-           "  private c: tautClient;",
-           "  constructor(c: tautClient) { this.c = c; }"]
+           "  private c: $TautTransport;",
+           "  constructor(c: $TautTransport) { this.c = c; }"]
     for meth in svc.methods:
-        args = ", ".join(f"{pn}: {_ts_ty(pt)}" for pn, pt in meth.params)
+        args = ", ".join(f"{pn}: {_ts_api_ty(pt, validation=validation, external_types=external_types)}" for pn, pt in meth.params)
         obj = "{ " + ", ".join(pn for pn, _ in meth.params) + " }" if meth.params else "{}"
         nm = _attr(meth.name)
         if not meth.streams():
-            ret = _ts_ty(meth.output)
-            out.append(f"  {nm}({args}): Promise<api.{ret}> {{")
-            out.append(f'    return this.c.call("{meth.name}", {obj}) as Promise<api.{ret}>;')
+            ret = _ts_api_ty(meth.output, validation=validation, external_types=external_types)
+            out.append(f"  {nm}({args}): Promise<{ret}> {{")
+            out.append(f'    return this.c.call("{meth.name}", {obj}) as Promise<{ret}>;')
             out.append("  }")
         else:
             out.append(f"  {nm}({args + ', ' if args else ''}onEvent: (event: string, value: unknown) => void): () => void {{  // {meth.shape}")
@@ -212,14 +210,14 @@ def ts_client(schema: Schema, svc: ServiceDef) -> str:
     return "\n".join(out) + "\n"
 
 
-def ts_server(schema: Schema, svc: ServiceDef) -> str:
+def ts_server(schema: Schema, svc: ServiceDef, *, validation=False, external_types=None) -> str:
     out = ["// GENERATED server stubs: a handler interface + IR-driven registration.",
            "import type * as api from \"./api.ts\";", "",
            f"export interface {svc.name}Handlers {{"]
     for meth in svc.methods:
-        args = ", ".join(f"{pn}: {_ts_ty(pt)}" for pn, pt in meth.params)
+        args = ", ".join(f"{pn}: {_ts_api_ty(pt, validation=validation, external_types=external_types)}" for pn, pt in meth.params)
         if not meth.streams():
-            out.append(f"  {_attr(meth.name)}({args}): Promise<api.{_ts_ty(meth.output)}>;")
+            out.append(f"  {_attr(meth.name)}({args}): Promise<{_ts_api_ty(meth.output, validation=validation, external_types=external_types)}>;")
         else:
             out.append(f"  {_attr(meth.name)}({args}): unknown;  // Subscription ({meth.shape})")
     out.append("}")
@@ -481,8 +479,10 @@ def kotlin_server(schema: Schema, svc: ServiceDef) -> str:
 # JavaScript
 # =============================================================================
 
-def js_api(schema: Schema, forward_compat: bool = False) -> str:
-    return _js.emit_types(schema, forward_compat)
+def js_api(schema: Schema, forward_compat: bool = False, *, validation=False,
+           external_types=None, identity=None, runtime_module='.') -> str:
+    return _js.emit_types(schema, forward_compat, validation=validation,
+                          external_types=external_types, identity=identity, runtime_module=runtime_module)
 
 
 def js_client(schema: Schema, svc: ServiceDef) -> str:
@@ -596,6 +596,8 @@ def emit(
     schema_identity: str | None = None,
     java_external_types: dict | None = None,
     kotlin_external_types: dict | None = None,
+    js_external_types: dict | None = None,
+    typescript_external_types: dict | None = None,
 ) -> list[Path]:
     """Generate per-language code from an IR (the engine behind the `tautc` CLI).
 
@@ -633,10 +635,24 @@ def emit(
     if errors:
         raise ValueError("; ".join(errors))
     constrained = any(f.oneof or f.cases for m in schema.messages.values() for f in m.fields)
-    if (validation or constrained) and set(lang_keys) - {"python", "rust", "java", "kotlin"}:
-        raise ValueError("oneof/validation supports Python, Rust, Java and Kotlin only; explicitly select supported languages")
-    if mode == "package" and set(lang_keys) - {"python", "rust", "java", "kotlin"}:
-        raise ValueError("package runtime binding is implemented for Python, Rust, Java and Kotlin only")
+    if (validation or constrained) and set(lang_keys) - {"python", "rust", "java", "kotlin", "js", "typescript"}:
+        raise ValueError("oneof/validation supports Python, Rust, Java, Kotlin, JavaScript and TypeScript only; explicitly select supported languages")
+    if mode == "package" and set(lang_keys) - {"python", "rust", "java", "kotlin", "js", "typescript"}:
+        raise ValueError("package runtime binding is implemented for Python, Rust, Java, Kotlin, JavaScript and TypeScript only")
+    js_binding = None
+    if "js" in lang_keys:
+        from .js_runtime import binding as resolve_js_binding, verify_artifact as verify_js_artifact
+        js_binding = resolve_js_binding(runtime_bindings, out_dir / "js", mode)
+        artifact = (runtime_bindings or {}).get("js", {}).get("artifact")
+        if artifact: verify_js_artifact(Path(artifact), validation=validation)
+    if js_external_types is not None and "js" not in lang_keys:
+        raise ValueError("JavaScript external types require a js generation target")
+    typescript_binding = None
+    if "typescript" in lang_keys:
+        from .typescript_runtime import binding as resolve_typescript_binding
+        typescript_binding = resolve_typescript_binding(runtime_bindings, out_dir / "typescript", mode, validation=validation)
+    if typescript_external_types is not None and "typescript" not in lang_keys:
+        raise ValueError("TypeScript external types require a typescript generation target")
     kotlin_binding = None
     if "kotlin" in lang_keys:
         from .kotlin_runtime import binding as resolve_kotlin_binding
@@ -712,11 +728,30 @@ def emit(
     rust_texts = {}
     java_texts = {}
     kotlin_texts = {}
+    js_texts = {}
+    typescript_texts = {}
     for lang in lang_keys:
         ext, api_fn, client_fn, server_fn = _LANGS[lang]
         d = out_dir / lang
         api_path = d / f"api.{ext}"
         api_kwargs = {"forward_compat": forward_compat}
+        if lang == "js":
+            api_kwargs.update(external_types=js_external_types, validation=validation,
+                              identity=schema_identity, runtime_module=js_binding[0])
+        if lang == "typescript":
+            api_kwargs.update(external_types=typescript_external_types, validation=validation,
+                              identity=schema_identity, runtime_module=typescript_binding[0],
+                              validation_module=typescript_binding[1])
+            if mode == "source" and svc_names:
+                import json
+                import os
+                transport = _runtime_source("typescript/taut_client.ts")
+                for resource in ("schema.ts", "codec.ts"):
+                    relative = os.path.relpath(typescript_binding[2] / resource, d).replace('\\', '/')
+                    if not relative.startswith('.'): relative = './' + relative
+                    transport = transport.replace(json.dumps('./' + resource), json.dumps(relative))
+                typescript_texts['taut_client.ts'] = transport
+                written.append(d / 'taut_client.ts')
         if lang == "rust":
             api_kwargs.update(external_types=rust_external_types, validation=validation,
                               identity=schema_identity, runtime_path=rust_binding[0])
@@ -735,10 +770,14 @@ def emit(
             java_texts[f"api.{ext}"] = api_text
         elif lang == "kotlin":
             kotlin_texts[f"api.{ext}"] = api_text
+        elif lang == "js":
+            js_texts[f"api.{ext}"] = api_text
+        elif lang == "typescript":
+            typescript_texts[f"api.{ext}"] = api_text
         else:
             all_writes[api_path] = api_text.encode("utf-8")
         written.append(api_path)
-        if runtime and lang in _RUNTIMES and lang not in ("rust", "java", "kotlin"):
+        if runtime and lang in _RUNTIMES and lang not in ("rust", "java", "kotlin", "js", "typescript"):
             for rel, resource in _RUNTIMES[lang]:
                 if not _runtime_exists(resource):
                     continue   # e.g. ext.<lang> before Phase 2 — vendored once its file lands
@@ -750,7 +789,8 @@ def emit(
             suffix = f"_{sname}" if multi else ""
             for stem, fn in (("client", client_fn), ("server", server_fn)):
                 path = d / f"{stem}{suffix}.{ext}"
-                content = fn(schema, svc)
+                service_kwargs = {"validation": validation, "external_types": typescript_external_types} if lang == "typescript" else {}
+                content = fn(schema, svc, **service_kwargs)
                 if lang == "python":
                     python_texts[path.name] = content
                 elif lang == "rust":
@@ -759,11 +799,29 @@ def emit(
                     java_texts[path.name] = content
                 elif lang == "kotlin":
                     kotlin_texts[path.name] = content
+                elif lang == "js":
+                    js_texts[path.name] = content
+                elif lang == "typescript":
+                    typescript_texts[path.name] = content
                 else:
                     all_writes[path] = content.encode("utf-8")
                 written.append(path)
     plans = []
     lock_roots = []
+    if "js" in lang_keys:
+        from .js_runtime import plan_outputs as js_plan_outputs, canonical_path as js_canonical_path
+        directory = js_canonical_path(out_dir / "js")
+        _, source_root, consume_source = js_binding
+        lock_roots.extend([directory, source_root])
+        plans.append((directory, source_root, directory / ".taut-js-outputs.json", js_plan_outputs,
+                      js_texts, {"consume_source": consume_source, "external": bool(js_external_types)}))
+    if "typescript" in lang_keys:
+        from .typescript_runtime import plan_outputs as typescript_plan_outputs, canonical_path as typescript_canonical_path
+        directory = typescript_canonical_path(out_dir / "typescript")
+        _, _, source_root, consume_source = typescript_binding
+        lock_roots.extend([directory, source_root])
+        plans.append((directory, source_root, directory / ".taut-typescript-outputs.json", typescript_plan_outputs,
+                      typescript_texts, {"consume_source": consume_source, "external": bool(typescript_external_types)}))
     if "python" in lang_keys:
         # Python output is a package (client/server use relative imports).
         init = out_dir / "python" / "__init__.py"
@@ -823,9 +881,11 @@ def emit(
 def emit_all(schema: Schema, service_name: str, out_dir: Path, *, runtime: bool = False,
              runtime_mode: str | None = None, validation: bool = False,
              runtime_bindings: dict | None = None, python_external_types=None,
-             schema_identity=None, langs=None, rust_external_types=None, java_external_types=None, kotlin_external_types=None) -> list[Path]:
+             schema_identity=None, langs=None, rust_external_types=None, java_external_types=None, kotlin_external_types=None,
+             js_external_types=None, typescript_external_types=None) -> list[Path]:
     """Back-compat: api + client/server for one service, all languages."""
     return emit(schema, out_dir, services=[service_name], runtime=runtime, runtime_mode=runtime_mode,
                 validation=validation, runtime_bindings=runtime_bindings,
                 python_external_types=python_external_types, schema_identity=schema_identity, langs=langs,
-                rust_external_types=rust_external_types, java_external_types=java_external_types, kotlin_external_types=kotlin_external_types)
+                rust_external_types=rust_external_types, java_external_types=java_external_types, kotlin_external_types=kotlin_external_types,
+                js_external_types=js_external_types, typescript_external_types=typescript_external_types)

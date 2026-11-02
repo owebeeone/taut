@@ -1,0 +1,31 @@
+"use strict";
+const assert = require("node:assert/strict");
+const a = require(process.argv[2] || "./generated/js/api.js");
+const codec = require(process.argv[3] || "./generated/js/cbor.js");
+const rows = [];
+function report(name,value,recursive=true) {
+  const r=value.validate({recursive});
+  assert.equal(value.isValid({recursive}),r.isValid() && r.isComplete());
+  const path = p => p.map(s => s.kind === "field" ? "f="+s.fieldName : s.kind === "index" ? "i="+s.index : "k="+s.keyType+","+s.keyCborBase64).join("/");
+  const row=[name,r.scope,String(r.isValid()),String(r.isComplete())];
+  row.push(...r.issues.map(i => "I:"+i.code+":"+i.rule+":"+path(i.path)));
+  row.push(...r.deferredChecks.map(d => "D:"+d.reasonCode+":"+d.rule+":"+path(d.path)));
+  rows.push(row.join("\t"));
+}
+const content = kind => new a.Content({kind});
+const c=content(a.Kind.text);report("missing",c);c.text="";report("empty",c);c.number=0n;report("extra",c);
+report("roundtrip",a.Content.decode(codec.encode(c.toCbor())));
+c.kind=a.Kind.number;c.text=null;report("zero",c);
+c.kind=a.Kind.flag;c.number=null;c.flag=false;report("false",c);
+c.flag=null;c.kind=a.Kind.items;c.items=[];report("empty-list",c);
+c.items=null;c.kind=a.Kind.empty;report("payload-free",c);
+c.kind=null;c.child=content(a.Kind.text);report("bad-tag-child",c);
+c.kind=a.Kind.empty;report("nonselected-child",c);
+c.kind=a.Kind.child;c.child=c;report("cycle",c);
+const bad=content(a.Kind.text);
+const w=new a.Wrapper({child:bad,children:[bad,bad],by_text:new Map([["z",bad],["",bad],["aa",bad]]),by_int:new Map([[-1n,bad],[24n,bad],[0n,bad]]),by_bool:new Map([[true,bad],[false,bad]])});
+report("wrapper",w);report("local",w,false);
+const v=new a.Virtual({child:bad});report("virtual-child",v);bad.text="";report("virtual-repaired",v);report("virtual-local",v,false);
+report("independent",new a.Multi({left:null,right:a.Kind.number}));
+report("plain",new a.Plain({value:0n,blob:null,ratio:null}));
+console.log(rows.join("\n"));

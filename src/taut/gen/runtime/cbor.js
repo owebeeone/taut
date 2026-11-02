@@ -152,11 +152,12 @@ function enumFromWire(value, enumName, allowed) {
   let wire;
   if (typeof value === "bigint") {
     wire = value;
-  } else if (typeof value === "number" && Number.isInteger(value)) {
+  } else if (typeof value === "number" && Number.isSafeInteger(value)) {
     wire = BigInt(value);
   } else {
     throw new DecodeError("UnknownEnum", { enum: enumName, value: stringValue(value) });
   }
+  if (allowed.has(wire)) return wire;
   if (wire >= -MAX_SAFE_BIGINT && wire <= MAX_SAFE_BIGINT) {
     const n = Number(wire);
     if (allowed.has(n)) return n;
@@ -640,6 +641,9 @@ function dec(data, off0, depth, limit) {
 }
 
 module.exports = {
+  // Lazy so the historical standalone codec remains independently usable.
+  get foundationOwner() { return require("./contracts.js").ownerToken; },
+  foundationCodecContract: 1,
   DEFAULT_MAX_DEPTH,
   MAX_DEPTH_CEILING,
   CInt,

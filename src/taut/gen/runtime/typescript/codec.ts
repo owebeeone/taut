@@ -18,6 +18,7 @@ import {
   encode as cborEncode,
 } from "./cbor.ts";
 import { MISSING_OK, type SchemaIndex, type TypeRef } from "./schema.ts";
+export const CodecContract = Object.freeze({owner:"taut.typescript.foundation",contract:1,projection:"typescript.native.v1"});
 
 // deno-lint friendly: native values are dynamic by nature.
 type Native = any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -91,7 +92,8 @@ function toWire(schema: SchemaIndex, t: TypeRef, value: Native): CborValue {
         return intToWire(value);
       }
       if (t.scalar === "float") {
-        return new CborFloat(Number(value));
+        if(typeof value!=="number") throw new EncodeError(String(value));
+        return new CborFloat(value);
       }
       if (t.scalar === "bytes") {
         if (!(value instanceof Uint8Array)) {
@@ -112,9 +114,13 @@ function toWire(schema: SchemaIndex, t: TypeRef, value: Native): CborValue {
         return value;
       }
       return value as CborValue;
-    case "enum":
-      return BigInt(schema.enumDef(t.name).members[value as string]);
+    case "enum": {
+      const members=schema.enumDef(t.name).members;
+      if(typeof value!=="string" || !Object.hasOwn(members,value)) throw new EncodeError(value);
+      return BigInt(members[value]);
+    }
     case "list":
+      if(!Array.isArray(value)) throw new EncodeError("list requires Array");
       return (value as Native[]).map((v) => toWire(schema, t.elem, v));
     case "map": {
       const entries = mapEntries(value).sort((a, b) => compareNativeKey(a[0], b[0])); // ascending keys
@@ -123,9 +129,12 @@ function toWire(schema: SchemaIndex, t: TypeRef, value: Native): CborValue {
     }
     case "msg": {
       const m = schema.message(t.name);
+      if(value===null || typeof value!=="object" || Array.isArray(value) || value instanceof Map || value instanceof Uint8Array)
+        throw new EncodeError(`${m.name}: message requires native data object`);
       const out = new Map<MapKey, CborValue>();
       for (const f of schema.wireFields(m)) {
         const fv = value[f.name];
+        if(fv==null && !f.optional) throw new EncodeError(`${m.name}.${f.name}: required field`);
         out.set(f.tag, fv === null || fv === undefined ? null : toWire(schema, f.type, fv));
       }
       // forward-compat: re-emit unknown tags this schema doesn't name (cbor sorts keys)
@@ -232,11 +241,11 @@ function fromWire(schema: SchemaIndex, t: TypeRef, cv: CborValue): Native {
           if (f.optional !== MISSING_OK) {
             throw new DecodeError("MissingKey", { key: f.tag });
           }
-          out[f.name] = null;
+          Object.defineProperty(out,f.name,{value:null,writable:true,enumerable:true,configurable:true});
           continue;
         }
         const raw = map.get(f.tag)!;
-        out[f.name] = raw === null && f.optional ? null : fromWire(schema, f.type, raw);
+        Object.defineProperty(out,f.name,{value:raw === null && f.optional ? null : fromWire(schema, f.type, raw),writable:true,enumerable:true,configurable:true});
       }
       // forward-compat: capture tags this schema doesn't know (preserved raw)
       const residual = new Map<MapKey, CborValue>();

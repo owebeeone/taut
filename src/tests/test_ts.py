@@ -345,7 +345,7 @@ def test_typescript_codec_parity_i64_if_node(tmp_path):
     ts_dir = tmp_path / "typescript"
     api = (ts_dir / "api.ts").read_text()
     assert "n: bigint;" in api
-    assert "by_id: Map<bigint, bigint>;" in api
+    assert "by_id: globalThis.Map<bigint, bigint>;" in api
 
     export_to(schema, ts_dir / "parity_int.ir.json")
     # Baseline smoke test: pin the reviewed set; `lead` rows belong to the
@@ -411,9 +411,9 @@ def _late_schema():
     )
 
 
-def _emit_ts(s: Any, out_dir: Path, ir_name: str) -> Path:
+def _emit_ts(s: Any, out_dir: Path, ir_name: str, *, services=()) -> Path:
     """Generate TypeScript for `s` with the runtime, beside its IR as `ir_name`."""
-    scaffold.emit(s, out_dir, langs=["typescript"], services=[], runtime=True)
+    scaffold.emit(s, out_dir, langs=["typescript"], services=list(services), runtime=True)
     ts_dir = out_dir / "typescript"
     export_to(s, ts_dir / ir_name)
     return ts_dir
@@ -860,8 +860,8 @@ def _refused_irs(v2: dict) -> list[dict[str, Any]]:
     depth = "message Tree: effective max_depth must be an integer from 1 to 128"
     length = "the file: effective max_encoded_len must be null or an integer from 1 to 2147483647"
     edits = [
-        ("version 3", lambda ir: ir.update(version=3),
-         "unsupported IR version 3: this runtime reads versions 1 and 2"),
+        ("version 4", lambda ir: ir.update(version=4),
+         "unsupported IR version 4: this runtime reads versions 1, 2 and 3"),
         ("version 0", lambda ir: ir.update(version=0), "unsupported IR version 0"),
         ("version 2.5", lambda ir: ir.update(version=2.5), "unsupported IR version 2.5"),
         ('version "2"', lambda ir: ir.update(version="2"), 'unsupported IR version "2"'),
@@ -1333,7 +1333,8 @@ def test_typescript_client_fails_a_call_or_stream_whose_payload_does_not_decode_
         pytest.skip("node not available")
 
     s = _service_schema()
-    ts_dir = _emit_ts(s, tmp_path, "svc.ir.json")
+    # The generic transport is optional service output, outside the API-only foundation.
+    ts_dir = _emit_ts(s, tmp_path, "svc.ir.json", services=s.services)
     assert codec.encode(s, "Item", {"n": 5}).hex() == "a10105"
     with pytest.raises(codec.DecodeError) as err:
         codec.decode(s, "Item", bytes.fromhex("a1016178"))  # n is text: the payload used below

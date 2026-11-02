@@ -21,6 +21,12 @@ from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MsgRef, Sca
 from ..ir.options import effective
 from .names import Clash, scope_clashes
 
+_KEYWORDS = frozenset("arguments eval await break case catch class const continue debugger default delete do else enum export extends false finally for function if implements import in instanceof interface let new null package private protected public return static super switch this throw true try typeof var void while with yield".split())
+
+
+def _type_name(name):
+    return '$' + name if name in _KEYWORDS else name
+
 # The names api.js takes from cbor.js, in the order its `require` lists them.
 _IMPORTS = ("CInt", "CFloat", "CText", "CBytes", "CBool", "CArr", "CMap", "CNull", "cget",
             "cgetOrNull", "mapFromCbor", "cmapEntries", "compareCodePoints", "isNull", "expectInt",
@@ -30,11 +36,10 @@ _IMPORTS = ("CInt", "CFloat", "CText", "CBytes", "CBool", "CArr", "CMap", "CNull
 RESERVED_FIELD_NAMES = MappingProxyType({
     "toCbor": "a method, which the instance's own field would hide",
     "wireResidual": "the forward-compat residual field",
-    "__proto__": "the prototype, which the constructor would replace",
 })
-"""Field names a class cannot take: the constructor sets each field on the instance, where it
-hides the class's method of its name, or, for `__proto__`, replaces the prototype that holds
-them. The static members sit on the class and meet no field."""
+"""Field names that hide a codec method or meet the residual storage slot.
+Quoted own-property definitions preserve other names, including __proto__.
+The static members sit on the class and meet no instance field."""
 
 RESERVED_TYPE_NAMES = MappingProxyType({
     **dict.fromkeys(_IMPORTS, "a name api.js takes from cbor.js"),
@@ -52,9 +57,10 @@ def _module_names(schema: Schema) -> Iterator[tuple[str, str, str]]:
     """Each name api.js declares, and the enum or message it is for."""
     for e in schema.enums.values():
         yield from ((name, f"enum {e.name}", "enum") for name in (
-            e.name, f"{e.name}Values", f"{e.name}FromWire", f"{e.name}FromCbor"))
+            _type_name(e.name), f"{_type_name(e.name)}Values", f"{_type_name(e.name)}FromWire", f"{_type_name(e.name)}FromCbor", f"{_type_name(e.name)}Descriptor"))
     for m in schema.messages.values():
-        yield m.name, m.name, "message"
+        yield _type_name(m.name), m.name, "message"
+        yield f"{_type_name(m.name)}Descriptor", m.name, "message"
 
 
 def name_clashes(schema: Schema) -> list[Clash]:
@@ -96,9 +102,9 @@ def _dec(t: TypeRef, expr: str) -> str:
                 "bytes": f"expectBytes({expr})", "bool": f"expectBool({expr})",
                 "float": f"expectFloat({expr})"}[t.kind]
     if isinstance(t, EnumRef):
-        return f"{t.name}FromCbor({expr})"
+        return f"{_type_name(t.name)}FromCbor({expr})"
     if isinstance(t, MsgRef):
-        return f"{t.name}.fromCbor({expr})"
+        return f"{_type_name(t.name)}.fromCbor({expr})"
     if isinstance(t, ListOf):
         return f"expectArray({expr}).map((e) => {_dec(t.elem, 'e')})"
     if isinstance(t, MapOf):  # entries checked for keys 1 and 2 first; a repeated key is refused
@@ -108,37 +114,46 @@ def _dec(t: TypeRef, expr: str) -> str:
 
 
 def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
-    body = ", ".join(f"{m}: {v}" for m, v in members.items())
-    values = ", ".join(str(v) for v in members.values())
+    import json
+    def wire(v): return str(v) + ('n' if abs(v) > 2**53 - 1 else '')
+    body = ", ".join(f"[{json.dumps(m)}, {wire(v)}]" for m, v in members.items())
+    values = ", ".join(wire(v) for v in members.values())
     return [
-        f"const {name} = Object.freeze({{ {body} }});",
+        f"const {name} = Object.freeze(Object.fromEntries([{body}]));",
         f"const {name}Values = new Set([{values}]);",
         f"function {name}FromWire(v) {{ return enumFromWire(v, \"{name}\", {name}Values); }}",
         f"function {name}FromCbor(c) {{ return enumFromCbor(c, \"{name}\", {name}Values); }}",
     ]
 
 
-def _emit_message(schema: Schema, msg, forward_compat: bool = False) -> list[str]:
+def _emit_message(schema: Schema, msg, forward_compat: bool = False, *, validation=False) -> list[str]:
+    import json
+    name = _type_name(msg.name)
     wire = list(msg.wire_fields())
     max_depth = effective(schema, "max_depth", message=msg.name)
     max_encoded_len = effective(schema, "max_encoded_len", message=msg.name)
     out = [
-        f"class {msg.name} {{",
+        f"class {name} {{",
         # The decode root's effective bounds (CD-B3), read-only so no caller can change them.
         f"  static get MAX_DEPTH() {{ return {max_depth}; }}",
         f"  static get MAX_ENCODED_LEN() {{ return {'null' if max_encoded_len is None else max_encoded_len}; }}",
         "  constructor(o = {}) {",
     ]
     for f in msg.fields:
-        out.append(f"    this.{f.name} = o.{f.name};")
+        if not f.virtual:
+            out.append(f"    Object.defineProperty(this, {json.dumps(f.name)}, {{value:o[{json.dumps(f.name)}], writable:true, enumerable:true, configurable:true}});")
     if forward_compat:
         out.append("    this.wireResidual = o.wireResidual || [];")
     out.append("  }")
+    out.append(f"  static descriptor() {{ return {name}Descriptor; }}")
+    if validation:
+        out += [f"  validate(options = {{recursive:true}}) {{ return $tautV.validateRecord(this, {name}Descriptor, $tautBinding, options); }}",
+                f"  isValid(options = {{recursive:true}}) {{ return $tautV.isRecordValid(this, {name}Descriptor, $tautBinding, options); }}"]
     # toCbor
     out.append("  toCbor() {")
     out.append("    const m = [")
     for f in wire:
-        fn = f"this.{f.name}"
+        fn = f"this[{json.dumps(f.name)}]"
         if f.optional:
             enc = f"({fn} != null ? {_enc(f.type, fn)} : CNull())"
         else:
@@ -153,11 +168,11 @@ def _emit_message(schema: Schema, msg, forward_compat: bool = False) -> list[str
     out.append("  static fromCbor(c) {")
     if not wire:  # a message with no fields must still be a map (CD-E5)
         out.append("    expectMap(c);")
-    out.append(f"    const v = new {msg.name}();")
+    out.append(f"    const v = new {name}();")
     for f in msg.fields:
-        if f.transient:
+        if f.transient or f.virtual:
             continue
-        fn = f"v.{f.name}"
+        fn = f"v[{json.dumps(f.name)}]"
         if f.optional:
             get = "cgetOrNull" if f.optional == MISSING_OK else "cget"
             out.append(f"    {{ const f = {get}(c, {f.tag}); {fn} = isNull(f) ? null : {_dec(f.type, 'f')}; }}")
@@ -170,26 +185,15 @@ def _emit_message(schema: Schema, msg, forward_compat: bool = False) -> list[str
     out.append("  }")
     # decode: bytes -> this message, under its own bounds and no caller's (CD-B3)
     out.append("  static decode(bytes) {")
-    out.append(f"    return {msg.name}.fromCbor(decode(bytes, "
-               f"{{ maxDepth: {msg.name}.MAX_DEPTH, maxEncodedLen: {msg.name}.MAX_ENCODED_LEN }}));")
+    out.append(f"    return {name}.fromCbor(decode(bytes, "
+               f"{{ maxDepth: {name}.MAX_DEPTH, maxEncodedLen: {name}.MAX_ENCODED_LEN }}));")
     out.append("  }")
     out.append("}")
     return out
 
 
-def emit_types(schema: Schema, forward_compat: bool = False) -> str:
-    out = ['"use strict";',
-           "// GENERATED native JS types + codec — do not edit. Pairs with cbor.js.",
-           f'const {{ {", ".join(_IMPORTS)} }} = require("./cbor.js");',
-           ""]
-    names = []
-    for e in schema.enums.values():
-        out += _emit_enum(e.name, e.members) + [""]
-        names.append(e.name)
-        names.append(f"{e.name}FromWire")
-        names.append(f"{e.name}FromCbor")
-    for m in schema.messages.values():
-        out += _emit_message(schema, m, forward_compat) + [""]
-        names.append(m.name)
-    out.append("module.exports = { " + ", ".join(names) + " };")
-    return "\n".join(out) + "\n"
+def emit_types(schema: Schema, forward_compat: bool = False, *, validation=False,
+               external_types=None, identity=None, runtime_module='.') -> str:
+    from .js_metadata import emit_types as metadata_emit
+    return metadata_emit(schema, forward_compat=forward_compat, validation=validation,
+                         external_types=external_types, identity=identity, runtime_module=runtime_module)

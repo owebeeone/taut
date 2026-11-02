@@ -1,0 +1,6 @@
+draft [
+  { code: 'oneof.payload_unexpected', path: [ 'text' ] },
+  { code: 'oneof.payload_missing', path: [ 'number' ] }
+]
+repaired true descriptor fields [ 'kind', 'text', 'number', 'child', 'flag', 'items' ]
+virtual { valid: true, complete: false, fast: false }

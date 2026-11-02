@@ -2,7 +2,7 @@
 // griplab.ir.json — the same artifact Python authored. No schema is re-declared
 // here; this is the cross-language contract.
 //
-// loadSchema reads IR versions 1 and 2 and refuses any other (TautOptions.md
+// loadSchema reads IR versions 1, 2 and 3 and refuses any other (TautOptions.md
 // OPT-I1, OPT-F4). Version 2 adds options: every level's declared values, raw,
 // and at the file and at each message `effective`, every option resolved by
 // Python, defaults included (OPT-I2). This runtime reads only `effective`, and
@@ -10,6 +10,8 @@
 // nothing, so its effective values are the defaults.
 
 import { DEFAULT_MAX_DEPTH, MAX_DEPTH_CEILING } from "./cbor.ts";
+import { snapshot } from "./snapshots.ts";
+export const SchemaContract = Object.freeze({owner:"taut.typescript.foundation",contract:1,irVersions:Object.freeze([1,2,3])});
 
 export type TypeRef =
   | { k: "scalar"; scalar: "int" | "str" | "bytes" | "bool" | "float" }
@@ -39,6 +41,8 @@ export interface FieldDef {
   type: TypeRef;
   optional: boolean | typeof MISSING_OK;
   transient: boolean;
+  oneof?: {enum:string; virtual:boolean; exhaustive:boolean};
+  cases?: readonly {controlling_field:string; enum:string; member:string}[];
 }
 
 export interface MessageDef {
@@ -51,7 +55,7 @@ export interface MessageDef {
 export interface EnumDef {
   name: string;
   options?: OptionMap; // version 2
-  members: Record<string, number>;
+  members: Record<string, number | bigint>;
   member_options?: Record<string, OptionMap>; // version 2: each member's, reserved
 }
 
@@ -94,7 +98,7 @@ export interface ServiceDef {
 }
 
 export interface Schema {
-  version: number; // 1 or 2
+  version: number; // 1, 2, or native constraint IR 3
   options?: OptionMap; // version 2: the file's
   effective?: Effective; // version 2: the file's
   enums: EnumDef[];
@@ -116,11 +120,11 @@ function show(value: unknown): string {
   return JSON.stringify(value) ?? "none";
 }
 
-function irVersion(ir: Schema): 1 | 2 {
+function irVersion(ir: Schema): 1 | 2 | 3 {
   const version: unknown = ir.version;
-  if (version !== 1 && version !== 2) {
+  if (version !== 1 && version !== 2 && version !== 3) {
     throw new Error(
-      `unsupported IR version ${show(version)}: this runtime reads versions 1 and 2; ` +
+      `unsupported IR version ${show(version)}: this runtime reads versions 1, 2 and 3; ` +
         "a newer taut wrote this IR, or it is not one",
     );
   }
@@ -155,7 +159,7 @@ function checkedLength(value: unknown, where: string): number | null {
 
 // The effective values of the file or of a message: in version 1 the defaults, as it
 // carries none; in version 2 the ones Python resolved, each known and in range.
-function readEffective(level: { effective?: unknown }, where: string, version: 1 | 2): Effective {
+function readEffective(level: { effective?: unknown }, where: string, version: 1 | 2 | 3): Effective {
   const values = level.effective;
   if (version === 1) {
     if (values !== undefined) {
@@ -193,25 +197,26 @@ function readEffective(level: { effective?: unknown }, where: string, version: 1
 }
 
 export class SchemaIndex {
-  private msgs = new Map<string, MessageDef>();
-  private enms = new Map<string, EnumDef>();
-  private mths = new Map<string, MethodDef>();
-  private fileEffective: Effective;
-  private msgEffective = new Map<string, Effective>();
+  #msgs = new Map<string, MessageDef>();
+  #enms = new Map<string, EnumDef>();
+  #mths = new Map<string, MethodDef>();
+  #fileEffective: Effective;
+  #msgEffective = new Map<string, Effective>();
 
   constructor(schema: Schema) {
+    schema=snapshot(schema);
     const version = irVersion(schema);
-    this.fileEffective = readEffective(schema, "the file", version);
+    this.#fileEffective = readEffective(schema, "the file", version);
     for (const m of schema.messages) {
-      this.msgs.set(m.name, m);
-      this.msgEffective.set(m.name, readEffective(m, `message ${m.name}`, version));
+      this.#msgs.set(m.name, m);
+      this.#msgEffective.set(m.name, readEffective(m, `message ${m.name}`, version));
     }
     for (const e of schema.enums) {
-      this.enms.set(e.name, e);
+      this.#enms.set(e.name, e);
     }
     for (const s of schema.services ?? []) {
       for (const m of s.methods) {
-        this.mths.set(m.name, m);
+        this.#mths.set(m.name, m);
       }
     }
   }
@@ -219,9 +224,9 @@ export class SchemaIndex {
   // A message's effective values, or the file's when no message is named.
   effective(message?: string): Effective {
     if (message === undefined) {
-      return this.fileEffective;
+      return this.#fileEffective;
     }
-    const e = this.msgEffective.get(message);
+    const e = this.#msgEffective.get(message);
     if (!e) {
       throw new Error(`unknown message ${message}`);
     }
@@ -234,11 +239,11 @@ export class SchemaIndex {
     if (t.k === "msg") {
       return this.effective(t.name);
     }
-    return this.fileEffective;
+    return this.#fileEffective;
   }
 
   method(name: string): MethodDef {
-    const m = this.mths.get(name);
+    const m = this.#mths.get(name);
     if (!m) {
       throw new Error(`unknown method ${name}`);
     }
@@ -246,7 +251,7 @@ export class SchemaIndex {
   }
 
   message(name: string): MessageDef {
-    const m = this.msgs.get(name);
+    const m = this.#msgs.get(name);
     if (!m) {
       throw new Error(`unknown message ${name}`);
     }
@@ -254,7 +259,7 @@ export class SchemaIndex {
   }
 
   enumDef(name: string): EnumDef {
-    const e = this.enms.get(name);
+    const e = this.#enms.get(name);
     if (!e) {
       throw new Error(`unknown enum ${name}`);
     }
@@ -262,7 +267,7 @@ export class SchemaIndex {
   }
 
   wireFields(m: MessageDef): FieldDef[] {
-    return m.fields.filter((f) => !f.transient);
+    return m.fields.filter((f) => !f.transient && !f.oneof?.virtual);
   }
 }
 

@@ -1,0 +1,21 @@
+{
+  "build": "javascript-oneof-reference.1",
+  "capabilities": [
+    "codec.v1",
+    "descriptors.v1",
+    "oneof.v1"
+  ],
+  "codec": 1,
+  "descriptor": 1,
+  "files": {
+    "cbor.js": "b558c494a54396b511f7e938a69ff860739b29eb3e32e13f2358bb5ea083c0ef",
+    "contracts.js": "68c1fea6011e6311c1af79277ba7bd6611b16a80d756cb581c2e91b109ec50b0",
+    "descriptors.js": "027df05287667f641d4d68413903fc8b84d2d5171bc34cf949e96914e70f9d26",
+    "ext.js": "d00bb6728e45bbf054af6d8b4c3d2dd426938ce6cef01e4c6ef176727859fd51",
+    "index.js": "eb2689afb28ae8b9f079fb35726aeb7972c51d9efc0bfd5e8f6d5761cbd5f0df",
+    "reports.js": "c53d94a3cd082a027570751ee7340b52d99f38911086aa7bbe2c9c71e21f0196",
+    "validation.js": "58b2cff4ac47fa292005ac93039546e48c9cdf30eb10590a26729eb6ae1c12e4"
+  },
+  "owner": "taut.javascript.foundation",
+  "validation": true
+}
