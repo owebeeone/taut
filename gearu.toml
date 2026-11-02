@@ -20,15 +20,15 @@ manifests = ["rust/taut-foundation/Cargo.toml"]
 # version needs no release commit), so `exact_checks` only rereads the metadata. The tests and
 # parity steps fail rather than skip a language, so each toolchain must be installed.
 checks = [
-    ["python", "scripts/prepare_release_workspace.py", "{repo}"],
-    ["python", "rust/sync_foundation.py", "--check"],
+    ["uv", "run", "--no-project", "--python", "3.13", "python", "scripts/prepare_release_workspace.py", "{repo}"],
+    ["uv", "run", "--no-project", "--python", "3.13", "python", "rust/sync_foundation.py", "--check"],
     ["cargo", "test", "--manifest-path", "rust/taut-foundation/Cargo.toml", "--all-features"],
     ["cargo", "package", "--manifest-path", "rust/taut-foundation/Cargo.toml", "--allow-dirty"],
     ["uv", "run", "--no-project", "--python", "3.13", "--with", "pytest", "--with", "pytest-xdist",
      "--with", "build", "--with", "twine", "python", "scripts/release_checks.py", "{python_version}"],
 ]
 exact_checks = [
-    ["python", "rust/sync_foundation.py", "--check"],
+    ["uv", "run", "--no-project", "--python", "3.13", "python", "rust/sync_foundation.py", "--check"],
     ["cargo", "package", "--manifest-path", "rust/taut-foundation/Cargo.toml"],
     ["uv", "run", "--no-project", "--python", "3.13",
      "python", "scripts/release_checks.py", "{python_version}", "--only", "metadata"],

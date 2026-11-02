@@ -22,6 +22,7 @@ for name, sha in inputs.items():
     if not target.exists():
         if original:
             subprocess.run(['git','-c','safe.directory='+original.as_posix(),
+                            '-c','safe.directory='+(original/'.git').as_posix(),
                             'clone','--shared','--no-checkout',str(original),str(target)],check=True)
         else:
             subprocess.run(['git','clone','--no-checkout',
