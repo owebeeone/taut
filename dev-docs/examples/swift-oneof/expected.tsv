@@ -1,0 +1,18 @@
+missing	recursive	false	true	I:oneof.payload_missing:taut.oneof.v1:f=text
+empty	recursive	true	true
+extra	recursive	false	true	I:oneof.payload_unexpected:taut.oneof.v1:f=number
+roundtrip	recursive	false	true	I:oneof.payload_unexpected:taut.oneof.v1:f=number
+zero	recursive	true	true
+false	recursive	true	true
+empty-list	recursive	true	true
+payload-free	recursive	true	true
+bad-tag-child	recursive	false	true	I:oneof.invalid_discriminator:taut.oneof.v1:f=kind	I:oneof.payload_missing:taut.oneof.v1:f=child/f=text
+nonselected-child	recursive	false	true	I:oneof.payload_unexpected:taut.oneof.v1:f=child	I:oneof.payload_missing:taut.oneof.v1:f=child/f=text
+cycle	recursive	false	true	I:validation.ownership_cycle:validation.shape.v1:f=child
+wrapper	recursive	false	true	I:oneof.payload_missing:taut.oneof.v1:f=child/f=text	I:oneof.payload_missing:taut.oneof.v1:f=children/i=0/f=text	I:oneof.payload_missing:taut.oneof.v1:f=children/i=1/f=text	I:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YA==/f=text	I:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YXo=/f=text	I:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YmFh/f=text	I:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,AA==/f=text	I:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,GBg=/f=text	I:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,IA==/f=text	I:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9A==/f=text	I:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9Q==/f=text
+local	local	true	true
+virtual-child	recursive	false	false	I:oneof.payload_missing:taut.oneof.v1:f=child/f=text	D:oneof.virtual_deferred:taut.oneof.v1:f=kind
+virtual-repaired	recursive	true	false	D:oneof.virtual_deferred:taut.oneof.v1:f=kind
+virtual-local	local	true	false	D:oneof.virtual_deferred:taut.oneof.v1:f=kind
+independent	recursive	false	true	I:oneof.invalid_discriminator:taut.oneof.v1:f=left	I:oneof.payload_missing:taut.oneof.v1:f=b
+plain	recursive	true	true

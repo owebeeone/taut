@@ -74,6 +74,32 @@ for guard if in repeat return switch where while as catch false is nil super
 self Self throw throws true try _ Any Protocol Type
 """.split())
 
+# Swift's normal identifier grammar, independent of Python's XID policy.
+# https://github.com/swiftlang/swift-book/blob/main/TSPL.docc/ReferenceManual/LexicalStructure.md
+_IDENTIFIER_HEAD_RANGES = (
+    (0x41, 0x5A), (0x61, 0x7A), (0x5F, 0x5F),
+    (0xA8, 0xA8), (0xAA, 0xAA), (0xAD, 0xAD), (0xAF, 0xAF),
+    (0xB2, 0xB5), (0xB7, 0xBA), (0xBC, 0xBE), (0xC0, 0xD6),
+    (0xD8, 0xF6), (0xF8, 0x2FF), (0x370, 0x167F), (0x1681, 0x180D),
+    (0x180F, 0x1DBF), (0x1E00, 0x1FFF), (0x200B, 0x200D),
+    (0x202A, 0x202E), (0x203F, 0x2040), (0x2054, 0x2054),
+    (0x2060, 0x206F), (0x2070, 0x20CF), (0x2100, 0x218F),
+    (0x2460, 0x24FF), (0x2776, 0x2793), (0x2C00, 0x2DFF),
+    (0x2E80, 0x2FFF), (0x3004, 0x3007), (0x3021, 0x302F),
+    (0x3031, 0xD7FF), (0xF900, 0xFD3D), (0xFD40, 0xFDCF),
+    (0xFDF0, 0xFE1F), (0xFE30, 0xFE44), (0xFE47, 0xFFFD),
+    *((plane << 16, (plane << 16) + 0xFFFD) for plane in range(1, 15)),
+)
+_IDENTIFIER_CONTINUE_RANGES = ((0x30, 0x39), (0x300, 0x36F),
+                               (0x1DC0, 0x1DFF), (0x20D0, 0x20FF), (0xFE20, 0xFE2F))
+
+
+def is_identifier(name: str) -> bool:
+    def in_ranges(char, ranges):
+        return any(low <= ord(char) <= high for low, high in ranges)
+    return (isinstance(name, str) and bool(name) and in_ranges(name[0], _IDENTIFIER_HEAD_RANGES)
+            and all(in_ranges(c, _IDENTIFIER_HEAD_RANGES + _IDENTIFIER_CONTINUE_RANGES) for c in name[1:]))
+
 # The parameters and locals the generated code binds: `wire_` and a role.
 _C = "wire_c"          # a fromCbor's parameter, the item it decodes
 _V = "wire_v"          # a nullable field's item
@@ -196,9 +222,29 @@ def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
     return out
 
 
+def reference_messages(schema: Schema) -> frozenset[str]:
+    """Direct recursive storage needs a native reference boundary in Swift.
+
+    Array/Dictionary already provide finite value storage; do not turn those
+    supported recursive values into classes or identify their shared backing.
+    """
+    edges = {m.name: {f.type.name for f in m.fields
+                     if not f.virtual and isinstance(f.type, MsgRef)}
+             for m in schema.messages.values()}
+
+    def cyclic(origin, current, seen):
+        return any(n == origin or (n not in seen and cyclic(origin, n, seen | {n}))
+                   for n in edges.get(current, ()))
+
+    return frozenset(n for n in edges if cyclic(n, n, {n}))
+
+
 def _emit_message(msg, schema: Schema, forward_compat: bool = False) -> list[str]:
-    out = [f"public struct {msg.name} {{"]
+    representation = "final class" if msg.name in reference_messages(schema) else "struct"
+    out = [f"public {representation} {msg.name} {{"]
     for f in msg.fields:
+        if f.virtual:
+            continue
         out.append(f"    public var {_id(f.name)}: {_field_type(f)}")
     if forward_compat:
         out.append("    public var wire_residual: [(Int64, Cbor)]")
@@ -206,6 +252,8 @@ def _emit_message(msg, schema: Schema, forward_compat: bool = False) -> list[str
     # explicit public init (so values are constructible cross-module)
     params = []
     for f in msg.fields:
+        if f.virtual:
+            continue
         ft = _field_type(f)
         if f.transient:
             params.append(f"{_id(f.name)}: {ft} = {'nil' if f.optional else _default(f.type, schema)}")
@@ -217,6 +265,8 @@ def _emit_message(msg, schema: Schema, forward_compat: bool = False) -> list[str
         params.append("wire_residual: [(Int64, Cbor)] = []")
     out.append(f"    public init({', '.join(params)}) {{")
     for f in msg.fields:
+        if f.virtual:
+            continue
         out.append(f"        self.{_id(f.name)} = {_id(f.name)}")
     if forward_compat:
         out.append("        self.wire_residual = wire_residual")
@@ -243,7 +293,7 @@ def _emit_message(msg, schema: Schema, forward_compat: bool = False) -> list[str
         out.append("        }")
     args = []
     for f in msg.fields:
-        if f.transient:
+        if f.transient or f.virtual:
             continue  # native-only; init default applies
         if f.optional == MISSING_OK:
             # an absent key reads as null, like a present null; a non-map still fails
@@ -278,11 +328,8 @@ def _emit_decode(msg: MessageDef, schema: Schema) -> list[str]:
     ]
 
 
-def emit_types(schema: Schema, forward_compat: bool = False) -> str:
-    out = ["// GENERATED native Swift types + codec — do not edit.",
-           "// Pairs with the vendored cbor.swift runtime (same module).", ""]
-    for e in schema.enums.values():
-        out += _emit_enum(e.name, e.members) + [""]
-    for m in schema.messages.values():
-        out += _emit_message(m, schema, forward_compat) + [""]
-    return "\n".join(out) + "\n"
+def emit_types(schema: Schema, forward_compat: bool = False, *, validation=False,
+               external_types=None, identity=None, runtime_module='') -> str:
+    from .swift_metadata import emit_types as emit_metadata
+    return emit_metadata(schema, forward_compat=forward_compat, validation=validation,
+                         external_types=external_types, identity=identity, runtime_module=runtime_module)

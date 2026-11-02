@@ -21,7 +21,7 @@ def test_pair_plans_all_targets_before_mutation(tmp_path):
     assert {p.relative_to(tmp_path).as_posix():p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}==before
 
 @pytest.mark.skipif(os.name!='nt',reason='Windows previous-owner junction contract')
-@pytest.mark.parametrize('target',['python','rust','java','kotlin','js','typescript','cpp','go'])
+@pytest.mark.parametrize('target',['python','rust','java','kotlin','js','typescript','cpp','go','swift'])
 def test_previous_owner_alias_rejected_before_lock_mutation(tmp_path,monkeypatch,target):
     record=schema(Record=Msg(value=F(1,INT)))
     actual=tmp_path/'owner';output=tmp_path/'schema'
@@ -39,7 +39,7 @@ def test_previous_owner_alias_rejected_before_lock_mutation(tmp_path,monkeypatch
         return original(path,*args,**kwargs)
     monkeypatch.setattr(Path,'open',observe)
     with pytest.raises(ValueError,match='previous runtime owner'):
-        emit(record,output,langs=[target],services=[],runtime_mode='package',runtime_bindings={'go':{'import_path':'example.local/package'}} if target=='go' else None)
+        emit(record,output,langs=[target],services=[],runtime_mode='package',runtime_bindings={'go':{'import_path':'example.local/package'}} if target=='go' else {'swift':{'module':'TautFoundation'}} if target=='swift' else None)
     assert attempted==[]
     assert {p.relative_to(tmp_path).as_posix():p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}==before
 

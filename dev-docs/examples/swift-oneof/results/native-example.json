@@ -1,0 +1,107 @@
+{
+  "source": {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\source-foundation",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\source-foundation",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\source\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\source\\app\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\source\\app\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "missing\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=text\nempty\trecursive\ttrue\ttrue\nextra\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nroundtrip\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nzero\trecursive\ttrue\ttrue\nfalse\trecursive\ttrue\ttrue\nempty-list\trecursive\ttrue\ttrue\npayload-free\trecursive\ttrue\ttrue\nbad-tag-child\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=kind\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\nnonselected-child\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=child\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\ncycle\trecursive\tfalse\ttrue\tI:validation.ownership_cycle:validation.shape.v1:f=child\nwrapper\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=0/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=1/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YXo=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YmFh/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,AA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,GBg=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,IA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9A==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9Q==/f=text\nlocal\tlocal\ttrue\ttrue\nvirtual-child\trecursive\tfalse\tfalse\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-repaired\trecursive\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-local\tlocal\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nindependent\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=left\tI:oneof.payload_missing:taut.oneof.v1:f=b\nplain\trecursive\ttrue\ttrue\n",
+    "api_sha256": {
+      "source\\swift\\api.swift": "6cb241afcaca659aa030f376db51b502498f68ed4618edb85bed801fdd0269b1"
+    }
+  },
+  "package": {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\package-foundation",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\package-foundation",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\package\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\package\\app\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\package\\app\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "missing\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=text\nempty\trecursive\ttrue\ttrue\nextra\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nroundtrip\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nzero\trecursive\ttrue\ttrue\nfalse\trecursive\ttrue\ttrue\nempty-list\trecursive\ttrue\ttrue\npayload-free\trecursive\ttrue\ttrue\nbad-tag-child\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=kind\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\nnonselected-child\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=child\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\ncycle\trecursive\tfalse\ttrue\tI:validation.ownership_cycle:validation.shape.v1:f=child\nwrapper\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=0/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=1/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YXo=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YmFh/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,AA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,GBg=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,IA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9A==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9Q==/f=text\nlocal\tlocal\ttrue\ttrue\nvirtual-child\trecursive\tfalse\tfalse\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-repaired\trecursive\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-local\tlocal\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nindependent\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=left\tI:oneof.payload_missing:taut.oneof.v1:f=b\nplain\trecursive\ttrue\ttrue\n",
+    "api_sha256": {
+      "package\\swift\\api.swift": "6cb241afcaca659aa030f376db51b502498f68ed4618edb85bed801fdd0269b1"
+    }
+  },
+  "supplied": {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\package-foundation",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\package-foundation",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\supplied\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\supplied\\app\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\supplied\\app\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "missing\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=text\nempty\trecursive\ttrue\ttrue\nextra\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nroundtrip\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=number\nzero\trecursive\ttrue\ttrue\nfalse\trecursive\ttrue\ttrue\nempty-list\trecursive\ttrue\ttrue\npayload-free\trecursive\ttrue\ttrue\nbad-tag-child\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=kind\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\nnonselected-child\trecursive\tfalse\ttrue\tI:oneof.payload_unexpected:taut.oneof.v1:f=child\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\ncycle\trecursive\tfalse\ttrue\tI:validation.ownership_cycle:validation.shape.v1:f=child\nwrapper\trecursive\tfalse\ttrue\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=0/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=children/i=1/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YXo=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_text/k=str,YmFh/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,AA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,GBg=/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_int/k=int,IA==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9A==/f=text\tI:oneof.payload_missing:taut.oneof.v1:f=by_bool/k=bool,9Q==/f=text\nlocal\tlocal\ttrue\ttrue\nvirtual-child\trecursive\tfalse\tfalse\tI:oneof.payload_missing:taut.oneof.v1:f=child/f=text\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-repaired\trecursive\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nvirtual-local\tlocal\ttrue\tfalse\tD:oneof.virtual_deferred:taut.oneof.v1:f=kind\nindependent\trecursive\tfalse\ttrue\tI:oneof.invalid_discriminator:taut.oneof.v1:f=left\tI:oneof.payload_missing:taut.oneof.v1:f=b\nplain\trecursive\ttrue\ttrue\n",
+    "api_sha256": {
+      "supplied\\swift\\api.swift": "6cb241afcaca659aa030f376db51b502498f68ed4618edb85bed801fdd0269b1"
+    }
+  },
+  "flat-off": {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-off\\supplied\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-off\\supplied\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-off\\supplied\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-off\\supplied\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-off\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-off\\app\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-off\\app\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "flat supplied PASS\n",
+    "api_sha256": {
+      "flat-off\\supplied\\cbor.swift": "4828ee6229d24a75da1813bb72982895085c571854d03008fbd2a878d80338f6",
+      "flat-off\\supplied\\descriptors.swift": "e577ede3592a9b3067dc8be5ef167ac963cbc548a403f83a8b9611f2b96be5bf",
+      "flat-off\\supplied\\ext.swift": "9bf764a3ef3a64f74e2662b09a64044ed8d8c34ec319d5c7e4a8cae02e4297b3",
+      "flat-off\\supplied\\paths.swift": "2729264314bf3a054b6ca69d60b708a8c697cd9cb528806ec6f38754abc6dcdd",
+      "flat-off\\swift\\api.swift": "e6919c58a40a83e5457b16d6e902f4249b319041092541775def96cf3be70eff"
+    }
+  },
+  "flat-on": {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-on\\supplied\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-on\\supplied\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-on\\supplied\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-on\\supplied\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-on\\supplied\\reports.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-on\\supplied\\validation.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-on\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-on\\app\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\settled-example\\flat-on\\app\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "flat supplied PASS\n",
+    "api_sha256": {
+      "flat-on\\supplied\\cbor.swift": "4828ee6229d24a75da1813bb72982895085c571854d03008fbd2a878d80338f6",
+      "flat-on\\supplied\\descriptors.swift": "e577ede3592a9b3067dc8be5ef167ac963cbc548a403f83a8b9611f2b96be5bf",
+      "flat-on\\supplied\\ext.swift": "9bf764a3ef3a64f74e2662b09a64044ed8d8c34ec319d5c7e4a8cae02e4297b3",
+      "flat-on\\supplied\\paths.swift": "2729264314bf3a054b6ca69d60b708a8c697cd9cb528806ec6f38754abc6dcdd",
+      "flat-on\\supplied\\reports.swift": "4d3b3b633e6d21f79a84a07494ed985d3b8617f0e428b765657a31f1b01aaec9",
+      "flat-on\\supplied\\validation.swift": "ab9bf32a5e2c4f764093f96a17e87c0c2d90e9e3d16ad708172db64665ec8dc8",
+      "flat-on\\swift\\api.swift": "94a07f35f1ca6f89996ff67751ea6cc852e8e858cf7a5d470b4ac2cdf21e88a2"
+    }
+  }
+}

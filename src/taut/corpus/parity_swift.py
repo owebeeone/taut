@@ -35,6 +35,7 @@ before it reported and fails the target through the runner's exit status.
 from __future__ import annotations
 
 import tempfile
+import os
 from pathlib import Path
 
 from . import parity, toolchains
@@ -395,9 +396,22 @@ def run(forward_compat: bool = False) -> parity.TargetReport:
             return failed
         main = work / "main.swift"
         main.write_text(_source())
-        sources = [str(path) for path in sorted((work / TARGET).glob("*.swift"))]
+        from ..gen.swift_runtime import build_foundation
+        try:
+            foundation = build_foundation(work / "foundation", validation=False,
+                                           source_directory=work / TARGET)
+        except ValueError as exc:
+            return parity.red(name, "foundation build failed\n" + str(exc))
+        main.write_text("import TautFoundation\n" + main.read_text())
+        sources = [str(work / TARGET / "api.swift")]
         binary = work / "parity_runner"
-        failed = parity.build(name, [swiftc, *sources, str(main), "-o", str(binary)], cwd=work)
+        failed = parity.build(name, [swiftc, '-I', str(foundation), '-L', str(foundation),
+                                     '-lTautFoundation', *sources, str(main), "-o", str(binary)], cwd=work)
         if failed is not None:
             return failed
-        return parity.run_runner(name, [str(binary)], cwd=work)
+        import shutil
+        for library in foundation.glob('*.dll'):
+            shutil.copy2(library, work / library.name)
+        env = dict(os.environ)
+        env['LD_LIBRARY_PATH'] = str(foundation) + os.pathsep + env.get('LD_LIBRARY_PATH', '')
+        return parity.run_runner(name, [str(binary)], cwd=work, env=env)

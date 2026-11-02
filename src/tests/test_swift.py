@@ -118,9 +118,22 @@ def _require_swiftc():
 
 def _compile_swift(tmp_path, sources, name):
     swiftc = _require_swiftc()
+    from taut.gen.swift_runtime import build_foundation, FILES
+    foundation = tmp_path.parent / 'swift-shared-foundation'
+    if not foundation.exists():
+        build_foundation(foundation, validation=False)
+    # Runtime is compiled once in its own module. Every original codec/bounds/
+    # residual/fuzz assertion below still executes against that actual owner.
+    native_sources = [p for p in sources if Path(p).name not in FILES]
+    for source in native_sources:
+        source = Path(source)
+        if 'import TautFoundation' not in source.read_text():
+            source.write_text('import TautFoundation\n' + source.read_text())
+    os.environ['PATH'] = str(foundation) + os.pathsep + os.environ.get('PATH', '')
+    os.environ['LD_LIBRARY_PATH'] = str(foundation) + os.pathsep + os.environ.get('LD_LIBRARY_PATH', '')
     exe = tmp_path / name
     compile_run = subprocess.run(
-        [swiftc, *map(str, sources), "-o", str(exe)],
+        [swiftc, '-I', str(foundation), '-L', str(foundation), '-lTautFoundation', *map(str, native_sources), "-o", str(exe)],
         text=True,
         capture_output=True,
     )
@@ -332,8 +345,14 @@ def test_generated_bindings_take_the_reserved_wire_prefix():
                  + re.findall(r"\blet (\w+) = ", s))
         assert {"wire_c", "wire_v", "wire_raw", "wire_value", "wire_bytes"} <= set(bound)
         assert [name for name in bound if not name.startswith("wire_")] == []
-        # a call, not the declaration of a message's own `decode`
-        assert re.findall(r"(?<![\w.])(?<!func )(?:encode|decode|tryDecode|decodeDictionary)\(", s) == []
+        # Native message bodies cannot call a free helper hidden by a field.
+        # Canonical map-path encoding in the separate static adapter holder is
+        # outside every message's field scope; keep those calls attributed.
+        calls = r"(?<![\w.])(?<!func )(?:encode|decode|tryDecode|decodeDictionary)\("
+        native = s.split("public extension ", 1)[0]
+        assert re.findall(calls, native) == []
+        holder = s[s.index("private enum TautSchema_"):]
+        assert re.findall(calls, s) == re.findall(calls, holder)
         assert "try wire_c.tryGet(14).tryDictionary(key: { try $0.tryText() }, " in s
         # the runtime's raw decode and the message's own members, qualified: no field hides them
         # (a name before `:` is a declaration or an argument label, not a reference)
@@ -1473,13 +1492,7 @@ def test_generated_swift_float_model_roundtrips(tmp_path):
             fatalError("generated transient float default decoded \\(decoded.scratch)")
         }}
         """))
-    exe = tmp_path / "swift-generated-float-harness"
-    compile_run = subprocess.run(
-        [swiftc, str(SWIFT_CBOR), str(model), str(harness), "-o", str(exe)],
-        text=True,
-        capture_output=True,
-    )
-    assert compile_run.returncode == 0, compile_run.stderr
+    exe = _compile_swift(tmp_path, [SWIFT_CBOR, model, harness], "swift-generated-float-harness")
 
     run = subprocess.run([str(exe)], text=True, capture_output=True)
     assert run.returncode == 0, run.stderr

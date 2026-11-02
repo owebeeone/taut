@@ -1,0 +1,428 @@
+{
+  "status": "REVIEW-READY/HOLD; root production freeze observed, exact local GWZ checkpoint/review authorization pending; not accepted",
+  "date": "2026-11-03 Australia/Sydney",
+  "source_inventory_sha256": "51c92bf28ff9d9936bb89f1c6a9225fcf2ce6858f816eebef406c6e74b5ee156",
+  "source_inventory_count": 29,
+  "source_inventory": "dev-docs/examples/swift-oneof/results/source-before.json",
+  "source_before_after_exact": true,
+  "source_parent": "83291c2c7c7b126e41625bd29623870330f3b0d6",
+  "workspace_parent": "45f1e4387f3bcd6b21b6291dc0fab0a262303ba9",
+  "current_committed_tuple": {
+    "taut": "83291c2c7c7b126e41625bd29623870330f3b0d6",
+    "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "45f1e4387f3bcd6b21b6291dc0fab0a262303ba9"
+  },
+  "incoming_user_commit": "5b5280ec472e891b34b10029647c6cb0fb90a40a",
+  "incoming_merge": "83291c2c7c7b126e41625bd29623870330f3b0d6",
+  "incoming_merge_parents": [
+    "14a2251df0dbbdaaa6e7a5f199df45a5f387c022",
+    "5b5280ec472e891b34b10029647c6cb0fb90a40a"
+  ],
+  "integration_workspace_receipt": "45f1e4387f3bcd6b21b6291dc0fab0a262303ba9",
+  "early_readonly_remote_snapshot": {
+    "taut": {
+      "origin": "5b5280ec472e891b34b10029647c6cb0fb90a40a",
+      "before_ahead": 9,
+      "before_behind": 1
+    },
+    "workspace": {
+      "origin": "f703be38c4b09a2597cdecd5fdf192877eb15b97",
+      "before_ahead": 9,
+      "before_behind": 0
+    },
+    "shape-py": {
+      "origin": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+      "before_ahead": 0,
+      "before_behind": 0
+    },
+    "shape-rs": {
+      "origin": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+      "before_ahead": 0,
+      "before_behind": 0
+    },
+    "shape-ts": {
+      "origin": "74597e5e3a1d3845e93644866b97b68080f4bbbe",
+      "before_ahead": 2,
+      "before_behind": 0
+    }
+  },
+  "remote_limit": "Remote fetch/inspection was early; coordinator owns final fresh inspection and ordinary nonforce pushes. No final remote-HEAD verification or push is claimed here.",
+  "owned_allowlist": [
+    "dev-docs/SwiftOneOfCheckpoint-Authority.md",
+    "dev-docs/SwiftOneOfCheckpoint-Draft.md",
+    "dev-docs/SwiftOneOfCheckpoint-Preparation.json",
+    "dev-docs/UserEnumCaseIntegration-Receipt.json",
+    "dev-docs/examples/swift-oneof/Conformance.swift",
+    "dev-docs/examples/swift-oneof/README.md",
+    "dev-docs/examples/swift-oneof/content.taut.py",
+    "dev-docs/examples/swift-oneof/expected.tsv",
+    "dev-docs/examples/swift-oneof/golden/flat-off.swift",
+    "dev-docs/examples/swift-oneof/golden/flat-on.swift",
+    "dev-docs/examples/swift-oneof/golden/imported-off.swift",
+    "dev-docs/examples/swift-oneof/golden/imported-on.swift",
+    "dev-docs/examples/swift-oneof/results/focused-commands.json",
+    "dev-docs/examples/swift-oneof/results/go-kernel-equivalence.json",
+    "dev-docs/examples/swift-oneof/results/native-example.json",
+    "dev-docs/examples/swift-oneof/results/settled-shared-preservation.log",
+    "dev-docs/examples/swift-oneof/results/settled-shared-preservation.xml",
+    "dev-docs/examples/swift-oneof/results/settled-swift-existing.log",
+    "dev-docs/examples/swift-oneof/results/settled-swift-existing.xml",
+    "dev-docs/examples/swift-oneof/results/settled-swift-feature.log",
+    "dev-docs/examples/swift-oneof/results/settled-swift-feature.xml",
+    "dev-docs/examples/swift-oneof/results/settled-swift-wheel.log",
+    "dev-docs/examples/swift-oneof/results/settled-swift-wheel.xml",
+    "dev-docs/examples/swift-oneof/results/source-after.json",
+    "dev-docs/examples/swift-oneof/results/source-before.json",
+    "dev-docs/examples/swift-oneof/run_example.py",
+    "dev-docs/examples/swift-oneof/surface.taut.py",
+    "docs/SWIFT_API.md",
+    "pyproject.toml",
+    "src/taut/cli.py",
+    "src/taut/corpus/parity_swift.py",
+    "src/taut/gen/go_runtime.py",
+    "src/taut/gen/owned_runtime.py",
+    "src/taut/gen/runtime/swift/descriptors.swift",
+    "src/taut/gen/runtime/swift/paths.swift",
+    "src/taut/gen/runtime/swift/reports.swift",
+    "src/taut/gen/runtime/swift/validation.swift",
+    "src/taut/gen/scaffold.py",
+    "src/taut/gen/swift.py",
+    "src/taut/gen/swift_metadata.py",
+    "src/taut/gen/swift_runtime.py",
+    "src/tests/test_cpp_go_distribution.py",
+    "src/tests/test_swift.py",
+    "src/tests/test_swift_distribution.py",
+    "src/tests/test_swift_oneof.py"
+  ],
+  "owned_count": 45,
+  "files": {
+    "dev-docs/SwiftOneOfCheckpoint-Authority.md": {
+      "sha256": "22364639fc57680793bcbc38ddaaee88108017ff0635e6aca934fbe401947ced",
+      "size": 5843
+    },
+    "dev-docs/SwiftOneOfCheckpoint-Draft.md": {
+      "sha256": "2427984b86794dfb69f13f7cb9e7a92b0ff65ca7a027517f108b785d3137c800",
+      "size": 9044
+    },
+    "dev-docs/UserEnumCaseIntegration-Receipt.json": {
+      "sha256": "0e1bd4418ee1ca77c9ac86889020184bced1648ccbff47ed556a5ba6e4dcaa53",
+      "size": 8743
+    },
+    "dev-docs/examples/swift-oneof/Conformance.swift": {
+      "sha256": "0d020a5949fdca1f1586e606dbb021ff5350a98fce21c9335c0816a5181dd904",
+      "size": 3417
+    },
+    "dev-docs/examples/swift-oneof/README.md": {
+      "sha256": "b6152b093a3ebd5df20ece38cca7269728108227cc3da354870e5db0726c71c8",
+      "size": 7889
+    },
+    "dev-docs/examples/swift-oneof/content.taut.py": {
+      "sha256": "784f549db4a0e324a7675f3f88e399d623d81738e7358f6225a449e0e349855d",
+      "size": 1185
+    },
+    "dev-docs/examples/swift-oneof/expected.tsv": {
+      "sha256": "02586adf94172f54e92c38809a4426d8e1cc372b70b669e405a5b20efc08b4ec",
+      "size": 1954
+    },
+    "dev-docs/examples/swift-oneof/golden/flat-off.swift": {
+      "sha256": "2076d1b5ad28cdacf30c6b75025f6b0edf03765f30564d7ee29d45839cf87b84",
+      "size": 5594
+    },
+    "dev-docs/examples/swift-oneof/golden/flat-on.swift": {
+      "sha256": "550e96d970da1ab23d9ac18139f94666e50d41bc66dfda143a94a535af61a9cb",
+      "size": 5864
+    },
+    "dev-docs/examples/swift-oneof/golden/imported-off.swift": {
+      "sha256": "fa3d688b5c1e2bcdb3270c8189f8bb06d64e0804d557ecb72b835c8d2f5d2fea",
+      "size": 6066
+    },
+    "dev-docs/examples/swift-oneof/golden/imported-on.swift": {
+      "sha256": "2cff95c885a4e624f1d1b4b1796a667d98fabe29467fc4cdcf31dea0c986784a",
+      "size": 6381
+    },
+    "dev-docs/examples/swift-oneof/results/focused-commands.json": {
+      "sha256": "e429f6aa9ab9ff3496a288d2ae7093286f4e3975382c8f7be6151cc77a8a88fc",
+      "size": 4627
+    },
+    "dev-docs/examples/swift-oneof/results/go-kernel-equivalence.json": {
+      "sha256": "376b27ff4b1e41ee8844af7fee57a3b36d81211cf1d56507a94fcf8ebdb3f002",
+      "size": 3352
+    },
+    "dev-docs/examples/swift-oneof/results/native-example.json": {
+      "sha256": "7ae21fd27c27afb254313409ba7e0575d7e8638c37b15dd7b7daafdefe918dac",
+      "size": 11573
+    },
+    "dev-docs/examples/swift-oneof/results/settled-shared-preservation.log": {
+      "sha256": "1ae81caece110ebf69920aca2158a9cf3107a7a42b901b8eb773185932d155d1",
+      "size": 265
+    },
+    "dev-docs/examples/swift-oneof/results/settled-shared-preservation.xml": {
+      "sha256": "719bf6fba75fbad02b66e6c4db045e3a189d140ba60cf88b4b91905b5a3d26f6",
+      "size": 20886
+    },
+    "dev-docs/examples/swift-oneof/results/settled-swift-existing.log": {
+      "sha256": "cf91d0c74eb035e34b1fdd2d548694419923e188f7cd48b8376b0676fe8f4f88",
+      "size": 127
+    },
+    "dev-docs/examples/swift-oneof/results/settled-swift-existing.xml": {
+      "sha256": "dbdeb1d8992575b159a15a8691f5074564bb509ffadf073c68617e98ccb4cdfc",
+      "size": 3609
+    },
+    "dev-docs/examples/swift-oneof/results/settled-swift-feature.log": {
+      "sha256": "f6a3b0e0abfb1c65d7951887b8d326c66fe69ff9ef03eeec258cc633364eef33",
+      "size": 195
+    },
+    "dev-docs/examples/swift-oneof/results/settled-swift-feature.xml": {
+      "sha256": "aa2acd7a764ec4241acfd9a1bb5118bc4fd02789830285729d595084994bc34d",
+      "size": 15867
+    },
+    "dev-docs/examples/swift-oneof/results/settled-swift-wheel.log": {
+      "sha256": "0e8fa0a4ec4b528a68791d42b5dd2811cb78f82194f88b52a68319b08f8cdf05",
+      "size": 116
+    },
+    "dev-docs/examples/swift-oneof/results/settled-swift-wheel.xml": {
+      "sha256": "b5d56b0126360db26e80fd84ecfcffa72c380b0acedc96e6bd95661c31550f07",
+      "size": 1649
+    },
+    "dev-docs/examples/swift-oneof/results/source-after.json": {
+      "sha256": "1e948b6f157cb9520216a4f2686f98bbdee8398de3c3307e46ce0066316f0122",
+      "size": 10729
+    },
+    "dev-docs/examples/swift-oneof/results/source-before.json": {
+      "sha256": "1e948b6f157cb9520216a4f2686f98bbdee8398de3c3307e46ce0066316f0122",
+      "size": 10729
+    },
+    "dev-docs/examples/swift-oneof/run_example.py": {
+      "sha256": "bb197f38d6a80b842246133e2491fc9930e6e377bd77a69352370d7ddeed862c",
+      "size": 4205
+    },
+    "dev-docs/examples/swift-oneof/surface.taut.py": {
+      "sha256": "659edc0bc32858ab15af8a213e4f12758b62d216173a4f1692a97aebec019955",
+      "size": 282
+    },
+    "docs/SWIFT_API.md": {
+      "sha256": "d49616e3dce727721a9a4b5597cec4e3a87972e360ff770108a13656ac8f80ad",
+      "size": 11425
+    },
+    "pyproject.toml": {
+      "sha256": "411d18e422dc38a0d75f50cad8dc24595cf0a1ad3ec671e6ba7de11de4b7667c",
+      "size": 2155
+    },
+    "src/taut/cli.py": {
+      "sha256": "e99a7caa0c82ac4d625a29031a21e5bb93d81553d5ab8943a4238ff9fb301c09",
+      "size": 16188
+    },
+    "src/taut/corpus/parity_swift.py": {
+      "sha256": "2d1738c2d0aa6e7e04f2a3f545a8729c19f01c3ccc1e84f7eafcbf5b744b8d00",
+      "size": 15080
+    },
+    "src/taut/gen/go_runtime.py": {
+      "sha256": "a49582ab269e78e9158c9b5ee51a1a9fec08fb7699f50645ad55daa4c72d338b",
+      "size": 11314
+    },
+    "src/taut/gen/owned_runtime.py": {
+      "sha256": "3fd61d8b8067c6af1aa89127bfc76ae64082a8d8c68159ecde65fe2140d4091f",
+      "size": 8031
+    },
+    "src/taut/gen/runtime/swift/descriptors.swift": {
+      "sha256": "e577ede3592a9b3067dc8be5ef167ac963cbc548a403f83a8b9611f2b96be5bf",
+      "size": 19165
+    },
+    "src/taut/gen/runtime/swift/paths.swift": {
+      "sha256": "2729264314bf3a054b6ca69d60b708a8c697cd9cb528806ec6f38754abc6dcdd",
+      "size": 1099
+    },
+    "src/taut/gen/runtime/swift/reports.swift": {
+      "sha256": "4d3b3b633e6d21f79a84a07494ed985d3b8617f0e428b765657a31f1b01aaec9",
+      "size": 1350
+    },
+    "src/taut/gen/runtime/swift/validation.swift": {
+      "sha256": "ab9bf32a5e2c4f764093f96a17e87c0c2d90e9e3d16ad708172db64665ec8dc8",
+      "size": 3629
+    },
+    "src/taut/gen/scaffold.py": {
+      "sha256": "f74c1e01312edb4811fe034d5068ac7c41a3ff52cdd3371b0c630cd39669679a",
+      "size": 50409
+    },
+    "src/taut/gen/swift.py": {
+      "sha256": "4559857fba1ee03a627fe4cd548153557cd33328cedd31f88262131518987f5c",
+      "size": 16198
+    },
+    "src/taut/gen/swift_metadata.py": {
+      "sha256": "c973214d70757fc075e98434028cdd5997fadcea9119c7640f2beedca9b0ec17",
+      "size": 19702
+    },
+    "src/taut/gen/swift_runtime.py": {
+      "sha256": "bb640c3a01534183d308d52384ed89331f85161b759064d4bca81c551f46e354",
+      "size": 7374
+    },
+    "src/tests/test_cpp_go_distribution.py": {
+      "sha256": "a2a2db878610e015dbd15fba2ec3ac970d2787d9bd9b57e9226ca5f438395451",
+      "size": 6110
+    },
+    "src/tests/test_swift.py": {
+      "sha256": "eff509092eb9e1a621cc9542a39ac71a292ec1089bee30143bf4545f713e8c60",
+      "size": 71005
+    },
+    "src/tests/test_swift_distribution.py": {
+      "sha256": "8705e85353bbc2337fc5f37960a5f2fa68605d55aeffb881f8cad2e88252cf73",
+      "size": 3892
+    },
+    "src/tests/test_swift_oneof.py": {
+      "sha256": "2e359c5e4b090c0f5a7227c50f5b5c9f3038958f1fc5b3ef9c13ff516ef881cb",
+      "size": 43677
+    }
+  },
+  "self_hash": "Omitted recursively; containing future GWZ checkpoint binds this Preparation",
+  "focused_commands": "dev-docs/examples/swift-oneof/results/focused-commands.json",
+  "focused_results": [
+    {
+      "name": "settled-swift-feature",
+      "command": "python -m pytest src/tests/test_swift_oneof.py -q --basetemp=D:/projects/limbo/swift-oneof-scratch/settled-swift-feature --junitxml=D:/projects/limbo/swift-oneof-scratch/settled-swift-feature.xml",
+      "exit": 0,
+      "tests": 116,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "name": "settled-swift-existing",
+      "command": "python -m pytest src/tests/test_swift.py -m 'not gate' -q --basetemp=D:/projects/limbo/swift-oneof-scratch/settled-swift-existing --junitxml=D:/projects/limbo/swift-oneof-scratch/settled-swift-existing.xml",
+      "exit": 0,
+      "tests": 30,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "name": "settled-swift-wheel",
+      "command": "python -m pytest src/tests/test_swift_distribution.py src/tests/test_cpp_go_distribution.py -k 'swift or previous' -q --basetemp=D:/projects/limbo/swift-oneof-scratch/settled-swift-wheel --junitxml=D:/projects/limbo/swift-oneof-scratch/settled-swift-wheel.xml",
+      "exit": 0,
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "name": "settled-shared-preservation",
+      "command": "python -m pytest src/tests/test_go_oneof.py src/tests/test_scaffold.py src/tests/test_java_oneof.py::test_jvm_help_describes_supported_targets_json_files_and_defaults src/tests/test_js_ts_distribution.py::test_shared_help_preserves_jvm_and_ecma_methods_defaults_and_artifact_formats -q --basetemp=D:/projects/limbo/swift-oneof-scratch/settled-shared-preservation --junitxml=D:/projects/limbo/swift-oneof-scratch/settled-shared-preservation.xml",
+      "exit": 0,
+      "tests": 159,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    }
+  ],
+  "focused_overlap": "Counts overlap; do not add.159=145existingGoOneOf+12scaffold+2unchangedJVM/ECMAhelp.10=1actualSwiftwheeltest+9previous-ownerprelockjunctioncases.",
+  "deselections": {
+    "settled-swift-existing": [
+      "src/tests/test_swift.py::test_swift_parity_gate_is_green (duplicate wrapper; root owns final all16)"
+    ],
+    "settled-swift-wheel": [
+      "src/tests/test_cpp_go_distribution.py::test_pair_plans_all_targets_before_mutation",
+      "src/tests/test_cpp_go_distribution.py::test_compiler_wheel_isolated_native_source_package (C++/Go wheel; Swift wheel is separate current test)"
+    ]
+  },
+  "native_examples": {
+    "executions": 5,
+    "exit": 0,
+    "receipt": "dev-docs/examples/swift-oneof/results/native-example.json"
+  },
+  "actual_swift_wheel": {
+    "path": "D:\\projects\\limbo\\swift-oneof-scratch\\settled-swift-wheel\\test_compiler_wheel_isolated_s0\\dist\\taut_proto-0.10.0+local.swift.probe-py3-none-any.whl",
+    "sha256": "a9376b96d22e4d5c133004b42be70d77789bec78cdd6f8ab28260d80d32b7502",
+    "canonical_swift_resources": {
+      "cbor.swift": "4828ee6229d24a75da1813bb72982895085c571854d03008fbd2a878d80338f6",
+      "ext.swift": "9bf764a3ef3a64f74e2662b09a64044ed8d8c34ec319d5c7e4a8cae02e4297b3",
+      "swift/paths.swift": "2729264314bf3a054b6ca69d60b708a8c697cd9cb528806ec6f38754abc6dcdd",
+      "swift/descriptors.swift": "e577ede3592a9b3067dc8be5ef167ac963cbc548a403f83a8b9611f2b96be5bf",
+      "swift/reports.swift": "4d3b3b633e6d21f79a84a07494ed985d3b8617f0e428b765657a31f1b01aaec9",
+      "swift/validation.swift": "ab9bf32a5e2c4f764093f96a17e87c0c2d90e9e3d16ad708172db64665ec8dc8"
+    },
+    "isolation": "actual built/extracted wheel, Python -I -S generation, native source/package/defaultflat applications compile+run; no compiler imports in applications"
+  },
+  "go_preservation": {
+    "passed": 145,
+    "combined_scaffold_help_total": 159,
+    "exact_old_new_plans": 10,
+    "actual_old_new_go_api_bytes_equal_off_on": true,
+    "old_native_emitter_and_metadata_unchanged": true,
+    "receipt": "dev-docs/examples/swift-oneof/results/go-kernel-equivalence.json"
+  },
+  "protection": {
+    "user_five": {
+      "src/taut/facts.py": "586616da9e7eefc011793902a66636c32f2a44b44388750dacc2279ee25dfaca",
+      "src/taut/ir/dsl.py": "717e351c9e3119f910f6fe16136f6bce2481e3f621b92193554bd32131a9293e",
+      "src/tests/test_dsl.py": "205d3922aa8399eadf6affbb53e85fac914c584d0cc80664c235efca0a38ac78",
+      "src/tests/test_ir_v2.py": "17be85b78f8835c37fda6a728e1c376bce297b3eb6cdbb38c100763ba0195107",
+      "src/tests/test_oneof.py": "095f872aea844dbe92593defa4528ca113bc06ffdce280307ebbe7866d5d8b94"
+    },
+    "excluded35_hashes": {
+      "dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json": "4e92a8cabe8f5959a4113d8a7f2738a913c1c71ab26c60c34707597549b3b399",
+      "dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json": "f3b639e2bd1ab69b1355e7a9935359dc2f9797bcf899cf4fce7afed19a50c644",
+      "dev-docs/examples/python-oneof/generated/disabled/python/__init__.py": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+      "dev-docs/examples/python-oneof/generated/disabled/python/api.py": "31fbb8d65d4871dbf6a9025cff50f5cb3cc530448f44c327e92c1f8b98064ac7",
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py": "ad2bb0a2ddb372ab77e5e7d19873f44804c487c63a22d0c7b99852329b4944af",
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py": "e21299bef0b04c86bff376cf6a678f7b8720dc067438d551ffef54b9a95964fe",
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py": "69766dfeca243099e7bf7c54f088069f271fa60f61e03d4d916d893d6d38416c",
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py": "e473c8532d5840e6f374dca4ead4c3e28726f23ed7c058e84a79f052418cb9fa",
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py": "99e5fab316640eb0527e905b194610557d8301210ca61cd72358002d7d10a8fb",
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py": "153026e825045eb67883ac9b66b6ac9d4ffd6fbc64c2bc010fa9e973a2271f9e",
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py": "8cde71892ed7882b869bd299c13be37223e77e679ce04a59e9994b82dc9bec42",
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py": "7577578775f99603032555479e843056a12d8465b5aa439fe7371f4fb76b7347",
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py": "bd3d5e2e3d18980a19e4519477c84ad78084f5d2c25af4c5ccca6e8477779022",
+      "dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json": "14a3a65b8314dee620248029963ea92526bae09c5d126f685d29754db8b2f2d0",
+      "dev-docs/examples/python-oneof/generated/package/python/__init__.py": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+      "dev-docs/examples/python-oneof/generated/package/python/api.py": "5bbd3d845613cc9ef6704801c4e976c4900f654b13e33a8ab20d8d312975fa8c",
+      "dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json": "9521b809e235b325be1355485e0b526f6bc19e5a990852735c7198096c22e031",
+      "dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json": "1bdbd28eff437d7a2a7b8d34d5b8f5134968ec3adb154141319ecec9533b6ddf",
+      "dev-docs/examples/python-oneof/generated/source/python/__init__.py": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+      "dev-docs/examples/python-oneof/generated/source/python/api.py": "5bbd3d845613cc9ef6704801c4e976c4900f654b13e33a8ab20d8d312975fa8c",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py": "ad2bb0a2ddb372ab77e5e7d19873f44804c487c63a22d0c7b99852329b4944af",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py": "e21299bef0b04c86bff376cf6a678f7b8720dc067438d551ffef54b9a95964fe",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py": "69766dfeca243099e7bf7c54f088069f271fa60f61e03d4d916d893d6d38416c",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py": "e473c8532d5840e6f374dca4ead4c3e28726f23ed7c058e84a79f052418cb9fa",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/ext.py": "99e5fab316640eb0527e905b194610557d8301210ca61cd72358002d7d10a8fb",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/facts.py": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/rules.py": "153026e825045eb67883ac9b66b6ac9d4ffd6fbc64c2bc010fa9e973a2271f9e",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/validation.py": "eb33734525330f131092c3bda540ef71742b7cd0eb1074e7aa72a92049db8903",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py": "8cde71892ed7882b869bd299c13be37223e77e679ce04a59e9994b82dc9bec42",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py": "7577578775f99603032555479e843056a12d8465b5aa439fe7371f4fb76b7347",
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py": "bd3d5e2e3d18980a19e4519477c84ad78084f5d2c25af4c5ccca6e8477779022",
+      "dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl": "7ff8c48266ec3814a4fea75c4afe94f1ffb1e1193c0a9134706ee99ad4f7fd44"
+    },
+    "unchanged_other_previous_tracked": 776,
+    "all_indices_staged_zero": true,
+    "root_tracked_clean": true,
+    "other_members_clean": true,
+    "reference_heads_unchanged": true,
+    "cbor_swift_ext_swift_unchanged": true,
+    "dependencies_unchanged": "pyproject change is Swift resource glob only; no dependency/lock/manifest upgrades"
+  },
+  "source_semantics_limits": [
+    "Virtual selection deliberately incomplete",
+    "No invented native JSON route",
+    "Direct recursive final classes only; collection recursion/ordinary values stay structs",
+    "No promised binary resilience for an arbitrarily changed Swift child layout; rebuild against replacement module then retain parent expected-fact checks",
+    "Flat same-module swiftc inputs need unique basenames; byte-identical filename-only copies, no generated content rewriting",
+    "Python authoring namespace retains its own rules; Swift Unicode/emoji fixture uses existing native IR without changing user DSL",
+    "Interruption retries recover or refuse unchanged; no silent orphan adoption",
+    "No cyclic-object serialization guarantee"
+  ],
+  "pending": [
+    "Root reconcile exact allowlist and authorize one scoped local GWZ checkpoint plus managed workspace receipt",
+    "Exactly two peer-blind original reviewers total: Code+Surface and State; isolated verified full-history clones, no saved-workspace builds",
+    "One root-assigned settled global/full16 gate; final verdicts consume receipt",
+    "Originating closure of any merged bounded findings; no self-closure",
+    "Coordinator final GitHub main checkpoint pushes and actual remote HEAD verification under existing user authorization"
+  ],
+  "reviewers_launched": 0,
+  "feature_staging_commits_pushes": "None after controlled user merge; HOLD",
+  "global_evidence": "No broad/full16 run at this source;3historical baseline failures remain visible. Old3enum reservation deselections obsolete.",
+  "freeze": "Root explicitly freezes production at source hash above; only this required metadata/receipt completion is allowed"
+}

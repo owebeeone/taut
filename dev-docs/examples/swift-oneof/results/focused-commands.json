@@ -1,0 +1,81 @@
+{
+  "source_inventory_sha256": "51c92bf28ff9d9936bb89f1c6a9225fcf2ce6858f816eebef406c6e74b5ee156",
+  "source_unchanged_before_after": true,
+  "runs": [
+    {
+      "name": "settled-swift-feature",
+      "command": "python -m pytest src/tests/test_swift_oneof.py -q --basetemp=D:/projects/limbo/swift-oneof-scratch/settled-swift-feature --junitxml=D:/projects/limbo/swift-oneof-scratch/settled-swift-feature.xml",
+      "exit": 0,
+      "tests": 116,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "name": "settled-swift-existing",
+      "command": "python -m pytest src/tests/test_swift.py -m 'not gate' -q --basetemp=D:/projects/limbo/swift-oneof-scratch/settled-swift-existing --junitxml=D:/projects/limbo/swift-oneof-scratch/settled-swift-existing.xml",
+      "exit": 0,
+      "tests": 30,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "name": "settled-swift-wheel",
+      "command": "python -m pytest src/tests/test_swift_distribution.py src/tests/test_cpp_go_distribution.py -k 'swift or previous' -q --basetemp=D:/projects/limbo/swift-oneof-scratch/settled-swift-wheel --junitxml=D:/projects/limbo/swift-oneof-scratch/settled-swift-wheel.xml",
+      "exit": 0,
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "name": "settled-shared-preservation",
+      "command": "python -m pytest src/tests/test_go_oneof.py src/tests/test_scaffold.py src/tests/test_java_oneof.py::test_jvm_help_describes_supported_targets_json_files_and_defaults src/tests/test_js_ts_distribution.py::test_shared_help_preserves_jvm_and_ecma_methods_defaults_and_artifact_formats -q --basetemp=D:/projects/limbo/swift-oneof-scratch/settled-shared-preservation --junitxml=D:/projects/limbo/swift-oneof-scratch/settled-shared-preservation.xml",
+      "exit": 0,
+      "tests": 159,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    }
+  ],
+  "overlap": "Counts overlap; do not add.159=145existingGoOneOf+12scaffold+2unchangedJVM/ECMAhelp.10=1actualSwiftwheeltest+9previous-ownerprelockjunctioncases.",
+  "deselections": {
+    "settled-swift-existing": [
+      "src/tests/test_swift.py::test_swift_parity_gate_is_green (duplicate wrapper; root owns final all16)"
+    ],
+    "settled-swift-wheel": [
+      "src/tests/test_cpp_go_distribution.py::test_pair_plans_all_targets_before_mutation",
+      "src/tests/test_cpp_go_distribution.py::test_compiler_wheel_isolated_native_source_package (C++/Go wheel; Swift wheel is separate current test)"
+    ]
+  },
+  "environment": {
+    "python": "CPython3.13.5",
+    "activation": "D:/projects/limbo/toolchain-readiness-2026-11-02/Activate-TautToolchains.ps1",
+    "PYTHONPATH": "D:/projects/limbo/taut-dev/taut/src;C:/Users/gianni/AppData/Local/Programs/Python/Python311/Lib/site-packages",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "utf8": true
+  },
+  "wheel": {
+    "path": "D:\\projects\\limbo\\swift-oneof-scratch\\settled-swift-wheel\\test_compiler_wheel_isolated_s0\\dist\\taut_proto-0.10.0+local.swift.probe-py3-none-any.whl",
+    "sha256": "a9376b96d22e4d5c133004b42be70d77789bec78cdd6f8ab28260d80d32b7502",
+    "canonical_swift_resources": {
+      "cbor.swift": "4828ee6229d24a75da1813bb72982895085c571854d03008fbd2a878d80338f6",
+      "ext.swift": "9bf764a3ef3a64f74e2662b09a64044ed8d8c34ec319d5c7e4a8cae02e4297b3",
+      "swift/paths.swift": "2729264314bf3a054b6ca69d60b708a8c697cd9cb528806ec6f38754abc6dcdd",
+      "swift/descriptors.swift": "e577ede3592a9b3067dc8be5ef167ac963cbc548a403f83a8b9611f2b96be5bf",
+      "swift/reports.swift": "4d3b3b633e6d21f79a84a07494ed985d3b8617f0e428b765657a31f1b01aaec9",
+      "swift/validation.swift": "ab9bf32a5e2c4f764093f96a17e87c0c2d90e9e3d16ad708172db64665ec8dc8"
+    },
+    "isolation": "actual built/extracted wheel, Python -I -S generation, native source/package/defaultflat applications compile+run; no compiler imports in applications"
+  },
+  "examples": {
+    "command": "python dev-docs/examples/swift-oneof/run_example.py --out D:/projects/limbo/swift-oneof-scratch/settled-example",
+    "native_executions": 5,
+    "all_exit": 0,
+    "source_package_imported_supplied_python_normalized": true,
+    "default_flat_off_on": true
+  },
+  "no_global": "No broad/full16 run or final-global-green claim; coordinator-assigned settled gate pending",
+  "development_attempts": "Earlier failed development runs remain under swift-oneof-scratch; only named settled receipts are final focused evidence. No baseline failures or authoring tests deselected here."
+}

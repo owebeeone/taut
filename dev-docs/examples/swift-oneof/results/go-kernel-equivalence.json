@@ -1,0 +1,110 @@
+{
+  "accepted_source": "83291c2c7c7b126e41625bd29623870330f3b0d6 (Go bytes identical acceptedCppGo14a2251d)",
+  "original_kernel_sha256": "ddf8e3d86f058a7681a5b5c37db326fd8f09d07431e9a041781c8bcb3dc8abf4",
+  "checks": [
+    {
+      "validation": false,
+      "step": 0,
+      "mode": "source",
+      "consume": false,
+      "writes": 7,
+      "deletes": 0,
+      "exact_maps_equal": true,
+      "api_sha256": "9027129be67776297d29a32e6fcaf23c60810b2443b950e8ff0d318079a0976b"
+    },
+    {
+      "validation": false,
+      "step": 1,
+      "mode": "source",
+      "consume": false,
+      "writes": 7,
+      "deletes": 0,
+      "exact_maps_equal": true,
+      "api_sha256": "9027129be67776297d29a32e6fcaf23c60810b2443b950e8ff0d318079a0976b"
+    },
+    {
+      "validation": false,
+      "step": 2,
+      "mode": "package",
+      "consume": true,
+      "writes": 3,
+      "deletes": 0,
+      "exact_maps_equal": true,
+      "api_sha256": "9027129be67776297d29a32e6fcaf23c60810b2443b950e8ff0d318079a0976b"
+    },
+    {
+      "validation": false,
+      "step": 3,
+      "mode": "package",
+      "consume": false,
+      "writes": 2,
+      "deletes": 5,
+      "exact_maps_equal": true,
+      "api_sha256": "9027129be67776297d29a32e6fcaf23c60810b2443b950e8ff0d318079a0976b"
+    },
+    {
+      "validation": false,
+      "step": 4,
+      "mode": "source",
+      "consume": false,
+      "writes": 7,
+      "deletes": 0,
+      "exact_maps_equal": true,
+      "api_sha256": "9027129be67776297d29a32e6fcaf23c60810b2443b950e8ff0d318079a0976b"
+    },
+    {
+      "validation": true,
+      "step": 0,
+      "mode": "source",
+      "consume": false,
+      "writes": 9,
+      "deletes": 0,
+      "exact_maps_equal": true,
+      "api_sha256": "faf3bfebb0522866fcc81e1c4bdb0d9fdcc1258abff44c59191d5c3262dc8348"
+    },
+    {
+      "validation": true,
+      "step": 1,
+      "mode": "source",
+      "consume": false,
+      "writes": 9,
+      "deletes": 0,
+      "exact_maps_equal": true,
+      "api_sha256": "faf3bfebb0522866fcc81e1c4bdb0d9fdcc1258abff44c59191d5c3262dc8348"
+    },
+    {
+      "validation": true,
+      "step": 2,
+      "mode": "package",
+      "consume": true,
+      "writes": 3,
+      "deletes": 0,
+      "exact_maps_equal": true,
+      "api_sha256": "faf3bfebb0522866fcc81e1c4bdb0d9fdcc1258abff44c59191d5c3262dc8348"
+    },
+    {
+      "validation": true,
+      "step": 3,
+      "mode": "package",
+      "consume": false,
+      "writes": 2,
+      "deletes": 7,
+      "exact_maps_equal": true,
+      "api_sha256": "faf3bfebb0522866fcc81e1c4bdb0d9fdcc1258abff44c59191d5c3262dc8348"
+    },
+    {
+      "validation": true,
+      "step": 4,
+      "mode": "source",
+      "consume": false,
+      "writes": 9,
+      "deletes": 0,
+      "exact_maps_equal": true,
+      "api_sha256": "faf3bfebb0522866fcc81e1c4bdb0d9fdcc1258abff44c59191d5c3262dc8348"
+    }
+  ],
+  "accepted_scaffold_sha256": "cc7285e1ce34594d773fdc624dd76774edebe79893897f7a30756c7bd7e227d9",
+  "actual_old_new_go_api_bytes_equal_off_on": true,
+  "unchanged_native_go_emitter_and_metadata_bytes": true,
+  "semantics": "10exact old/new write-byte/deletion-set comparisons on identical physical roots; existing76native/state cases separately PASS including40persisted retirement cutoffs"
+}

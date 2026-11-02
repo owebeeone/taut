@@ -17,13 +17,21 @@ Writes, into `<out>/swift/`:
 
 | file | what |
 | --- | --- |
-| `api.swift` | native types (`enum`/`struct`) + `toCbor`/`fromCbor`, and per message its bounds and `decode` |
+| `api.swift` | native types, codecs, bounds, mandatory descriptors and optional validation methods |
 | `cbor.swift` | the deterministic-CBOR runtime (`Cbor`, `encode`, `tryDecode`, `CborError`) |
 | `ext.swift` | extension accessors (`extSet`/`extGet`/`extClear`) |
+| `paths.swift` / `descriptors.swift` | immutable metadata, paths and typed adapters |
+| `reports.swift` / `validation.swift` | shared reports/engine, only with `--with-validation` |
 | `client.swift` / `server.swift` | typed stubs over a transport (see [Server.md](Server.md)) |
 
-All files live in one module — `api.swift` refers to `Cbor` directly (no imports).
-Compile the lot with `swiftc *.swift`; no third-party packages.
+`--with-runtime` is the alias for `--runtime source`. Build the runtime sources
+once as the shared `TautFoundation` module; generated APIs import that owner.
+Without either runtime option, legacy supplied mode emits no runtime or import:
+compile the canonical runtime once in the application module alongside schemas.
+Explicit `module` bindings also support an imported supplied owner. Package mode
+requires a real application-supplied module binding; it never installs a package.
+See [the executable build examples](../dev-docs/examples/swift-oneof/README.md)
+for complete module, link, package and flat supplied commands.
 
 ## 2. Native types
 
@@ -35,8 +43,8 @@ public enum TaskState: Int64 { case `open` = 0; case doing = 1; case done = 2 }
 // CborError.unknownEnum for any other value
 ```
 
-Messages are structs with `toCbor` / `fromCbor`, and a decode from bytes, `decode`,
-under the message's bounds:
+Ordinary messages are structs with `toCbor` / `fromCbor`, and a decode from bytes,
+`decode`, under the message's bounds:
 
 ```swift
 public struct User { public var id: Int64; public var name: String }
@@ -57,12 +65,19 @@ Field mapping: `INT → Int64`, `STR → String`, `BYTES → [UInt8]`, `BOOL →
 but never on the wire. A generated `public init(…)` keeps values constructible
 cross-module.
 
+Only direct recursive stored-message components become `final class`, because
+Swift cannot store an optional self/mutually recursive struct inline. Ordinary
+and collection-indirect recursive records retain value semantics. No message
+base/protocol or per-field wrapper is introduced; required initializer arguments
+remain required. Reference cycles are explicit validation issues.
+
 ## 3. Encode / decode
 
 A message ↔ CBOR bytes goes through the generated `toCbor` plus the runtime `encode`,
 and back through the generated `decode`:
 
 ```swift
+import TautFoundation  // for explicitly shared module modes
 let bytes: [UInt8] = encode(task.toCbor())   // serialize
 let task = try Task.decode(bytes)            // deserialize, under Task's bounds
 ```
@@ -120,8 +135,8 @@ if not a map) do not throw. Float narrowing uses native `Float16`.
 
 ## 5. Forward-compatibility (unknown-field preservation)
 
-Generate with `--forward-compat` and each struct gains
-`public var wire_residual: [(Int64, Cbor)]`. On `fromCbor`, tags the struct doesn't
+Generate with `--forward-compat` and each message gains
+`public var wire_residual: [(Int64, Cbor)]`. On `fromCbor`, tags the message doesn't
 name are captured there; on `toCbor`, they're appended and `encode` sorts every key
 ascending — so a node that *decodes → edits → re-encodes* a newer message never
 drops fields it doesn't understand. (Swift's `encode` sorts keys, so the residual
@@ -161,9 +176,29 @@ extension rides in `wire_residual` and survives.
 
 ## 7. Consuming the runtime
 
-`cbor.swift` / `ext.swift` are vendored, dependency-free source — drop them into the
-module alongside `api.swift`, which refers to `Cbor` directly. `swiftc *.swift` is
-the only toolchain. The bytes match every other taut target.
+One canonical source closure supplies codecs, descriptors and optional validation.
+It can be compiled once in the default supplied application module, or once in an
+explicitly shared imported module for source/package/supplied bindings. Every
+schema must use that same actual owner for codec, descriptor and report types.
+Applications need Swift and its standard libraries; no Taut compiler or schema
+loader participates in their build/runtime. Package selection performs no install,
+discovery or fallback. Native types from separately generated disabled children
+are reused through explicit external mappings and mandatory typed metadata.
+
+When several `api.swift` files share one application module, give the build inputs
+distinct basenames using byte-identical copies; Swift rejects duplicate basenames.
+The [Swift example](../dev-docs/examples/swift-oneof/README.md) includes those exact
+commands, output ownership rules and independently compiled child bindings.
+
+Every message publishes `static let descriptor` and `static var schemaDescriptor`
+with complete immutable fields/types/enums/options/reservations/constraints.
+`--with-validation` adds `validate(recursive: Bool = true) -> ValidationReport`
+and `isValid(recursive: Bool = true) -> Bool` to every message. Both call one shared
+engine. Reports own their paths and collections; `isValid` and `isComplete` are
+computed properties. Virtual selection contributes a deferred check, making a
+report incomplete and the Boolean false. Local scope checks only the root;
+recursive scope traverses every populated owned child. Drafts remain mutable and
+serialize populated payloads without implicit validation or repair.
 
 ## 8. Changed in v0.10.0
 

@@ -362,8 +362,10 @@ def _swift_ty(t: TypeRef | None) -> str:
     raise TypeError(t)
 
 
-def swift_api(schema: Schema, forward_compat: bool = False) -> str:
-    return _swift.emit_types(schema, forward_compat)
+def swift_api(schema: Schema, forward_compat: bool = False, *, validation=False,
+              external_types=None, identity=None, runtime_module='') -> str:
+    return _swift.emit_types(schema, forward_compat, validation=validation,
+        external_types=external_types, identity=identity, runtime_module=runtime_module)
 
 
 def swift_client(schema: Schema, svc: ServiceDef) -> str:
@@ -605,6 +607,7 @@ def emit(
     typescript_external_types: dict | None = None,
     cpp_external_types: dict | None = None,
     go_external_types: dict | None = None,
+    swift_external_types: dict | None = None,
 ) -> list[Path]:
     """Generate per-language code from an IR (the engine behind the `tautc` CLI).
 
@@ -644,11 +647,17 @@ def emit(
     if errors:
         raise ValueError("; ".join(errors))
     constrained = any(f.oneof or f.cases for m in schema.messages.values() for f in m.fields)
-    supported = {"python", "rust", "java", "kotlin", "js", "typescript", "cpp", "go"}
+    supported = {"python", "rust", "java", "kotlin", "js", "typescript", "cpp", "go", "swift"}
     if (validation or constrained) and set(lang_keys) - supported:
-        raise ValueError("oneof/validation supports Python, Rust, Java, Kotlin, JavaScript, TypeScript, C++ and Go only; explicitly select supported languages")
+        raise ValueError("oneof/validation supports Python, Rust, Java, Kotlin, JavaScript, TypeScript, C++, Go and Swift only; explicitly select supported languages")
     if mode == "package" and set(lang_keys) - supported:
-        raise ValueError("package runtime binding is implemented for Python, Rust, Java, Kotlin, JavaScript, TypeScript, C++ and Go only")
+        raise ValueError("package runtime binding is implemented for Python, Rust, Java, Kotlin, JavaScript, TypeScript, C++, Go and Swift only")
+    swift_binding = None
+    if "swift" in lang_keys:
+        from .swift_runtime import binding as resolve_swift_binding
+        swift_binding = resolve_swift_binding(runtime_bindings, out_dir / "swift", mode, validation=validation)
+    if swift_external_types is not None and "swift" not in lang_keys:
+        raise ValueError("Swift external types require a swift generation target")
     cpp_binding = None
     if "cpp" in lang_keys:
         from .cpp_runtime import binding as resolve_cpp_binding
@@ -754,11 +763,15 @@ def emit(
     typescript_texts = {}
     cpp_texts = {}
     go_texts = {}
+    swift_texts = {}
     for lang in lang_keys:
         ext, api_fn, client_fn, server_fn = _LANGS[lang]
         d = out_dir / lang
         api_path = d / f"api.{ext}"
         api_kwargs = {"forward_compat": forward_compat}
+        if lang == "swift":
+            api_kwargs.update(validation=validation, external_types=swift_external_types,
+                              identity=schema_identity, runtime_module=swift_binding[0])
         if lang == "cpp":
             api_kwargs.update(validation=validation, external_types=cpp_external_types, identity=schema_identity)
         if lang == "go":
@@ -807,10 +820,12 @@ def emit(
             cpp_texts[f"api.{ext}"] = api_text
         elif lang == "go":
             go_texts[f"api.{ext}"] = api_text
+        elif lang == "swift":
+            swift_texts[f"api.{ext}"] = api_text
         else:
             all_writes[api_path] = api_text.encode("utf-8")
         written.append(api_path)
-        if runtime and lang in _RUNTIMES and lang not in ("rust", "java", "kotlin", "js", "typescript", "cpp", "go"):
+        if runtime and lang in _RUNTIMES and lang not in ("rust", "java", "kotlin", "js", "typescript", "cpp", "go", "swift"):
             for rel, resource in _RUNTIMES[lang]:
                 if not _runtime_exists(resource):
                     continue   # e.g. ext.<lang> before Phase 2 — vendored once its file lands
@@ -840,11 +855,20 @@ def emit(
                     cpp_texts[path.name] = content
                 elif lang == "go":
                     go_texts[path.name] = content
+                elif lang == "swift":
+                    swift_texts[path.name] = content
                 else:
                     all_writes[path] = content.encode("utf-8")
                 written.append(path)
     plans = []
     lock_roots = []
+    if "swift" in lang_keys:
+        from .swift_runtime import plan_outputs as swift_plan_outputs, canonical_path as swift_canonical_path
+        directory = swift_canonical_path(out_dir / "swift")
+        _, source_root, consume_source = swift_binding
+        lock_roots.extend([directory, source_root])
+        plans.append((directory, source_root, directory / ".taut-swift-outputs.json", swift_plan_outputs,
+                      swift_texts, {"consume_source": consume_source, "external": bool(swift_external_types)}))
     if "cpp" in lang_keys:
         from .cpp_runtime import plan_outputs as cpp_plan_outputs, canonical_path as cpp_canonical_path
         directory = cpp_canonical_path(out_dir / "cpp")
@@ -941,11 +965,12 @@ def emit_all(schema: Schema, service_name: str, out_dir: Path, *, runtime: bool 
              runtime_bindings: dict | None = None, python_external_types=None,
              schema_identity=None, langs=None, rust_external_types=None, java_external_types=None, kotlin_external_types=None,
              js_external_types=None, typescript_external_types=None,
-             cpp_external_types=None, go_external_types=None) -> list[Path]:
+             cpp_external_types=None, go_external_types=None, swift_external_types=None) -> list[Path]:
     """Back-compat: api + client/server for one service, all languages."""
     return emit(schema, out_dir, services=[service_name], runtime=runtime, runtime_mode=runtime_mode,
                 validation=validation, runtime_bindings=runtime_bindings,
                 python_external_types=python_external_types, schema_identity=schema_identity, langs=langs,
                 rust_external_types=rust_external_types, java_external_types=java_external_types, kotlin_external_types=kotlin_external_types,
                 js_external_types=js_external_types, typescript_external_types=typescript_external_types,
-                cpp_external_types=cpp_external_types, go_external_types=go_external_types)
+                cpp_external_types=cpp_external_types, go_external_types=go_external_types,
+                swift_external_types=swift_external_types)
