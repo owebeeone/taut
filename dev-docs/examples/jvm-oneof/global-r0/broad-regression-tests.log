@@ -1,0 +1,102 @@
+........................................................................ [  4%]
+........................................................................ [  8%]
+.................................................F...................... [ 13%]
+........................................................................ [ 17%]
+..............FF........................................................ [ 22%]
+........................................................................ [ 26%]
+........................................................................ [ 30%]
+........................................................................ [ 35%]
+........................................................................ [ 39%]
+........................................................................ [ 44%]
+........................................................................ [ 48%]
+........................................................................ [ 53%]
+........................................................................ [ 57%]
+......................................sss............................... [ 61%]
+........................................................................ [ 66%]
+........................................................................ [ 70%]
+........................................................................ [ 75%]
+........................................................................ [ 79%]
+........................................................................ [ 84%]
+.....................................................................s.. [ 88%]
+........................................................................ [ 92%]
+........................................................................ [ 97%]
+...........................................                              [100%]
+================================== FAILURES ===================================
+______ test_proto_api_surface_extensions_doc_exists_and_covers_contract _______
+
+    def test_proto_api_surface_extensions_doc_exists_and_covers_contract():
+        doc = ROOT / "dev-docs" / "TautProtoApiSurfaceExtensions.md"
+>       text = doc.read_text()
+               ^^^^^^^^^^^^^^^
+
+..\..\taut-dev\taut\src\tests\test_dev_docs.py:9: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_abc.py:632: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('D:/projects/limbo/taut-dev/taut/dev-docs/TautProtoApiSurfaceExtensions.md')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: 'D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\TautProtoApiSurfaceExtensions.md'
+
+C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\pathlib\_local.py:537: FileNotFoundError
+______________ test_go_runtime_and_parity_runner_are_gofmt_clean ______________
+
+tmp_path = WindowsPath('D:/projects/limbo/jvm-oneof-scratch/global-gate-r0/pytest-temp/test_go_runtime_and_parity_run0')
+
+    def test_go_runtime_and_parity_runner_are_gofmt_clean(tmp_path):
+        gofmt = shutil.which("gofmt")
+        if gofmt is None:
+            pytest.skip("gofmt not installed")
+        runner = tmp_path / "main.go"
+        runner.write_text(parity_go._source())
+        runtime = sorted(str(p) for p in RUNTIME.glob("*.go"))
+        result = subprocess.run([gofmt, "-l", str(runner), *runtime], capture_output=True, text=True, check=False)
+>       assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+E       AssertionError: assert (0, 'D:\\proj...ain.go\n', '') == (0, '', '')
+E         
+E         At index 1 diff: 'D:\\projects\\limbo\\jvm-oneof-scratch\\global-gate-r0\\pytest-temp\\test_go_runtime_and_parity_run0\\main.go\n' != ''
+E         Use -v to get more diff
+
+..\..\taut-dev\taut\src\tests\test_go.py:433: AssertionError
+______________________ test_generated_go_is_gofmt_clean _______________________
+
+tmp_path = WindowsPath('D:/projects/limbo/jvm-oneof-scratch/global-gate-r0/pytest-temp/test_generated_go_is_gofmt_cle0')
+
+    def test_generated_go_is_gofmt_clean(tmp_path):
+        gofmt = shutil.which("gofmt")
+        if gofmt is None:
+            pytest.skip("gofmt not installed")
+        paths = []
+        for name, source in _generated_go().items():
+            paths.append(tmp_path / f"{name}.go")
+            paths[-1].write_text(source)
+        result = subprocess.run([gofmt, "-l", *map(str, paths)], capture_output=True, text=True, check=False)
+>       assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+E       AssertionError: assert (0, 'D:\\proj..._fc.go\n', '') == (0, '', '')
+E         
+E         At index 1 diff: 'D:\\projects\\limbo\\jvm-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\glade.go\nD:\\projects\\limbo\\jvm-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\glade_fc.go\nD:\\projects\\limbo\\jvm-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\griplab.go\nD:\\projects\\limbo\\jvm-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\griplab_fc.go\nD:\\projects\\limbo\\jvm-oneof-scratch\\global-gate-r0\\pytest-temp\\test_generated_go_is_gofmt_cle0\\parity_int.go\nD:...
+E         
+E         ...Full output truncated (2 lines hidden), use '-vv' to show
+
+..\..\taut-dev\taut\src\tests\test_go.py:483: AssertionError
+=========================== short test summary info ===========================
+FAILED ..\..\taut-dev\taut\src\tests\test_dev_docs.py::test_proto_api_surface_extensions_doc_exists_and_covers_contract
+FAILED ..\..\taut-dev\taut\src\tests\test_go.py::test_go_runtime_and_parity_runner_are_gofmt_clean
+FAILED ..\..\taut-dev\taut\src\tests\test_go.py::test_generated_go_is_gofmt_clean
+3 failed, 1620 passed, 4 skipped, 8 deselected in 797.86s (0:13:17)

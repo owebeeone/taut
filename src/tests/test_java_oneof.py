@@ -461,3 +461,112 @@ def test_compatible_unequal_runtime_build_labels_link(tmp_path,jar):
         p=tmp_path/'runtime-src'/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
     runtime=tmp_path/'runtime';compile_java(runtime,sorted((tmp_path/'runtime-src').rglob('*.java')))
     assert 'PASS' in execute(app,'taut.Patch',dependencies=(runtime,)).stdout
+
+@pytest.mark.parametrize('child_mode,parent_mode',[('source','source'),('package','package'),('source','package'),('package','source')])
+@pytest.mark.parametrize('validation',[False,True])
+def test_reordered_external_fields_and_cases_compose(tmp_path,jar,descriptor_jar,child_mode,parent_mode,validation):
+    from taut.ir.dsl import OneOf,Case
+    from taut.ir.export import schema_json
+    from taut.gen.java_metadata import fingerprint
+    e=Enum('OrderingChoice',first=0,second=1,empty=2)
+    child=schema(e,Child=Msg(note=F(4,STR,optional=True),
+                           data=F(3,STR,Case(tag=e.first),Case(tag=e.second)),
+                           tag=F(1,OneOf(e)),amount=F(2,INT,optional=True)))
+    reordered=dataclasses.replace(child.messages['Child'],fields=tuple(
+        dataclasses.replace(f,cases=tuple(reversed(f.cases)))
+        for f in reversed(child.messages['Child'].fields)))
+    parent=dataclasses.replace(child,messages={'Child':reordered,
+        **schema(Parent=Msg(child=F(1,Ref('Child')))).messages})
+    # Fingerprinting is observational and agrees with published field/case order.
+    facts=schema_json(parent)['messages'][0];before=json.dumps(facts,sort_keys=True)
+    assert fingerprint(facts)==fingerprint(schema_json(child)['messages'][0])
+    assert json.dumps(facts,sort_keys=True)==before
+    if 'source' in (child_mode,parent_mode):
+        owner=tmp_path/'owner';bindings={'java':{'source_root':str(owner)}}
+        emit(schema(RuntimeUser=Msg()),tmp_path/'runtime-user',langs=['java'],services=[],runtime_mode='source',validation=validation,runtime_bindings=bindings)
+        foundation=tmp_path/'foundation'
+    else:
+        owner=None;foundation=jar if validation else descriptor_jar
+        bindings={'java':{'artifact':str(foundation)}}
+    emit(child,tmp_path/'child',langs=['java'],services=[],runtime_mode=child_mode,runtime_bindings=bindings,schema_identity='child-order')
+    cd=tmp_path/'child/java';child_bytes=(cd/'api.java').read_bytes()
+    if owner:compile_java(foundation,sorted(owner.rglob('*.java')))
+    cc=tmp_path/'child-classes';compile_java(cc,[cd/'api.java'],dependencies=(foundation,))
+    emit(parent,tmp_path/'parent',langs=['java'],services=[],runtime_mode=parent_mode,validation=validation,
+         java_external_types=external(['OrderingChoice','Child']),runtime_bindings=bindings,schema_identity='parent-order')
+    assert (cd/'api.java').read_bytes()==child_bytes
+    assert ' validate(' not in child_bytes.decode('utf-8')
+    checks='''if(p.isValid() || !p.isValid(false) || !p.validate().issues().get(0).code().equals("oneof.payload_missing"))throw new AssertionError();c.data="";if(!p.isValid())throw new AssertionError();''' if validation else 'c.data="";'
+    pd=tmp_path/'parent/java'
+    (pd/'Reordered.java').write_text('''package taut;
+public class Reordered {public static void main(String[]a){
+ Child c=new Child();c.tag=OrderingChoice.FIRST;Parent p=new Parent();p.child=c;
+ if(Parent.descriptor().fields().get(0).type().message()!=Child.descriptor())throw new AssertionError("split child");
+ if(!Child.descriptor().fields().get(0).name().equals("tag"))throw new AssertionError("field order");
+ '''+checks+'''
+ Parent copy=Parent.decode(Cbor.encode(p.toCbor()));
+ if(copy.child.tag!=OrderingChoice.FIRST || !copy.child.data.equals(""))throw new AssertionError("codec");
+ System.out.println("PASS");}}
+''',encoding='utf-8')
+    pc=tmp_path/'parent-classes';compile_java(pc,sorted(pd.rglob('*.java')),dependencies=(cc,foundation))
+    assert 'PASS' in execute(pc,'taut.Reordered',dependencies=(cc,foundation)).stdout
+
+
+@pytest.mark.parametrize('difference',['field','rule','reservation','effective'])
+def test_normalized_external_facts_still_reject_real_changes(tmp_path,jar,difference):
+    from taut.ir.dsl import OneOf,Case
+    e=Enum('MismatchChoice',first=0,second=1,empty=2)
+    child=schema(e,Child=Msg(tag=F(1,OneOf(e)),data=F(2,STR,Case(tag=e.first),Case(tag=e.second))))
+    emit(child,tmp_path/'child',langs=['java'],services=[],runtime_mode='package')
+    cc=tmp_path/'cc';compile_java(cc,[tmp_path/'child/java/api.java'],dependencies=(jar,))
+    m=child.messages['Child'];fields=list(reversed(m.fields))
+    if difference=='field':fields[0]=dataclasses.replace(fields[0],type=INT)
+    elif difference=='rule':fields[0]=dataclasses.replace(fields[0],cases=fields[0].cases[:1])
+    changed=dataclasses.replace(m,fields=tuple(fields),reserved_names=('retired',) if difference=='reservation' else ())
+    parent=dataclasses.replace(child,messages={'Child':changed,**schema(Parent=Msg(child=F(1,Ref('Child')))).messages},options={'max_depth':4} if difference=='effective' else {})
+    emit(parent,tmp_path/'parent',langs=['java'],services=[],runtime_mode='package',validation=True,java_external_types=external(['MismatchChoice','Child']))
+    pd=tmp_path/'parent/java';(pd/'RealMismatch.java').write_text('package taut;public class RealMismatch{public static void main(String[]a){Parent.descriptor();}}',encoding='utf-8')
+    pc=tmp_path/'pc';compile_java(pc,sorted(pd.rglob('*.java')),dependencies=(cc,jar))
+    r=execute(pc,'taut.RealMismatch',dependencies=(cc,jar),ok=False)
+    assert r.returncode and 'imported message facts mismatch' in r.stderr
+
+
+@pytest.mark.parametrize('mode',['source','package'])
+@pytest.mark.parametrize('validation',[False,True])
+def test_oneof_signed_i64_enum_values_compile_and_run(tmp_path,jar,mode,validation):
+    from taut.ir.dsl import OneOf,Case
+    e=Enum('WideTag',below_int=-(1<<31)-1,above_int=1<<31,low=-(1<<63),high=(1<<63)-1,empty=0)
+    s=schema(e,Wide=Msg(kind=F(1,OneOf(e)),data=F(2,STR,Case(kind=e.below_int),Case(kind=e.above_int),Case(kind=e.low),Case(kind=e.high))))
+    emit(s,tmp_path,langs=['java'],services=[],runtime_mode=mode,validation=validation)
+    d=tmp_path/'java';checks='''boolean selected=tag!=WideTag.EMPTY;if(value.isValid()==selected || value.validate().isValid()==selected)throw new AssertionError("presence");''' if validation else ''
+    valid='if(!value.isValid() || !value.validate().isValid() || !value.validate().isComplete())throw new AssertionError("valid");' if validation else ''
+    (d/'WideValues.java').write_text('''package taut;
+public class WideValues {public static void main(String[]a){
+ if(WideTag.BELOW_INT.wire!=-2147483649L || WideTag.ABOVE_INT.wire!=2147483648L || WideTag.LOW.wire!=Long.MIN_VALUE || WideTag.HIGH.wire!=Long.MAX_VALUE)throw new AssertionError("values");
+ if(Wide.descriptor().fields().get(0).type().enumeration().members().get("low")!=Long.MIN_VALUE || WideTag.descriptor().members().get("high")!=Long.MAX_VALUE)throw new AssertionError("metadata");
+ for(WideTag tag:WideTag.values()){
+  Wide value=new Wide();value.kind=tag;
+  '''+checks+'''
+  value.data=tag==WideTag.EMPTY?null:"";
+  '''+valid+'''
+  Wide copy=Wide.decode(Cbor.encode(value.toCbor()));
+  if(copy.kind!=tag || copy.kind.wire!=tag.wire || (tag!=WideTag.EMPTY && !copy.data.equals("")))throw new AssertionError("roundtrip");
+ }
+ System.out.println("PASS");}}
+''',encoding='utf-8')
+    deps=() if mode=='source' else (jar,)
+    c=tmp_path/'classes';compile_java(c,sorted(d.rglob('*.java')),dependencies=deps)
+    assert 'PASS' in execute(c,'taut.WideValues',dependencies=deps).stdout
+
+
+def test_jvm_help_describes_supported_targets_json_files_and_defaults():
+    gen=' '.join(run([sys.executable,'-m','taut.cli','gen','--help']).stdout.split())
+    assert 'Python/Rust/Java/Kotlin' in gen and 'Java/Kotlin methods: validate/isValid' in gen
+    assert 'default: off' in gen and 'descriptors always emitted' in gen
+    assert '--java-external-types JSON_FILE' in gen and '--kotlin-external-types JSON_FILE' in gen
+    assert 'JSON file path' in gen and 'default: no external mappings' in gen
+    for phrase in ('python/rust/java/kotlin','descriptor_contract=1','codec_contract=1','source_root defaults','optional artifact jar','Python/Java module=taut','Kotlin packages fixed','Rust module defaults'):
+        assert phrase in gen,phrase
+    package=' '.join(run([sys.executable,'-m','taut.gen.kotlin_package','--help']).stdout.split())
+    for phrase in ('OUTPUT','fresh output directory','--without-validation','descriptor/codec-only artifact','validation is included by default'):
+        assert phrase in package,phrase

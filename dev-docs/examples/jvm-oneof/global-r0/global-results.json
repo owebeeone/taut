@@ -1,0 +1,61 @@
+{
+  "tuple": {
+    "taut": "92c6894dc9a8d071a5637c086aa56292b649adf1",
+    "workspace": "07b5853cf31911e45945b88eabc270b0b7680de5",
+    "shape_python": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "shape_rust": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4"
+  },
+  "tuple_unchanged": true,
+  "source_unchanged": true,
+  "parity_variants": 16,
+  "parity_violations": [],
+  "broad_command": [
+    "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+    "-m",
+    "pytest",
+    "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests",
+    "-q",
+    "-m",
+    "not gate",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp",
+    "D:\\projects\\limbo\\jvm-oneof-scratch\\global-gate-r0\\pytest-temp",
+    "--junitxml",
+    "D:\\projects\\limbo\\jvm-oneof-scratch\\global-gate-r0\\broad-results.xml"
+  ],
+  "broad_exit_code": 1,
+  "broad_tests": 1627,
+  "broad_failures": [
+    [
+      "test_dev_docs",
+      "test_proto_api_surface_extensions_doc_exists_and_covers_contract"
+    ],
+    [
+      "test_go",
+      "test_go_runtime_and_parity_runner_are_gofmt_clean"
+    ],
+    [
+      "test_go",
+      "test_generated_go_is_gofmt_clean"
+    ]
+  ],
+  "new_failures": [],
+  "baseline_failures": [
+    [
+      "test_dev_docs",
+      "test_proto_api_surface_extensions_doc_exists_and_covers_contract"
+    ],
+    [
+      "test_go",
+      "test_generated_go_is_gofmt_clean"
+    ],
+    [
+      "test_go",
+      "test_go_runtime_and_parity_runner_are_gofmt_clean"
+    ]
+  ],
+  "passed": 1620,
+  "skipped": 4,
+  "elapsed_seconds": 840.63
+}

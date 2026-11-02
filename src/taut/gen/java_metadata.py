@@ -31,6 +31,16 @@ def mapping(ty, values):
     return '$map('+seq('String',[q(k) for k in values])+', '+seq(ty,list(values.values()))+')'
 
 def fingerprint(value):
+    # Message descriptors publish field-number order. Author declaration order
+    # and the order of equivalent Case nominations are not compatibility facts.
+    # Copy the records so hashing never mutates the export used by the emitter.
+    if 'fields' in value and 'name' in value:
+        value = dict(value, fields=[dict(field) for field in
+                                   sorted(value['fields'], key=lambda field: field['tag'])])
+        for field in value['fields']:
+            if 'cases' in field:
+                field['cases'] = sorted(field['cases'], key=lambda case:
+                                        (case['controlling_field'], case['enum'], case['member']))
     return hashlib.sha256(json.dumps(value,sort_keys=True,default=dict).encode()).hexdigest()
 
 def preflight(schema, validation, external):

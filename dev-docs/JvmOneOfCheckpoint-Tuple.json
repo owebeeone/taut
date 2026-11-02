@@ -1,0 +1,36 @@
+{
+  "status": "committed pair under two-axis review; acceptance and global integration result pending",
+  "tuple": {
+    "taut": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut",
+      "commit": "92c6894dc9a8d071a5637c086aa56292b649adf1"
+    },
+    "workspace": {
+      "path": "D:\\projects\\limbo\\taut-dev",
+      "commit": "07b5853cf31911e45945b88eabc270b0b7680de5"
+    },
+    "taut-shape-py": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut-shape-py",
+      "commit": "c08c2a1b5197f761c5b0b835c588da512130ceda"
+    },
+    "taut-shape-rs": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut-shape-rs",
+      "commit": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4"
+    }
+  },
+  "source_range": "1607b6e0b000f607153b2ec20fc244aeb5952744..92c6894dc9a8d071a5637c086aa56292b649adf1",
+  "source_commit_file_count": 77,
+  "index_verified_before_commit": "exact allowlist, disk and index bytes equal; monitored user sources unchanged/excluded",
+  "root_receipt": "GWZ-managed lock and integrity digest only,1607b6e0->92c6894d; no manual metadata edits",
+  "reviewers": {
+    "Code+Surface": "/root/pair_code_surface",
+    "State": "/root/pair_state"
+  },
+  "reviewer_count": 2,
+  "review_round": 0,
+  "remediation_rounds_used": 0,
+  "global_watcher": "Kotlin executor, one broad suite plus all16 codec parity variants; verdicts must consume completed evidence",
+  "user_enum_case": "parallel user-owned, not included; source/facts/test hashes unchanged at checkpoint",
+  "excluded_noise": "35 preexisting untracked Python generated/wheel paths plus authorized review outputs",
+  "commands": "GWZ scoped member checkpoint+capture, root receipt commit; no push/tag/release/installation/publication"
+}

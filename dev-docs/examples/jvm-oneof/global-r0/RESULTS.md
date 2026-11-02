@@ -1,0 +1,15 @@
+# Settled Java/Kotlin global gate — 2 November 2026
+
+Completed read-only against Taut `92c6894dc9a8d071a5637c086aa56292b649adf1`, workspace `07b5853cf31911e45945b88eabc270b0b7680de5`, Python shape `c08c2a1b5197f761c5b0b835c588da512130ceda`, Rust shape `8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4`.
+
+All 16 existing codec variants are GREEN. The one require-all parity run had zero failures, missing variants or governance violations. The separate broad unmarked suite completed with **1620 passed, 3 established baseline failures, 4 skipped, 8 deselected in 797.86 seconds**. Combined parity plus broad elapsed 840.63 seconds. Broad exit code 1 is retained explicitly; this is not a claim of an entirely green broad suite.
+
+The three exact failures are the old missing `TautProtoApiSurfaceExtensions.md` document and the two Windows Go CRLF/gofmt cases listed in global-results.json. There are **no new failures**. baseline-source-proof.json independently compares six relevant current test/Go source blobs with original baseline `2cfee5d6156b0179066dc4eed70f60cde489a422`: all identical. The old document is absent at both commits. Failure traces remain unmodified in broad-regression-tests.log and broad-results.xml.
+
+The four skips are three existing Windows-inapplicable fake-shell/POSIX toolchain tests and the unavailable wasm32-unknown-unknown target, not skipped Java/Kotlin/other codec variants. Exact reasons are saved in skip-classification.json. No tool or target was installed.
+
+All four repository HEADs and every recorded source SHA256 match before and after execution. The normalized frozen-source diff is clean. No source, test, corpus, commit, tag, release, installation or global Git setting was changed. All temporary outputs are under this directory. The preflight ownership-environment abort happened before any case execution; its log is preserved separately. A process-local normalized safe.directory configuration corrected that environment, after which the ONE actual full gate ran. There was no duplicate global run or source-change abort.
+
+Execution used the verified toolchain activation, stable Python3.13.5 with existing pytest packages, PYTEST_DISABLE_PLUGIN_AUTOLOAD=1, PYTHONDONTWRITEBYTECODE=1, UTF8 Java/Python settings, and local Git ownership entries. The broad command is recorded verbatim in global-results.json. Marked parity gate tests were deselected so the full16 gate was not duplicated by the broad run. pytest cache writing was disabled; scratch base temp and JUnit outputs were explicit.
+
+Evidence: global-results.json; codec-parity.log/json; broad-regression-tests.log; broad-results.xml; tuple-before/after.json; source-before/after.json; baseline-source-proof.json; skip-classification.json; expected-tuple.json; run-global-gate.py; gate-console.log; preflight-environment-abort.log. This watcher records execution/classification only, not an independent review verdict or acceptance. Kotlin production/tests remain frozen for the pair owner.

@@ -1,0 +1,22 @@
+[
+  {
+    "classname": "src.tests.test_parity",
+    "name": "test_java_tools_come_from_java_home_first",
+    "reason": "fake tools are shell scripts"
+  },
+  {
+    "classname": "src.tests.test_parity",
+    "name": "test_kotlinc_comes_from_the_kotlinc_variable_with_the_java_it_runs_with",
+    "reason": "fake tools are shell scripts"
+  },
+  {
+    "classname": "src.tests.test_parity",
+    "name": "test_a_missing_toolchain_is_none",
+    "reason": "PATH isolation uses POSIX paths"
+  },
+  {
+    "classname": "src.tests.test_rust",
+    "name": "test_rust_runtime_keeps_long_lengths_whole_on_a_32_bit_target",
+    "reason": "the wasm32-unknown-unknown target is not installed"
+  }
+]

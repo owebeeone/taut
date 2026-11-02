@@ -1,0 +1,36 @@
+{
+  "src/tests/test_dev_docs.py": {
+    "baseline_sha256": "0d8a8193b25192f874f4028591e8cc8df1a54bfad9d38ec9b5a66ada0a2a1052",
+    "frozen_sha256": "0d8a8193b25192f874f4028591e8cc8df1a54bfad9d38ec9b5a66ada0a2a1052",
+    "identical": true
+  },
+  "src/tests/test_go.py": {
+    "baseline_sha256": "060a71a117e68e1707a5dc35965b021c78b824bab374de234b710d8c727a6bfc",
+    "frozen_sha256": "060a71a117e68e1707a5dc35965b021c78b824bab374de234b710d8c727a6bfc",
+    "identical": true
+  },
+  "src/taut/gen/go.py": {
+    "baseline_sha256": "41dbdcd06778ae2e417f2e4b61c3a6911743ba8b766f4c9f98986ab46781e79f",
+    "frozen_sha256": "41dbdcd06778ae2e417f2e4b61c3a6911743ba8b766f4c9f98986ab46781e79f",
+    "identical": true
+  },
+  "src/taut/corpus/parity_go.py": {
+    "baseline_sha256": "ef79dbfb7aa8b85cd70d11d953794872be8838bdd670b44f3a55673bda39edc5",
+    "frozen_sha256": "ef79dbfb7aa8b85cd70d11d953794872be8838bdd670b44f3a55673bda39edc5",
+    "identical": true
+  },
+  "src/taut/gen/runtime/cbor.go": {
+    "baseline_sha256": "bb1a741f36de2cdeed45df885b7a7e4ebb5d8cb04403c1d755ba5b0e6f73d8ef",
+    "frozen_sha256": "bb1a741f36de2cdeed45df885b7a7e4ebb5d8cb04403c1d755ba5b0e6f73d8ef",
+    "identical": true
+  },
+  "src/taut/gen/runtime/ext.go": {
+    "baseline_sha256": "14c0fbb5ca9c1238bff77dc5cc99ed7e541e6695574db4a6514a5031443e1b85",
+    "frozen_sha256": "14c0fbb5ca9c1238bff77dc5cc99ed7e541e6695574db4a6514a5031443e1b85",
+    "identical": true
+  },
+  "missing_document": {
+    "2cfee5d6156b0179066dc4eed70f60cde489a422": 128,
+    "92c6894dc9a8d071a5637c086aa56292b649adf1": 128
+  }
+}

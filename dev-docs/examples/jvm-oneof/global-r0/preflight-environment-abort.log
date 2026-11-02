@@ -1,0 +1,27 @@
+fatal: detected dubious ownership in repository at 'D:/projects/limbo/taut-dev'
+'D:/projects/limbo/taut-dev' is owned by:
+	BUILTIN/Administrators (S-1-5-32-544)
+but the current user is:
+	MAGENTA/gianni (S-1-5-21-2748472898-1817171792-147888465-1001)
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory D:/projects/limbo/taut-dev
+Traceback (most recent call last):
+  File "D:\projects\limbo\jvm-oneof-scratch\global-gate-r0\run-global-gate.py", line 78, in <module>
+    if __name__=='__main__': raise SystemExit(main())
+                                              ~~~~^^
+  File "D:\projects\limbo\jvm-oneof-scratch\global-gate-r0\run-global-gate.py", line 39, in main
+    before={name:git(path,'rev-parse','HEAD') for name,path in REPOS.items()}
+                 ~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\projects\limbo\jvm-oneof-scratch\global-gate-r0\run-global-gate.py", line 22, in git
+    return subprocess.check_output(['git','-c','safe.directory='+str(repo),'-C',str(repo),*args],text=True,encoding='utf-8').strip()
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\subprocess.py", line 472, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "C:\Users\gianni\AppData\Roaming\uv\python\cpython-3.13.5-windows-x86_64-none\Lib\subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['git', '-c', 'safe.directory=D:\\projects\\limbo\\taut-dev', '-C', 'D:\\projects\\limbo\\taut-dev', 'rev-parse', 'HEAD']' returned non-zero exit status 128.

@@ -1,5 +1,43 @@
 # Java execution results — 2 November 2026
 
+## Remediation1 — awaiting originating review
+
+Both initial reviewers returned NO-GO at Taut92c6894d/root07b5853c. The
+verbatim reports and one merged disposition are filed in the pair checkpoint
+review records. Remediation1 fixes Java field/Case-order fingerprint
+normalization and signed-i64 enum literal spelling, plus shared CLI/helper help.
+No descriptor/adapter/report/engine API, runtime contract/owner, wire semantics
+or filesystem mutation boundary changed. The user Enum.case work is excluded.
+
+All17 new regression cases passed: eight independent reordered child/parent
+field+Case composition combinations across validation modes/distributions,
+four real field/rule/reservation/effective-option mismatch rejections, four
+source/package/validation signed-i64 enum compile/run/codec/metadata matrices,
+and one shared help test including Kotlin's helper default.
+
+The affected full target command (Java feature+existing Java regressions,
+both Java codec-parity variants, CLI/scaffold and real compiler-wheel generation/
+Java+Kotlin compilation/execution) reported141 passed and one stale source-shape
+assertion in123.70s. That assertion alone expected BUILT(1), the exact literal
+spelling intentionally corrected by the review; it now expects BUILT(1L).
+Its isolated rerun passed in0.12s with production unchanged. Thus all142
+distinct targeted cases have passing evidence across the141+1 runs. The raw
+failed-first log remains preserved; no clean142-pass single run is claimed.
+Relevant Python/Rust/core/options/IR/reserved-name preservation:865 passed in
+46.66s. See ../jvm-oneof/remediation-r1/ for exact logs. Java example source/
+package and engine-free adapter runs pass; golden deltas are enum long suffixes.
+
+The sole broad/all16global gate remains honestly tied to the ORIGINAL frozen
+Taut92c6894d/root07b5853c tuple:16 codec variants GREEN, broad1620 passed,
+3 established baseline failures,4 skipped,8 deselected, no new failure and
+unchanged source/tuple. Original receipts are preserved verbatim under
+../jvm-oneof/global-r0/. It is not relabeled as running on remediation1, and
+root explicitly directed against an automatic duplicate global run for these
+localized corrections. Originating reviewers must re-run the counterexamples
+against the newly settled R1 tuple before any finding closes.
+
+## Original implementation evidence (historical source92c6894d)
+
 Implementation is REVIEW-READY, pending the coordinator's settled Java/Kotlin
 pair freeze and independent reviews. This document does not claim acceptance,
 publication, a registry release, or a Git commit/push.

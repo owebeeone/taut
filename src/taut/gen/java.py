@@ -139,7 +139,7 @@ def _dec(t: TypeRef, expr: str, depth: int = 0) -> str:
 
 
 def _emit_enum(name: str, members: dict[str, int]) -> list[str]:
-    consts = ", ".join(f"{_enum_member(m)}({v})" for m, v in members.items())
+    consts = ", ".join(f"{_enum_member(m)}({v}L)" for m, v in members.items())
     return [
         f"enum {name} {{",
         f"    {consts};",

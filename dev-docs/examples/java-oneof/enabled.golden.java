@@ -3,7 +3,7 @@
 package taut;
 
 enum Kind {
-    TEXT(0), NUMBER(1), EMPTY(2), CHILD(3), FLAG(4), ITEMS(5);
+    TEXT(0L), NUMBER(1L), EMPTY(2L), CHILD(3L), FLAG(4L), ITEMS(5L);
     final long wire;
     Kind(long $w) { this.wire = $w; }
     static Kind fromWire(long $v) {

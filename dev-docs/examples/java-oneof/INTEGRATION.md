@@ -95,3 +95,11 @@ preserve positively identified other users and refuse unknown/modified files.
 Shared integration ownership: this executor owns scaffold.py, cli.py,
 pyproject.toml runtime resource declarations, and the Java corpus source-file
 inventory update. Kotlin-specific files are owned by the companion executor.
+
+
+Remediation1 canonicalizes portable per-message fingerprint fields by number and
+Case nominations by controlling field/enum/member, independently of source
+declaration order. It retains genuine field/rule/reservation/effective-option
+mismatch rejection and never mutates exported input facts. Java enum constructor
+arguments use long literals throughout the accepted signed-i64 range, including
+both extrema; descriptor values and CBOR wire semantics remain the same.

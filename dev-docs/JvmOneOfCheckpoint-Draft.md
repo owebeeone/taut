@@ -1,6 +1,6 @@
 # Java/Kotlin OneOf checkpoint — controlling DRAFT
 
-Status: **pair source frozen for one committed Java/Kotlin acceptance review**.
+Status: **remediation1 candidate; initial tuple NO-GO, originating re-verdict pending**.
 Both executors reported REVIEW-READY; the coordinator explicitly authorized the
 precise allowlist and scoped LOCAL GWZ checkpoint on 2 November 2026. Production
 edits are on HOLD. The settled source revision is the commit containing this
@@ -204,3 +204,39 @@ verify their original counterexamples; implementers do not self-close findings.
 Use the skill's at-most-two-remediation cap and material-change reviewer
 replacement rules. No push, tag, release, registry publication or other backend
 is authorized by a local checkpoint or a GO verdict.
+
+
+## Remediation1 checkpoint amendment
+
+The initial source92c6894d/root07b5853c review returned NO-GO from both
+original axes. Verbatim -ReviewCode.md and -ReviewState.md and the
+-RemPlan-1.md/ -Verdict.md ledger control the ONE merged correction. Both
+independently reproduced Java noncanonical dependency fingerprints; Code also
+proved signed-i64 enum literal compile failure and incomplete help.
+
+The R1 patch canonicalizes per-message fields/Case arrays before hashing,
+emits enum constructor long literals, and documents existing CLI/helper
+inputs/defaults. No public API, engine predicate/traversal, owner/contract,
+codec numeric value or output mutation boundary changes. Kotlin's contribution
+is ONLY kotlin_package.py argparse help. No user authoring or other backend
+source is changed. New compile/run regressions cover all requested positive
+and genuine-mismatch boundaries. The same two originating reviewers continue
+for a localized implementation correction; they must classify any newly
+material change rather than accepting this assertion blindly.
+
+Current working-byte gate evidence:17 new closure cases pass; affected target
+command141 pass plus one deliberate literal-spelling assertion update passes
+its focused rerun;865 preservation cases pass. Details/raw logs are in Java
+RESULTS and examples/jvm-oneof/remediation-r1. No production changes followed
+the full affected target run. The only golden differences are enum long
+literal suffixes. The prior all16/broad evidence remains at its original exact
+source tuple, preserved under examples/jvm-oneof/global-r0, and is not claimed
+as a repeated gate on this R1 patch.
+
+-Inventory-1.json is the R1 freeze inventory; the original -Inventory.json
+remains the immutable historical source92c6894d record. The new committed
+source tuple/ranges will be supplied in canonical-template focused re-verdict
+prompts. Every blocking finding remains open until the originating reviewer
+verifies its ORIGINAL reproduction on that tuple with a closure table, common
+scope/necessity check and changed-range analysis. Remediation count used:1 of2.
+No third reviewer axis, push, tag, release or registry publication is authorized.

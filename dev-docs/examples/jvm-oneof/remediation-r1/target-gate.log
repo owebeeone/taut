@@ -1,0 +1,10 @@
+........................................................................ [ 50%]
+.................................F....................................   [100%]
+================================== FAILURES ===================================
+_____________________ test_emits_classes_enums_and_codec ______________________
+taut-dev\taut\src\tests\test_java.py:932: in test_emits_classes_enums_and_codec
+    assert "BUILT(1)" in s
+E   AssertionError: assert 'BUILT(1)' in '// GENERATED native Java types + codec; Java 8 foundation ABI.\n// generator=java-oneof-reference.1; owner=taut.java....java.util.Arrays.<taut.validation.descriptors.MessageAdapter<?>>asList($A0, $A1, $A2, $A3, $A4, $A5, $A6, $A7)));\n}\n'
+=========================== short test summary info ===========================
+FAILED taut-dev\taut\src\tests\test_java.py::test_emits_classes_enums_and_codec
+1 failed, 141 passed in 123.70s (0:02:03)

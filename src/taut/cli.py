@@ -166,19 +166,19 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("-l", "--lang", help="comma-separated targets (default: all): python,typescript,rust,cpp,swift,go,kotlin,js,java")
     g.add_argument("-s", "--service", help="comma-separated services for client/server stubs (default: all in the IR)")
     g.add_argument("--api-only", action="store_true", help="emit only api (types + encoders/decoders), no client/server")
-    g.add_argument("--kotlin-external-types", metavar="JSON", help="name-to-qualified-Kotlin dependency types; compatible mandatory descriptors and shared foundation required")
-    g.add_argument("--java-external-types", metavar="JSON", help="Java dependency typed owner/contract bindings; independently compiled same-package types")
-    g.add_argument("--rust-external-types", metavar="JSON", help="name-to-Rust-path map for types owned by a dependency; compose its schema and share its CBOR runtime")
+    g.add_argument("--kotlin-external-types", metavar="JSON_FILE", help="JSON file path mapping schema names to qualified Kotlin dependency types (default: no external mappings); compatible descriptors and shared foundation required")
+    g.add_argument("--java-external-types", metavar="JSON_FILE", help="JSON file path containing Java dependency type/owner/contract bindings (default: no external mappings); independently compiled same-package types")
+    g.add_argument("--rust-external-types", metavar="JSON_FILE", help="JSON file path mapping schema names to dependency Rust paths (default: no external mappings); compose its schema and share its CBOR runtime")
     g.add_argument("--with-runtime", action="store_true",
                    help="compatibility alias for --runtime source; does not enable validation")
     g.add_argument("--runtime", choices=("source", "package"), action="append",
-                   help="runtime distribution (default: application supplies runtime); Python package imports taut-proto; Rust package imports taut_foundation; source emits canonical foundation modules; repeated values must agree")
+                   help="runtime distribution (default: application supplies runtime); Python package imports taut-proto; Rust package imports taut_foundation; Java/Kotlin package consumers supply the compatible foundation on their classpath; source emits canonical foundations; repeated values must agree")
     g.add_argument("--with-validation", action="store_true",
-                   help="emit explicit validate/is_valid instance methods on every Python/Rust message (default: off; descriptors always emitted)")
-    g.add_argument("--runtime-bindings", metavar="JSON",
-                   help='target-keyed runtime bindings JSON; Python/Rust keys: owner, module, source_root, descriptor_contract, codec_contract, capabilities; Python module=taut, Rust default=crate (supplied/source) or taut_foundation (package)')
-    g.add_argument("--python-external-types", metavar="JSON",
-                   help="schema-name to module.Class mapping for independently generated Python dependencies; full dependency schema must be present")
+                   help="emit instance validation on every Python/Rust/Java/Kotlin message (default: off; descriptors always emitted); Java/Kotlin methods: validate/isValid; Python/Rust: validate/is_valid")
+    g.add_argument("--runtime-bindings", metavar="JSON_FILE",
+                   help='JSON file path with target-keyed python/rust/java/kotlin bindings (default: canonical owners, descriptor_contract=1, codec_contract=1, codec.v1/descriptors.v1/oneof.v1 capabilities; source_root defaults to each target output directory). Keys: owner, source_root, descriptor_contract, codec_contract, capabilities; Python/Rust/Java also accept module, Java also accepts optional artifact jar. Python/Java module=taut; Kotlin packages fixed to taut; Rust module defaults to crate (supplied/source) or taut_foundation (package)')
+    g.add_argument("--python-external-types", metavar="JSON_FILE",
+                   help="JSON file path mapping schema names to module.Class for independently generated Python dependencies (default: no external mappings); full dependency schema must be present")
     g.add_argument("--forward-compat", action="store_true",
                    help="generated types keep unknown/newer tags and re-encode them (every generated target; required if the IR has extensions; python and typescript always keep them)")
     g.add_argument("--fail-closed", action="store_true",

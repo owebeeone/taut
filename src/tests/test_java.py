@@ -929,7 +929,7 @@ def test_emits_classes_enums_and_codec():
     assert "package taut;" in s
     assert "class BuildResult {" in s
     assert "enum BuildStatus {" in s
-    assert "BUILT(1)" in s
+    assert "BUILT(1L)" in s
     # The class's toCbor and fromCbor call its codec, a class of its own beside it.
     assert "Cbor toCbor() { return BuildResult$Codec.toCbor(this); }" in s
     assert "static BuildResult fromCbor(Cbor $c) { return BuildResult$Codec.fromCbor($c); }" in s

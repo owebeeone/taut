@@ -1,0 +1,14 @@
+usage: kotlin_package.py [-h] [--without-validation] OUTPUT
+
+Build a local Kotlin foundation jar from the source-bundle canonical closure.
+No Maven coordinate, installer, dependency resolver or publication is
+involved. Consumers explicitly put this artifact on kotlinc/java's classpath.
+
+positional arguments:
+  OUTPUT                fresh output directory for the local foundation
+                        artifact
+
+options:
+  -h, --help            show this help message and exit
+  --without-validation  build a descriptor/codec-only artifact; validation is
+                        included by default
