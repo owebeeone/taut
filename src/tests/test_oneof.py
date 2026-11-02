@@ -391,12 +391,55 @@ def test_internal_double_underscore_substrings_remain_ordinary_fields():
     assert value.DESCRIPTOR.fields_by_name["part__name"].attribute == "part__name"
 
 
-@pytest.mark.parametrize("name", ["name", "members", "options"])
-def test_enum_authoring_metadata_namespace_is_reserved_early(name):
-    with pytest.raises(ValueError, match=rf"member '{name}'.*reserved.*metadata namespace"):
-        Enum("Choice", **{name: 0})
+@pytest.mark.parametrize("name", ["name", "members", "options", "case", "_definition"])
+def test_enum_case_namespace_preserves_metadata_named_members(name):
+    choice = Enum("Choice", **{name: 0})
+    assert choice.name == "Choice"
+    assert choice.members == {name: 0}
+    assert choice.options == {}
+    member = getattr(choice.case, name)
+    assert Case(tag=member) == CaseRule("tag", "Choice", name)
+    s = schema(choice, Record=Msg(tag=F(1, OneOf(choice, exhaustive=True)),
+                                  data=F(2, STR, Case(tag=member))))
+    validate_or_raise(s)
+    assert schema_from_json(schema_json(s)) == s
+    m = module(s)
+    value = m.Record(m.Choice[name], data="present")
+    assert value.is_valid()
+    value.data = None
+    assert codes(value.validate()) == [("oneof.payload_missing", ("data",))]
+
+
+def test_enum_case_namespace_is_read_only_and_preserves_ordinary_lookup():
     choice = Enum("Choice", ordinary=0)
     assert Case(tag=choice.ordinary) == CaseRule("tag", "Choice", "ordinary")
+    assert choice.case.ordinary == choice.ordinary
+    with pytest.raises(AttributeError, match="Unknown enum member"):
+        _ = choice.case.missing
+    with pytest.raises(AttributeError, match="read-only"):
+        choice.case.ordinary = 1
+    with pytest.raises(AttributeError, match="read-only"):
+        choice.case._definition = Enum("OtherChoice", ordinary=0)
+    with pytest.raises(AttributeError, match="read-only"):
+        del choice.case._definition
+    restored = schema_from_json(schema_json(schema(choice)))
+    assert restored.enums["Choice"].case.ordinary == choice.ordinary
+
+
+def test_enum_case_namespace_rejects_wrong_enum_and_changes_no_generated_api():
+    choice = Enum("Choice", ordinary=0)
+    other = Enum("OtherChoice", ordinary=0)
+    direct = schema(choice, Record=Msg(tag=F(1, OneOf(choice)),
+                                     data=F(2, STR, Case(tag=choice.ordinary))))
+    qualified = schema(choice, Record=Msg(tag=F(1, OneOf(choice)),
+                                        data=F(2, STR, Case(tag=choice.case.ordinary))))
+    assert schema_json(direct) == schema_json(qualified)
+    assert python_api(direct, validation=True) == python_api(qualified, validation=True)
+    from taut.gen.scaffold import rust_api
+    assert rust_api(direct, validation=True) == rust_api(qualified, validation=True)
+    wrong = schema(choice, other, Record=Msg(tag=F(1, OneOf(choice)),
+                                           data=F(2, STR, Case(tag=other.case.ordinary))))
+    assert validate(wrong)
 
 
 def test_compatibility_uses_normalized_constraint_facts_only():

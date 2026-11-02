@@ -115,10 +115,6 @@ def Enum(*args, **members: int) -> EnumDef:
     if not all(isinstance(value, OptionValue) for value in option_values):
         raise TypeError("Enum expects Enum(name, *options, **members) or Enum(*options, **members)")
     where = f"enum {name!r}" if name else "an enum"
-    for member in members:
-        if member in ("name", "members", "options"):
-            raise ValueError(f"{where}: member {member!r} is reserved by the enum-definition metadata namespace; "
-                             "choose a distinct member name before using the referenceable Enum DSL")
     return EnumDef(name=name, members=dict(members),
                    options=_declared_options(option_values, where))
 
