@@ -189,6 +189,7 @@ def step_tests(version: str, work: Path, out: IO[str]) -> None:
     if os.name == "nt":
         selection += " and not posix"
     run([sys.executable, "-m", "pytest", "src/tests", "-q", "-rs", "-p", "no:cacheprovider",
+         '-p', 'xdist.plugin',
          '-p', 'release_test_ledger', '--release-ledger='+str(native_path), '--release-host=windows',
          "-n", "auto", "-m", selection, f"--basetemp={work / 'pytest'}", f"--junit-xml={report}"],
         out=out, env=source_env())

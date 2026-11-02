@@ -25,7 +25,8 @@ checks = [
     ["cargo", "test", "--manifest-path", "rust/taut-foundation/Cargo.toml", "--all-features"],
     ["cargo", "package", "--manifest-path", "rust/taut-foundation/Cargo.toml", "--allow-dirty"],
     ["uv", "run", "--no-project", "--python", "3.13", "--with", "pytest", "--with", "pytest-xdist",
-     "--with", "build", "--with", "twine", "python", "scripts/release_checks.py", "{python_version}"],
+     "--with", "build", "--with", "twine", "--with", "setuptools>=77", "--with", "setuptools-scm>=8",
+     "python", "scripts/release_checks.py", "{python_version}"],
 ]
 exact_checks = [
     ["uv", "run", "--no-project", "--python", "3.13", "python", "rust/sync_foundation.py", "--check"],
