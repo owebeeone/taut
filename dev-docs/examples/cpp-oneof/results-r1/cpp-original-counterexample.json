@@ -1,0 +1,18 @@
+{
+  "original_probe": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\review-r0\\code\\scratch\\first-member-exact\\main.cpp",
+  "copied_probe_sha256": "cec7bdda4b8562aec876717a4d47603e6b9407b23804a3ab8cd004415228c92f",
+  "unchanged_probe": true,
+  "command": [
+    "C:\\Users\\gianni\\AppData\\Local\\Programs\\Swift\\Toolchains\\6.4.2+Asserts\\usr\\bin\\clang++.EXE",
+    "-std=c++20",
+    "-fno-rtti",
+    "-I",
+    "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\cpp-original-counterexample\\cpp",
+    "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\cpp-original-counterexample\\main.cpp",
+    "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\cpp-original-counterexample\\cpp\\foundation.cpp",
+    "-o",
+    "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\cpp-original-counterexample\\probe.exe"
+  ],
+  "stdout": "same_address=1 valid=1 complete=1 fast=1 issues=0\n",
+  "runtime_sha256": "fc8a5c5fdef9fca3b075bf4e72c99aab5bd894746feed33a92d8e8c56c842076"
+}

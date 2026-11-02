@@ -1,0 +1,146 @@
+{
+  "canonical_template": "C:\\Users\\gianni\\.codex\\skills\\review-loop\\references\\review-prompt-template.md",
+  "clone_receipts": {
+    "code": {
+      "axis": "code",
+      "full_history": true,
+      "historical_commits_verified": [
+        "b9f99ac88ec585616ffac8bf4fbc2aaf4535fc16",
+        "68c24a89",
+        "57c56d5f7d727eb483ac9fd89c482f6a44f7913e",
+        "1607b6e0b000f607153b2ec20fc244aeb5952744"
+      ],
+      "original_workspace_builds": false,
+      "repos": {
+        "taut": {
+          "HEAD": "4222822320cbb22e376f8b387a963e86aad10ff2",
+          "path": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/code/taut-dev/taut"
+        },
+        "taut-shape-py": {
+          "HEAD": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+          "path": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/code/taut-dev/taut-shape-py"
+        },
+        "taut-shape-rs": {
+          "HEAD": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+          "path": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/code/taut-dev/taut-shape-rs"
+        },
+        "taut-shape-ts": {
+          "HEAD": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+          "path": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/code/taut-dev/taut-shape-ts"
+        },
+        "workspace": {
+          "HEAD": "bd455ef9174fb13679d0ec6814e43ec1345505fc",
+          "path": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/code/taut-dev"
+        }
+      },
+      "tracked_oracle_corpus": [
+        "corpus/ext_vectors.json",
+        "corpus/float_vectors.json",
+        "corpus/glade.golden.json",
+        "corpus/glade.ir.json",
+        "corpus/glade_folds.json",
+        "corpus/glade_hashes.json",
+        "corpus/griplab.golden.json",
+        "corpus/griplab.ir.json",
+        "corpus/parity/allowlist.json",
+        "corpus/parity/bounds.vectors.json",
+        "corpus/parity/gen_vectors.py",
+        "corpus/parity/int.vectors.json",
+        "corpus/parity/malformed.vectors.json",
+        "corpus/resext.ir.json",
+        "corpus/residual_vectors.json"
+      ]
+    },
+    "state": {
+      "axis": "state",
+      "full_history": true,
+      "historical_commits_verified": [
+        "b9f99ac88ec585616ffac8bf4fbc2aaf4535fc16",
+        "68c24a89",
+        "57c56d5f7d727eb483ac9fd89c482f6a44f7913e",
+        "1607b6e0b000f607153b2ec20fc244aeb5952744"
+      ],
+      "original_workspace_builds": false,
+      "repos": {
+        "taut": {
+          "HEAD": "4222822320cbb22e376f8b387a963e86aad10ff2",
+          "path": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/state/taut-dev/taut"
+        },
+        "taut-shape-py": {
+          "HEAD": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+          "path": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/state/taut-dev/taut-shape-py"
+        },
+        "taut-shape-rs": {
+          "HEAD": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+          "path": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/state/taut-dev/taut-shape-rs"
+        },
+        "taut-shape-ts": {
+          "HEAD": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+          "path": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/state/taut-dev/taut-shape-ts"
+        },
+        "workspace": {
+          "HEAD": "bd455ef9174fb13679d0ec6814e43ec1345505fc",
+          "path": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/state/taut-dev"
+        }
+      },
+      "tracked_oracle_corpus": [
+        "corpus/ext_vectors.json",
+        "corpus/float_vectors.json",
+        "corpus/glade.golden.json",
+        "corpus/glade.ir.json",
+        "corpus/glade_folds.json",
+        "corpus/glade_hashes.json",
+        "corpus/griplab.golden.json",
+        "corpus/griplab.ir.json",
+        "corpus/parity/allowlist.json",
+        "corpus/parity/bounds.vectors.json",
+        "corpus/parity/gen_vectors.py",
+        "corpus/parity/int.vectors.json",
+        "corpus/parity/malformed.vectors.json",
+        "corpus/resext.ir.json",
+        "corpus/residual_vectors.json"
+      ]
+    }
+  },
+  "dispatch": {
+    "Code+Surface": "/root/cpp_go_code_review",
+    "State": "/root/cpp_go_state_review",
+    "accepted_ecma_reference": "TypeScript-OwnedFiles-R1.json, RESULTS-R1.md/results-r1 and corrected Ecma verdict at shape-ts1aaeab65; original r0 manifest not current",
+    "final_verdict_gate": "Wait for COMPLETE root-assigned Go settled broad/full16 integration receipt",
+    "fork_context": "none; read generated exact prompt files",
+    "peer_blind": true,
+    "reviewers_total": 2
+  },
+  "integration_receipt": "pending root-assigned Go completion; final reviewers must consume fullreceipt",
+  "object": {
+    "taut": "4222822320cbb22e376f8b387a963e86aad10ff2",
+    "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "bd455ef9174fb13679d0ec6814e43ec1345505fc"
+  },
+  "prompts": {
+    "Code+Surface": {
+      "clone_root": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/code/taut-dev",
+      "prompt": "dev-docs/CppGoOneOfCheckpoint-PromptCode.md",
+      "role_block": 1,
+      "scratch": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/code/scratch",
+      "sha256": "ef0b2952aadf62ce3043c9e0c1e659bff80976ef7ab768cbe38971c074766f16",
+      "surface": true,
+      "template_body_substitutions": true
+    },
+    "State": {
+      "clone_root": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/state/taut-dev",
+      "prompt": "dev-docs/CppGoOneOfCheckpoint-PromptState.md",
+      "role_block": 2,
+      "scratch": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/state/scratch",
+      "sha256": "d555619552ea00c3b552f2bedcf7544d4eea3b1b5123940195d6080012bf76fe",
+      "surface": false,
+      "template_body_substitutions": true
+    }
+  },
+  "reviewers_per_revision": 2,
+  "skill_sha256": "bf33d564e50e50ebc1d17a6ceb620debe18c6d730b86f20f96418da4ee05d96c",
+  "source_base": "b9f99ac88ec585616ffac8bf4fbc2aaf4535fc16",
+  "template_sha256": "3b10ae89cf101c6273d34668eaaeaebf7e030a4c132406e0b234a846665eca58"
+}

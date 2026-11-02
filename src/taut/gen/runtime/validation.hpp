@@ -21,7 +21,7 @@ inline std::string key_bytes(ValueRef key) {
 inline bool unsigned_less(std::string_view a,std::string_view b) noexcept {
   return std::lexicographical_compare(a.begin(),a.end(),b.begin(),b.end(),[](char x,char y){return static_cast<unsigned char>(x)<static_cast<unsigned char>(y);});
 }
-struct Ancestor { const void* value;const Ancestor* parent; };
+struct Ancestor { const void* value;const SchemaBinding* binding;const Ancestor* parent; };
 template<bool Report> struct Sink {
   std::vector<PathSegment> path;
   std::vector<ValidationIssue> issues;
@@ -89,9 +89,13 @@ template<bool R> bool group(ValueRef value,const MessageDescriptor& descriptor,c
   return true;
 }
 template<bool R> bool walk(ValueRef value,Sink<R>& sink,const Ancestor* ancestors,bool recursive) {
-  for(auto p=ancestors;p;p=p->parent)if(p->value==value.identity())return sink.event("validation.ownership_cycle","validation.shape.v1");
-  const Ancestor current{value.identity(),ancestors};
-  const auto& descriptor=value.binding().descriptor();
+  const auto& binding=value.binding();
+  // A complete object and its first value subobject can share an address.
+  // The actual static native binding distinguishes those valid owned values,
+  // while optional/shared-pointer views of one message retain the same key.
+  for(auto p=ancestors;p;p=p->parent)if(p->value==value.identity() && p->binding==&binding)return sink.event("validation.ownership_cycle","validation.shape.v1");
+  const Ancestor current{value.identity(),&binding,ancestors};
+  const auto& descriptor=binding.descriptor();
   std::size_t index=0;
   for(const auto& field:descriptor.fields()) {
     bool control=false;

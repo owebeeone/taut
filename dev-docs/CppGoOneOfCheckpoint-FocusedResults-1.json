@@ -1,0 +1,184 @@
+{
+  "authorization": "Merged RemPlan-1, exact7production/testfiles plus scoped evidence; one local corrected GWZ checkpoint/rootreceipt; no push or Swift",
+  "corrected_global_failures": {
+    "src/tests/test_go_oneof.py::test_go_emission_and_canonical_closure_are_gofmt_clean_without_crlf": "PASS from required scratchcwd/source-onlyPYTHONPATH in pairwheel11; also finalGo145 and reporoot1",
+    "src/tests/test_map_gen.py::test_go_imports_sort_only_for_maps": "PASS in shared16; actual sortbinding asserted and map/plain native codec roundtrips compile/run",
+    "src/tests/test_scaffold.py::test_declared_means_declared_not_default": "PASS in shared16; exact api ownership SHA and mode/validation/source_root checked; neighboring declared-option refusals retained"
+  },
+  "corrected_tuple": "To be recorded after authorized single corrected local GWZ checkpoint; containing commit binds these focused bytes",
+  "counts_not_additive": "C++ counterexamples overlap C++contracts; Go corrected56 overlap final145; exactformat overlaps finalGo; do not sum",
+  "gates": {
+    "cpp_contracts": {
+      "failed": 0,
+      "passed": 109,
+      "skipped": 0,
+      "tests": 109,
+      "xml": {
+        "path": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\cpp-contracts.xml",
+        "sha256": "f72b2ed19cd5222b09e91c2763d07f255e209db8410d9c63adac60dcb04f48dd",
+        "size": 13479
+      }
+    },
+    "cpp_counterexamples": {
+      "failed": 0,
+      "passed": 18,
+      "skipped": 0,
+      "tests": 18,
+      "xml": {
+        "path": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\cpp-counterexamples.xml",
+        "sha256": "92931fc85424240d47887a4492785337a8a0da85898d40aac6644d9723e3d909",
+        "size": 2553
+      }
+    },
+    "go_all_current_features": {
+      "failed": 0,
+      "passed": 145,
+      "skipped": 0,
+      "tests": 145,
+      "xml": {
+        "path": "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1\\all-go.xml",
+        "sha256": "ea3fa3eb5ce9450aa0bfa368ed209ba1ed1c86fad65ccec3259c25be27ebb1fc",
+        "size": 19210
+      }
+    },
+    "go_initial_correction_attempt": {
+      "failed": 3,
+      "passed": 59,
+      "skipped": 0,
+      "tests": 62,
+      "xml": {
+        "path": "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1\\closure.xml",
+        "sha256": "ca68049fb32e9fd207e94dab122cf663fc4066d8cc95cc253c4b051e83730646",
+        "size": 17235
+      }
+    },
+    "go_retirement_corrected": {
+      "failed": 0,
+      "passed": 56,
+      "skipped": 0,
+      "tests": 56,
+      "xml": {
+        "path": "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1\\retirement-corrected.xml",
+        "sha256": "506a6144644286d0d82b605e34782cfaca3146b000a80d7ccff158fb5870381b",
+        "size": 8046
+      }
+    },
+    "pair_wheel_and_scratch_format": {
+      "failed": 0,
+      "passed": 11,
+      "skipped": 0,
+      "tests": 11,
+      "xml": {
+        "path": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\pair-wheel.xml",
+        "sha256": "73aef0e87d255dad174c7a9bccce63fab4e6ac34f9edf3105db4c772a876c4bb",
+        "size": 1768
+      }
+    },
+    "shared_assertions": {
+      "failed": 0,
+      "passed": 16,
+      "skipped": 0,
+      "tests": 16,
+      "xml": {
+        "path": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\shared-assertions.xml",
+        "sha256": "c19cbc7e480d3a6773c769cfcb2bf0c101479e4d7035e619d4e9a1daa6a5c0ce",
+        "size": 2083
+      }
+    }
+  },
+  "go_additional_receipts": {
+    "all-go.log": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\go-oneof\\results-r1\\all-go.log",
+      "sha256": "ba901b2ef667ee22b97d2ed05742b5c8bf601723746350b2d6721e385876cb2b",
+      "size": 265
+    },
+    "closure.log": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\go-oneof\\results-r1\\closure.log",
+      "sha256": "d7544e479d165c12f74cbb5a9a17761bf0a4fae10b0545947595fdc939ad1574",
+      "size": 8606
+    },
+    "example.log": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\go-oneof\\results-r1\\example.log",
+      "sha256": "8033a17f04f38cdc98efc21186d20285e1a10f1960005db350df6a87954e7b7a",
+      "size": 131
+    },
+    "format-from-root.log": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\go-oneof\\results-r1\\format-from-root.log",
+      "sha256": "e2d80bebebb0a802eefa4b65f7108ff05a97fa187d3204e75dd15dff03e40e50",
+      "size": 100
+    },
+    "retirement-corrected.log": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut\\dev-docs\\examples\\go-oneof\\results-r1\\retirement-corrected.log",
+      "sha256": "71ac3e23c714e87cce1fde96bfa6360a551ed6a66060e5f4a5d8ac4d6e9cc03d",
+      "size": 117
+    }
+  },
+  "go_cutoff_attempt": "Initial59pass3persisted-cutofffail83deselect retained; pureplanner imported-supplied unknown-leftover scan corrected; focused56 and final145 then pass at final sourcehashes",
+  "native_examples": "CPP109 includes3source/package/supplied conformance builds+runs; Go6nativeexecutions source/package/supplied validationoff/on; actual current compilerwheel bothlanguages/source+package",
+  "no_automatic_widening": "Canonical core codecs, sharedmutationmechanism, descriptor/publicABI and dependencies unchanged. No second broad/full16 or standalone reference-library gate; currentwheel warranted by changed canonical runtime files. Any widening requires concrete impact and root reconciliation.",
+  "original_complete_global": {
+    "association": "Historical complete r0 evidence remains at its exact original tuple; NOT claimed as a new global result on corrected source",
+    "broad": "2060passed/6failed/5skipped/11exactauthorizeddeselections;2071selected",
+    "failures": "3exacthistoricalbaseline +3newintegrationtestfailures repaired by exact currentfocusednodes above",
+    "inventory": {
+      "path": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\global-gate-r0\\evidence-inventory.json",
+      "sha256": "c2f6ed2aeb24415a414da638f610ea46beedc1a613f32dc769d69fdd9a2b419b",
+      "size": 6730
+    },
+    "parity": "all16require_allGREEN/zero violations",
+    "results": {
+      "path": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\global-gate-r0\\global-results.json",
+      "sha256": "60d064499dfce2e1189b8fc326dd2dd4f1af34f62d10e34bd0b0ca5f03f6f549",
+      "size": 5639
+    },
+    "source_taut": "4222822320cbb22e376f8b387a963e86aad10ff2",
+    "source_workspace": "bd455ef9174fb13679d0ec6814e43ec1345505fc"
+  },
+  "original_cpp_counterexample": {
+    "path": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\cpp-original-counterexample.json",
+    "sha256": "da7e0d89e981fca05d98bfdda771bbdc5f1fc16c459dbfcf2b713780f07df855",
+    "size": 1022
+  },
+  "original_tuple": {
+    "shape_python": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "shape_rust": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "shape_ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "taut": "4222822320cbb22e376f8b387a963e86aad10ff2",
+    "workspace": "bd455ef9174fb13679d0ec6814e43ec1345505fc"
+  },
+  "preserved_baseline_failures": [
+    "missing historical proto document",
+    "test_go::test_go_runtime_and_parity_runner_are_gofmt_clean (historical WindowsCRLF)",
+    "test_go::test_generated_go_is_gofmt_clean (historical WindowsCRLF)"
+  ],
+  "protection": {
+    "after": {
+      "path": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\audit-after.json",
+      "sha256": "08a527e550dba3cb318629ca623496f2e034bfa642f01391ee3736b9af6a0870",
+      "size": 90605
+    },
+    "before": {
+      "path": "D:\\projects\\limbo\\cpp-go-oneof-scratch\\remediation-r1\\audit-before.json",
+      "sha256": "08a527e550dba3cb318629ca623496f2e034bfa642f01391ee3736b9af6a0870",
+      "size": 90605
+    },
+    "equal": true,
+    "excluded_old_python_artifacts": 35,
+    "indices": 5,
+    "locks_and_manifests": 46,
+    "only_authorized7source_paths_changed": true,
+    "protected_user_sources": 5,
+    "source_files": 678
+  },
+  "remediation_round": 1,
+  "source_change_hashes": {
+    "src/taut/gen/go_runtime.py": "ddf8e3d86f058a7681a5b5c37db326fd8f09d07431e9a041781c8bcb3dc8abf4",
+    "src/taut/gen/runtime/go/paths.go": "a1509ebb35b79523e6a40057201505aedd8ee030a2fba4fe71c47d3febd60c36",
+    "src/taut/gen/runtime/validation.hpp": "fc8a5c5fdef9fca3b075bf4e72c99aab5bd894746feed33a92d8e8c56c842076",
+    "src/tests/test_cpp_oneof.py": "0ffada645d91e2cceaacd82b8a726d62f0f80f1b3580c3a7e92c3404136eb923",
+    "src/tests/test_go_oneof.py": "42b3e9bf489fd356dc282e058b798dc342fdba7600515b4b5c3c10ff46493e81",
+    "src/tests/test_map_gen.py": "09e449e5deee62c89b30d68c8e484cb2f71019488c770b9382c60d0320dde5eb",
+    "src/tests/test_scaffold.py": "ccb6f3f30c2bdc56e25b203b0a2d4dc669722cafab19a6844b88f0aae097ab89"
+  },
+  "status": "Corrected focused implementer checks PASS; no finding self-closed; original-two-reviewer settled closure pending"
+}

@@ -1,0 +1,233 @@
+{
+  "files": {
+    "dev-docs/examples/cpp-oneof/AllocationFault.cpp": {
+      "sha256": "11bd45b77f72b25a416e2fb7f8787d0a7f43fb8eb8c91798a4bad579a501f2db",
+      "size": 2668
+    },
+    "dev-docs/examples/cpp-oneof/Conformance.cpp": {
+      "sha256": "022b0969e9422685b51217294a430905d6667ce7c0463a737dcf85ec26fe491c",
+      "size": 3284
+    },
+    "dev-docs/examples/cpp-oneof/Example.cpp": {
+      "sha256": "c1c36c54321c12aaa17586dbae6ef8a55cad9d4a5c16144cc3e638ad7908c708",
+      "size": 1134
+    },
+    "dev-docs/examples/cpp-oneof/README.md": {
+      "sha256": "a67f9df11b7aca1ebd00dd166790ec6f80d8426d4d8ca9e84bc50dfc200ee385",
+      "size": 6930
+    },
+    "dev-docs/examples/cpp-oneof/RESULTS-R1.md": {
+      "sha256": "902ec9f1bb56e3be140fd99281b2a82c529e23e051830db32b5240f565f3a7b9",
+      "size": 2271
+    },
+    "dev-docs/examples/cpp-oneof/RESULTS.md": {
+      "sha256": "17e63e95323b86d1a2e2406ca7c8ce1f4ac3aff72485af87ca7f4643ba9cfdbf",
+      "size": 7583
+    },
+    "dev-docs/examples/cpp-oneof/content.taut.py": {
+      "sha256": "784f549db4a0e324a7675f3f88e399d623d81738e7358f6225a449e0e349855d",
+      "size": 1185
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/audit-after.json": {
+      "sha256": "08a527e550dba3cb318629ca623496f2e034bfa642f01391ee3736b9af6a0870",
+      "size": 90605
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/audit-before.json": {
+      "sha256": "08a527e550dba3cb318629ca623496f2e034bfa642f01391ee3736b9af6a0870",
+      "size": 90605
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/audit.py": {
+      "sha256": "d86b1df414b4afbb6b1fb875029791e38cf3cdfea73fd4af993fe4cb4da61e0c",
+      "size": 2936
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/commands.json": {
+      "sha256": "2d8b7718767b16dac6e2acab47ff2b827bdecf91c97d8cf3ada0af5c7beee53c",
+      "size": 3423
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/cpp-contracts.log": {
+      "sha256": "8cc61f4d68101da7c55631b9abfb3dbc487d58a17b9a95c3e5fca8a43fabcb06",
+      "size": 209
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/cpp-contracts.xml": {
+      "sha256": "f72b2ed19cd5222b09e91c2763d07f255e209db8410d9c63adac60dcb04f48dd",
+      "size": 13479
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/cpp-counterexamples.log": {
+      "sha256": "8f099ec616d9483f8f7ddd11ce6948dbed2e5c15a6232a652e8bf740f03926c6",
+      "size": 102
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/cpp-counterexamples.xml": {
+      "sha256": "92931fc85424240d47887a4492785337a8a0da85898d40aac6644d9723e3d909",
+      "size": 2553
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/cpp-original-counterexample.json": {
+      "sha256": "da7e0d89e981fca05d98bfdda771bbdc5f1fc16c459dbfcf2b713780f07df855",
+      "size": 1022
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/pair-wheel.log": {
+      "sha256": "b6a892815f65e0589682c0e9ffaa072644f0bd7b0e54ecee76aabef1ae2e290c",
+      "size": 102
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/pair-wheel.xml": {
+      "sha256": "73aef0e87d255dad174c7a9bccce63fab4e6ac34f9edf3105db4c772a876c4bb",
+      "size": 1768
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/replay-cpp.py": {
+      "sha256": "0e7fa44143de2f6688cd37e4f9ee4399db90ef0bf028aa16d0b76bb4afd96493",
+      "size": 1366
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/shared-assertions.log": {
+      "sha256": "1bd9104feaed37082893f839c298e1bd40aba31fe8b476a230b8e67b88362007",
+      "size": 101
+    },
+    "dev-docs/examples/cpp-oneof/results-r1/shared-assertions.xml": {
+      "sha256": "c19cbc7e480d3a6773c769cfcb2bf0c101479e4d7035e619d4e9a1daa6a5c0ce",
+      "size": 2083
+    },
+    "dev-docs/examples/cpp-oneof/results/example-api-association.json": {
+      "sha256": "11c4d1f84da0fbf8b1f66c8a71c0271b887d39662eab9dad378833d3a652dd60",
+      "size": 765
+    },
+    "dev-docs/examples/cpp-oneof/results/naming-final.log": {
+      "sha256": "560b1b0bdd9cd0c1252568c7c627d1a9584474c0a69ef1c1388ccf4631c00678",
+      "size": 102
+    },
+    "dev-docs/examples/cpp-oneof/results/naming-final.xml": {
+      "sha256": "c1aa9afe868ab883c1344404b3d5c09e6b0b4bc28787cb584473e844a3e59a0c",
+      "size": 2897
+    },
+    "dev-docs/examples/cpp-oneof/results/normalized-reports.txt": {
+      "sha256": "02586adf94172f54e92c38809a4426d8e1cc372b70b669e405a5b20efc08b4ec",
+      "size": 1954
+    },
+    "dev-docs/examples/cpp-oneof/results/owned-source.json": {
+      "sha256": "24d128e4dd3d0c4c0595925b76ed3ac660a65f6c975c7ae473cf6b7bfdfef3da",
+      "size": 10522
+    },
+    "dev-docs/examples/cpp-oneof/results/package-provenance.json": {
+      "sha256": "3de6fbc3ee8bd1461a72d91e0f87f41d3733cce971a40bbcd41332be880eafb8",
+      "size": 1765
+    },
+    "dev-docs/examples/cpp-oneof/results/shared-affected-after.json": {
+      "sha256": "4512698b6c87fc7e0b52ba182712ce91b405b1dd88a2fbb45f6392ee920d0df0",
+      "size": 14942
+    },
+    "dev-docs/examples/cpp-oneof/results/shared-affected-before.json": {
+      "sha256": "4512698b6c87fc7e0b52ba182712ce91b405b1dd88a2fbb45f6392ee920d0df0",
+      "size": 14942
+    },
+    "dev-docs/examples/cpp-oneof/results/shared-affected-receipt.json": {
+      "sha256": "2fadb5ebd0f3e5bdbed802f59d79da5933ed8a6e813f46ba8d9f0853cd6c62cc",
+      "size": 4409
+    },
+    "dev-docs/examples/cpp-oneof/results/shared-affected-runner.py": {
+      "sha256": "964948ccccf4faa9977f7b6d1017eb3f64f21b18fec58a2d95bf618b6211db4e",
+      "size": 5085
+    },
+    "dev-docs/examples/cpp-oneof/results/shared-affected.log": {
+      "sha256": "816af8aa94e1896ab170b1d4d5f24fb71cf165d95c2ed4c501b4c0fd434df50c",
+      "size": 193
+    },
+    "dev-docs/examples/cpp-oneof/results/target-gate-receipt.json": {
+      "sha256": "2d121660cb1f995922e46d786528e263aae31df9356de86e20971b077c8f5a3c",
+      "size": 1144
+    },
+    "dev-docs/examples/cpp-oneof/verify_examples.py": {
+      "sha256": "74227a502bafb0103c26425e3e7e98d8d571e5a72b6754c3a7f78a783dc20d9e",
+      "size": 3116
+    },
+    "pyproject.toml": {
+      "sha256": "8996804505c30bcb05a074a0a5022166ce00ec52bd1fba2dadfcf8ceaeb22ec0",
+      "size": 2138
+    },
+    "src/taut/cli.py": {
+      "sha256": "406e471766743c2db617644b8ef90fae166aaeab53247e2fb56d48e538dd9a4d",
+      "size": 15543
+    },
+    "src/taut/corpus/parity_cpp.py": {
+      "sha256": "2dca5981429b9b15fb8f78a82a0a0db6315209ebb1db3033de0c173409dfaf13",
+      "size": 18071
+    },
+    "src/taut/gen/cpp.py": {
+      "sha256": "90474c42e8726388a0dc839b0eec72d2b56ebe5e9134b3d327e8e09c47edbaf3",
+      "size": 32040
+    },
+    "src/taut/gen/cpp_metadata.py": {
+      "sha256": "038b6dce3c75853ef6ba1e294bad9e20ab574b500bbc2d66fa31be21e0538a3f",
+      "size": 13571
+    },
+    "src/taut/gen/cpp_runtime.py": {
+      "sha256": "3db3604f843cffd1c5ec5ba7f6bf9a6788ec41dca30b6df4ac20d014fe7f54d1",
+      "size": 13528
+    },
+    "src/taut/gen/runtime/descriptors.hpp": {
+      "sha256": "4dc0b2b40ca2ed8459c733898812eeff0db30d637d03a108a33c5fa3bb0669ec",
+      "size": 23446
+    },
+    "src/taut/gen/runtime/foundation.cpp": {
+      "sha256": "78934d68fee208771c91467bf86b75a867439c00d62199962472e43d70fff101",
+      "size": 255
+    },
+    "src/taut/gen/runtime/foundation.hpp": {
+      "sha256": "f65eac9452ea2e76e9e8cc9554490f8c81e8d7cd2e093d7401d361db0f1c782b",
+      "size": 790
+    },
+    "src/taut/gen/runtime/reports.hpp": {
+      "sha256": "c60ecfdb93f7029e35b155d69a19f190159fb8b08463d4aec366d843c42a12d1",
+      "size": 7248
+    },
+    "src/taut/gen/runtime/validation.hpp": {
+      "sha256": "fc8a5c5fdef9fca3b075bf4e72c99aab5bd894746feed33a92d8e8c56c842076",
+      "size": 6950
+    },
+    "src/taut/gen/scaffold.py": {
+      "sha256": "cc7285e1ce34594d773fdc624dd76774edebe79893897f7a30756c7bd7e227d9",
+      "size": 48734
+    },
+    "src/tests/test_cpp.py": {
+      "sha256": "55fad2e63c3cffff9ef219fa0e492c403a9c094f704572499bc8529daff30af5",
+      "size": 74137
+    },
+    "src/tests/test_cpp_go_distribution.py": {
+      "sha256": "d9630bf6083a614e4cf482749347f59646f17edbb3e7979cf7fdd6c32ce2ca08",
+      "size": 6040
+    },
+    "src/tests/test_cpp_oneof.py": {
+      "sha256": "0ffada645d91e2cceaacd82b8a726d62f0f80f1b3580c3a7e92c3404136eb923",
+      "size": 31578
+    },
+    "src/tests/test_map_gen.py": {
+      "sha256": "09e449e5deee62c89b30d68c8e484cb2f71019488c770b9382c60d0320dde5eb",
+      "size": 3218
+    },
+    "src/tests/test_scaffold.py": {
+      "sha256": "ccb6f3f30c2bdc56e25b203b0a2d4dc669722cafab19a6844b88f0aae097ab89",
+      "size": 5558
+    }
+  },
+  "finding_status": "No implementer self-closure; same original Code and State reviewers must verify corrected settled tuple",
+  "gates": {
+    "cpp_contracts": "109passed/1duplicateparitywrapperdeselected in148.61s, nofails/skips",
+    "cpp_counterexamples": "18 passed in31.97s; overlap nextgate",
+    "cpp_original": "unchanged reviewer probe PASS same_address=1 valid=1 complete=1 fast=1 issues=0",
+    "pair_wheel_and_format": "11passed in11.48s incl actualwheel canonicalbytes, isolated C++/Go source/package,8junctionprelockprobes and exactLFformatnode",
+    "scope": "no second broad/full16 or standalone library gate; old receipts retain original source association",
+    "shared_assertions": "16passed in1.84s incl native Go map/plain roundtrips"
+  },
+  "manifest_self": "include this file in exact allowlist; containing corrected commit binds omitted self-hash",
+  "original_manifest_preserved": {
+    "path": "dev-docs/examples/cpp-oneof/results/owned-source.json",
+    "sha256": "24d128e4dd3d0c4c0595925b76ed3ac660a65f6c975c7ae473cf6b7bfdfef3da",
+    "size": 10522
+  },
+  "original_source_tuple": "4222822320cbb22e376f8b387a963e86aad10ff2",
+  "production_test_changes": [
+    "src/taut/gen/runtime/validation.hpp",
+    "src/tests/test_cpp_oneof.py",
+    "src/tests/test_map_gen.py",
+    "src/tests/test_scaffold.py"
+  ],
+  "protection": "audit before==after for678sourcefiles,5protectedusersources,35excludedartifacts,5indices,46locks/manifests; exact7R1sourcechanges vs initial global snapshot",
+  "scope": "C++ and shared owned correction/evidence only; Go owned separately; one merged pair corrective checkpoint",
+  "status": "R1 implementer gates PASS; production HOLD pending settled original-axis closure"
+}

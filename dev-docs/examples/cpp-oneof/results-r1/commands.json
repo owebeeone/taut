@@ -1,0 +1,73 @@
+{
+  "activation": ". D:/projects/limbo/toolchain-readiness-2026-11-02/Activate-TautToolchains.ps1",
+  "commands": {
+    "cpp-contracts": [
+      "python",
+      "-B",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "D:/projects/limbo/taut-dev/taut/src/tests/test_cpp_oneof.py",
+      "D:/projects/limbo/taut-dev/taut/src/tests/test_cpp.py",
+      "-m",
+      "not gate",
+      "--basetemp=D:/projects/limbo/cpp-go-oneof-scratch/remediation-r1/cpp-contracts",
+      "--junitxml=D:/projects/limbo/cpp-go-oneof-scratch/remediation-r1/cpp-contracts.xml",
+      "-q"
+    ],
+    "cpp-counterexamples": [
+      "python",
+      "-B",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "D:/projects/limbo/taut-dev/taut/src/tests/test_cpp_oneof.py::test_first_value_child_is_not_its_enclosing_message",
+      "D:/projects/limbo/taut-dev/taut/src/tests/test_cpp_oneof.py::test_reference_behavior",
+      "D:/projects/limbo/taut-dev/taut/src/tests/test_cpp_oneof.py::test_mutual_recursion_and_primitive_borrows",
+      "D:/projects/limbo/taut-dev/taut/src/tests/test_cpp_oneof.py::test_allocation_fault_noexcept",
+      "--basetemp=D:/projects/limbo/cpp-go-oneof-scratch/remediation-r1/cpp-counterexamples",
+      "--junitxml=D:/projects/limbo/cpp-go-oneof-scratch/remediation-r1/cpp-counterexamples.xml",
+      "-q"
+    ],
+    "pair-wheel": [
+      "python",
+      "-B",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "D:/projects/limbo/taut-dev/taut/src/tests/test_cpp_go_distribution.py",
+      "D:/projects/limbo/taut-dev/taut/src/tests/test_go_oneof.py::test_go_emission_and_canonical_closure_are_gofmt_clean_without_crlf",
+      "--basetemp=D:/projects/limbo/cpp-go-oneof-scratch/remediation-r1/pair-wheel",
+      "--junitxml=D:/projects/limbo/cpp-go-oneof-scratch/remediation-r1/pair-wheel.xml",
+      "-q"
+    ],
+    "shared-assertions": [
+      "python",
+      "-B",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "D:/projects/limbo/taut-dev/taut/src/tests/test_map_gen.py",
+      "D:/projects/limbo/taut-dev/taut/src/tests/test_scaffold.py",
+      "--basetemp=D:/projects/limbo/cpp-go-oneof-scratch/remediation-r1/shared-assertions",
+      "--junitxml=D:/projects/limbo/cpp-go-oneof-scratch/remediation-r1/shared-assertions.xml",
+      "-q"
+    ]
+  },
+  "cwd": "D:/projects/limbo/cpp-go-oneof-scratch/remediation-r1",
+  "env": {
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONPATH": "D:/projects/limbo/taut-dev/taut/src;C:/Users/gianni/AppData/Local/Programs/Python/Python311/Lib/site-packages"
+  },
+  "exact_original_probe": "python -B replay-cpp.py; command/stdout/source hash in cpp-original-counterexample.json",
+  "native_cpp": "Clang21.1.6/MSVC19.33; C++20/noRTTI; MSVCnative execution also in fullCPPsuite",
+  "no_duplicate_global": "one historical r0 broad/full16; no second run",
+  "output": "Each gate stdout+stderr redirected to same-name.log; exit code propagated",
+  "protection": "audit.py before immediately before pair-wheel; audit.py after immediately after; equality checks all678selectedsourcefiles,5usersources,35excluded,5indices,46locks,5HEADs. Other gate association uses stable owned source hashes; do not claim nonexistent earlier per-gate snapshot.",
+  "stable_python": "CPython3.13.5"
+}

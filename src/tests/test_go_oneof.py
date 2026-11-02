@@ -362,7 +362,9 @@ def test_cli_runtime_validation_independence(tmp_path,package,mode,validation):
 def test_go_emission_and_canonical_closure_are_gofmt_clean_without_crlf(tmp_path):
     # This is an additional exact formatting check. The two historical Windows
     # write_text/CRLF tests remain unchanged and visible in test_go.py.
-    from src.tests.test_go import _generated_go
+    # Pytest exposes sibling test modules without making the repo parent a
+    # package root. This works for absolute test paths from a scratch cwd too.
+    from test_go import _generated_go
     for name,text in {**_generated_go(),'oneof_on':emit_types(SCHEMA,validation=True),'oneof_off':emit_types(SCHEMA)}.items():
         result=subprocess.run(['gofmt'],input=text,capture_output=True,text=True)
         assert result.returncode==0 and result.stdout==text,(name,result.stderr)
@@ -524,3 +526,162 @@ def test_supplementary_unicode_native_names_and_original_report_paths(tmp_path):
     module(tmp_path)
     app(tmp_path,'v:=a.𐐀Record{Tag:a.ChoiceA}; r:=v.Validate(); name,_:=r.Issues()[0].Path()[0].FieldName(); if name!="𐐨value" || v.Descriptor().QualifiedName()!="schema😀.𐐀Record" {panic("Unicode facts")}; text:="";v.𐐀value=&text;if !v.IsValid(){panic("repair")}', 'import a "example.local/app/go"')
     go_run(tmp_path)
+
+
+@pytest.mark.parametrize('mode',['source','package'])
+@pytest.mark.parametrize('rules',[False,True])
+def test_finite_prefix_slice_views_keep_both_paths(tmp_path,package,mode,rules):
+    if rules:
+        k=Enum('Choice',text=0,empty=1)
+        s=schema(k,Node=Msg(tag=F(1,OneOf(k)),text=F(2,STR,Case(tag=k.text)),children=F(3,List(Ref('Node')))))
+        root='a.Node{Tag:a.ChoiceEmpty,Children:nodes}'
+        init='nodes[0]=a.Node{Tag:a.ChoiceEmpty};nodes[1]=a.Node{Tag:a.ChoiceEmpty,Children:nodes[:1]}'
+        cycle_init='cycle[0]=a.Node{Tag:a.ChoiceEmpty,Children:cycle[:1:1]}'
+        cycle_root='a.Node{Tag:a.ChoiceEmpty,Children:cycle}'
+    else:
+        s=schema(Node=Msg(children=F(1,List(Ref('Node')))),Root=Msg(nodes=F(1,List(Ref('Node')))))
+        root='a.Root{Nodes:nodes}'
+        init='nodes[1].Children=nodes[:1]'
+        cycle_init='cycle[0].Children=cycle[:1:1]'
+        cycle_root='a.Root{Nodes:cycle}'
+    module(tmp_path,'require foundation.local/runtime v0.0.0\nreplace foundation.local/runtime => '+json.dumps(package.as_posix())+'\n' if mode=='package' else '')
+    bindings={'go':{'import_path':'foundation.local/runtime','artifact':str(package)}} if mode=='package' else None
+    emit(s,tmp_path,langs=['go'],services=[],runtime_mode=mode,validation=True,runtime_bindings=bindings)
+    invalid='''
+      nodes[0].Tag=a.ChoiceText
+      report=root.Validate(); if report.IsValid() || !report.IsComplete() || root.IsValid() || len(report.Issues())!=2 {panic("missing shared paths")}
+      for _,issue:=range report.Issues(){if issue.Code()!="oneof.payload_missing" {panic("invented cycle")}}
+      first,second:=report.Issues()[0].Path(),report.Issues()[1].Path()
+      if len(first)!=3 || len(second)!=5 {panic("shared leaf path lengths")}
+      i,_:=first[1].Index();j,_:=second[1].Index();k,_:=second[3].Index();name,_:=second[4].FieldName()
+      if i!=0||j!=1||k!=0||name!="text"{panic("shared leaf path locations")}
+      local:=root.ValidateWithOptions(a.ValidationOptions{});if !local.IsValid()||!local.IsComplete()||!root.IsValidWithOptions(a.ValidationOptions{}){panic("local scope")}
+      text:="";nodes[0].Text=&text
+      if !root.IsValid() || len(report.Issues())!=2{panic("repair/report snapshot")}
+    ''' if rules else ''
+    app(tmp_path,f'''
+      nodes:=make([]a.Node,2);{init};root:={root}
+      report:=root.Validate();if !report.IsValid()||!report.IsComplete()||!root.IsValid()||len(report.Issues())!=0{{panic("finite prefix rejected")}}
+      // Capacity does not change the traversed view; length does.
+      nodes[1].Children=nodes[:1:1];if !root.IsValid(){{panic("finite capped prefix rejected")}}
+      {invalid}
+      cycle:=make([]a.Node,1,2);{cycle_init};cyclic:={cycle_root}
+      report=cyclic.Validate();if report.IsValid()||!report.IsComplete()||cyclic.IsValid()||len(report.Issues())!=1||report.Issues()[0].Code()!="validation.ownership_cycle"{{panic("real capped-view cycle missed")}}
+    ''','import a "example.local/app/go"')
+    go_run(tmp_path)
+
+
+def external_module(root,package):
+    module(root,'require foundation.local/runtime v0.0.0\nreplace foundation.local/runtime => '+json.dumps(package.as_posix())+'\n')
+    return {'go':{'import_path':'foundation.local/runtime','artifact':str(package)}}
+
+
+@pytest.mark.parametrize('validation',[False,True])
+@pytest.mark.parametrize('mode',['package',None])
+def test_default_source_owner_retires_for_external_runtime_and_returns(tmp_path,package,mode,validation):
+    s=schema(Record=Msg(n=F(1,INT)));target=tmp_path/'application'
+    emit(s,target,langs=['go'],services=[],runtime_mode='source',validation=validation)
+    owner=target/'go';before=json.loads((owner/'.taut-go-runtime.json').read_text())
+    assert before['import_path']=='' and len(before['users'])==1
+    handwritten=owner/'handwritten.txt';handwritten.write_text('keep')
+    artifact_before=tree(package);config=external_module(target,package)
+    emit(s,target,langs=['go'],services=[],runtime_mode=mode,validation=validation,runtime_bindings=config)
+    assert all(not (owner/name).exists() for name in FILES)
+    assert not (owner/'.taut-go-runtime.json').exists() and handwritten.read_text()=='keep'
+    receipt=json.loads((owner/'.taut-go-outputs.json').read_text())
+    assert receipt['source_root'] is None and receipt['mode']==(mode or 'supplied')
+    def native(enabled):
+        app(target,'v:=a.Record{N:0};got,err:=a.TryRecordFromCbor(v.ToCbor());if err!=nil||got.N!=0||v.Descriptor()!=a.DescribeRecord(){panic("native runtime transition")};'+('if !v.IsValid(){panic("validation")}' if enabled else ''),'import a "example.local/app/go"')
+        go_run(target)
+    native(validation)
+    emit(s,target,langs=['go'],services=[],runtime_mode='source',validation=not validation)
+    assert (owner/'.taut-go-runtime.json').exists()
+    assert (owner/ENGINE).exists()==(not validation)
+    assert handwritten.read_text()=='keep' and tree(package)==artifact_before
+    native(not validation)
+
+
+@pytest.mark.parametrize('mode',['package',None])
+def test_external_retirement_keeps_other_source_user_and_engine(tmp_path,package,mode):
+    s=schema(Record=Msg(n=F(1,INT)));owner=tmp_path/'shared'
+    config={'go':{'import_path':'example.local/app/shared','source_root':str(owner)}}
+    for name in ('one','two'):
+        emit(s,tmp_path/name,langs=['go'],services=[],runtime_mode='source',validation=True,runtime_bindings=config)
+    survivor=(tmp_path/'two/go/api.go').read_bytes();artifact_before=tree(package)
+    external=external_module(tmp_path,package)
+    emit(s,tmp_path/'one',langs=['go'],services=[],runtime_mode=mode,validation=False,runtime_bindings=external)
+    receipt=json.loads((owner/'.taut-go-runtime.json').read_text())
+    assert receipt['import_path']=='example.local/app/shared' and len(receipt['users'])==1
+    assert all(user['validation'] for user in receipt['users'].values()) and (owner/ENGINE).exists()
+    assert (tmp_path/'two/go/api.go').read_bytes()==survivor and tree(package)==artifact_before
+    app(tmp_path,'v:=a.Record{};if !v.IsValid(){panic("surviving engine")}', 'import a "example.local/app/two/go"')
+    go_run(tmp_path)
+    app(tmp_path,'v:=a.Record{};_,err:=a.TryRecordFromCbor(v.ToCbor());if err!=nil{panic(err)}', 'import a "example.local/app/one/go"')
+    go_run(tmp_path)
+
+
+@pytest.mark.parametrize('mode',['source','package',None])
+def test_actual_selected_source_import_remap_still_refuses(tmp_path,mode):
+    config={'go':{'import_path':'example.local/app/shared','source_root':str(tmp_path/'shared')}}
+    emit(SCHEMA,tmp_path/'app',langs=['go'],services=[],runtime_mode='source',validation=True,runtime_bindings=config)
+    before=tree(tmp_path)
+    config['go']['import_path']='other.local/rebound'
+    with pytest.raises(ValueError,match='cannot remap'):
+        emit(SCHEMA,tmp_path/'app',langs=['go'],services=[],runtime_mode=mode,validation=True,runtime_bindings=config)
+    assert tree(tmp_path)==before
+
+
+@pytest.mark.parametrize('problem',['missing_owner','modified_file','unknown_file','validation_type','consumer_type','unknown_record','relative_user'])
+def test_external_retirement_requires_known_unmodified_owner(tmp_path,package,problem):
+    emit(SCHEMA,tmp_path,langs=['go'],services=[],runtime_mode='source',validation=False)
+    owner=tmp_path/'go';receipt=owner/'.taut-go-runtime.json'
+    if problem=='missing_owner':receipt.unlink()
+    elif problem=='modified_file':(owner/'paths.go').write_text('// changed')
+    elif problem=='unknown_file':(owner/ENGINE).write_text('// handwritten')
+    else:
+        data=json.loads(receipt.read_text());user=next(iter(data['users']))
+        if problem=='validation_type':data['users'][user]['validation']=1
+        elif problem=='consumer_type':data['users'][user]['consumer']='yes'
+        elif problem=='unknown_record':data['users'][user]['future_use']=True
+        elif problem=='relative_user':data['users']['relative-schema']={'validation':False}
+        receipt.write_text(json.dumps(data))
+    before=tree(tmp_path)
+    with pytest.raises(ValueError):
+        emit(SCHEMA,tmp_path,langs=['go'],services=[],runtime_mode='package',validation=False,runtime_bindings={'go':{'import_path':'foundation.local/runtime','artifact':str(package)}})
+    assert tree(tmp_path)==before
+
+
+@pytest.mark.parametrize('validation',[False,True])
+@pytest.mark.parametrize('mode',['package',None])
+@pytest.mark.parametrize('cutoff',range(1,11))
+def test_external_retirement_interruption_stays_fail_closed(tmp_path,package,monkeypatch,validation,mode,cutoff):
+    target=tmp_path/'app';owner=target/'go'
+    emit(SCHEMA,target,langs=['go'],services=[],runtime_mode='source',validation=validation)
+    handwritten=owner/'handwritten.txt';handwritten.write_text('keep')
+    config={'go':{'import_path':'foundation.local/runtime','artifact':str(package)}}
+    artifact_before=tree(package);replace=os.replace;unlink=Path.unlink;operations=0
+    def persisted():
+        nonlocal operations
+        operations+=1
+        if operations==cutoff:raise OSError('injected persisted retirement cutoff')
+    def replacing(source,destination):
+        replace(source,destination)
+        if Path(destination).parent==owner:persisted()
+    def deleting(path,*args,**kwargs):
+        existed=path.exists();unlink(path,*args,**kwargs)
+        if existed and path.parent==owner and path.name in {*FILES,'.taut-go-runtime.json'}:persisted()
+    interrupted=False
+    with monkeypatch.context() as context:
+        context.setattr(os,'replace',replacing);context.setattr(Path,'unlink',deleting)
+        try:emit(SCHEMA,target,langs=['go'],services=[],runtime_mode=mode,validation=validation,runtime_bindings=config)
+        except OSError as error:
+            assert 'injected' in str(error);interrupted=True
+    before_retry=tree(target)
+    try:emit(SCHEMA,target,langs=['go'],services=[],runtime_mode=mode,validation=validation,runtime_bindings=config)
+    except ValueError:
+        assert interrupted and tree(target)==before_retry
+    else:
+        assert all(not (owner/name).exists() for name in FILES)
+        assert not (owner/'.taut-go-runtime.json').exists()
+        assert json.loads((owner/'.taut-go-outputs.json').read_text())['source_root'] is None
+    assert handwritten.read_text()=='keep' and tree(package)==artifact_before

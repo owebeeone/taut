@@ -1,0 +1,23 @@
+{
+  "reports": {
+    "code": {
+      "source": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/code/scratch/final-review-code.md",
+      "filed": "dev-docs/CppGoOneOfCheckpoint-ReviewCode.md",
+      "sha256": "df945aff0f549ff9af657868a2570807c792a50559c429ecea169fb46c7485d4",
+      "bytes": 24097,
+      "verbatim": true,
+      "original_agent": "/root/cpp_go_code_review"
+    },
+    "state": {
+      "source": "D:/projects/limbo/cpp-go-oneof-scratch/review-r0/state/scratch/final-review-state.md",
+      "filed": "dev-docs/CppGoOneOfCheckpoint-ReviewState.md",
+      "sha256": "a401ede7f0ad06ab795dc767f0e9c383975169cbac64366e250ef9e9d8a164b7",
+      "bytes": 20130,
+      "verbatim": true,
+      "original_agent": "/root/cpp_go_state_review"
+    }
+  },
+  "method": "Original reviewers exported their exact immediately preceding complete final reports, no revised review; lane owner byte-copied and verified hash/length. No editorial alteration.",
+  "reviewers_total": 2,
+  "tuple": "Taut4222822320cbb22e376f8b387a963e86aad10ff2/rootbd455ef9174fb13679d0ec6814e43ec1345505fc"
+}

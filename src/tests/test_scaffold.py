@@ -1,5 +1,8 @@
 """The scaffold generators emit per-language API types + client/server stubs."""
 
+import hashlib
+import json
+
 import pytest
 
 from taut.corpus.build import IR_PATH
@@ -78,7 +81,10 @@ def test_declared_means_declared_not_default(tmp_path, monkeypatch):
     monkeypatch.setitem(scaffold._IMPLEMENTED_OPTIONS, "go", frozenset())
     plain = schema(Msg("M", F("x", 1, INT)))   # max_depth resolves to 32, but none is declared
     written = scaffold.emit(plain, tmp_path, langs=["go"], services=[])
-    assert [p.relative_to(tmp_path).as_posix() for p in written] == ["go/api.go"]
+    assert [p.relative_to(tmp_path).as_posix() for p in written] == ["go/api.go", "go/.taut-go-outputs.json"]
+    receipt=json.loads((tmp_path/'go/.taut-go-outputs.json').read_text())
+    assert receipt['files']=={'api.go':hashlib.sha256((tmp_path/'go/api.go').read_bytes()).hexdigest()}
+    assert receipt['mode']=='supplied' and receipt['validation'] is False and receipt['source_root'] is None
 
 
 def test_only_an_option_that_binds_the_target_is_refused(tmp_path, monkeypatch):

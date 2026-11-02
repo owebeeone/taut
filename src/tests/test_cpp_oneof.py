@@ -180,6 +180,31 @@ int main(){const char bytes[]="borrowed";taut::B b{};b.text=bytes;b.blob=bytes;b
 '''
     executable,_=compile_cpp(tmp_path/'build',source,include=[d],objects=[d/'foundation.cpp']);run([executable])
 
+@pytest.mark.parametrize('mode',['source','package',None])
+@pytest.mark.parametrize('optional',[False,True])
+@pytest.mark.parametrize('constrained',[False,True])
+def test_first_value_child_is_not_its_enclosing_message(tmp_path,package,mode,optional,constrained):
+    from taut.ir.dsl import OneOf,Case
+    choice=Enum('ChildChoice',text=0,empty=1)
+    child=schema(choice,Child=Msg(tag=F(1,OneOf(choice)),text=F(2,STR,Case(tag=choice.text)))) if constrained else schema(Child=Msg(n=F(1,INT)))
+    parent=dataclasses.replace(child,messages={**child.messages,**schema(Parent=Msg(child=F(1,Ref('Child'),optional=optional))).messages})
+    owner=tmp_path/'owner'
+    bindings={'cpp':{'source_root':str(owner)}} if mode=='source' else {'cpp':{'artifact':str(package)}}
+    emit(child,tmp_path/'child',langs=['cpp'],services=[],runtime_mode=mode,runtime_bindings=bindings,schema_identity='first-child')
+    cd=tmp_path/'child/cpp';shutil.copyfile(cd/'api.hpp',cd/'child.hpp')
+    emit(parent,tmp_path/'parent',langs=['cpp'],services=[],runtime_mode=mode,validation=True,runtime_bindings=bindings,
+         schema_identity='first-parent',cpp_external_types=external(('ChildChoice','Child') if constrained else ('Child',)))
+    pd=tmp_path/'parent/cpp';include=owner if mode=='source' else package/'include'
+    obj=owner/'foundation.cpp' if mode=='source' else package/'taut-foundation.lib'
+    setup='assert(p.is_valid());p.child.emplace();auto& child=*p.child;' if optional else 'assert(static_cast<const void*>(&p)==static_cast<const void*>(&p.child));auto& child=p.child;'
+    body=('child.tag=taut::ChildChoice::Text;child.text="";' if constrained else 'child.n=0;')
+    body+='auto valid=p.validate();assert(valid.is_valid()&&valid.is_complete()&&valid.issues().empty()&&p.is_valid());assert(p.is_valid(false));'
+    if constrained:
+        body+='child.text.reset();auto invalid=p.validate();assert(!invalid.is_valid()&&invalid.is_complete()&&!p.is_valid()&&p.is_valid(false));assert(invalid.issues().size()==1);const auto& issue=invalid.issues()[0];assert(issue.code()=="oneof.payload_missing");assert(issue.path().size()==2&&issue.path()[0].field_name()=="child"&&issue.path()[1].field_name()=="text");child.text="";assert(p.is_valid());assert(invalid.issues().size()==1);'
+    source='#include "api.hpp"\n#include <cassert>\nint main(){taut::Parent p{};'+setup+body+'}\n'
+    executable,_=compile_cpp(tmp_path/'build',source,include=[pd,cd,include],objects=[obj]);run([executable])
+    assert 'Child::validate' not in (cd/'child.hpp').read_text()
+
 @pytest.mark.parametrize('replacement',['descriptor','codec','capabilities','guard','owner'])
 def test_actual_replaced_link_artifact_rejected(tmp_path,package,replacement):
     emit(SCHEMA,tmp_path,langs=['cpp'],services=[],runtime_mode='package',validation=True)

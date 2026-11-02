@@ -1,0 +1,24 @@
+{
+  "counts": {
+    "excluded_python_artifacts": 35,
+    "indices": 5,
+    "locks_and_manifests": 46,
+    "user_sources": 5
+  },
+  "heads": {
+    "shape_python": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "shape_rust": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "shape_ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "taut": "4222822320cbb22e376f8b387a963e86aad10ff2",
+    "workspace": "bd455ef9174fb13679d0ec6814e43ec1345505fc"
+  },
+  "original_go_owned_r0_nonchanged_files_verified": 18,
+  "owned_source_sha256": {
+    "src/taut/gen/go_runtime.py": "ddf8e3d86f058a7681a5b5c37db326fd8f09d07431e9a041781c8bcb3dc8abf4",
+    "src/taut/gen/runtime/go/paths.go": "a1509ebb35b79523e6a40057201505aedd8ee030a2fba4fe71c47d3febd60c36",
+    "src/tests/test_go_oneof.py": "42b3e9bf489fd356dc282e058b798dc342fdba7600515b4b5c3c10ff46493e81"
+  },
+  "protected_unchanged": true,
+  "r0_original_records_unchanged": true,
+  "reused_cbor_ext_unchanged": true
+}

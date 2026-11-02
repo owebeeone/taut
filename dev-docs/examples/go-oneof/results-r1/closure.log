@@ -1,0 +1,133 @@
+................................F...........F........F........           [100%]
+================================== FAILURES ===================================
+____ test_external_retirement_interruption_stays_fail_closed[3-None-False] ____
+
+tmp_path = WindowsPath('D:/projects/limbo/go-oneof-scratch/remediation-1/pytest-closure/test_external_retirement_inter10')
+package = WindowsPath('D:/projects/limbo/go-oneof-scratch/remediation-1/pytest-closure/go-foundation0/extracted')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000022AB2FE74D0>
+validation = False, mode = None, cutoff = 3
+
+    @pytest.mark.parametrize('validation',[False,True])
+    @pytest.mark.parametrize('mode',['package',None])
+    @pytest.mark.parametrize('cutoff',range(1,11))
+    def test_external_retirement_interruption_stays_fail_closed(tmp_path,package,monkeypatch,validation,mode,cutoff):
+        target=tmp_path/'app';owner=target/'go'
+        emit(SCHEMA,target,langs=['go'],services=[],runtime_mode='source',validation=validation)
+        handwritten=owner/'handwritten.txt';handwritten.write_text('keep')
+        config={'go':{'import_path':'foundation.local/runtime','artifact':str(package)}}
+        artifact_before=tree(package);replace=os.replace;unlink=Path.unlink;operations=0
+        def persisted():
+            nonlocal operations
+            operations+=1
+            if operations==cutoff:raise OSError('injected persisted retirement cutoff')
+        def replacing(source,destination):
+            replace(source,destination)
+            if Path(destination).parent==owner:persisted()
+        def deleting(path,*args,**kwargs):
+            existed=path.exists();unlink(path,*args,**kwargs)
+            if existed and path.parent==owner and path.name in {*FILES,'.taut-go-runtime.json'}:persisted()
+        interrupted=False
+        with monkeypatch.context() as context:
+            context.setattr(os,'replace',replacing);context.setattr(Path,'unlink',deleting)
+            try:emit(SCHEMA,target,langs=['go'],services=[],runtime_mode=mode,validation=validation,runtime_bindings=config)
+            except OSError as error:
+                assert 'injected' in str(error);interrupted=True
+        before_retry=tree(target)
+        try:emit(SCHEMA,target,langs=['go'],services=[],runtime_mode=mode,validation=validation,runtime_bindings=config)
+        except ValueError:
+            assert interrupted and tree(target)==before_retry
+        else:
+>           assert all(not (owner/name).exists() for name in FILES)
+E           assert False
+E            +  where False = all(<generator object test_external_retirement_interruption_stays_fail_closed.<locals>.<genexpr> at 0x0000022AB2F042B0>)
+
+..\..\taut-dev\taut\src\tests\test_go_oneof.py:684: AssertionError
+____ test_external_retirement_interruption_stays_fail_closed[6-None-False] ____
+
+tmp_path = WindowsPath('D:/projects/limbo/go-oneof-scratch/remediation-1/pytest-closure/test_external_retirement_inter22')
+package = WindowsPath('D:/projects/limbo/go-oneof-scratch/remediation-1/pytest-closure/go-foundation0/extracted')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000022AB2E82190>
+validation = False, mode = None, cutoff = 6
+
+    @pytest.mark.parametrize('validation',[False,True])
+    @pytest.mark.parametrize('mode',['package',None])
+    @pytest.mark.parametrize('cutoff',range(1,11))
+    def test_external_retirement_interruption_stays_fail_closed(tmp_path,package,monkeypatch,validation,mode,cutoff):
+        target=tmp_path/'app';owner=target/'go'
+        emit(SCHEMA,target,langs=['go'],services=[],runtime_mode='source',validation=validation)
+        handwritten=owner/'handwritten.txt';handwritten.write_text('keep')
+        config={'go':{'import_path':'foundation.local/runtime','artifact':str(package)}}
+        artifact_before=tree(package);replace=os.replace;unlink=Path.unlink;operations=0
+        def persisted():
+            nonlocal operations
+            operations+=1
+            if operations==cutoff:raise OSError('injected persisted retirement cutoff')
+        def replacing(source,destination):
+            replace(source,destination)
+            if Path(destination).parent==owner:persisted()
+        def deleting(path,*args,**kwargs):
+            existed=path.exists();unlink(path,*args,**kwargs)
+            if existed and path.parent==owner and path.name in {*FILES,'.taut-go-runtime.json'}:persisted()
+        interrupted=False
+        with monkeypatch.context() as context:
+            context.setattr(os,'replace',replacing);context.setattr(Path,'unlink',deleting)
+            try:emit(SCHEMA,target,langs=['go'],services=[],runtime_mode=mode,validation=validation,runtime_bindings=config)
+            except OSError as error:
+                assert 'injected' in str(error);interrupted=True
+        before_retry=tree(target)
+        try:emit(SCHEMA,target,langs=['go'],services=[],runtime_mode=mode,validation=validation,runtime_bindings=config)
+        except ValueError:
+            assert interrupted and tree(target)==before_retry
+        else:
+>           assert all(not (owner/name).exists() for name in FILES)
+E           assert False
+E            +  where False = all(<generator object test_external_retirement_interruption_stays_fail_closed.<locals>.<genexpr> at 0x0000022AB2EEC1E0>)
+
+..\..\taut-dev\taut\src\tests\test_go_oneof.py:684: AssertionError
+____ test_external_retirement_interruption_stays_fail_closed[8-None-True] _____
+
+tmp_path = WindowsPath('D:/projects/limbo/go-oneof-scratch/remediation-1/pytest-closure/test_external_retirement_inter31')
+package = WindowsPath('D:/projects/limbo/go-oneof-scratch/remediation-1/pytest-closure/go-foundation0/extracted')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000022AB2E81B70>
+validation = True, mode = None, cutoff = 8
+
+    @pytest.mark.parametrize('validation',[False,True])
+    @pytest.mark.parametrize('mode',['package',None])
+    @pytest.mark.parametrize('cutoff',range(1,11))
+    def test_external_retirement_interruption_stays_fail_closed(tmp_path,package,monkeypatch,validation,mode,cutoff):
+        target=tmp_path/'app';owner=target/'go'
+        emit(SCHEMA,target,langs=['go'],services=[],runtime_mode='source',validation=validation)
+        handwritten=owner/'handwritten.txt';handwritten.write_text('keep')
+        config={'go':{'import_path':'foundation.local/runtime','artifact':str(package)}}
+        artifact_before=tree(package);replace=os.replace;unlink=Path.unlink;operations=0
+        def persisted():
+            nonlocal operations
+            operations+=1
+            if operations==cutoff:raise OSError('injected persisted retirement cutoff')
+        def replacing(source,destination):
+            replace(source,destination)
+            if Path(destination).parent==owner:persisted()
+        def deleting(path,*args,**kwargs):
+            existed=path.exists();unlink(path,*args,**kwargs)
+            if existed and path.parent==owner and path.name in {*FILES,'.taut-go-runtime.json'}:persisted()
+        interrupted=False
+        with monkeypatch.context() as context:
+            context.setattr(os,'replace',replacing);context.setattr(Path,'unlink',deleting)
+            try:emit(SCHEMA,target,langs=['go'],services=[],runtime_mode=mode,validation=validation,runtime_bindings=config)
+            except OSError as error:
+                assert 'injected' in str(error);interrupted=True
+        before_retry=tree(target)
+        try:emit(SCHEMA,target,langs=['go'],services=[],runtime_mode=mode,validation=validation,runtime_bindings=config)
+        except ValueError:
+            assert interrupted and tree(target)==before_retry
+        else:
+>           assert all(not (owner/name).exists() for name in FILES)
+E           assert False
+E            +  where False = all(<generator object test_external_retirement_interruption_stays_fail_closed.<locals>.<genexpr> at 0x0000022AB2D77920>)
+
+..\..\taut-dev\taut\src\tests\test_go_oneof.py:684: AssertionError
+=========================== short test summary info ===========================
+FAILED ..\..\taut-dev\taut\src\tests\test_go_oneof.py::test_external_retirement_interruption_stays_fail_closed[3-None-False]
+FAILED ..\..\taut-dev\taut\src\tests\test_go_oneof.py::test_external_retirement_interruption_stays_fail_closed[6-None-False]
+FAILED ..\..\taut-dev\taut\src\tests\test_go_oneof.py::test_external_retirement_interruption_stays_fail_closed[8-None-True]
+3 failed, 59 passed, 83 deselected in 17.81s

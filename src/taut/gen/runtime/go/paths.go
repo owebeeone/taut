@@ -7,15 +7,18 @@ import (
 )
 
 type collectionIdentity struct {
-	kind  string
-	value any
+	kind   string
+	value  any
+	length int
 }
 
 func ListIdentity[T any](value []T) any {
 	if len(value) == 0 {
 		return nil
 	}
-	return collectionIdentity{"list", &value[0]}
+	// The typed start and traversed extent identify a view. A finite prefix
+	// shares its start with the enclosing slice but is not the same traversal.
+	return collectionIdentity{kind: "list", value: &value[0], length: len(value)}
 }
 
 // Go's documented %p map format identifies its backing map without field/type
@@ -24,7 +27,7 @@ func MapIdentity[K comparable, V any](value map[K]V) any {
 	if len(value) == 0 {
 		return nil
 	}
-	return collectionIdentity{"map", fmt.Sprintf("%p", value)}
+	return collectionIdentity{kind: "map", value: fmt.Sprintf("%p", value)}
 }
 
 type PathSegment struct {

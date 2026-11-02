@@ -1,0 +1,5 @@
+{
+  "src/taut/gen/runtime/go/paths.go": "e32e1e216ef22125ef7f617b8a5756ea68366c0718e58e1ebf01ca31ec0836f2",
+  "src/taut/gen/go_runtime.py": "b9fcfaaaec78c3bfeb311763f37d2b2931c1988b4ce3ff25c61db1683dffee19",
+  "src/tests/test_go_oneof.py": "3b13614285932150809e12530d77a25f17176b07e3f605b1dae1122e5eb44910"
+}

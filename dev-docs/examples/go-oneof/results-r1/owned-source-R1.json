@@ -1,0 +1,99 @@
+{
+  "baseline": {
+    "taut": "4222822320cbb22e376f8b387a963e86aad10ff2",
+    "workspace": "bd455ef9174fb13679d0ec6814e43ec1345505fc"
+  },
+  "manifest_self": "dev-docs/examples/go-oneof/results-r1/owned-source-R1.json; include in allowlist, self hash omitted",
+  "merged_dispositions": [
+    "M2",
+    "M3",
+    "M4"
+  ],
+  "modified_source_test": {
+    "src/taut/gen/go_runtime.py": {
+      "sha256": "ddf8e3d86f058a7681a5b5c37db326fd8f09d07431e9a041781c8bcb3dc8abf4",
+      "size": 17785
+    },
+    "src/taut/gen/runtime/go/paths.go": {
+      "sha256": "a1509ebb35b79523e6a40057201505aedd8ee030a2fba4fe71c47d3febd60c36",
+      "size": 2428
+    },
+    "src/tests/test_go_oneof.py": {
+      "sha256": "42b3e9bf489fd356dc282e058b798dc342fdba7600515b4b5c3c10ff46493e81",
+      "size": 46389
+    }
+  },
+  "new_evidence": {
+    "dev-docs/examples/go-oneof/RESULTS-R1.md": {
+      "sha256": "21713ea644789c94dd62b48d604adabfba6508751c6a9152863b48d5386f238c",
+      "size": 7238
+    },
+    "dev-docs/examples/go-oneof/results-r1/all-go.log": {
+      "sha256": "ba901b2ef667ee22b97d2ed05742b5c8bf601723746350b2d6721e385876cb2b",
+      "size": 265
+    },
+    "dev-docs/examples/go-oneof/results-r1/all-go.xml": {
+      "sha256": "ea3fa3eb5ce9450aa0bfa368ed209ba1ed1c86fad65ccec3259c25be27ebb1fc",
+      "size": 19210
+    },
+    "dev-docs/examples/go-oneof/results-r1/closure.log": {
+      "sha256": "d7544e479d165c12f74cbb5a9a17761bf0a4fae10b0545947595fdc939ad1574",
+      "size": 8606
+    },
+    "dev-docs/examples/go-oneof/results-r1/closure.xml": {
+      "sha256": "ca68049fb32e9fd207e94dab122cf663fc4066d8cc95cc253c4b051e83730646",
+      "size": 17235
+    },
+    "dev-docs/examples/go-oneof/results-r1/commands.json": {
+      "sha256": "64a9992dc017314c09fb3053ebc2d86ee6ebb2d9c267ce037ac5d9743be607a3",
+      "size": 3062
+    },
+    "dev-docs/examples/go-oneof/results-r1/example.log": {
+      "sha256": "8033a17f04f38cdc98efc21186d20285e1a10f1960005db350df6a87954e7b7a",
+      "size": 131
+    },
+    "dev-docs/examples/go-oneof/results-r1/format-from-root.log": {
+      "sha256": "e2d80bebebb0a802eefa4b65f7108ff05a97fa187d3204e75dd15dff03e40e50",
+      "size": 100
+    },
+    "dev-docs/examples/go-oneof/results-r1/native-example.json": {
+      "sha256": "effa70d212ce498f4dbbb57e93273ef385ad00ecb57fd99e04b5ae64d75d0d9c",
+      "size": 6743
+    },
+    "dev-docs/examples/go-oneof/results-r1/owned-r0-source.json": {
+      "sha256": "d65f02fc55b161d80e24fa74567edee86cca705dea901105d585be42d1e1caf8",
+      "size": 314
+    },
+    "dev-docs/examples/go-oneof/results-r1/preservation.json": {
+      "sha256": "8a0292055f58196a301740265b3c010ed2317d6c028a965c0ae927b5a5ee89b1",
+      "size": 982
+    },
+    "dev-docs/examples/go-oneof/results-r1/protected-after.json": {
+      "sha256": "f023f897782e5a05da88a400db40aae56ce4d01d27ac786934a409a8a8a425ee",
+      "size": 12646
+    },
+    "dev-docs/examples/go-oneof/results-r1/protected-before.json": {
+      "sha256": "f023f897782e5a05da88a400db40aae56ce4d01d27ac786934a409a8a8a425ee",
+      "size": 12646
+    },
+    "dev-docs/examples/go-oneof/results-r1/retirement-corrected.log": {
+      "sha256": "71ac3e23c714e87cce1fde96bfa6360a551ed6a66060e5f4a5d8ac4d6e9cc03d",
+      "size": 117
+    },
+    "dev-docs/examples/go-oneof/results-r1/retirement-corrected.xml": {
+      "sha256": "506a6144644286d0d82b605e34782cfaca3146b000a80d7ccff158fb5870381b",
+      "size": 8046
+    }
+  },
+  "original_r0_records_preserved": true,
+  "ownership": "Go owns only listed3 modified source/test paths plus listed R1 evidence; C++ owns other4pairchanges/sharedgates/mergedcheckpoint/review records. No independent staging/commit/review/push.",
+  "results": {
+    "complete_go_feature": "145passed45.98s, scratchcwd/sourceonlyPYTHONPATH",
+    "counts_not_additive": true,
+    "examples": "6nativeexecutionsPASS",
+    "repo_root_lf_format": "1passed0.83s",
+    "retirement_subset": "56passed89deselected11.68s"
+  },
+  "status": "R1 IMPLEMENTATION READY / Go production HOLD / original reviewer closure pending",
+  "unchanged_public_signatures_and_runtime_inventory": true
+}

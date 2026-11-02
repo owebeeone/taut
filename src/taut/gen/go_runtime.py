@@ -192,7 +192,10 @@ def manifest(path, kind):
             raise ValueError('incompatible ownership/contracts/generation policy')
         if kind == 'go-runtime' and data['files'].keys() - FILES.keys():
             raise ValueError('unsupported runtime source inventory')
-        if any(not isinstance(user, dict) or type(user.get('validation')) is not bool for user in data['users'].values()):
+        if any(not isinstance(user, dict) or user.keys() - {'validation', 'consumer'}
+               or type(user.get('validation')) is not bool
+               or ('consumer' in user and type(user['consumer']) is not bool)
+               for user in data['users'].values()):
             raise ValueError('invalid shared-user inventory')
         for name, expected in data['files'].items():
             candidate = path.parent / name
@@ -232,11 +235,16 @@ def plan_outputs(directory, texts, *, mode, validation, source_root, consume_sou
         if old.get('source_root') and root == canonical_path(old['source_root']) and not owner_path.exists():
             raise ValueError(f'{owner_path}: previous Go runtime owner unavailable; use a fresh output root or explicit migration')
         runtime = manifest(owner_path, 'go-runtime')
-        if root == source_root and runtime['files'] and runtime.get('import_path') != runtime_import:
+        runtime['users'] = remaining_users(runtime['users'], user)
+        # The default root variable can still name the old local owner while
+        # package/imported supplied mode selects no source at all. Withdraw the
+        # old user without relabeling that owner as the external package.
+        selected_source = root == source_root and (mode == 'source' or consume_source)
+        if selected_source and runtime['files'] and runtime.get('import_path') != runtime_import:
             raise ValueError(f'{owner_path}: cannot remap a Go physical source owner to another import_path; use explicit migration')
-        if root == source_root:
+        if selected_source:
             runtime['import_path'] = runtime_import
-        if mode in ('source', 'package') or consume_source or owner_path.exists():
+        if mode in ('source', 'package') or runtime_import or consume_source or owner_path.exists():
             for filename in FILES:
                 candidate = root / filename
                 if candidate.exists() and filename not in runtime['files']:
@@ -244,7 +252,6 @@ def plan_outputs(directory, texts, *, mode, validation, source_root, consume_sou
         consuming = (mode != 'source' or external) and consume_source
         if root == source_root and consuming and not owner_path.exists():
             raise ValueError(f'{owner_path}: bound Go source owner unavailable; generate owner first or bind package')
-        runtime['users'] = remaining_users(runtime['users'], user)
         if root == source_root and mode == 'source':
             runtime['users'][user] = {'validation': validation}
         elif root == source_root and owner_path.exists() and consume_source:

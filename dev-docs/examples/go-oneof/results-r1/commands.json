@@ -1,0 +1,82 @@
+{
+  "environment": {
+    "python": "3.13.5 (main, Jul 23 2025, 00:30:06) [MSC v.1944 64 bit (AMD64)]",
+    "source_pythonpath": "D:/projects/limbo/taut-dev/taut/src;C:/Users/gianni/AppData/Local/Programs/Python/Python311/Lib/site-packages",
+    "pytest_autoload": "disabled",
+    "toolchains": "Activate-TautToolchains.ps1; native Go1.27.3"
+  },
+  "cwd": "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1",
+  "failed_first": [
+    "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+    "-B",
+    "-m",
+    "pytest",
+    "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests\\test_go_oneof.py",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-k",
+    "finite_prefix or default_source_owner or external_retirement or actual_selected_source or canonical_closure or native_map_slice_cycles",
+    "--basetemp",
+    "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1\\pytest-closure",
+    "--junitxml",
+    "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1\\closure.xml"
+  ],
+  "retirement_corrected": [
+    "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+    "-B",
+    "-m",
+    "pytest",
+    "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests\\test_go_oneof.py",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-k",
+    "external_retirement or default_source_owner or actual_selected_source",
+    "--basetemp",
+    "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1\\pytest-retirement-corrected",
+    "--junitxml",
+    "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1\\retirement-corrected.xml"
+  ],
+  "all_go": [
+    "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+    "-B",
+    "-m",
+    "pytest",
+    "D:\\projects\\limbo\\taut-dev\\taut\\src\\tests\\test_go_oneof.py",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp",
+    "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1\\pytest-all-go",
+    "--junitxml",
+    "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1\\all-go.xml"
+  ],
+  "format_repository_root": {
+    "cwd": "D:\\projects\\limbo\\taut-dev\\taut",
+    "argv": [
+      "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+      "-B",
+      "-m",
+      "pytest",
+      "src/tests/test_go_oneof.py::test_go_emission_and_canonical_closure_are_gofmt_clean_without_crlf",
+      "-q",
+      "-p",
+      "no:cacheprovider",
+      "--basetemp",
+      "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1\\pytest-format-root"
+    ]
+  },
+  "example": {
+    "cwd": "D:\\projects\\limbo\\taut-dev\\taut",
+    "argv": [
+      "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+      "-B",
+      "dev-docs/examples/go-oneof/run-example.py",
+      "--out",
+      "D:\\projects\\limbo\\go-oneof-scratch\\remediation-1\\example"
+    ]
+  },
+  "counts_overlap": true,
+  "full_broad_parity_repeated": false
+}
