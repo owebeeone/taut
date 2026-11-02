@@ -744,8 +744,8 @@ def emit(
         plans.append((directory, source_root, directory / ".taut-python-outputs.json", plan_outputs,
                       python_texts, {"consume_source": "source_root" in (runtime_bindings or {}).get("python", {})}))
     if "rust" in lang_keys:
-        from .rust_runtime import plan_outputs as rust_plan_outputs
-        directory = (out_dir / "rust").absolute()
+        from .rust_runtime import plan_outputs as rust_plan_outputs, canonical_path
+        directory = canonical_path(out_dir / "rust")
         _, source_root, consume_source = rust_binding
         lock_roots.extend([directory, source_root])
         plans.append((directory, source_root, directory / ".taut-rust-outputs.json", rust_plan_outputs,

@@ -248,7 +248,7 @@ def emit_types(schema, *, validation=False, external_types=None, identity=None, 
         visited.add(start)
         return any(reaches(child, target, visited) for child in graph[start])
     out = ["// GENERATED native Rust types + codec — do not edit.", "#![allow(dead_code, clippy::redundant_closure, clippy::needless_question_mark, clippy::collapsible_if)]",
-           "extern crate alloc;", "#[allow(unused_imports)]", "use alloc::{boxed::Box, string::String, vec, vec::Vec};", f"use {runtime_path}::cbor::{{Cbor, DecodeError}};"]
+           "extern crate alloc;", "#[allow(unused_imports)]", "use alloc::{string::String, vec, vec::Vec};", f"use {runtime_path}::cbor::{{Cbor, DecodeError}};"]
     out += imports(schema, external)
     out += rust._emit_file_bounds(schema)
     for e in schema.enums.values():

@@ -57,6 +57,23 @@ def _is_alias(path):
         return False
 
 
+def _physical_path(path):
+    """Normalize filesystem identity, including Windows drive/UNC namespace spelling.
+
+    Ownership/mutation callers must inspect the original lexical path for aliases
+    first; resolving identity is not permission to follow a directory reparse point.
+    """
+    import os
+    resolved = Path(path).resolve()
+    if os.name == 'nt':
+        spelling = str(resolved)
+        if spelling[:8].lower() == '\\\\?\\unc\\':
+            resolved = Path('\\\\' + spelling[8:])
+        elif spelling.startswith('\\\\?\\') and len(spelling) > 6 and spelling[5:7] == ':\\':
+            resolved = Path(spelling[4:])
+    return resolved
+
+
 def _read_manifest(path, kind):
     if _is_alias(path) or (path.exists() and not path.is_file()):
         raise ValueError(f"{path}: unsafe ownership metadata path; use a fresh root or explicit migration")
@@ -86,7 +103,7 @@ def output_locks(roots):
     locks = []
     created = []
     try:
-        for root in sorted(set(Path(p).resolve() for p in roots)):
+        for root in sorted(set(_physical_path(p) for p in roots)):
             if root.exists() and not root.is_dir():
                 raise ValueError(f"{root}: output owner must be a directory; use a fresh root or explicit migration")
             missing = []
@@ -201,14 +218,20 @@ def apply_outputs(writes, deletes):
     import os
     import tempfile
     deletes = set(deletes)
-    for path in set(writes) | deletes:
-        path = path.absolute()
+    physical_targets = {}
+    for target in set(writes) | deletes:
+        path = target.absolute()
         for component in reversed(path.parents):
             linked = _is_alias(component)
             if linked or (component.exists() and not component.is_dir()):
                 raise ValueError(f"{component}: unsafe/obstructed output directory; use a fresh root or explicit migration")
         if _is_alias(path) or (path.exists() and not path.is_file()):
             raise ValueError(f"{path}: unsafe output file path; use a fresh root or explicit migration")
+        identity = _physical_path(path)
+        previous = physical_targets.get(identity)
+        if previous is not None or (target in writes and target in deletes):
+            raise ValueError(f"conflicting physical output targets {previous or target} and {target}; refusing overlapping write/delete ownership")
+        physical_targets[identity] = target
     for path, content in writes.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:

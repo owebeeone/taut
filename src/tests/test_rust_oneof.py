@@ -735,3 +735,94 @@ def test_mandatory_adapter_reads_every_primitive_without_engine(tmp_path):
     }''')
     result=run(['rustc','--edition=2021',d/'bad.rs','-o',d/'bad.exe'],success=False)
     assert 'does not live long enough' in result.stderr
+
+
+@pytest.mark.parametrize('kind',['message','enum'])
+@pytest.mark.parametrize('mode',['source','package'])
+@pytest.mark.parametrize('enabled',[False,True])
+def test_schema_types_named_box_compile_in_all_modes(tmp_path,foundation,kind,mode,enabled):
+    if kind=='message':
+        s=schema(Box=Msg(value=F(1,INT),next_id=2))
+        body='let value=api::Box{value:0};let decoded=api::Box::from_cbor(&value.to_cbor()).unwrap();assert_eq!(decoded,value);'
+    else:
+        s=schema(Box=Enum(data=0),Packet=Msg(kind=F(1,Ref.Box)))
+        body='let value=api::Packet{kind:api::Box::Data};let decoded=api::Packet::from_cbor(&value.to_cbor()).unwrap();assert_eq!(decoded,value);'
+    emit(s,tmp_path,langs=['rust'],services=[],runtime_mode=mode,validation=enabled)
+    prefix=source_modules(enabled) if mode=='source' else 'extern crate alloc;mod api;'
+    body+='assert_eq!(api::Box::descriptor().name(),"Box");'
+    if enabled:body+='assert!(value.is_valid());'
+    run([program(tmp_path/'rust',prefix+'fn main(){'+body+'}',dependencies=[] if mode=='source' else [('taut_foundation',foundation)])])
+
+
+def owner_application(directory,owner):
+    prefix=f'''extern crate alloc;
+        #[path={json.dumps((owner/'cbor.rs').as_posix())}]pub mod cbor;
+        #[path={json.dumps((owner/'validation.rs').as_posix())}]pub mod validation;
+        mod api;'''
+    run([program(directory,prefix+'fn main(){let value=api::M{n:0};assert!(value.is_valid());}')])
+
+
+def test_equivalent_source_root_retains_live_runtime_and_builds(tmp_path):
+    s=schema(M=Msg(n=F(1,INT)))
+    owner=tmp_path/'owner';app=tmp_path/'app'
+    for root in (owner,owner/'..'/'owner'):
+        emit(s,app,langs=['rust'],services=[],runtime_mode='source',validation=True,
+            runtime_bindings={'rust':{'source_root':str(root)}})
+    record=json.loads((owner/'.taut-rust-runtime.json').read_text())
+    assert len(record['users'])==1
+    assert set(record['files'])=={'cbor.rs','descriptors.rs','ext.rs','validation.rs'}
+    assert all((owner/name).is_file() for name in record['files'])
+    owner_application(app/'rust',owner)
+
+
+def test_equivalent_shared_root_keeps_both_users_and_enabled_engine(tmp_path):
+    s=schema(M=Msg(n=F(1,INT)))
+    owner=tmp_path/'owner'
+    def generate(user,root,enabled):
+        emit(s,tmp_path/user,langs=['rust'],services=[],runtime_mode='source',validation=enabled,
+            runtime_bindings={'rust':{'source_root':str(root)}})
+    generate('a',owner,True);generate('b',owner,False)
+    generate('a',owner/'..'/'owner',True)
+    record=json.loads((owner/'.taut-rust-runtime.json').read_text())
+    assert len(record['users'])==2 and sum(u['validation'] for u in record['users'].values())==1
+    assert (owner/'validation.rs').exists()
+    owner_application(tmp_path/'a/rust',owner)
+    generate('b',owner,False)
+    assert (owner/'validation.rs').exists()
+    generate('a',owner,False)
+    assert not (owner/'validation.rs').exists()
+    assert len(json.loads((owner/'.taut-rust-runtime.json').read_text())['users'])==2
+
+
+def test_equivalent_schema_output_spelling_has_one_user(tmp_path):
+    s=schema(M=Msg(n=F(1,INT)))
+    owner=tmp_path/'owner';app=tmp_path/'app'
+    for destination in (app,app/'..'/'app'):
+        emit(s,destination,langs=['rust'],services=[],runtime_mode='source',validation=True,
+            runtime_bindings={'rust':{'source_root':str(owner)}})
+    assert len(json.loads((owner/'.taut-rust-runtime.json').read_text())['users'])==1
+    owner_application(app/'rust',owner)
+
+
+def test_physical_write_delete_overlap_fails_before_mutation(tmp_path):
+    from taut.gen.python_runtime import apply_outputs
+    target=tmp_path/'keep.txt';target.write_text('original')
+    step=tmp_path/'step';step.mkdir()
+    before=snapshot(tmp_path)
+    with pytest.raises(ValueError,match='conflicting physical output'):
+        apply_outputs({target:b'replacement'},[step/'..'/'keep.txt'])
+    assert snapshot(tmp_path)==before
+
+
+def test_windows_extended_path_spelling_shares_owner_and_schema_identity(tmp_path):
+    import os
+    if os.name!='nt':pytest.skip('Windows extended drive-path spelling')
+    s=schema(M=Msg(n=F(1,INT)))
+    owner=tmp_path/'owner';app=tmp_path/'app'
+    extended=lambda path:Path('\\\\?\\'+str(path))
+    for destination,root in ((app,owner),(app,extended(owner)),(extended(app),owner)):
+        emit(s,destination,langs=['rust'],services=[],runtime_mode='source',validation=True,
+            runtime_bindings={'rust':{'source_root':str(root)}})
+    record=json.loads((owner/'.taut-rust-runtime.json').read_text())
+    assert len(record['users'])==1 and (owner/'validation.rs').exists()
+    owner_application(app/'rust',owner)

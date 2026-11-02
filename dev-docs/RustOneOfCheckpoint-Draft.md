@@ -1,8 +1,16 @@
 # Rust OneOf checkpoint — draft and review object
 
-Status: implementation source frozen for a dual Code+Surface / State review.
+Status: remediation 1 source frozen for dual Code+Surface / State re-verdicts.
 Acceptance and GitHub publication are not claimed by this draft. The exact source
 tuple is supplied by the checkpoint commit and the generated reviewer prompts.
+
+Initial review at Taut `020f7b08` / Rust shape `b55cd89e` reported two distinct
+localized P2 findings. The filed reports and `RustOneOfCheckpoint-RemPlan-1.md`
+control their one-patch correction: qualified allocator Box helpers preserve
+schema types named Box; lexical safety checks precede canonical owner/user path
+identity, including Windows drive/UNC spellings; shared application preflight
+rejects physical write/delete overlap. Both originating reviewers must verify
+closure on the new committed tuple. This is the first bounded remediation round.
 
 Authority: [RustOneOfCheckpoint-Authority.md](RustOneOfCheckpoint-Authority.md)
 records the original implementation directive, the Python freeze/clearance,

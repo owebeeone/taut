@@ -98,7 +98,7 @@ def _field_name(name: str) -> str:
 def _field_type(f: FieldDef, *, boxed: bool = False) -> str:
     base = _rust_type(f.type)
     if boxed:
-        base = f"Box<{base}>"
+        base = f"alloc::boxed::Box<{base}>"
     return f"Option<{base}>" if f.optional else base
 
 
@@ -303,7 +303,7 @@ def _from_cbor(msg, forward_compat: bool, *, boxed_fields=frozenset()) -> list[s
         else:
             dec = _decode_try(f.type, f"c.try_get({f.tag})?")
         if f.name in boxed_fields:
-            dec = f"({dec}).map(Box::new)" if f.optional else f"Box::new({dec})"
+            dec = f"({dec}).map(alloc::boxed::Box::new)" if f.optional else f"alloc::boxed::Box::new({dec})"
         out.append(f"            {_field_name(f.name)}: {dec},")
     if forward_compat:
         known = [str(f.tag) for f in msg.wire_fields()]

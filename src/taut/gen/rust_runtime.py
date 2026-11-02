@@ -2,9 +2,10 @@
 from __future__ import annotations
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
-from .python_runtime import _is_alias
+from .python_runtime import _is_alias, _physical_path
 from .rust_external import _KEYWORDS
 
 OWNER = 'taut.rust.foundation'
@@ -12,6 +13,38 @@ BUILD = 'rust-oneof-reference.1'
 CAPABILITIES = {'descriptors.v1', 'codec.v1', 'oneof.v1'}
 FILES = {'cbor.rs': 'cbor_fail_closed.rs', 'ext.rs': 'ext.rs',
          'descriptors.rs': 'descriptors.rs', 'validation.rs': 'validation.rs'}
+
+
+def canonical_path(value, *, directory=True):
+    """One physical identity, after checking the original lexical path for aliases.
+
+    Do not resolve first: doing so would hide a junction/reparse obstruction.
+    Path.absolute alone preserves '..' and cannot identify an ownership root.
+    """
+    lexical = Path(value).absolute()
+    for index, component in enumerate((lexical, *lexical.parents)):
+        if _is_alias(component) or ((directory or index) and component.exists() and not component.is_dir()):
+            raise ValueError(f'{component}: unsafe/obstructed Rust output directory; use a fresh root or explicit migration')
+    return _physical_path(lexical)
+
+
+def user_identity(value):
+    path = Path(value)
+    if not path.is_absolute():
+        raise ValueError(f'{value}: unsafe Rust source user identity; use an absolute schema owner or explicit migration')
+    return os.path.normcase(str(canonical_path(path, directory=False)))
+
+
+def remaining_users(users, current_user):
+    normalized = {}
+    for name, entry in users.items():
+        identity = user_identity(name)
+        if identity == current_user:
+            continue  # all equivalent spellings of this known schema are replaced
+        if identity in normalized and normalized[identity] != entry:
+            raise ValueError(f'ambiguous Rust source user identity {name}; use a fresh owner root or explicit migration')
+        normalized[identity] = entry
+    return normalized
 
 
 def binding(bindings, directory, mode):
@@ -28,7 +61,7 @@ def binding(bindings, directory, mode):
         raise ValueError(f'invalid Rust runtime owner module {module!r}')
     if any(p in _KEYWORDS and not (i == 0 and p == 'crate') for i, p in enumerate(module.split('::'))):
         raise ValueError(f'invalid reserved word in Rust runtime owner module {module!r}')
-    root = Path(config.get('source_root', directory)).absolute()
+    root = canonical_path(config.get('source_root', directory))
     return module, root, 'source_root' in config
 
 
@@ -67,10 +100,12 @@ def manifest(path, kind):
 
 
 def plan_outputs(directory, texts, *, mode, validation, source_root, consume_source=False, external=False):
-    directory, source_root = directory.absolute(), source_root.absolute()
+    directory, source_root = canonical_path(directory), canonical_path(source_root)
     path = directory / '.taut-rust-outputs.json'
     old = manifest(path, 'rust-schema')
     writes = {directory / name: text.encode('utf-8') for name, text in texts.items()}
+    if len(writes) != len(texts):
+        raise ValueError(f'conflicting Rust schema output paths in {directory}; use distinct target filenames')
     deletes = {directory / name for name in old['files'] if name not in texts}
     for target in writes:
         name = target.relative_to(directory).as_posix()
@@ -78,8 +113,8 @@ def plan_outputs(directory, texts, *, mode, validation, source_root, consume_sou
             raise ValueError(f'unknown/handwritten Rust output {target}; use a fresh directory or migration')
     roots = {source_root}
     if old.get('source_root'):
-        roots.add(Path(old['source_root']))
-    user = str(path)
+        roots.add(canonical_path(old['source_root']))
+    user = user_identity(path)
     canonical = Path(__file__).parent / 'runtime'
     for root in roots:
         owner_path = root / '.taut-rust-runtime.json'
@@ -92,7 +127,7 @@ def plan_outputs(directory, texts, *, mode, validation, source_root, consume_sou
         consuming = (mode != 'source' or external) and consume_source
         if root == source_root and consuming and not owner_path.exists():
             raise ValueError(f'{owner_path}: bound Rust source owner unavailable; generate owner first or bind package')
-        runtime['users'].pop(user, None)
+        runtime['users'] = remaining_users(runtime['users'], user)
         if root == source_root and mode == 'source':
             runtime['users'][user] = {'validation': validation}
         elif root == source_root and owner_path.exists() and consume_source:

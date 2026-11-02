@@ -2,7 +2,7 @@
 #![allow(dead_code, clippy::redundant_closure, clippy::needless_question_mark, clippy::collapsible_if)]
 extern crate alloc;
 #[allow(unused_imports)]
-use alloc::{boxed::Box, string::String, vec, vec::Vec};
+use alloc::{string::String, vec, vec::Vec};
 use crate::cbor::{Cbor, DecodeError};
 // The file's bounds, for a decode rooted at a type that is not a message:
 // `cbor::try_decode_with(bytes, MAX_DEPTH, MAX_ENCODED_LEN)`.

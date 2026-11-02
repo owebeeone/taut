@@ -192,6 +192,10 @@ identifiers retain their original schema names in reports. Metadata helper/type
 symbols and enum variant collisions are rejected explicitly; ordinary fields
 named `validate` remain valid because Rust fields and methods use separate access
 syntax. Python's leading-double-underscore restriction is not copied to Rust.
+Allocator boxes use qualified paths, so schema messages/enums named `Box` remain
+valid in both modes. Owner roots and schema-user identities are normalized only
+after lexical alias/obstruction checks; equivalent `..` spellings share one
+owner. Physical write/delete contradictions are rejected before application.
 
 Actual test totals and baseline limits are recorded in the checkpoint draft and
 verdict. `-AllRegression` also runs the broad suite; three previously reproduced
