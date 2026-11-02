@@ -23,7 +23,7 @@ for name, sha in inputs.items():
         if original:
             subprocess.run(['git','-c','safe.directory='+original.as_posix(),
                             '-c','safe.directory='+(original/'.git').as_posix(),
-                            'clone','--shared','--no-checkout',str(original),str(target)],check=True)
+                            'clone','--shared','--no-checkout',original.as_posix(),target.as_posix()],check=True)
         else:
             subprocess.run(['git','clone','--no-checkout',
                             'https://github.com/owebeeone/'+name+'.git',str(target)],check=True)
