@@ -76,6 +76,14 @@ before writes. Shared owner manifests retain every schema user and required engi
 The common physical identity, namespace guard, locks and write/delete preflight
 come from the accepted compiler helpers.
 
+Generated modules present the actual selected namespace to
+`requireFoundation(selected)`, which verifies exported descriptor/report/codec
+identities and returns the checked owner. Publication requires a defined valid
+owner token and that exact return identity. Older guards that ignore the namespace
+or return no checked owner fail with a named support error; build labels alone
+never establish compatibility. Genuine CJS/ESM and explicit source-owner facades
+may wrap namespaces while re-exporting the same actual implementation values.
+
 For an independent disabled child, retain its complete native schema facts in the
 parent input and pass `--typescript-external-types mappings.json`:
 
@@ -139,6 +147,14 @@ metadata captures no live object. Lazy links handle recursive schemas and are
 checked before publication. Every field, including unconstrained primitives,
 collections and virtual logical fields, is described, together with enum inventory,
 normalized groups/rules, reservations, next ID and declared/effective options.
+
+Constraint inputs are copied into canonical frozen records, including parameter
+snapshots. Publication requires the exact normalized oneof parameter grammar and
+one constraint for each control; duplicate, missing, coercible or unsupported
+declarations are configuration errors. A throwing application accessor reached
+through a known field binding produces a located discriminator/shape issue and
+report mode continues independent checks. That catch is limited to the field
+read: configuration errors and other engine/binding failures remain usage errors.
 
 Reports use shared `ValidationIssue`, `DeferredCheck`, `ValidationReport` and
 `PathSegment` classes. They own frozen copies, including paths and options; readonly

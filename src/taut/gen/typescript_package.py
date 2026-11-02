@@ -75,6 +75,8 @@ def verify_artifact(path, *, validation=False):
 
 if __name__=='__main__':
     import argparse
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('directory',type=Path)
-    parser.add_argument('--without-validation',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('directory',type=Path,metavar='OUTPUT',help='fresh output directory for the local foundation artifact')
+    parser.add_argument('--without-validation',action='store_true',help='build a descriptor/codec-only artifact; validation is included by default')
+    args=parser.parse_args()
     print(build_foundation(args.directory,validation=not args.without_validation))

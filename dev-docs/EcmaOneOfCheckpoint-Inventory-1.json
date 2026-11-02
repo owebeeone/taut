@@ -1,0 +1,459 @@
+{
+  "changed_paths": {
+    "taut": [
+      "dev-docs/EcmaOneOfCheckpoint-Authority.md",
+      "dev-docs/EcmaOneOfCheckpoint-Draft.md",
+      "dev-docs/EcmaOneOfCheckpoint-Gates-1.md",
+      "dev-docs/EcmaOneOfCheckpoint-PromptCode.md",
+      "dev-docs/EcmaOneOfCheckpoint-PromptGeneration.json",
+      "dev-docs/EcmaOneOfCheckpoint-PromptState.md",
+      "dev-docs/EcmaOneOfCheckpoint-RemPlan-1.md",
+      "dev-docs/EcmaOneOfCheckpoint-ReviewCode.md",
+      "dev-docs/EcmaOneOfCheckpoint-ReviewState.md",
+      "dev-docs/EcmaOneOfCheckpoint-Tuple.json",
+      "dev-docs/EcmaOneOfCheckpoint-Verdict.md",
+      "dev-docs/examples/js-oneof/results/remediation-1-affected-after.json",
+      "dev-docs/examples/js-oneof/results/remediation-1-affected-before.json",
+      "dev-docs/examples/js-oneof/results/remediation-1-affected-receipt.json",
+      "dev-docs/examples/js-oneof/results/remediation-1-affected.log",
+      "dev-docs/examples/js-oneof/results/remediation-1-affected.xml",
+      "dev-docs/examples/js-oneof/results/remediation-1-run-affected.py",
+      "dev-docs/examples/typescript-oneof/README.md",
+      "dev-docs/examples/typescript-oneof/RESULTS-R1.md",
+      "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles-R1.json",
+      "dev-docs/examples/typescript-oneof/results-r1/commands.json",
+      "dev-docs/examples/typescript-oneof/results-r1/example-results.json",
+      "dev-docs/examples/typescript-oneof/results-r1/example.log",
+      "dev-docs/examples/typescript-oneof/results-r1/library-build.log",
+      "dev-docs/examples/typescript-oneof/results-r1/library-tests.log",
+      "dev-docs/examples/typescript-oneof/results-r1/library-typecheck.log",
+      "dev-docs/examples/typescript-oneof/results-r1/protected-after.json",
+      "dev-docs/examples/typescript-oneof/results-r1/protected-before.json",
+      "dev-docs/examples/typescript-oneof/results-r1/r0-guard-source-hashes.json",
+      "dev-docs/examples/typescript-oneof/results-r1/target-tests.log",
+      "dev-docs/examples/typescript-oneof/results-r1/target-tests.xml",
+      "src/taut/cli.py",
+      "src/taut/gen/runtime/typescript/descriptors.ts",
+      "src/taut/gen/runtime/typescript/validation.ts",
+      "src/taut/gen/typescript_metadata.py",
+      "src/taut/gen/typescript_package.py",
+      "src/tests/test_java_oneof.py",
+      "src/tests/test_js_ts_distribution.py",
+      "src/tests/test_typescript_review_closure.py"
+    ],
+    "taut-shape-ts": [
+      "foundation-src/descriptors.ts",
+      "foundation-src/provenance.json",
+      "foundation-src/validation.ts",
+      "scripts/build-foundation.mjs",
+      "src/taut/gen/shape_atom.ts",
+      "src/taut/gen/shape_crdt.ts",
+      "src/taut/gen/shape_log.ts",
+      "src/taut/gen/shape_stream.ts",
+      "src/taut/gen/shape_swmr.ts",
+      "src/taut/gen/shape_value.ts",
+      "tests/foundation.test.ts"
+    ]
+  },
+  "current_gates": {
+    "shared": "503 passed/1symlink-privilege skip; unchanged source/index/protected/lock beforeafter",
+    "typescript": "169 affected passed; actual library typecheck/build and315Node tests passed; see TS owned manifest/source receipts"
+  },
+  "excluded": {
+    "count": 35,
+    "disposition": "preserve untouched, never stage generated bundles/ownership receipts or old wheel",
+    "files": {
+      "dev-docs/examples/python-oneof/generated/disabled/python/.taut-python-outputs.json": {
+        "sha256": "4e92a8cabe8f5959a4113d8a7f2738a913c1c71ab26c60c34707597549b3b399",
+        "size": 506
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/.taut-runtime.json": {
+        "sha256": "f3b639e2bd1ab69b1355e7a9935359dc2f9797bcf899cf4fce7afed19a50c644",
+        "size": 1373
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/__init__.py": {
+        "sha256": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+        "size": 38
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/api.py": {
+        "sha256": "31fbb8d65d4871dbf6a9025cff50f5cb3cc530448f44c327e92c1f8b98064ac7",
+        "size": 6338
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/__init__.py": {
+        "sha256": "ad2bb0a2ddb372ab77e5e7d19873f44804c487c63a22d0c7b99852329b4944af",
+        "size": 129
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/_runtime_version.py": {
+        "sha256": "e21299bef0b04c86bff376cf6a678f7b8720dc067438d551ffef54b9a95964fe",
+        "size": 267
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/contracts.py": {
+        "sha256": "69766dfeca243099e7bf7c54f088069f271fa60f61e03d4d916d893d6d38416c",
+        "size": 1298
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/descriptors.py": {
+        "sha256": "e473c8532d5840e6f374dca4ead4c3e28726f23ed7c058e84a79f052418cb9fa",
+        "size": 16907
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/ext.py": {
+        "sha256": "99e5fab316640eb0527e905b194610557d8301210ca61cd72358002d7d10a8fb",
+        "size": 2289
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/facts.py": {
+        "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "size": 8202
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/rules.py": {
+        "sha256": "153026e825045eb67883ac9b66b6ac9d4ffd6fbc64c2bc010fa9e973a2271f9e",
+        "size": 2940
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/__init__.py": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/cbor.py": {
+        "sha256": "8cde71892ed7882b869bd299c13be37223e77e679ce04a59e9994b82dc9bec42",
+        "size": 11383
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/codec.py": {
+        "sha256": "7577578775f99603032555479e843056a12d8465b5aa439fe7371f4fb76b7347",
+        "size": 8827
+      },
+      "dev-docs/examples/python-oneof/generated/disabled/python/taut/wire/jsoncodec.py": {
+        "sha256": "bd3d5e2e3d18980a19e4519477c84ad78084f5d2c25af4c5ccca6e8477779022",
+        "size": 6247
+      },
+      "dev-docs/examples/python-oneof/generated/package/python/.taut-python-outputs.json": {
+        "sha256": "14a3a65b8314dee620248029963ea92526bae09c5d126f685d29754db8b2f2d0",
+        "size": 410
+      },
+      "dev-docs/examples/python-oneof/generated/package/python/__init__.py": {
+        "sha256": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+        "size": 38
+      },
+      "dev-docs/examples/python-oneof/generated/package/python/api.py": {
+        "sha256": "5bbd3d845613cc9ef6704801c4e976c4900f654b13e33a8ab20d8d312975fa8c",
+        "size": 8389
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/.taut-python-outputs.json": {
+        "sha256": "9521b809e235b325be1355485e0b526f6bc19e5a990852735c7198096c22e031",
+        "size": 503
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/.taut-runtime.json": {
+        "sha256": "1bdbd28eff437d7a2a7b8d34d5b8f5134968ec3adb154141319ecec9533b6ddf",
+        "size": 1464
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/__init__.py": {
+        "sha256": "75356c72ae5dd979ba0bb699bb565964c001beb6dec5edb4aa0adef7d2eace4e",
+        "size": 38
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/api.py": {
+        "sha256": "5bbd3d845613cc9ef6704801c4e976c4900f654b13e33a8ab20d8d312975fa8c",
+        "size": 8389
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/__init__.py": {
+        "sha256": "ad2bb0a2ddb372ab77e5e7d19873f44804c487c63a22d0c7b99852329b4944af",
+        "size": 129
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/_runtime_version.py": {
+        "sha256": "e21299bef0b04c86bff376cf6a678f7b8720dc067438d551ffef54b9a95964fe",
+        "size": 267
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/contracts.py": {
+        "sha256": "69766dfeca243099e7bf7c54f088069f271fa60f61e03d4d916d893d6d38416c",
+        "size": 1298
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/descriptors.py": {
+        "sha256": "e473c8532d5840e6f374dca4ead4c3e28726f23ed7c058e84a79f052418cb9fa",
+        "size": 16907
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/ext.py": {
+        "sha256": "99e5fab316640eb0527e905b194610557d8301210ca61cd72358002d7d10a8fb",
+        "size": 2289
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/facts.py": {
+        "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "size": 8202
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/rules.py": {
+        "sha256": "153026e825045eb67883ac9b66b6ac9d4ffd6fbc64c2bc010fa9e973a2271f9e",
+        "size": 2940
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/validation.py": {
+        "sha256": "eb33734525330f131092c3bda540ef71742b7cd0eb1074e7aa72a92049db8903",
+        "size": 10105
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/__init__.py": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/cbor.py": {
+        "sha256": "8cde71892ed7882b869bd299c13be37223e77e679ce04a59e9994b82dc9bec42",
+        "size": 11383
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/codec.py": {
+        "sha256": "7577578775f99603032555479e843056a12d8465b5aa439fe7371f4fb76b7347",
+        "size": 8827
+      },
+      "dev-docs/examples/python-oneof/generated/source/python/taut/wire/jsoncodec.py": {
+        "sha256": "bd3d5e2e3d18980a19e4519477c84ad78084f5d2c25af4c5ccca6e8477779022",
+        "size": 6247
+      },
+      "dev-docs/examples/python-oneof/package-artifacts/taut_proto-0.10.0+python.oneof.reference.1-py3-none-any.whl": {
+        "sha256": "7ff8c48266ec3814a4fea75c4afe94f1ffb1e1193c0a9134706ee99ad4f7fd44",
+        "size": 264014
+      }
+    }
+  },
+  "files": {
+    "taut": {
+      "dev-docs/EcmaOneOfCheckpoint-Authority.md": {
+        "sha256": "94ecc3df11d81dbc92fa4ab2fe9be4a144ec40a935018a12ffb9d0ea593d94ff",
+        "size": 11996
+      },
+      "dev-docs/EcmaOneOfCheckpoint-Draft.md": {
+        "sha256": "eeec16eb97276bdf652491da8634552a7d60c35cbb19c3a174866613b3f01521",
+        "size": 16171
+      },
+      "dev-docs/EcmaOneOfCheckpoint-Gates-1.md": {
+        "sha256": "f9e141588c43e5e8dd85722c969d0d50eebeb9d5b7a1fc2ddda333e229581125",
+        "size": 2304
+      },
+      "dev-docs/EcmaOneOfCheckpoint-PromptCode.md": {
+        "sha256": "a1a93d5c76859dac032574a268d6ba64f712fd945905355b6d3c1d2e0be3503a",
+        "size": 18796
+      },
+      "dev-docs/EcmaOneOfCheckpoint-PromptGeneration.json": {
+        "sha256": "39b331fb706235fa7d87bd7d5dc61aa62a05a3cdac0c5aa3fed0445d539c399d",
+        "size": 2198
+      },
+      "dev-docs/EcmaOneOfCheckpoint-PromptState.md": {
+        "sha256": "1500998aeb25559d6fffa5e86897270e65c11b44305a805156e7b65dfeec7814",
+        "size": 17970
+      },
+      "dev-docs/EcmaOneOfCheckpoint-RemPlan-1.md": {
+        "sha256": "fd3e62554f1e541936cfbfa8a840d6fd536d4f0197ce0fce34d34861f1c84992",
+        "size": 12814
+      },
+      "dev-docs/EcmaOneOfCheckpoint-ReviewCode.md": {
+        "sha256": "f5d0fefd55bf9edd34e636be459fbced2bd1249b90a9b8c548c822070d85810f",
+        "size": 19042
+      },
+      "dev-docs/EcmaOneOfCheckpoint-ReviewState.md": {
+        "sha256": "05d856668ce624a3e9df138611382ff2f71de18add2197724b6a1b6ef4da4062",
+        "size": 20368
+      },
+      "dev-docs/EcmaOneOfCheckpoint-Tuple.json": {
+        "sha256": "e61630b291d735e3dea76c1433f77dca71a82db2f49ebabc02059628a22154d3",
+        "size": 2637
+      },
+      "dev-docs/EcmaOneOfCheckpoint-Verdict.md": {
+        "sha256": "0bbf6444742fd22969b85be5fcf3903a96f6c7dbb578a0e4c258fb0122982680",
+        "size": 2270
+      },
+      "dev-docs/examples/js-oneof/results/remediation-1-affected-after.json": {
+        "sha256": "518e6a9e1b485d2a9a5c4049eee3f35493328afd35a01f89acc9a782d18f4ed4",
+        "size": 17542
+      },
+      "dev-docs/examples/js-oneof/results/remediation-1-affected-before.json": {
+        "sha256": "518e6a9e1b485d2a9a5c4049eee3f35493328afd35a01f89acc9a782d18f4ed4",
+        "size": 17542
+      },
+      "dev-docs/examples/js-oneof/results/remediation-1-affected-receipt.json": {
+        "sha256": "5323391e751fe73cd672cbea24332d353022902d7e2c21cf02047a81c6a4ad91",
+        "size": 1127
+      },
+      "dev-docs/examples/js-oneof/results/remediation-1-affected.log": {
+        "sha256": "c3130b163905ac3d55553794a8cf4845da1c633803469539e4264e68041fd942",
+        "size": 600
+      },
+      "dev-docs/examples/js-oneof/results/remediation-1-affected.xml": {
+        "sha256": "c45d81c9b826da22b661c2bdae5624b3accc5fc50dfa8480ebd8632c1317e801",
+        "size": 80149
+      },
+      "dev-docs/examples/js-oneof/results/remediation-1-run-affected.py": {
+        "sha256": "c09cd5b312820ce3819128457047e5d1ddce07bcd6525a768e5656520d911b6a",
+        "size": 3649
+      },
+      "dev-docs/examples/typescript-oneof/README.md": {
+        "sha256": "773e19c600314676277891d74ea813062782b98d345d8cf7c24254e8d12c83c2",
+        "size": 10577
+      },
+      "dev-docs/examples/typescript-oneof/RESULTS-R1.md": {
+        "sha256": "e9e1e0458a9512ec5da86ba0d5d53281e6a419c2b70fc373ca1eacdee32fe54d",
+        "size": 7426
+      },
+      "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles-R1.json": {
+        "sha256": "c66a38825e7a8716eb9626beec14784a650dc41b9786a28c40dbedae2a08a087",
+        "size": 6193
+      },
+      "dev-docs/examples/typescript-oneof/results-r1/commands.json": {
+        "sha256": "43b1bee405db34727fac1af8ce7f54737fedb49bdc838fea1ddc2df1a67fdd2c",
+        "size": 1205
+      },
+      "dev-docs/examples/typescript-oneof/results-r1/example-results.json": {
+        "sha256": "9d0edce7ba28480d658d7d75311915aa721a6e150579bee89c8556cdfae75626",
+        "size": 1094
+      },
+      "dev-docs/examples/typescript-oneof/results-r1/example.log": {
+        "sha256": "9d0edce7ba28480d658d7d75311915aa721a6e150579bee89c8556cdfae75626",
+        "size": 1094
+      },
+      "dev-docs/examples/typescript-oneof/results-r1/library-build.log": {
+        "sha256": "a9120e106f55b637d79043a28576a95ca418ce7ee638c392c32ec15d649723fa",
+        "size": 209
+      },
+      "dev-docs/examples/typescript-oneof/results-r1/library-tests.log": {
+        "sha256": "05df00cf2b9ea3f6fcf812fe5518103c072f8db148b9bdc1732a7a0ca37ac065",
+        "size": 18145
+      },
+      "dev-docs/examples/typescript-oneof/results-r1/library-typecheck.log": {
+        "sha256": "8d0e8ca6face14b38c6ec53924037c0098a0fbeb982ff06383bc756d96a86127",
+        "size": 192
+      },
+      "dev-docs/examples/typescript-oneof/results-r1/protected-after.json": {
+        "sha256": "ec9c8a71b6660f3402f9ec638c4d46f057c9271525e586b73855b95d597df04f",
+        "size": 5735
+      },
+      "dev-docs/examples/typescript-oneof/results-r1/protected-before.json": {
+        "sha256": "ec9c8a71b6660f3402f9ec638c4d46f057c9271525e586b73855b95d597df04f",
+        "size": 5735
+      },
+      "dev-docs/examples/typescript-oneof/results-r1/r0-guard-source-hashes.json": {
+        "sha256": "b0f4981d8aabd91ef383ee90d9221bdd769feef8e3832f97820b8f900e7292d2",
+        "size": 1067
+      },
+      "dev-docs/examples/typescript-oneof/results-r1/target-tests.log": {
+        "sha256": "01205484c474ef2913e196389d9cf1936d9ef25f197b49d4fb756a254cb4d990",
+        "size": 275
+      },
+      "dev-docs/examples/typescript-oneof/results-r1/target-tests.xml": {
+        "sha256": "071d2fafd514f4eba59f18703fe1bc43a37421f4d4e9c14c315ab9fcc835badf",
+        "size": 24515
+      },
+      "src/taut/cli.py": {
+        "sha256": "5ed1ce5d475fea2c014579fd1b9abab671c486230c86d1bd645b23ab5a0b7288",
+        "size": 14426
+      },
+      "src/taut/gen/runtime/typescript/descriptors.ts": {
+        "sha256": "ba883571da8b70c008a58c14f5a7feb0be48948ca8678eb96b0a66bf9ed7ffac",
+        "size": 15247
+      },
+      "src/taut/gen/runtime/typescript/validation.ts": {
+        "sha256": "50adcd1d36a92dd54921b1fd3d4fb7fbdbf3ff7ebee89dc5643bc13f5e599b7f",
+        "size": 6087
+      },
+      "src/taut/gen/typescript_metadata.py": {
+        "sha256": "ae22fc51fab61e80763bb9ea8f8da47fc473756d874e0aba32266a0124f01120",
+        "size": 14673
+      },
+      "src/taut/gen/typescript_package.py": {
+        "sha256": "b08800dc0b5e9645175815d395f0281e6fbda9498c841d24f5b2d25739110085",
+        "size": 5658
+      },
+      "src/tests/test_java_oneof.py": {
+        "sha256": "ed32832b6d5aceff83830058f8aca9e820a53e7e5b9ec908db61a129c8184a7b",
+        "size": 39061
+      },
+      "src/tests/test_js_ts_distribution.py": {
+        "sha256": "f54e98df879c9fdc1bd5c720254a33bc6e6579cd2ee7526568b68797f4557f9f",
+        "size": 13530
+      },
+      "src/tests/test_typescript_review_closure.py": {
+        "sha256": "a4e73031728c9140ac36e1905db363ebc9a66047a9b44f4cf3f3f0a5ad184b7e",
+        "size": 16553
+      }
+    },
+    "taut-shape-ts": {
+      "foundation-src/descriptors.ts": {
+        "sha256": "ba883571da8b70c008a58c14f5a7feb0be48948ca8678eb96b0a66bf9ed7ffac",
+        "size": 15247
+      },
+      "foundation-src/provenance.json": {
+        "sha256": "090076dce712fd50f172e260c08e1fb60451649919fb3eb4a94589194bf52c0c",
+        "size": 1022
+      },
+      "foundation-src/validation.ts": {
+        "sha256": "50adcd1d36a92dd54921b1fd3d4fb7fbdbf3ff7ebee89dc5643bc13f5e599b7f",
+        "size": 6087
+      },
+      "scripts/build-foundation.mjs": {
+        "sha256": "77039b68fb4a16bfc5fc460514464029bea33756d77898598b63320bd9982db3",
+        "size": 4083
+      },
+      "src/taut/gen/shape_atom.ts": {
+        "sha256": "10a0f045b96f9cf5c86d776cd6d29d350f6043a95499b3ee643eee789a19149e",
+        "size": 28007
+      },
+      "src/taut/gen/shape_crdt.ts": {
+        "sha256": "188b8b59fe436ef2c03ded87d7937f3469f85dbd4e6772319a3fd4fab8f673c8",
+        "size": 26306
+      },
+      "src/taut/gen/shape_log.ts": {
+        "sha256": "7f7c22248be7ae4a9411e8ce429e78d583e1f136878b3b272da108586f5fa906",
+        "size": 29649
+      },
+      "src/taut/gen/shape_stream.ts": {
+        "sha256": "b61909f1e64f90998425823b0bc8697139c2542943e223dfe3936355368f97cd",
+        "size": 28214
+      },
+      "src/taut/gen/shape_swmr.ts": {
+        "sha256": "fed4c18bb15b62fda56c00861c1f1dc54203ded470c63ad9423f12fca4e0d792",
+        "size": 36545
+      },
+      "src/taut/gen/shape_value.ts": {
+        "sha256": "6086d257f7583af91107774d2e24a843c480e2af387ae80142ce7a8f818d9e05",
+        "size": 13698
+      },
+      "tests/foundation.test.ts": {
+        "sha256": "50180ea798c5c236246da1d1f9205d48a51cbc42fa3e9bd5e71c66da570cd536",
+        "size": 1321
+      }
+    }
+  },
+  "historical_global": "r0 only: all16 parity green; broad1807pass/4fail/5skip/11deselected, exit1 retained; not repeated or relabeled",
+  "initial_tuple": {
+    "taut": "68c24a899345367f3026372d3c67737751215a0e",
+    "taut-shape-ts": "1409634e9b1c8eea0696bf0fee560d5017f34d1f",
+    "workspace": "fe244bc4915acbce58198889feae633f778fe649"
+  },
+  "inventory_self_hash": "external immutable frozen-r1/snapshot.json verifies this file; no circular embedded self-hash",
+  "protected": {
+    "monitored_sources": {
+      "src/taut/facts.py": {
+        "HEAD_sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "matches_HEAD": true,
+        "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+        "size": 8202
+      },
+      "src/taut/ir/dsl.py": {
+        "HEAD_sha256": "5b2061584dcd78a3f73d2a757d6b101bacf280c9190f6a068b613eecb55b307d",
+        "matches_HEAD": true,
+        "sha256": "5b2061584dcd78a3f73d2a757d6b101bacf280c9190f6a068b613eecb55b307d",
+        "size": 13760
+      },
+      "src/tests/test_dsl.py": {
+        "HEAD_sha256": "205d3922aa8399eadf6affbb53e85fac914c584d0cc80664c235efca0a38ac78",
+        "matches_HEAD": true,
+        "sha256": "205d3922aa8399eadf6affbb53e85fac914c584d0cc80664c235efca0a38ac78",
+        "size": 13776
+      },
+      "src/tests/test_ir_v2.py": {
+        "HEAD_sha256": "17be85b78f8835c37fda6a728e1c376bce297b3eb6cdbb38c100763ba0195107",
+        "matches_HEAD": true,
+        "sha256": "17be85b78f8835c37fda6a728e1c376bce297b3eb6cdbb38c100763ba0195107",
+        "size": 20104
+      },
+      "src/tests/test_oneof.py": {
+        "HEAD_sha256": "a47cc246e59a2717dc9b182afa9a47860ee48d5085f7e94b5f53ff256f9d4dcd",
+        "matches_HEAD": true,
+        "sha256": "a47cc246e59a2717dc9b182afa9a47860ee48d5085f7e94b5f53ff256f9d4dcd",
+        "size": 22409
+      }
+    },
+    "status": "Enum.case is user-owned/excluded; do not assume patch present or make old reservation permanent"
+  },
+  "round": 1,
+  "source_scope": "R1-R5 in authorized merged RemPlan-1; no other production, user authoring, dependency, lock or backend changes",
+  "status": "frozen merged R1 candidate; no finding self-closure; originating re-verdicts pending"
+}

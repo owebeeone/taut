@@ -155,3 +155,24 @@ authorized review outputs. No source edits while reviewers/global gate run,
 except one coordinated merged correction window when authorized. TS retains
 ownership of TS fixes; JS handles JS/shared fixes. No extra reviewer, separate
 target review, next backend, push, tag, release or publication is authorized.
+
+## Explicit merged remediation1 amendment
+
+After both original reports returned NO-GO and the one r0 global gate completed,
+the coordinator authorized the merged RemPlan-1 correction window. TS owns actual
+selected-export verification, narrow bound-field read diagnostics, defensive owned
+constraint snapshots/grammar, package-builder help and canonical library
+re-vendoring. JS/shared owns shared CLI guidance and the obsolete JVM grouping
+assertion, retaining all supported-target/method/default/artifact checks. Exactly
+the same original two reviewers continue for closure; no redesign, broad authoring
+change, extra reviewer or automatic repeat global gate is authorized.
+
+When the patch and meaningful affected/reproducer/library/shared-preservation
+checks are complete, the coordinator authorizes one scoped LOCAL GWZ corrected
+checkpoint and managed receipt containing that exact merged source/test/evidence
+scope. Recheck all protected user/excluded/lock bytes and unrelated indices before
+staging. Record a corrected exact tuple and canonical-template focused prompts;
+each originator must replay its own counterexamples and provide closure and
+changed-range tables. All findings remain open until reviewer closure. Material
+architecture/mutation-boundary changes or a third architectural round require
+stopping/reporting to root, not an unlimited patch loop. No push/tag/release.

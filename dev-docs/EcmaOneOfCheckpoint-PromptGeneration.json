@@ -1,0 +1,50 @@
+{
+  "generation": "UTF8canonicalPromptbodyplaceholderfill+exactoneaxisrole+CodeSurface+canonicalreportformat; no drafterhistory or otheraxisreport",
+  "generator_script": "D:/projects/limbo/ecma-oneof-scratch/generate-review-prompts.py",
+  "generator_script_sha256": "9ee9e9e405d107ea5bd455272203524da9840767ca63216ea27085b05c9ab53c",
+  "global_gate": "RootassignedTS;finalverdictsmustconsumecompletedsettledresults",
+  "prompts": {
+    "Code+Surface": {
+      "axis_scratch": "D:/projects/limbo/ecma-oneof-scratch/review-r0/code",
+      "file": "dev-docs/EcmaOneOfCheckpoint-PromptCode.md",
+      "sha256": "a1a93d5c76859dac032574a268d6ba64f712fd945905355b6d3c1d2e0be3503a"
+    },
+    "State": {
+      "axis_scratch": "D:/projects/limbo/ecma-oneof-scratch/review-r0/state",
+      "file": "dev-docs/EcmaOneOfCheckpoint-PromptState.md",
+      "sha256": "1500998aeb25559d6fffa5e86897270e65c11b44305a805156e7b65dfeec7814"
+    }
+  },
+  "reviewers": {
+    "Code+Surface": "/root/ecma_code_surface",
+    "State": "/root/ecma_state"
+  },
+  "reviewers_per_revision": 2,
+  "source_snapshot": "D:/projects/limbo/ecma-oneof-scratch/frozen-r0/snapshot.json",
+  "status": "DISPATCHED exactly two peer-blind original-axis reviewers; production frozen; no acceptance",
+  "surface": "Codeonly,notthirdreviewer",
+  "template": "C:/Users/gianni/.codex/skills/review-loop/references/review-prompt-template.md",
+  "template_sha256": "3b10ae89cf101c6273d34668eaaeaebf7e030a4c132406e0b234a846665eca58",
+  "tuple": {
+    "taut": {
+      "commit": "68c24a899345367f3026372d3c67737751215a0e",
+      "path": "D:/projects/limbo/taut-dev/taut"
+    },
+    "taut-shape-py": {
+      "commit": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-py"
+    },
+    "taut-shape-rs": {
+      "commit": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-rs"
+    },
+    "taut-shape-ts": {
+      "commit": "1409634e9b1c8eea0696bf0fee560d5017f34d1f",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-ts"
+    },
+    "workspace": {
+      "commit": "fe244bc4915acbce58198889feae633f778fe649",
+      "path": "D:/projects/limbo/taut-dev"
+    }
+  }
+}

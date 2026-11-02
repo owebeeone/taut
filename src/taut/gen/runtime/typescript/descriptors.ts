@@ -4,6 +4,12 @@ import { CborContract, CborFloat, DecodeError, EncodeError } from "./cbor.ts";
 import { CodecContract } from "./codec.ts";
 import { SchemaContract } from "./schema.ts";
 import { JsonCodecContract } from "./jsoncodec.ts";
+import * as cborExports from "./cbor.ts";
+import * as codecExports from "./codec.ts";
+import * as schemaExports from "./schema.ts";
+import * as jsonExports from "./jsoncodec.ts";
+import * as extExports from "./ext.ts";
+import * as reportExports from "./reports.ts";
 export { snapshot } from "./snapshots.ts";
 export const ONEOF_RULE = "taut.oneof.v1";
 export class ConfigurationError extends Error {}
@@ -13,14 +19,32 @@ export const Foundation = Object.freeze({
   capabilities: Object.freeze(["codec.v1", "descriptors.v1", "oneof.v1"]),
   codecTypes: Object.freeze({CborFloat, DecodeError, EncodeError}),
 });
-export function requireFoundation(actual: unknown = Foundation): void {
-  const a = actual as typeof Foundation;
-  if (!a || a.owner !== Foundation.owner || a.descriptorContract !== 1 || a.codecContract !== 1 ||
-      !Array.isArray(a.capabilities) || Foundation.capabilities.some(c => !a.capabilities.includes(c)))
+export function requireFoundation(selected?: unknown): typeof Foundation {
+  if (Foundation.owner !== "taut.typescript.foundation" || Foundation.descriptorContract !== 1 || Foundation.codecContract !== 1 ||
+      !Array.isArray(Foundation.capabilities) || ["codec.v1","descriptors.v1","oneof.v1"].some(c => !Foundation.capabilities.includes(c)))
     throw new ConfigurationError("compatible TypeScript foundation required: descriptor=1 codec=1; regenerate/rebind runtime");
   if ([CborContract,CodecContract,SchemaContract,JsonCodecContract].some(c=>!c || c.owner!==Foundation.owner || c.contract!==1) ||
       !SchemaContract.irVersions.includes(3) || !JsonCodecContract.oneofSparse)
     throw new ConfigurationError("actual loaded TypeScript codec/schema/JSON artifact is old or incompatible; regenerate/rebind foundation");
+  if (selected !== undefined) {
+    // Compare actual exported identities, not the facade's labels or this checker's
+    // lexical dependencies. Namespace wrappers may differ while genuine re-exports
+    // still expose these exact implementation values.
+    const check = (actual:unknown, expected:object, where:string):void => {
+      if (!actual || (typeof actual!=="object" && typeof actual!=="function")) throw new ConfigurationError(`selected TypeScript foundation missing ${where}; rebind owner`);
+      for (const [name,value] of Object.entries(expected)) {
+        if (name==="default" || name==="__esModule") continue;
+        if ((actual as Record<string,unknown>)[name] !== value) throw new ConfigurationError(`selected TypeScript foundation ${where}.${name} has a missing/incompatible export or split runtime owner; rebind foundation`);
+      }
+    };
+    check(selected, {Foundation,ConfigurationError,ONEOF_RULE,snapshot,typeDescriptor,EnumDescriptor,FieldDescriptor,
+      OneOfDescriptor,ConstraintDescriptor,MessageDescriptor,MessageBinding,SchemaDescriptor,requireExternal,publish,requireFoundation}, "exports");
+    check(selected,cborExports,"CBOR exports");
+    check(selected,reportExports,"report exports");
+    for (const [name,expected] of Object.entries({codec:codecExports,schema:schemaExports,jsoncodec:jsonExports,ext:extExports}))
+      check((selected as Record<string,unknown>)[name],expected,name);
+  }
+  return Foundation;
 }
 export type Options = Readonly<Record<string, unknown>>;
 function record<T>(values: Readonly<Record<string,T>>): Readonly<Record<string,T>> {
@@ -67,7 +91,21 @@ export class OneOfDescriptor {
 }
 export class ConstraintDescriptor {
   readonly parameters:Options;
-  constructor(readonly rule:string, parameters:Options={}) { this.parameters=snapshot(parameters); Object.freeze(this); }
+  constructor(readonly rule:string, parameters:Options={}) {
+    if (typeof rule!=="string" || parameters===null || typeof parameters!=="object" ||
+        ![Object.prototype,null].includes(Object.getPrototypeOf(parameters)) ||
+        Reflect.ownKeys(parameters).some(k=>typeof k!=="string" || !Object.prototype.propertyIsEnumerable.call(parameters,k)))
+      throw new ConfigurationError("invalid portable constraint record/parameters");
+    try { this.parameters=snapshot(parameters); }
+    catch (_) { throw new ConfigurationError("invalid portable constraint parameter values"); }
+    Object.freeze(this);
+  }
+}
+function constraintSnapshot(value:ConstraintDescriptor):ConstraintDescriptor {
+  if (!value || typeof value!=="object" || Reflect.ownKeys(value).length!==2 ||
+      !Object.hasOwn(value,"rule") || !Object.hasOwn(value,"parameters"))
+    throw new ConfigurationError("invalid constraint record shape");
+  return new ConstraintDescriptor(value.rule,value.parameters);
 }
 export class MessageDescriptor {
   readonly fields:readonly FieldDescriptor[]; readonly oneofs:readonly OneOfDescriptor[];
@@ -83,7 +121,7 @@ export class MessageDescriptor {
               reservedNames:readonly string[]=[], readonly nextId:number|null=null, options:Options={},
               effectiveOptions:Options={}, readonly fingerprint="") {
     this.fields=Object.freeze([...fields]); this.oneofs=Object.freeze([...oneofs]);
-    this.constraints=Object.freeze([...constraints]); this.reservedNumbers=Object.freeze([...reservedNumbers]);
+    this.constraints=Object.freeze(constraints.map(constraintSnapshot)); this.reservedNumbers=Object.freeze([...reservedNumbers]);
     this.reservedNames=Object.freeze([...reservedNames]); this.options=snapshot(options); this.effectiveOptions=snapshot(effectiveOptions);
     this.fieldsByName=record(Object.fromEntries(fields.map(f=>[f.name,f])));
     this.groupsByField=record(Object.fromEntries(oneofs.map(g=>[g.controllingField,g])));
@@ -157,7 +195,7 @@ export function publish(schema:SchemaDescriptor, bindings:readonly MessageBindin
     if (Object.keys(d.groupsByField).length!==d.oneofs.length) throw new ConfigurationError("duplicate oneof group");
     for (const g of d.oneofs) {
       const f=d.fieldsByName[g.controllingField];
-      if (!(g instanceof OneOfDescriptor) || !f || f.type.kind!=="enum" || f.type.enum()!==g.enumDescriptor || f.virtual!==g.virtual || f.presence!=="required" ||
+      if (!(g instanceof OneOfDescriptor) || typeof g.controllingField!=="string" || !f || f.type.kind!=="enum" || f.type.enum()!==g.enumDescriptor || f.virtual!==g.virtual || f.presence!=="required" ||
           typeof g.virtual!=="boolean" || typeof g.exhaustive!=="boolean" ||
           Object.keys(g.members).sort().join("\0")!==Object.keys(g.enumDescriptor.members).sort().join("\0")) throw new ConfigurationError("invalid oneof descriptor links");
       for (const p of new Set(Object.values(g.members))) {
@@ -166,7 +204,15 @@ export function publish(schema:SchemaDescriptor, bindings:readonly MessageBindin
         owned.add(p);
       }
     }
-    if (d.constraints.length!==d.oneofs.length || d.constraints.some(c=>c.rule!==ONEOF_RULE || !d.groupsByField[String(c.parameters.controlling_field)])) throw new ConfigurationError("unsupported/invalid constraints");
+    const controls=new Set<string>();
+    for (const c of d.constraints) {
+      const control=c.parameters.controlling_field;
+      if (!(c instanceof ConstraintDescriptor) || !Object.isFrozen(c) || !Object.isFrozen(c.parameters) || c.rule!==ONEOF_RULE ||
+          Reflect.ownKeys(c.parameters).length!==1 || !Object.hasOwn(c.parameters,"controlling_field") || typeof control!=="string" ||
+          !Object.hasOwn(d.groupsByField,control) || controls.has(control)) throw new ConfigurationError("unsupported/invalid oneof constraint parameters or duplicate control");
+      controls.add(control);
+    }
+    if (controls.size!==d.oneofs.length) throw new ConfigurationError("missing oneof constraint control");
   }
   bindings.forEach(check);
 }

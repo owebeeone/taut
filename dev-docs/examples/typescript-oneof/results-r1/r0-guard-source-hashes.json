@@ -1,0 +1,16 @@
+{
+  "description": "Exact original r0 canonical sources compiled as stale guard artifact in actual substitution tests",
+  "source_commit": "68c24a899345367f3026372d3c67737751215a0e",
+  "sources": {
+    "cbor.ts": "4a98c2476c09efc647da13a838e05e46af28733b93d5d9fe0bb8b86d9a6ba74c",
+    "codec.ts": "bb658127b49e332fe589dd89f3e8e0e06d9b5605d8a27458451cea75cc18ee8e",
+    "descriptors.ts": "e071cd1f20ec0a01569162980b45f8b4507e8468098735cec0818ef6a4c36e29",
+    "ext.ts": "6c08845312c6f7bd5ee07be490b1397747de61846c0d663357c9df3af58e9391",
+    "foundation.ts": "4d9f9247ac8540208fa05b3bddfe45e59d81fc576e60043761e740095dcb0a08",
+    "jsoncodec.ts": "514a6f44696be7ec7d100e16452045a6ad72b9a1e521471cacb13a1f4eb26bf3",
+    "reports.ts": "5a22e5bf9d426808d561951490d17caf83df1543c60884ad47f307cff612af83",
+    "schema.ts": "4ac5faa18610c76ad6acde1c1ec4363d0ec304652ce76f216dd22b245353fc90",
+    "snapshots.ts": "c2b6bfdcfb55859868af3134d5b922894a9bbe8e3d656204272335ba74948faa",
+    "validation.ts": "c7b9b7d231338af6b510766e96d8635bf1e5c69b920c28c275f0ec262492bdc0"
+  }
+}

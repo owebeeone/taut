@@ -1,0 +1,26 @@
+{
+  "counts": {
+    "actual_library_passed": 315,
+    "affected_target_passed": 169,
+    "legacy_typescript_cases": 14,
+    "new_closure_cases": 83,
+    "prior_feature_cases": 72
+  },
+  "environment": {
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONPATH": [
+      "D:\\projects\\limbo\\taut-dev\\taut\\src",
+      "C:/Users/gianni/AppData/Local/Programs/Python/Python311/Lib/site-packages"
+    ],
+    "PYTHONUTF8": "1",
+    "TAUT_R0_REPOSITORY": "D:\\projects\\limbo\\taut-dev\\taut"
+  },
+  "example": "activated python dev-docs/examples/typescript-oneof/run-example.py --out D:/projects/limbo/ecma-oneof-scratch/remediation-r1/typescript/example",
+  "historical_r0_gate": "unchanged D:/projects/limbo/ecma-oneof-scratch/global-gate-r0; no new broad/parity run",
+  "library": [
+    "pnpm typecheck",
+    "pnpm build",
+    "node --experimental-strip-types --test --test-reporter=spec tests/*.test.ts"
+  ],
+  "target": "activated stable python3.13.5 -m pytest src/tests/test_typescript_review_closure.py src/tests/test_typescript_oneof.py src/tests/test_ts.py -q --basetemp D:/projects/limbo/ecma-oneof-scratch/remediation-r1/typescript/target-final-origin --junitxml .../target-final-origin.xml"
+}

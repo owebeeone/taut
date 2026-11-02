@@ -561,7 +561,8 @@ public class WideValues {public static void main(String[]a){
 
 def test_jvm_help_describes_supported_targets_json_files_and_defaults():
     gen=' '.join(run([sys.executable,'-m','taut.cli','gen','--help']).stdout.split())
-    assert 'Python/Rust/Java/Kotlin' in gen and 'Java/Kotlin methods: validate/isValid' in gen
+    assert 'Python/Rust/Java/Kotlin/JavaScript/TypeScript' in gen
+    assert 'JS/TS/JVM methods: validate/isValid' in gen
     assert 'default: off' in gen and 'descriptors always emitted' in gen
     assert '--java-external-types JSON_FILE' in gen and '--kotlin-external-types JSON_FILE' in gen
     assert 'JSON file path' in gen and 'default: no external mappings' in gen

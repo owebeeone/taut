@@ -5,6 +5,16 @@ export const ValidationEngine = Object.freeze({contract:1, owner:Foundation});
 type Path=readonly PathSegment[];
 type Event=readonly [boolean,string,string,Path];
 function issue(code:string,path:Path,rule="validation.shape.v1"):Event { return [false,code,rule,path]; }
+const UNREADABLE=Symbol("unreadable generated field");
+function readField(value:unknown,binding:MessageBinding<any>,index:number):unknown {
+  try { return binding.read(value,index); }
+  catch (error) {
+    // This is solely the application data-slot boundary, never a catch around
+    // binding discovery, descriptor links, configuration checks or the engine.
+    if (error instanceof ConfigurationError) throw error;
+    return UNREADABLE;
+  }
+}
 function primitive(kind:string,value:unknown):boolean {
   switch(kind) {
     case "int":return typeof value==="bigint" && value>=I64_MIN && value<=I64_MAX;
@@ -45,17 +55,22 @@ function* walk(value:unknown,b:MessageBinding<any>,path:Path,ancestors:Set<unkno
   if(ancestors.has(value)) {yield issue("validation.ownership_cycle",path);return;} ancestors.add(value);
   try {
     const d=b.descriptor;
+    let unreadablePayloads:Set<number>|undefined;
     for(let i=0;i<d.fields.length;i++) {
       const f=d.fields[i], group=d.groupsByField[f.name]; const fieldpath=[...path,PathSegment.forField(f.name)];
       if(group) {
         if(group.virtual) yield [true,"oneof.virtual_deferred",ONEOF_RULE,fieldpath];
         else {
-          const tag=b.read(value,i);
+          const tag=readField(value,b,i);
           if(typeof tag!=="string" || !Object.hasOwn(group.members,tag)) yield issue("oneof.invalid_discriminator",fieldpath,ONEOF_RULE);
           else {
             const selected=group.members[tag], payloads=new Set(Object.values(group.members));
             for(let j=0;j<d.fields.length;j++) { const p=d.fields[j]; if(!payloads.has(p.name)) continue;
-              const child=b.read(value,j), pp=[...path,PathSegment.forField(p.name)];
+              const child=readField(value,b,j), pp=[...path,PathSegment.forField(p.name)];
+              if(child===UNREADABLE) {
+                (unreadablePayloads??=new Set()).add(j);
+                yield issue("validation.type_mismatch",pp); continue;
+              }
               if(p.name===selected && child==null) yield issue("oneof.payload_missing",pp,ONEOF_RULE);
               else if(p.name!==selected && child!=null) yield issue("oneof.payload_unexpected",pp,ONEOF_RULE);
             }
@@ -63,7 +78,9 @@ function* walk(value:unknown,b:MessageBinding<any>,path:Path,ancestors:Set<unkno
         }
       }
       if(recursive && !f.virtual && !group) {
-        const child=b.read(value,i);
+        if(unreadablePayloads?.has(i)) continue;
+        const child=readField(value,b,i);
+        if(child===UNREADABLE) {yield issue("validation.type_mismatch",fieldpath);continue;}
         if(child===undefined) {if(f.presence!=="missing_ok" && !d.payloadsByField[f.name]) yield issue("validation.type_mismatch",fieldpath);}
         else if(child!==null) yield* walkType(child,f.type,fieldpath,ancestors);
         else if(f.presence==="required") yield issue("validation.type_mismatch",fieldpath);

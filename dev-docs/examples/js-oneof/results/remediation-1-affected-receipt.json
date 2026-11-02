@@ -1,0 +1,27 @@
+{
+  "command": [
+    "C:\\Users\\gianni\\AppData\\Roaming\\uv\\python\\cpython-3.13.5-windows-x86_64-none\\python.exe",
+    "-m",
+    "pytest",
+    "src/tests/test_js_oneof.py",
+    "src/tests/test_js_ts_distribution.py",
+    "src/tests/test_js.py",
+    "src/tests/test_scaffold.py",
+    "src/tests/test_cli.py",
+    "src/tests/test_reserved_names.py",
+    "src/tests/test_java_oneof.py::test_jvm_help_describes_supported_targets_json_files_and_defaults",
+    "-q",
+    "--tb=short",
+    "--junitxml=D:\\projects\\limbo\\ecma-oneof-scratch\\remediation-r1\\shared\\affected.xml"
+  ],
+  "cwd": "D:\\projects\\limbo\\taut-dev\\taut",
+  "elapsed_seconds": 29.658979892730713,
+  "environment": {
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONPATH": "D:\\projects\\limbo\\taut-dev\\taut\\src;C:\\Users\\gianni\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages"
+  },
+  "exit_code": 0,
+  "python": "3.13.5 (main, Jul 23 2025, 00:30:06) [MSC v.1944 64 bit (AMD64)]",
+  "scope": "JS/shared affected gate plus complete existing JVM help test; not broad/all16",
+  "source_stable": true
+}

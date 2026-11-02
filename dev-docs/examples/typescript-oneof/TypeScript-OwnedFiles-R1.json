@@ -1,0 +1,93 @@
+{
+  "baseline": {
+    "taut": "68c24a899345367f3026372d3c67737751215a0e",
+    "taut-shape-ts": "1409634e9b1c8eea0696bf0fee560d5017f34d1f",
+    "workspace": "fe244bc4915acbce58198889feae633f778fe649"
+  },
+  "canonical_vendoring_exact": true,
+  "checks": {
+    "affected": "169passed (83closure+72feature+14legacy), final current-source single run",
+    "example": "source/package strict example identical;PASS",
+    "global": "not rerun;historical r0 remains original tuple/results",
+    "library": "pnpm typecheck/build PASS;315tests PASS"
+  },
+  "excluded": [
+    "shared CLI/help/JVM-test changes owned by JS",
+    "all other production",
+    "original r0 evidence files",
+    "builds/dependencies/packages/scratch",
+    "user authoring files and old35artifacts"
+  ],
+  "protected_files": 41,
+  "protected_unchanged": true,
+  "sha256": {
+    "taut": {
+      "dev-docs/examples/typescript-oneof/README.md": "773e19c600314676277891d74ea813062782b98d345d8cf7c24254e8d12c83c2",
+      "dev-docs/examples/typescript-oneof/RESULTS-R1.md": "e9e1e0458a9512ec5da86ba0d5d53281e6a419c2b70fc373ca1eacdee32fe54d",
+      "dev-docs/examples/typescript-oneof/results-r1/commands.json": "43b1bee405db34727fac1af8ce7f54737fedb49bdc838fea1ddc2df1a67fdd2c",
+      "dev-docs/examples/typescript-oneof/results-r1/example-results.json": "9d0edce7ba28480d658d7d75311915aa721a6e150579bee89c8556cdfae75626",
+      "dev-docs/examples/typescript-oneof/results-r1/example.log": "9d0edce7ba28480d658d7d75311915aa721a6e150579bee89c8556cdfae75626",
+      "dev-docs/examples/typescript-oneof/results-r1/library-build.log": "a9120e106f55b637d79043a28576a95ca418ce7ee638c392c32ec15d649723fa",
+      "dev-docs/examples/typescript-oneof/results-r1/library-tests.log": "05df00cf2b9ea3f6fcf812fe5518103c072f8db148b9bdc1732a7a0ca37ac065",
+      "dev-docs/examples/typescript-oneof/results-r1/library-typecheck.log": "8d0e8ca6face14b38c6ec53924037c0098a0fbeb982ff06383bc756d96a86127",
+      "dev-docs/examples/typescript-oneof/results-r1/protected-after.json": "ec9c8a71b6660f3402f9ec638c4d46f057c9271525e586b73855b95d597df04f",
+      "dev-docs/examples/typescript-oneof/results-r1/protected-before.json": "ec9c8a71b6660f3402f9ec638c4d46f057c9271525e586b73855b95d597df04f",
+      "dev-docs/examples/typescript-oneof/results-r1/r0-guard-source-hashes.json": "b0f4981d8aabd91ef383ee90d9221bdd769feef8e3832f97820b8f900e7292d2",
+      "dev-docs/examples/typescript-oneof/results-r1/target-tests.log": "01205484c474ef2913e196389d9cf1936d9ef25f197b49d4fb756a254cb4d990",
+      "dev-docs/examples/typescript-oneof/results-r1/target-tests.xml": "071d2fafd514f4eba59f18703fe1bc43a37421f4d4e9c14c315ab9fcc835badf",
+      "src/taut/gen/runtime/typescript/descriptors.ts": "ba883571da8b70c008a58c14f5a7feb0be48948ca8678eb96b0a66bf9ed7ffac",
+      "src/taut/gen/runtime/typescript/validation.ts": "50adcd1d36a92dd54921b1fd3d4fb7fbdbf3ff7ebee89dc5643bc13f5e599b7f",
+      "src/taut/gen/typescript_metadata.py": "ae22fc51fab61e80763bb9ea8f8da47fc473756d874e0aba32266a0124f01120",
+      "src/taut/gen/typescript_package.py": "b08800dc0b5e9645175815d395f0281e6fbda9498c841d24f5b2d25739110085",
+      "src/tests/test_typescript_review_closure.py": "a4e73031728c9140ac36e1905db363ebc9a66047a9b44f4cf3f3f0a5ad184b7e"
+    },
+    "taut-shape-ts": {
+      "foundation-src/descriptors.ts": "ba883571da8b70c008a58c14f5a7feb0be48948ca8678eb96b0a66bf9ed7ffac",
+      "foundation-src/provenance.json": "090076dce712fd50f172e260c08e1fb60451649919fb3eb4a94589194bf52c0c",
+      "foundation-src/validation.ts": "50adcd1d36a92dd54921b1fd3d4fb7fbdbf3ff7ebee89dc5643bc13f5e599b7f",
+      "scripts/build-foundation.mjs": "77039b68fb4a16bfc5fc460514464029bea33756d77898598b63320bd9982db3",
+      "src/taut/gen/shape_atom.ts": "10a0f045b96f9cf5c86d776cd6d29d350f6043a95499b3ee643eee789a19149e",
+      "src/taut/gen/shape_crdt.ts": "188b8b59fe436ef2c03ded87d7937f3469f85dbd4e6772319a3fd4fab8f673c8",
+      "src/taut/gen/shape_log.ts": "7f7c22248be7ae4a9411e8ce429e78d583e1f136878b3b272da108586f5fa906",
+      "src/taut/gen/shape_stream.ts": "b61909f1e64f90998425823b0bc8697139c2542943e223dfe3936355368f97cd",
+      "src/taut/gen/shape_swmr.ts": "fed4c18bb15b62fda56c00861c1f1dc54203ded470c63ad9423f12fca4e0d792",
+      "src/taut/gen/shape_value.ts": "6086d257f7583af91107774d2e24a843c480e2af387ae80142ce7a8f818d9e05",
+      "tests/foundation.test.ts": "50180ea798c5c236246da1d1f9205d48a51cbc42fa3e9bd5e71c66da570cd536"
+    }
+  },
+  "status": "R1 TS-owned patch REVIEW-READY; HOLD production; original reviewer closure pending",
+  "taut": [
+    "dev-docs/examples/typescript-oneof/README.md",
+    "dev-docs/examples/typescript-oneof/RESULTS-R1.md",
+    "dev-docs/examples/typescript-oneof/TypeScript-OwnedFiles-R1.json",
+    "dev-docs/examples/typescript-oneof/results-r1/commands.json",
+    "dev-docs/examples/typescript-oneof/results-r1/example-results.json",
+    "dev-docs/examples/typescript-oneof/results-r1/example.log",
+    "dev-docs/examples/typescript-oneof/results-r1/library-build.log",
+    "dev-docs/examples/typescript-oneof/results-r1/library-tests.log",
+    "dev-docs/examples/typescript-oneof/results-r1/library-typecheck.log",
+    "dev-docs/examples/typescript-oneof/results-r1/protected-after.json",
+    "dev-docs/examples/typescript-oneof/results-r1/protected-before.json",
+    "dev-docs/examples/typescript-oneof/results-r1/r0-guard-source-hashes.json",
+    "dev-docs/examples/typescript-oneof/results-r1/target-tests.log",
+    "dev-docs/examples/typescript-oneof/results-r1/target-tests.xml",
+    "src/taut/gen/runtime/typescript/descriptors.ts",
+    "src/taut/gen/runtime/typescript/validation.ts",
+    "src/taut/gen/typescript_metadata.py",
+    "src/taut/gen/typescript_package.py",
+    "src/tests/test_typescript_review_closure.py"
+  ],
+  "taut-shape-ts": [
+    "foundation-src/descriptors.ts",
+    "foundation-src/provenance.json",
+    "foundation-src/validation.ts",
+    "scripts/build-foundation.mjs",
+    "src/taut/gen/shape_atom.ts",
+    "src/taut/gen/shape_crdt.ts",
+    "src/taut/gen/shape_log.ts",
+    "src/taut/gen/shape_stream.ts",
+    "src/taut/gen/shape_swmr.ts",
+    "src/taut/gen/shape_value.ts",
+    "tests/foundation.test.ts"
+  ]
+}

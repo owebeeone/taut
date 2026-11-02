@@ -1,0 +1,64 @@
+{
+  "source": {
+    "before": [
+      {
+        "code": "oneof.payload_unexpected",
+        "path": [
+          "text"
+        ]
+      },
+      {
+        "code": "oneof.payload_missing",
+        "path": [
+          "number"
+        ]
+      }
+    ],
+    "json": {
+      "kind": "number",
+      "text": "an unfinished draft"
+    },
+    "cborBytes": 26,
+    "after": {
+      "valid": true,
+      "complete": true,
+      "scope": "recursive"
+    },
+    "fields": [
+      "kind",
+      "text",
+      "number"
+    ]
+  },
+  "package": {
+    "before": [
+      {
+        "code": "oneof.payload_unexpected",
+        "path": [
+          "text"
+        ]
+      },
+      {
+        "code": "oneof.payload_missing",
+        "path": [
+          "number"
+        ]
+      }
+    ],
+    "json": {
+      "kind": "number",
+      "text": "an unfinished draft"
+    },
+    "cborBytes": 26,
+    "after": {
+      "valid": true,
+      "complete": true,
+      "scope": "recursive"
+    },
+    "fields": [
+      "kind",
+      "text",
+      "number"
+    ]
+  }
+}

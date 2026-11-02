@@ -109,7 +109,9 @@ def emit_types(schema, *, forward_compat=False, validation=False, external_types
         out += [f'import type {{ {data_export} as {name} }} from {q(module)};',
                 f'export type {{ {name} }};',
                 f'import {{ {export}Descriptor as {name}Descriptor'+(f', {export}Binding as {name}Binding' if name in schema.messages else '')+f' }} from {q(module)};']
-    out += ['if (typeof _taut.requireFoundation !== "function") throw new globalThis.Error("compatible TypeScript descriptor/codec foundation required; regenerate/rebind runtime");', '_taut.requireFoundation();']
+    out += ['if (typeof _taut.requireFoundation !== "function") throw new globalThis.Error("compatible TypeScript descriptor/codec foundation required; regenerate/rebind runtime");',
+            'if (!_taut.Foundation || typeof _taut.Foundation !== "object" || _taut.Foundation.owner !== "taut.typescript.foundation" || _taut.Foundation.descriptorContract !== 1 || _taut.Foundation.codecContract !== 1 || !globalThis.Array.isArray(_taut.Foundation.capabilities) || ["codec.v1", "descriptors.v1", "oneof.v1"].some(c => !_taut.Foundation.capabilities.includes(c))) throw new globalThis.Error("selected TypeScript foundation lacks a valid owner token (incompatible owner/contracts); regenerate/rebind owner");',
+            'if (_taut.requireFoundation(_taut) !== _taut.Foundation) throw new _taut.ConfigurationError("selected TypeScript foundation lacks namespace-checked guard support; regenerate/rebind owner");']
     if validation: out += ['if (_tautEngine.ValidationEngine?.contract !== 1 || _tautEngine.ValidationEngine.owner !== _taut.Foundation) throw new _taut.ConfigurationError("incompatible TypeScript validation engine/owner");']
     for name in external:
         out += [f'_taut.requireExternal({name+"Binding" if name in schema.messages else name+"Descriptor"}, {q(fingerprint(schema,name))}, {q(name)}, {q("message" if name in schema.messages else "enum")});']

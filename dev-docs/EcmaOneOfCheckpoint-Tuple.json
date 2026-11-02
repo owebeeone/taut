@@ -1,0 +1,53 @@
+{
+  "authority": "dev-docs/EcmaOneOfCheckpoint-Authority.md at source commit; includes root explicit freeze and prefreeze service/residual amendments",
+  "cached_whitespace_note": "Default cached diff check flags raw Windows CRLF/example/receipt terminal spacing in23artifact paths; no runtime/compiler/helper implementation path flagged. Frozen receipts preserved; no default cached-check-clean claim. See scratch frozen-r0/cached-whitespace.json",
+  "committed_file_counts": {
+    "taut": 73,
+    "taut-shape-ts": 28,
+    "workspace_GWZ_receipt": 2
+  },
+  "integration_runner": "TypeScript executor, ONE settled all16parity+fullTaut suite; D:/projects/limbo/ecma-oneof-scratch/global-gate-r0; final verdicts must consume completed source/hash evidence",
+  "production": "FROZEN; no edits while gate/reviews running absent coordinated correction window",
+  "prohibited": "push,tag,release,publication,next backend,extra reviewers",
+  "protected": "Five user source hashes+35excluded oldPython paths verified unchanged; originalPython/Rust refs unchanged; member/root tracked/index clean",
+  "remediation_rounds_used": 0,
+  "review_axes": [
+    "Code+Surface",
+    "State"
+  ],
+  "review_round": 0,
+  "reviewers": {
+    "Code+Surface": "/root/ecma_code_surface",
+    "State": "/root/ecma_state"
+  },
+  "snapshot": "D:/projects/limbo/ecma-oneof-scratch/frozen-r0/snapshot.json",
+  "snapshot_sha256": "6b3a931d8640d4e76bcb46a8004f45299d4d0cbd3b3cbe1741e94a0bc310705d",
+  "source_ranges": {
+    "taut": "8c113e36a927cda5c50848f25ab828185080272d..68c24a899345367f3026372d3c67737751215a0e",
+    "taut-shape-ts": "74597e5e3a1d3845e93644866b97b68080f4bbbe..1409634e9b1c8eea0696bf0fee560d5017f34d1f",
+    "workspace": "c511e7aaa6754bade75c8eea50ae46501ff863f3..fe244bc4915acbce58198889feae633f778fe649"
+  },
+  "status": "committed source checkpoint; two-axis review and root-assigned settled integration pending; NOT accepted",
+  "tuple": {
+    "taut": {
+      "commit": "68c24a899345367f3026372d3c67737751215a0e",
+      "path": "D:/projects/limbo/taut-dev/taut"
+    },
+    "taut-shape-py": {
+      "commit": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-py"
+    },
+    "taut-shape-rs": {
+      "commit": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-rs"
+    },
+    "taut-shape-ts": {
+      "commit": "1409634e9b1c8eea0696bf0fee560d5017f34d1f",
+      "path": "D:/projects/limbo/taut-dev/taut-shape-ts"
+    },
+    "workspace": {
+      "commit": "fe244bc4915acbce58198889feae633f778fe649",
+      "path": "D:/projects/limbo/taut-dev"
+    }
+  }
+}

@@ -1,10 +1,11 @@
 # JavaScript/TypeScript OneOf checkpoint — controlling DRAFT
 
-Status: **FROZEN combined source object; BOTH executors REVIEW-READY and the
-coordinator authorized the exact scoped local GWZ checkpoint and two-axis review**.
-Production is on HOLD. No acceptance or publication is claimed. The source
-revision is the commit containing this DRAFT and Preparation; post-checkpoint
-canonical reviewer prompts record its exact tuple/ranges and workspace receipt.
+Status: **REMEDIATION1 candidate; initial committed tuple NO-GO; one bounded
+merged correction window is coordinator-authorized**. No acceptance/publication.
+The initial immutable source is68c24a89/shape-ts1409634e/rootfe244bc4. Its original
+Preparation and r0 global receipts retain their exact attribution. A corrected
+Inventory-1 and canonical originating-reviewer prompts will name the revised
+settled tuple/ranges after the authorized scoped local GWZ checkpoint.
 
 [Authority](EcmaOneOfCheckpoint-Authority.md) records the operator directive,
 scope and amendments. [Preparation](EcmaOneOfCheckpoint-Preparation.json) records
@@ -221,3 +222,21 @@ Implementers cannot self-close. Continue originating reviewers unless material
 change triggers replacement under the skill; maximum two remediation rounds.
 No push, tag, release, publication or next backend follows from a local checkpoint
 or GO verdict. Production remains held until explicitly coordinated otherwise.
+
+## Remediation1 candidate amendment
+
+Both original axes reported NO-GO on the initial tuple. Verbatim ReviewCode and
+ReviewState plus the ONE RemPlan-1 govern the correction. Three P2 roots concern
+actual selected TS facade exports, read-access diagnostics through known bindings,
+and defensive immutable normalized constraint publication. Two P3 roots concern
+TS package-builder defaults and shared JVM/ECMA help coverage. The accessor scope
+interpretation difference is recorded; State owns its original-counterexample
+closure, and Code independently judges the changed boundary. No implementer
+self-closure or claim of unanimous discovery is made.
+
+The original r0 gate is all16GREEN and broad1807passed/4failed/5skipped/11deselected,
+including one NEW help failure beyond baseline3. It is not corrected-source
+evidence. Root directs affected closure/conformance/library/shared-preservation
+checks after this localized patch rather than automatic repeat global execution.
+The runtime/wire/output-mutation architecture, public instance methods, user
+authoring boundaries and frozen declared dependencies remain unchanged in scope.

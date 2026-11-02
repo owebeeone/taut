@@ -52,6 +52,19 @@ def test_cli_conflicts_preserve_outputs(tmp_path,flags):
     assert list(tmp_path.iterdir())==before
 
 
+def test_shared_help_preserves_jvm_and_ecma_methods_defaults_and_artifact_formats():
+    text=' '.join(run([sys.executable,'-m','taut.cli','gen','--help']).split())
+    for phrase in ('Python/Rust/Java/Kotlin/JavaScript/TypeScript',
+                   'JS/TS/JVM methods: validate/isValid', 'Python/Rust: validate/is_valid',
+                   'default: off', 'descriptors always emitted',
+                   '--js-external-types JSON_FILE', '--typescript-external-types JSON_FILE',
+                   'data_export defaults to ExportFields', 'enums to Export',
+                   'Java accepts optional artifact jar', 'JS/TS accept optional artifact tgz',
+                   'TS also validation_module', 'Python/Java module=taut', 'Kotlin packages fixed',
+                   'Rust module defaults', 'source_root defaults', 'never installs it'):
+        assert phrase in text,phrase
+
+
 @pytest.fixture(scope='module')
 def ts_package(tmp_path_factory):
     root=tmp_path_factory.mktemp('shared-ts-package');build_foundation(root)

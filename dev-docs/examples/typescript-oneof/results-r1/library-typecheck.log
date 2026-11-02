@@ -1,0 +1,5 @@
+
+> @owebeeone/taut-shape@0.10.0 typecheck D:\projects\limbo\taut-dev\taut-shape-ts
+> node scripts/build-foundation.mjs && tsc --noEmit
+
+canonical foundation CJS owner + ESM facades built
