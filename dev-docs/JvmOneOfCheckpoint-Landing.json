@@ -1,0 +1,107 @@
+{
+  "status": "ACCEPTED exact implementation tuple; evidence-only landing record; production fixed at8682555a",
+  "reviewed_tuple": {
+    "taut": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut",
+      "sha": "8682555a66e61659c465092b461d3b2cb4c58ff4"
+    },
+    "workspace": {
+      "path": "D:\\projects\\limbo\\taut-dev",
+      "sha": "183359cdefae3921d65c208eec85ca048da58db8"
+    },
+    "shape_python": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut-shape-py",
+      "sha": "c08c2a1b5197f761c5b0b835c588da512130ceda"
+    },
+    "shape_rust": {
+      "path": "D:\\projects\\limbo\\taut-dev\\taut-shape-rs",
+      "sha": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4"
+    }
+  },
+  "rounds": {
+    "initial": {
+      "Code": "NO-GO",
+      "State": "NO-GO"
+    },
+    "remediation1": {
+      "Code": "GO",
+      "State": "GO"
+    },
+    "remediations_used": 1,
+    "cap": 2
+  },
+  "open_findings": [],
+  "originating_reports": {
+    "dev-docs/JvmOneOfCheckpoint-ReviewCode-1.md": "de5db42033e7a828f22bd695a0fd685aafd63decd291878246234caa02929c7e",
+    "dev-docs/JvmOneOfCheckpoint-ReviewState-1.md": "2fd121a346ec5482d5ee3f05e72769fbaec298ad6dfc4f6cc4a3f1e16cf9ce5f"
+  },
+  "protected_implementation_test_example_files": {
+    "dev-docs/examples/java-oneof/AdapterProbe.java": "d62abece1d30e3e394073d8b482644efea6606738e5f87047abaa7b5fbf44fb8",
+    "dev-docs/examples/java-oneof/Conformance.java": "67df6e39a4a8172019ee6d83cc37967d9fd3e62a30082996718097b887cc8030",
+    "dev-docs/examples/java-oneof/content.taut.py": "784f549db4a0e324a7675f3f88e399d623d81738e7358f6225a449e0e349855d",
+    "dev-docs/examples/java-oneof/disabled.golden.java": "6db025acd8377936cf280d59b784fdc58da5382e8b64d71195f0aa667727157e",
+    "dev-docs/examples/java-oneof/enabled.golden.java": "feb5b488cb705709207f098a7c7a410c687a0d8ffe13b9602e6e3a23506609e9",
+    "dev-docs/examples/java-oneof/verify_examples.py": "c70da232b334e00518a0d00b090d23bae57f5ca1984b0f7a9ef49d13812e82b0",
+    "dev-docs/examples/kotlin-oneof/AdapterProbe.kt": "368f8fd497cb80cf6782c1fe61fd83e640b66c1ef4a23c720cbffe6ae2c80873",
+    "dev-docs/examples/kotlin-oneof/Example.kt": "63f4611026614b5ea97815b357a3157ca8fbffc6a9e0d2d103b85551f1f4338f",
+    "dev-docs/examples/kotlin-oneof/run-example.py": "c0303641eb5e3abcc07e2ceddaaff5ecb64cf3bcc31aa8d80fb048fcf9907d89",
+    "pyproject.toml": "9b16c639c626a1d289876c3bfa548815ac1054fa9ea54952035568f7af40fcf9",
+    "src/taut/cli.py": "e90035660197d432942325d57a10f998eead12ab397f49975396be28551514cf",
+    "src/taut/corpus/parity_java.py": "35324e349da2b7979ff75f9e853fc8ba973c784e15672fd175c01fa921ee800a",
+    "src/taut/gen/java.py": "7e0101ef83e2dbe927c21ba16ddf1dfdfe6c8c6740d536657f739187ecf8c65d",
+    "src/taut/gen/java_metadata.py": "8d639557c9771e54476cbbc2c86ce9e4f32213b8843aebcffeca69f842f27551",
+    "src/taut/gen/java_runtime.py": "d67c03be5cfc21622ac2e16193ca925c5ab7993a9f91533494ca24e0c1cf25a2",
+    "src/taut/gen/kotlin.py": "40356d3c9e600505e28af60584b3ecac93df95911b078c33ceeb89efb96ef665",
+    "src/taut/gen/kotlin_metadata.py": "e60039c74ebf216543faf584b390acc1222cee152eabb015723c72b6f9468557",
+    "src/taut/gen/kotlin_package.py": "18e18589dc9cf0281ac90618bea15bc1161235a7aa74f143754c8767567d0fa4",
+    "src/taut/gen/kotlin_runtime.py": "3e215995fde5c363878a4c7ef9cb67e2c1b79b7825c81d2c0324cb30a1a23a83",
+    "src/taut/gen/runtime/Cbor.java": "b7a4c0d85e3fde9e72426820e4e1751d541441f5068d20de2cae210496bfcc9a",
+    "src/taut/gen/runtime/cbor.kt": "36baf6c178ea1417c46c6748b3cedbdb59f43085717d5e363b8e93be0a55a3c8",
+    "src/taut/gen/runtime/java/taut/validation/ConfigurationException.java": "33a1c62e787097f8513167e7af841bd89cf7d6c2aad3ff1a7f39878c217ec610",
+    "src/taut/gen/runtime/java/taut/validation/DeferredCheck.java": "3af27978aabbf45c46a4c3bb88ceb3ee412f2973a4cf2aff0f0f4116e67fb2fc",
+    "src/taut/gen/runtime/java/taut/validation/PathSegment.java": "6059c26e10348a2728c619122ab640fa6f75205ec210a2abdf77be5b1298f3f6",
+    "src/taut/gen/runtime/java/taut/validation/ValidationEngine.java": "6e712fee16e9f0f69d4bcd797e99c70cc67490c22cc6eab2f1811790547e424e",
+    "src/taut/gen/runtime/java/taut/validation/ValidationIssue.java": "138f35360edc6658ea46d0efced78542c83bb9ad65f029932c31c2613cdcaf94",
+    "src/taut/gen/runtime/java/taut/validation/ValidationReport.java": "f6748b6ce6bdb046f5e3b5ba6fea7f9fae1971ae39f5a8d4581bc85487002541",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ConstraintDescriptor.java": "c345aa2365c15325687d7e1a6dd0019c07f33f066c78400c7d2e72e7677f846c",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/EnumDescriptor.java": "b7d903678c9f81fc100950bd281715cfc3402b55fefa0e65dd9e020193b8e6ec",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/FieldBinding.java": "a5a76efc7f7186c346ba98598df61c667f7f8fbaa38eb95dc4dc94c7c4edbd31",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/FieldDescriptor.java": "d378517ea1a0fe7c136934f95ee210e0ca02385cb4fab728af4b5487d61e4d29",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ImmutableBytes.java": "8ca3187940e6131e62c501c5d0b44801f6a89ee30a39ae3cc1e3d5ee14ddda2f",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/MessageAdapter.java": "482c298371c008f361d36ac23436f305503678517766cef0bb1e7d37e6995d69",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/MessageDescriptor.java": "a3d812b9d161a5aeef6eb6d6a0591464ac00851c49e8286f5e002a04d21503db",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/OneOfDescriptor.java": "2a458146e9fdfb2b499ba3ec9844116e5e75aab353bc70c70c56dd39c41fb065",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/RuntimeContract.java": "524400e16da93213b83dca017146abc5c4c462c18ca7fe8325587a29588d3c56",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/SchemaBinding.java": "54c5d418976162f08e02e572e1a47ef68f318f9b2c5463286b5dc2cf012fabad",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/SchemaDescriptor.java": "ccef82dba86198204d27901a8bff6e9ddd75331413c9a870f1838ab6a73f8d55",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/Snapshots.java": "3f81e37b28a9ba822c99d885d0914b57a91514b0061db7a7efcf465a9c8588bf",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/Traversal.java": "78cc6b59beccde6b2770e73cbf2c8d042a6afa4911e3452bf760d9a078d7cc5b",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/TypeDescriptor.java": "61a1cc7f65e3eba75cf5dba3ebd22a9fff1ba12c31919e5ec01a897d962c892d",
+    "src/taut/gen/runtime/java/taut/validation/descriptors/ValueAdapter.java": "e9c70bca056d78a9655f83659910d64dbf4e0a8e92756db29b4e8c1911e3cb74",
+    "src/taut/gen/runtime/kotlin/descriptors.kt": "037d20d1447a3324ef4eaadd45a4261d8a9d4b596948240906da54a8689d2073",
+    "src/taut/gen/runtime/kotlin/validation.kt": "d4b63eade7e51fad82fc0d9ed00c4f2e624cd08e8275bf00bcfa780d64730c43",
+    "src/taut/gen/scaffold.py": "05594e6acd2b69c5963330538489b65cce27e94045a09b8018c0b6ce1750932f",
+    "src/tests/test_java.py": "08a993e416a692f98cdfde47b1d0e993218b97bb76ec93dbb71818d8ea79f315",
+    "src/tests/test_java_oneof.py": "77a2063ec0ab3e14b9daf0c85671917a7ad19757e0f56e226e9293742bc00fd5",
+    "src/tests/test_jvm_compiler_distribution.py": "f0f082101699f23195591a83b89477b97993ca7f8f1db896eb596e2e85d6a1b5",
+    "src/tests/test_kotlin.py": "a5ff0232b271d4b1f7d6cd7f1fba391650cdb1b4c95f2d211e057b50c404bc98",
+    "src/tests/test_kotlin_oneof.py": "e84837e6254a235e9a91b9fd1ad803a39b215308e44036dfae7098db4be22470",
+    "src/tests/test_reserved_names.py": "a467d58b16cd233b92383f41d1fea1214dc7383a2173daa5b5587e97ce113377"
+  },
+  "user_hashes": {
+    "src/taut/ir/dsl.py": {
+      "sha256": "5b2061584dcd78a3f73d2a757d6b101bacf280c9190f6a068b613eecb55b307d",
+      "matches_HEAD": true
+    },
+    "src/taut/facts.py": {
+      "sha256": "81d2b87e7bd199b30248305eaefd6849a195d4b3ea296626e74affda13bef0cb",
+      "matches_HEAD": true
+    },
+    "src/tests/test_oneof.py": {
+      "sha256": "a47cc246e59a2717dc9b182afa9a47860ee48d5085f7e94b5f53ff256f9d4dcd",
+      "matches_HEAD": true
+    }
+  },
+  "global_evidence_tuple": "92c6894dc9a8d071a5637c086aa56292b649adf1/root07b5853cf31911e45945b88eabc270b0b7680de5 only; not relabelled R1",
+  "landing_policy": "local review evidence/receipt only; production protected bytes must equal868; no push/tag/release/installation/publication"
+}

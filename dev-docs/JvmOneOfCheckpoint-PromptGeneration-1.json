@@ -1,0 +1,39 @@
+{
+  "remediation_round": 1,
+  "previous_source": "92c6894dc9a8d071a5637c086aa56292b649adf1",
+  "template": "C:\\Users\\gianni\\.codex\\skills\\review-loop\\references\\review-prompt-template.md",
+  "template_sha256": "3b10ae89cf101c6273d34668eaaeaebf7e030a4c132406e0b234a846665eca58",
+  "source_sha": "8682555a66e61659c465092b461d3b2cb4c58ff4",
+  "base_sha": "1607b6e0b000f607153b2ec20fc244aeb5952744",
+  "tuple": {
+    "Taut": [
+      "D:\\projects\\limbo\\taut-dev\\taut",
+      "8682555a66e61659c465092b461d3b2cb4c58ff4"
+    ],
+    "GWZ workspace": [
+      "D:\\projects\\limbo\\taut-dev",
+      "183359cdefae3921d65c208eec85ca048da58db8"
+    ],
+    "Python shape reference": [
+      "D:\\projects\\limbo\\taut-dev\\taut-shape-py",
+      "c08c2a1b5197f761c5b0b835c588da512130ceda"
+    ],
+    "Rust shape reference": [
+      "D:\\projects\\limbo\\taut-dev\\taut-shape-rs",
+      "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4"
+    ]
+  },
+  "snapshot": "D:\\projects\\limbo\\toolchain-readiness-2026-11-02\\jvm-review-scratch\\source-8682555-64lpy6d5",
+  "axes": {
+    "Code": {
+      "prompt": "JvmOneOfCheckpoint-PromptCode-1.md",
+      "sha256": "13fe08cb9bb78eebaf63ac1a8b611c70e694c0ea5ccef0607e92b234e85f6f05",
+      "report": "JvmOneOfCheckpoint-ReviewCode-1.md"
+    },
+    "State": {
+      "prompt": "JvmOneOfCheckpoint-PromptState-1.md",
+      "sha256": "91465eb2af71c1efd1462f76cd18d046bc56a02693319440d37924dcf32dc037",
+      "report": "JvmOneOfCheckpoint-ReviewState-1.md"
+    }
+  }
+}

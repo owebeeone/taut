@@ -1,6 +1,11 @@
 # Java execution results — 2 November 2026
 
-## Remediation1 — awaiting originating review
+Accepted Java/Kotlin implementation: Taut8682555a/root183359cd after both
+original reviewers reported GO and verified closure. The controlling pair
+verdict is ../../JvmOneOfCheckpoint-Verdict.md; implementation and evidence
+below retain their exact source/run provenance.
+
+## Remediation1 — originating reviewers closed
 
 Both initial reviewers returned NO-GO at Taut92c6894d/root07b5853c. The
 verbatim reports and one merged disposition are filed in the pair checkpoint
