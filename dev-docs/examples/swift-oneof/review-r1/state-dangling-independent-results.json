@@ -1,0 +1,46 @@
+[
+  {
+    "language": "go",
+    "command": [
+      "cmd",
+      "/c",
+      "mklink",
+      "/J",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\dangling-independent\\go\\go\\cbor.go",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\dangling-independent\\go\\target"
+    ],
+    "observed": {
+      "exists": false,
+      "is_symlink": false,
+      "lstat_reparse": true,
+      "is_alias": true
+    },
+    "result": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\dangling-independent\\go\\go\\cbor.go; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "retiring_roots": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\dangling-independent\\go\\go"
+    ]
+  },
+  {
+    "language": "swift",
+    "command": [
+      "cmd",
+      "/c",
+      "mklink",
+      "/J",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\dangling-independent\\swift\\swift\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\dangling-independent\\swift\\target"
+    ],
+    "observed": {
+      "exists": false,
+      "is_symlink": false,
+      "lstat_reparse": true,
+      "is_alias": true
+    },
+    "result": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\dangling-independent\\swift\\swift\\cbor.swift; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "retiring_roots": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\dangling-independent\\swift\\swift"
+    ]
+  }
+]

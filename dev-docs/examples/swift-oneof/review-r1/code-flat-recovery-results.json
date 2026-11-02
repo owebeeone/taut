@@ -1,0 +1,164 @@
+[
+  {
+    "language": "go",
+    "old_validation": false,
+    "new_validation": false,
+    "separate": false,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\go\\False\\False\\False\\app\\go\\cbor.go; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "go",
+    "old_validation": false,
+    "new_validation": false,
+    "separate": true,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\go\\False\\False\\True\\source-owner\\cbor.go; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "go",
+    "old_validation": false,
+    "new_validation": true,
+    "separate": false,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\go\\False\\True\\False\\app\\go\\cbor.go; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "go",
+    "old_validation": false,
+    "new_validation": true,
+    "separate": true,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\go\\False\\True\\True\\source-owner\\cbor.go; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "go",
+    "old_validation": true,
+    "new_validation": false,
+    "separate": false,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\go\\True\\False\\False\\app\\go\\cbor.go; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "go",
+    "old_validation": true,
+    "new_validation": false,
+    "separate": true,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\go\\True\\False\\True\\source-owner\\cbor.go; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "go",
+    "old_validation": true,
+    "new_validation": true,
+    "separate": false,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\go\\True\\True\\False\\app\\go\\cbor.go; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "go",
+    "old_validation": true,
+    "new_validation": true,
+    "separate": true,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Go runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\go\\True\\True\\True\\source-owner\\cbor.go; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "go",
+    "fresh_repeated_nonowning": true,
+    "preserved": true
+  },
+  {
+    "language": "go",
+    "clean_retirement_cleared": true
+  },
+  {
+    "language": "swift",
+    "old_validation": false,
+    "new_validation": false,
+    "separate": false,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\swift\\False\\False\\False\\app\\swift\\cbor.swift; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "swift",
+    "old_validation": false,
+    "new_validation": false,
+    "separate": true,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\swift\\False\\False\\True\\source-owner\\cbor.swift; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "swift",
+    "old_validation": false,
+    "new_validation": true,
+    "separate": false,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\swift\\False\\True\\False\\app\\swift\\cbor.swift; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "swift",
+    "old_validation": false,
+    "new_validation": true,
+    "separate": true,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\swift\\False\\True\\True\\source-owner\\cbor.swift; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "swift",
+    "old_validation": true,
+    "new_validation": false,
+    "separate": false,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\swift\\True\\False\\False\\app\\swift\\cbor.swift; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "swift",
+    "old_validation": true,
+    "new_validation": false,
+    "separate": true,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\swift\\True\\False\\True\\source-owner\\cbor.swift; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "swift",
+    "old_validation": true,
+    "new_validation": true,
+    "separate": false,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\swift\\True\\True\\False\\app\\swift\\cbor.swift; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "swift",
+    "old_validation": true,
+    "new_validation": true,
+    "separate": true,
+    "refused": true,
+    "unchanged": true,
+    "error": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\flat-recovery\\swift\\True\\True\\True\\source-owner\\cbor.swift; use a fresh owner root or explicit migration"
+  },
+  {
+    "language": "swift",
+    "fresh_repeated_nonowning": true,
+    "preserved": true
+  },
+  {
+    "language": "swift",
+    "clean_retirement_cleared": true
+  }
+]

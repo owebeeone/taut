@@ -1,0 +1,133 @@
+{
+  "status": "SAME TWO originating reviewers GO at corrected tuple; complete reports copied verbatim",
+  "tuple": {
+    "taut": "848f6e749f607d82b93941095f0cbbc7f10bbabf",
+    "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "331e760dc04e0d671b19c8d2ed394dfa4d49c6af"
+  },
+  "reports": {
+    "code": {
+      "role": "Code",
+      "sha256": "8c2a0557f2e289e2dd9b5bb9f20b176eb85fba71cf9fcdf34d455aaf40a98056",
+      "size": 18826,
+      "report": "dev-docs/SwiftOneOfCheckpoint-ReviewCode-1.md"
+    },
+    "state": {
+      "role": "State",
+      "sha256": "bf0057848c1876415fba74eb7d8e43b6b23bef5e2c9996ca458807e06510f71c",
+      "size": 19366,
+      "report": "dev-docs/SwiftOneOfCheckpoint-ReviewState-1.md"
+    }
+  },
+  "dispatch": "dev-docs/examples/swift-oneof/review-r1/dispatch.json",
+  "same_original_contexts": true,
+  "peer_blind_current_round": true,
+  "reviewers_total": 2,
+  "remediation_round": 1,
+  "updated_original_full_history_clones": true,
+  "raw_tracked_each": 1237,
+  "all_setup_exits_zero": true,
+  "core_autocrlf_false_before_checkout": true,
+  "historical_objects_and_oracles_present": true,
+  "verdicts": "Code GO closes CodeP2-1; State GO closes StateP2-1; no new architectural/nonarchitectural roots",
+  "evidence_files": {
+    "code-Activate-Review.ps1": {
+      "sha256": "f93d064942f87964c22961c8918aeed8753ca485fd9464dcf00f9c405966106a",
+      "size": 765
+    },
+    "code-delivery-checks.xml": {
+      "sha256": "a5ce76cdae21f63f17c43886c721044bc151103ff4ebb33d1004971e654411b6",
+      "size": 2204
+    },
+    "code-flat-recovery-results.json": {
+      "sha256": "dacacb9954ad093263d1b7588849898ca8879cb781fcc3be38bf2fa226e1f063",
+      "size": 6749
+    },
+    "code-flat-recovery.py": {
+      "sha256": "4aa7fead79dca2cf937d33698a91c7175717dfdb1bd5d6858f949722a453740f",
+      "size": 3430
+    },
+    "code-native-replay-results.json": {
+      "sha256": "925b315a3a7382e3ce20261f8d3281e9136a378da306e79646f05f354633fc30",
+      "size": 55528
+    },
+    "code-native-replay.py": {
+      "sha256": "ece1d4084277224630ea67b5ae62c3d1585986b3d1cb2cd7349501e13e23b2ae",
+      "size": 3640
+    },
+    "code-native-tests.xml": {
+      "sha256": "aaa9aa45233fc18a644cc90ec067f1554ff4b359590eac273ee13e9514c27e74",
+      "size": 7162
+    },
+    "code-prompt.md": {
+      "sha256": "06f0d4ddf5bbdf21aa874913588286032e0cb40722ddf4fc6ee153753b7ef470",
+      "size": 19101
+    },
+    "code-setup.json": {
+      "sha256": "e292ae45a5db387c6e799259d66b8637589d0582c11a768a55101de554c5572c",
+      "size": 368615
+    },
+    "code-shared-state.xml": {
+      "sha256": "826654dd68d55fc727b85bbb68783ae056454adb9e14436e76b3e19e31b9401e",
+      "size": 34133
+    },
+    "dispatch.json": {
+      "sha256": "36e6ce2b3e58efe626f2799186c9efaf5fec143b565c2b39d9836e6196ebb1e4",
+      "size": 2674
+    },
+    "prompt-generation.json": {
+      "sha256": "7b06e5df86706c8d058f034d8926614a31435a845ed3c4f0dc0895fe5156c425",
+      "size": 1381
+    },
+    "state-Activate-Review.ps1": {
+      "sha256": "dccbc9b7cf6c372600770adfd16a29a780673b04d6b461a021631c25c94f5854",
+      "size": 771
+    },
+    "state-compare-go-r1.py": {
+      "sha256": "b9d0b12bcad7c727e6ba85fa8bcb537d3579b875954179fb4fbfb87786e9070b",
+      "size": 3048
+    },
+    "state-dangling-independent-results.json": {
+      "sha256": "9efd8a6349d7b8501485730c46760f749258cc06b4f352751bf75a41be6e5ab8",
+      "size": 1818
+    },
+    "state-dangling-independent.py": {
+      "sha256": "fa865238d9eedd94ed86811ebcc768f28d072cd2481f652789de9c0c0e120560",
+      "size": 1982
+    },
+    "state-go-equivalence-r1-independent.json": {
+      "sha256": "f16d822176bca19f84ca1399d2eb2b66a8f9981da323061eb18be86c094868ae",
+      "size": 4142
+    },
+    "state-native-tests.xml": {
+      "sha256": "ebe90b108b509c8dca1fd2a3389b3debd76b33dd1d3843d9d14805e4353e82e6",
+      "size": 7588
+    },
+    "state-prelock-tests.xml": {
+      "sha256": "27392e02f059e09e6f03a1b9204c3c2f350b6f6b06ddc03fa4bf7990ef83ff3f",
+      "size": 1642
+    },
+    "state-prompt.md": {
+      "sha256": "d1e1207bc9988d47cd92393859ec84e66e9bfff00a06b7431c84bce3a5622990",
+      "size": 18039
+    },
+    "state-receipt-first-results.json": {
+      "sha256": "465347ba3ca2a06f11040ce9eda2ec97b0109eea2ae918b43c377df9104117c1",
+      "size": 2932
+    },
+    "state-receipt-first.py": {
+      "sha256": "8d7355596d0832fb835c714cb646de41f2648b047aec901f31eaf07b89eca003",
+      "size": 1771
+    },
+    "state-setup.json": {
+      "sha256": "9ce568b07addef322f6e6aeda491613e4af70bb02c8ed1f9cfae4c0f320171ea",
+      "size": 368725
+    },
+    "state-state-tests.xml": {
+      "sha256": "a28662d735b5d684ad4475557759058dd9d57fb09fe0be41fbcd45ee3888eebb",
+      "size": 42055
+    }
+  }
+}

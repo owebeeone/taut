@@ -1,0 +1,26 @@
+{
+  "tuple": {
+    "taut": "848f6e749f607d82b93941095f0cbbc7f10bbabf",
+    "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "331e760dc04e0d671b19c8d2ed394dfa4d49c6af"
+  },
+  "source_hash": "7be5937d06eab85d3f1b2f579b18cb36b476d3a8cc79de43812675c457f76b49",
+  "committed_owned_count": 135,
+  "all_committed_raw_bytes_verified": true,
+  "production_changed_count": 12,
+  "protected5_excluded35_unchanged": true,
+  "indices_clean": true,
+  "references_unchanged": true,
+  "remediation_round": 1,
+  "initial_tuple": {
+    "taut": "c02765930f06cfcb19a522843aa54582db514706",
+    "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "a8f37984471654902149d136b7a13a588346b58f"
+  },
+  "global_r0_retains_its_old_tuple": true,
+  "findings_not_self_closed": true
+}

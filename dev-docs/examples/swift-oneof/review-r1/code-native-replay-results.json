@@ -1,0 +1,930 @@
+[
+  {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\flat\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\flat\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\flat\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\flat\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Data None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Data None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\flat\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\flat\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\flat\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\flat\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "NSLock None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "NSLock None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\flat\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\flat\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\flat\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\flat\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "ObjectIdentifier None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "ObjectIdentifier None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\flat\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\flat\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\flat\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\flat\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "AnyObject None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "AnyObject None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-off\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\flat\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\flat\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\flat\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\flat\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Void None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Void None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\source\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\source\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\source\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\source\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Void source False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\package\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\package\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\package\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\package\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\False\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Void package False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\source\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\source\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\source\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\source\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation source False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\package\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\package\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\package\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\package\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation package False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\source\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\source\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\source\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\source\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation source False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\package\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\package\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\package\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\package\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation package False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-off",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\False\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation None False PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\reports.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\validation.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\flat\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\flat\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\flat\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\flat\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Data None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Data-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Data None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\reports.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\validation.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\flat\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\flat\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\flat\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\flat\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "NSLock None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\NSLock-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "NSLock None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\reports.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\validation.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\flat\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\flat\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\flat\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\flat\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "ObjectIdentifier None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\ObjectIdentifier-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "ObjectIdentifier None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\reports.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\validation.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\flat\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\flat\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\flat\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\flat\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "AnyObject None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\AnyObject-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "AnyObject None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\cbor.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\descriptors.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\ext.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\paths.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\reports.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\flat-on\\validation.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\flat\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\flat\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\flat\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\flat\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\flat\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Void None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Void None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\source\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\source\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\source\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\source\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Void source True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\package\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\package\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\package\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\package\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Void-message\\True\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Void package True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\source\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\source\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\source\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\source\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation source True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\package\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\package\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\package\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\package\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation package True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-message\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\source\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\source\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\source\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\source\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\source\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation source True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\package\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\package\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\package\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\package\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\package\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation package True PASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "swiftc",
+      "-I",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-L",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\owner-on",
+      "-lTautFoundation",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\None\\swift\\api.swift",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\None\\main.swift",
+      "-o",
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "   Creating library D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\None\\app.lib and object D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\None\\app.exp\n\n"
+  },
+  {
+    "command": [
+      "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\code-raw\\scratch\\probes\\native-replay\\Foundation-enum\\True\\None\\app.exe"
+    ],
+    "exit": 0,
+    "stdout": "Foundation None True PASS\n",
+    "stderr": ""
+  },
+  {
+    "flat_foundation": "message",
+    "validation": false,
+    "refused": true,
+    "before_lock": true,
+    "error": "Foundation: Swift flat supplied declaration hides the Foundation module used by canonical helpers; bind an explicit imported runtime module (for example TautFoundation) in source/package/supplied mode"
+  },
+  {
+    "flat_foundation": "enum",
+    "validation": false,
+    "refused": true,
+    "before_lock": true,
+    "error": "Foundation: Swift flat supplied declaration hides the Foundation module used by canonical helpers; bind an explicit imported runtime module (for example TautFoundation) in source/package/supplied mode"
+  },
+  {
+    "flat_foundation": "message",
+    "validation": true,
+    "refused": true,
+    "before_lock": true,
+    "error": "Foundation: Swift flat supplied declaration hides the Foundation module used by canonical helpers; bind an explicit imported runtime module (for example TautFoundation) in source/package/supplied mode"
+  },
+  {
+    "flat_foundation": "enum",
+    "validation": true,
+    "refused": true,
+    "before_lock": true,
+    "error": "Foundation: Swift flat supplied declaration hides the Foundation module used by canonical helpers; bind an explicit imported runtime module (for example TautFoundation) in source/package/supplied mode"
+  }
+]

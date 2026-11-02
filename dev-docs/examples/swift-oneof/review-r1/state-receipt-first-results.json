@@ -1,0 +1,86 @@
+[
+  {
+    "selected": "flat",
+    "validation": false,
+    "result": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\receipt-first-cases\\flat-False\\swift\\cbor.swift; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "leftovers": [
+      "cbor.swift",
+      "descriptors.swift",
+      "ext.swift",
+      "paths.swift"
+    ],
+    "source_root": null
+  },
+  {
+    "selected": "flat",
+    "validation": true,
+    "result": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\receipt-first-cases\\flat-True\\swift\\cbor.swift; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "leftovers": [
+      "cbor.swift",
+      "descriptors.swift",
+      "ext.swift",
+      "paths.swift",
+      "reports.swift",
+      "validation.swift"
+    ],
+    "source_root": null
+  },
+  {
+    "selected": "imported",
+    "validation": false,
+    "result": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\receipt-first-cases\\imported-False\\swift\\cbor.swift; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "leftovers": [
+      "cbor.swift",
+      "descriptors.swift",
+      "ext.swift",
+      "paths.swift"
+    ],
+    "source_root": null
+  },
+  {
+    "selected": "imported",
+    "validation": true,
+    "result": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\receipt-first-cases\\imported-True\\swift\\cbor.swift; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "leftovers": [
+      "cbor.swift",
+      "descriptors.swift",
+      "ext.swift",
+      "paths.swift",
+      "reports.swift",
+      "validation.swift"
+    ],
+    "source_root": null
+  },
+  {
+    "selected": "package",
+    "validation": false,
+    "result": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\receipt-first-cases\\package-False\\swift\\cbor.swift; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "leftovers": [
+      "cbor.swift",
+      "descriptors.swift",
+      "ext.swift",
+      "paths.swift"
+    ],
+    "source_root": null
+  },
+  {
+    "selected": "package",
+    "validation": true,
+    "result": "unknown/handwritten Swift runtime D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\receipt-first-cases\\package-True\\swift\\cbor.swift; use a fresh owner root or explicit migration",
+    "unchanged": true,
+    "leftovers": [
+      "cbor.swift",
+      "descriptors.swift",
+      "ext.swift",
+      "paths.swift",
+      "reports.swift",
+      "validation.swift"
+    ],
+    "source_root": null
+  }
+]

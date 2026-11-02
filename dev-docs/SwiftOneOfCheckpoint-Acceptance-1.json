@@ -1,0 +1,83 @@
+{
+  "status": "accepted",
+  "reviewed_tuple": {
+    "taut": "848f6e749f607d82b93941095f0cbbc7f10bbabf",
+    "taut-shape-py": "c08c2a1b5197f761c5b0b835c588da512130ceda",
+    "taut-shape-rs": "8e92b89ed3a4f218a5a4e018fbfee6301fcc14b4",
+    "taut-shape-ts": "1aaeab65e4564a462044d2f5d824cd2f375aae97",
+    "workspace": "331e760dc04e0d671b19c8d2ed394dfa4d49c6af"
+  },
+  "scope": "Swift mandatory metadata/explicit validation/runtime delivery and exact authorized shared Go/Swift retirement-provenance correction only; prior target acceptances retain their own scopes",
+  "accepted_at": "2026-11-03 Australia/Sydney",
+  "source_inventory_sha256": "7be5937d06eab85d3f1b2f579b18cb36b476d3a8cc79de43812675c457f76b49",
+  "reviewed_owned_count": 135,
+  "all_reviewed_files_raw_unchanged": true,
+  "production_source_count": 30,
+  "reports": {
+    "code": {
+      "role": "Code",
+      "sha256": "8c2a0557f2e289e2dd9b5bb9f20b176eb85fba71cf9fcdf34d455aaf40a98056",
+      "size": 18826,
+      "report": "dev-docs/SwiftOneOfCheckpoint-ReviewCode-1.md"
+    },
+    "state": {
+      "role": "State",
+      "sha256": "bf0057848c1876415fba74eb7d8e43b6b23bef5e2c9996ca458807e06510f71c",
+      "size": 19366,
+      "report": "dev-docs/SwiftOneOfCheckpoint-ReviewState-1.md"
+    }
+  },
+  "originating_closure": [
+    {
+      "id": "Code P2-1",
+      "plan": "M1",
+      "disposition": "CLOSED",
+      "originator": "/root/swift_review_code",
+      "evidence": "20 original apps+4Void+12Foundation imported native apps;4Foundation prelock refusals;47focused+14delivery/help and own16statecontrols"
+    },
+    {
+      "id": "State P2-1",
+      "plan": "M2",
+      "disposition": "CLOSED",
+      "originator": "/root/swift_review_state",
+      "evidence": "UNCHANGED original8d7355probe now refuses;299state+50native+10prelock;ownGo/Swift danglingjunction proofs"
+    }
+  ],
+  "open_P0_P1_P2_P3": [],
+  "new_architectural_roots": 0,
+  "new_nonarchitectural_roots": 0,
+  "ledger": {
+    "remediation_windows_used": 1,
+    "maximum": 2,
+    "reviewers_total": 2,
+    "same_originators": true,
+    "discovery_phase": {
+      "initial_dual_review": [
+        "Code P2-1 native helper resolution",
+        "State P2-1 default-flat receipt-first recovery"
+      ],
+      "uncommitted_R1_self_probe": "dangling junction predicate extension within same M2 root; originators classify no new architectural root",
+      "original_broad_new_failures": 0,
+      "known_baseline_failures": 3
+    },
+    "escaped_after_acceptance": 0
+  },
+  "focused_results": "dev-docs/SwiftOneOfCheckpoint-FocusedResults-1.json",
+  "old_global_evidence": {
+    "tuple_taut": "c02765930f06cfcb19a522843aa54582db514706",
+    "tuple_workspace": "a8f37984471654902149d136b7a13a588346b58f",
+    "all16_green": true,
+    "broad": {
+      "passed": 2260,
+      "baseline_failed": 3,
+      "skipped": 5,
+      "duplicate_deselected": 8,
+      "selected": 2268
+    },
+    "final_source_global_rerun": false,
+    "source_association_preserved": true
+  },
+  "protection": "All135 reviewed source/test/golden/document/evidence bytes retained through authorized evidence-only landing; protected user5/excluded35/reference heads preserved",
+  "final_local_landing": "Evidence-only GWZ commit/managed receipt authorized after GO/GO; final tuple reported separately to avoid self-reference",
+  "publication": "Not performed by executor; root coordinates already-user-authorized fresh-verified GitHub push. No tag/release/registry action."
+}

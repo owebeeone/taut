@@ -1,0 +1,133 @@
+{
+  "baseline": "83291c2c7c7b126e41625bd29623870330f3b0d6",
+  "original_kernel_sha256": "ddf8e3d86f058a7681a5b5c37db326fd8f09d07431e9a041781c8bcb3dc8abf4",
+  "current_owned_kernel_sha256": "eee21a90952e093f3bc4c300aac852e69f90b6ac081f93a812049f3969d5da06",
+  "unchanged_go_emitter_and_metadata": {
+    "src/taut/gen/go.py": "39aac13eceefc6e83f8a6b6de407e80cb16e02ebaf697848fd6afb66735aa357",
+    "src/taut/gen/go_metadata.py": "b92d4a38510234c2fff64b1b5e5c205f60fc871c1489d64e5a3cd689a865ce0f"
+  },
+  "checks": [
+    {
+      "validation": false,
+      "step": 0,
+      "mode": "source",
+      "consume_source": false,
+      "exact_maps_equal": true,
+      "retirement_provenance_only_delta": {},
+      "all_other_write_bytes_equal": true,
+      "deletion_sets_equal": true
+    },
+    {
+      "validation": false,
+      "step": 1,
+      "mode": "source",
+      "consume_source": false,
+      "exact_maps_equal": true,
+      "retirement_provenance_only_delta": {},
+      "all_other_write_bytes_equal": true,
+      "deletion_sets_equal": true
+    },
+    {
+      "validation": false,
+      "step": 2,
+      "mode": "package",
+      "consume_source": true,
+      "exact_maps_equal": true,
+      "retirement_provenance_only_delta": {},
+      "all_other_write_bytes_equal": true,
+      "deletion_sets_equal": true
+    },
+    {
+      "validation": false,
+      "step": 3,
+      "mode": "package",
+      "consume_source": false,
+      "exact_maps_equal": false,
+      "retirement_provenance_only_delta": {
+        "before": null,
+        "after": [
+          "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\go-equivalence-independent-False\\owner"
+        ]
+      },
+      "all_other_write_bytes_equal": true,
+      "deletion_sets_equal": true
+    },
+    {
+      "validation": false,
+      "step": 4,
+      "mode": "source",
+      "consume_source": false,
+      "exact_maps_equal": false,
+      "retirement_provenance_only_delta": {
+        "before": [
+          "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\go-equivalence-independent-False\\owner"
+        ],
+        "after": null
+      },
+      "all_other_write_bytes_equal": true,
+      "deletion_sets_equal": true
+    },
+    {
+      "validation": true,
+      "step": 0,
+      "mode": "source",
+      "consume_source": false,
+      "exact_maps_equal": true,
+      "retirement_provenance_only_delta": {},
+      "all_other_write_bytes_equal": true,
+      "deletion_sets_equal": true
+    },
+    {
+      "validation": true,
+      "step": 1,
+      "mode": "source",
+      "consume_source": false,
+      "exact_maps_equal": true,
+      "retirement_provenance_only_delta": {},
+      "all_other_write_bytes_equal": true,
+      "deletion_sets_equal": true
+    },
+    {
+      "validation": true,
+      "step": 2,
+      "mode": "package",
+      "consume_source": true,
+      "exact_maps_equal": true,
+      "retirement_provenance_only_delta": {},
+      "all_other_write_bytes_equal": true,
+      "deletion_sets_equal": true
+    },
+    {
+      "validation": true,
+      "step": 3,
+      "mode": "package",
+      "consume_source": false,
+      "exact_maps_equal": false,
+      "retirement_provenance_only_delta": {
+        "before": null,
+        "after": [
+          "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\go-equivalence-independent-True\\owner"
+        ]
+      },
+      "all_other_write_bytes_equal": true,
+      "deletion_sets_equal": true
+    },
+    {
+      "validation": true,
+      "step": 4,
+      "mode": "source",
+      "consume_source": false,
+      "exact_maps_equal": false,
+      "retirement_provenance_only_delta": {
+        "before": [
+          "D:\\projects\\limbo\\swift-oneof-scratch\\review-r1\\state-raw\\scratch\\probes\\go-equivalence-independent-True\\owner"
+        ],
+        "after": null
+      },
+      "all_other_write_bytes_equal": true,
+      "deletion_sets_equal": true
+    }
+  ],
+  "exact_maps": 6,
+  "provenance_only_deltas": 4
+}
