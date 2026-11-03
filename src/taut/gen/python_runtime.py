@@ -53,7 +53,7 @@ def _is_alias(path):
     try:
         return bool(getattr(path.lstat(), "st_file_attributes", 0) &
                     getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
-    except FileNotFoundError:
+    except (FileNotFoundError, NotADirectoryError):
         return False
 
 

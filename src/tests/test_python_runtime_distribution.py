@@ -21,6 +21,29 @@ SHAPE_SOURCE = ROOT.parent / "taut-shape-py/src"
 EXAMPLE = ROOT / "dev-docs/examples/python-oneof/content.taut.py"
 
 
+@pytest.mark.parametrize('target', ['go', 'java'])
+def test_parent_file_obstruction_on_pre313_pathlib(tmp_path, monkeypatch, target):
+    """Older POSIX pathlib raises ENOTDIR for a child of a regular file."""
+    import importlib
+    import errno
+    blocked = tmp_path / 'blocked'
+    blocked.write_text('handwritten', encoding='utf-8')
+    requested = blocked / 'owner'
+    original = Path.lstat
+
+    def lstat(path):
+        if path == requested:
+            raise NotADirectoryError(errno.ENOTDIR, 'Not a directory', str(path))
+        return original(path)
+
+    monkeypatch.setattr(Path, 'lstat', lstat)
+    runtime = importlib.import_module('taut.gen.' + target + '_runtime')
+    with pytest.raises(ValueError, match='obstructed'):
+        runtime.canonical_path(requested)
+    assert blocked.read_text(encoding='utf-8') == 'handwritten'
+    assert sorted(path.name for path in tmp_path.iterdir()) == ['blocked']
+
+
 def run(code, paths, *, success=True):
     prelude = "import sys\nsys.path[:0] = " + repr([str(p) for p in paths]) + "\n"
     env = dict(os.environ)

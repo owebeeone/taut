@@ -11,8 +11,8 @@ github_repo = "owebeeone/taut"
 manifest = "pyproject.toml"
 version = "scm"
 
-[rust]
-manifests = ["rust/taut-foundation/Cargo.toml"]
+# Foundation has its own published version. Compiler-only patches must retain
+# that version and canonical payload rather than manufacture a crate release.
 
 [release]
 # scripts/release_checks.py, whose steps run side by side (RELEASE.md). gearu runs `checks` on its

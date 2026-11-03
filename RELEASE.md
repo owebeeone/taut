@@ -124,8 +124,9 @@ package publication and documentation deployment where configured.
 ## taut's checks
 
 The 0.11 train also releases the dependency-free `taut-foundation` Rust crate.
-Gearu versions `rust/taut-foundation/Cargo.toml` with the Python package and
-verifies its canonical-source inventory and standalone Cargo package. Its
+Foundation 0.11.0 is already published and has an independent version. Compiler
+patch releases retain that crate version when its canonical payload is unchanged.
+Gearu verifies its canonical-source inventory and standalone Cargo package. Its
 runtime files are generated from the canonical sources, never independently
 maintained. The crate includes its own license, README and provenance.
 
@@ -142,6 +143,13 @@ Only after foundation is visible on crates.io, rerun Gearu with
 `--push --github-release` to publish Taut to PyPI. Then release the three shape
 libraries against registry dependencies. Never copy the bootstrap credential
 to a checkout or publish from a local source tree.
+
+The public compiler tag v0.11.0 is retained, but its PyPI publication is held
+after Linux/Python 3.12 path-preflight failures. The corrective compiler release
+is 0.11.1; foundation and compatible shape libraries remain 0.11.0. Its publish
+matrix uses Ubuntu 24.04, Clang 18 with libstdc++ 13, the frozen sibling TypeScript
+compiler, and pure-Go CGO_ENABLED=0. Do not replace the earlier tag or publish a
+new foundation version merely to match the compiler patch number.
 
 `gearu.toml` runs `scripts/release_checks.py`, which took over from `scripts/release.py` in
 v0.10.0. That script tagged as well as checking. gearu runs every step on its candidate, and
