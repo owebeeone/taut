@@ -14,7 +14,22 @@ from ..contracts import GENERATOR_BUILD, RUNTIME_OWNER
 from ..ir.export import schema_json
 
 
-def emit_types(schema, *, validation=False, external_types=None, identity=None):
+def _freeze_spec(t):
+    from ..facts import ListOf, MapOf, MsgRef
+    if isinstance(t, ListOf):
+        return ("list", _freeze_spec(t.elem))
+    if isinstance(t, MapOf):
+        return ("map", _freeze_spec(t.value))
+    return ("message",) if isinstance(t, MsgRef) else ("scalar",)
+
+
+def emit_types(schema, *, validation=False, external_types=None, identity=None, python_records="stdlib"):
+    if python_records not in ("stdlib", "yidl"):
+        raise ValueError("python_records must be stdlib or yidl")
+    yidl_records = python_records == "yidl"
+    required_capabilities = ("descriptors.v1", "codec.v1", "oneof.v1")
+    if yidl_records:
+        required_capabilities += ("records.yidl.v1",)
     from .scaffold import _py_ty, python_name_clashes, PYTHON_RESERVED_TYPE_NAMES
     external_types = dict(external_types or {})
     unknown = set(external_types) - (set(schema.messages) | set(schema.enums))
@@ -47,16 +62,20 @@ def emit_types(schema, *, validation=False, external_types=None, identity=None):
     out = ['"""GENERATED native Python types — do not edit."""',
            f"# Generator build: {GENERATOR_BUILD}; descriptor=1; codec=1; owner={RUNTIME_OWNER}",
            "from __future__ import annotations",
-           "from dataclasses import dataclass as _taut_dataclass, field as _taut_field",
+           "from dataclasses import dataclass as _taut_dataclass, field as _taut_field" if not yidl_records else "",
            "from enum import Enum as _taut_Enum",
            "from typing import ClassVar as _taut_ClassVar",
            "try:",
            "    from taut.contracts import require_contract as _taut_require_contract",
-           f"    _taut_require_contract(artifact={identity!r}, descriptor=1, codec=1, capabilities=('descriptors.v1', 'codec.v1', 'oneof.v1'), generator={GENERATOR_BUILD!r})",
+           f"    _taut_require_contract(artifact={identity!r}, descriptor=1, codec=1, capabilities={required_capabilities!r}, generator={GENERATOR_BUILD!r})",
            "    from taut import facts as _taut_facts",
            "    from taut.descriptors import publish as _taut_publish, MessageDescriptor as _taut_MessageDescriptor",
            "except ImportError as _taut_error:",
            f"    raise ImportError({(identity + ': compatible taut foundation required (owner=taut.python.foundation, descriptor=1, codec=1); supply compatible runtime and regenerate/rebind artifacts')!r}) from _taut_error"]
+    if yidl_records:
+        out.insert(out.index("    from taut import facts as _taut_facts"),
+                   "    from taut.records import taut_dataclass as _taut_dataclass, "
+                   "field as _taut_field, freeze_field as _taut_freeze_field")
     if validation:
         out += ["try:", "    from taut.validation import (ValidationReport as _taut_ValidationReport,",
                 "        validate_record as _taut_validate, is_record_valid as _taut_is_valid)",
@@ -86,6 +105,10 @@ def emit_types(schema, *, validation=False, external_types=None, identity=None):
                 continue
             ann = f"{_py_ty(f.type)} | None" if f.optional else _py_ty(f.type)
             default = " = _taut_field(default=None, kw_only=True)" if f.cases else ""
+            if yidl_records:
+                hook = f"freeze=_taut_freeze_field({_freeze_spec(f.type)!r})"
+                default = (" = _taut_field(default=None, kw_only=True, " + hook + ")"
+                           if f.cases else " = _taut_field(" + hook + ")")
             out.append(f"    {field_attribute(f.name)}: {ann}{default}")
         if validation:
             out += ["", "    def validate(self, *, recursive: bool = True) -> _taut_ValidationReport:",

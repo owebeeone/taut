@@ -272,3 +272,38 @@ Design notes and the decisions log live in [dev-docs/](dev-docs/).
 ## License
 
 [MIT](LICENSE)
+# Prototype: optional YIDL Python records
+
+The local prototype adds a Python-only record backend selection:
+
+```sh
+tautc gen schema.taut.py --out generated --lang python --python-records yidl --runtime package --with-validation
+```
+
+The default remains `--python-records stdlib`. An explicit record option is
+rejected before output writes when no Python target is selected; in a mixed
+generation it changes only Python code. Runtime delivery and validation remain
+independent options.
+
+The YIDL path imports Taut's own `taut.records.taut_dataclass` decorator, which
+configures the method name `_taut_freeze` centrally. Ordinary fields named
+`freeze` remain available. Generated field hooks freeze children recursively,
+convert lists to tuples and copy maps into read-only `FrozenDict` values.
+Shared child identity is retained. The validator accepts these representations
+after a YIDL record freezes; stdlib records keep their existing type rules.
+Descriptors, codecs and validation reports retain one shared Taut runtime owner.
+
+This prototype requires the companion modified `yidl-dataclass` checkout with
+the `freeze_method` option; public version0.1.1 does not provide that option.
+YIDL currently supports CPython3.12–3.15 subject to its platform/wheel boundary
+(Windows3.15 is not qualified), while the stdlib backend retains Taut's
+existing Python baseline. No mandatory YIDL dependency or published version has
+been changed. A release dependency pin must follow publication of the YIDL API.
+
+Freezing is permanent and optimistic: a callback failure can leave earlier
+children or fields frozen. It does not validate a record automatically, confer
+hashability or provide synchronization. External children must also use the
+Taut YIDL backend to participate in deep freezing. Mutable aliases to a child
+observe that same child becoming frozen; aliases to input containers cannot
+change the copied frozen containers. As with Python frozen dataclasses, this
+prevents regular mutation rather than deliberate low-level bypasses.

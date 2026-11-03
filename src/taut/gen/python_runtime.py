@@ -10,7 +10,7 @@ from ..contracts import (RUNTIME_OWNER, GENERATOR_BUILD, DESCRIPTOR_CONTRACT,
                          CODEC_CONTRACT, require_contract)
 
 BASE_FILES = ("__init__.py", "_runtime_version.py", "contracts.py", "facts.py", "rules.py",
-              "descriptors.py", "wire/__init__.py", "wire/cbor.py", "wire/codec.py",
+              "descriptors.py", "records.py", "wire/__init__.py", "wire/cbor.py", "wire/codec.py",
               "wire/jsoncodec.py", "ext.py")
 
 

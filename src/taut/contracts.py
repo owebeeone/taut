@@ -4,7 +4,7 @@ GENERATOR_BUILD = "python-oneof-reference.1"
 DESCRIPTOR_CONTRACT = 1
 CODEC_CONTRACT = 1
 CONSTRAINT_IR_VERSION = 3
-CAPABILITIES = frozenset({"descriptors.v1", "codec.v1", "oneof.v1"})
+CAPABILITIES = frozenset({"descriptors.v1", "codec.v1", "oneof.v1", "records.yidl.v1"})
 
 
 class ConfigurationError(ValueError):

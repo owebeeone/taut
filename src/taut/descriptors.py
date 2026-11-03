@@ -132,6 +132,7 @@ class SchemaBinding:
     external_bindings: Mapping = field(default_factory=dict)
 
     def __post_init__(self):
+        from .records import has_record_field
         for k in ("message_classes", "enum_classes", "external_bindings"):
             object.__setattr__(self, k, MappingProxyType(dict(getattr(self, k))))
         require_contract(artifact=self.schema.identity, descriptor=self.schema.descriptor_contract_version)
@@ -145,7 +146,8 @@ class SchemaBinding:
             if not isinstance(cls, type):
                 raise ConfigurationError(f"{name}: message binding must be a generated class")
             for f in desc.fields:
-                if f.attribute is not None and f.attribute not in getattr(cls, "__slots__", ()):
+                if (f.attribute is not None and f.attribute not in getattr(cls, "__slots__", ())
+                        and not has_record_field(cls, f.attribute)):
                     raise ConfigurationError(f"{name}.{f.name}: missing generated slot {f.attribute}")
                 if (f.presence not in ("required", "nullable", "missing_ok")
                         or type(f.number) is not int or f.number <= 0

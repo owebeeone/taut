@@ -106,9 +106,10 @@ def _py_ty(t: TypeRef | None) -> str:
 
 
 def python_api(schema: Schema, forward_compat: bool = False, *, validation=False,
-               external_types=None, identity=None) -> str:
+               external_types=None, identity=None, python_records="stdlib") -> str:
     from .python import emit_types
-    return emit_types(schema, validation=validation, external_types=external_types, identity=identity)
+    return emit_types(schema, validation=validation, external_types=external_types, identity=identity,
+                      python_records=python_records)
 
 
 def python_client(schema: Schema, svc: ServiceDef) -> str:
@@ -600,6 +601,7 @@ def emit(
     validation: bool = False,
     runtime_bindings: dict | None = None,
     python_external_types: dict[str, str] | None = None,
+    python_records: str | None = None,
     schema_identity: str | None = None,
     java_external_types: dict | None = None,
     kotlin_external_types: dict | None = None,
@@ -643,6 +645,11 @@ def emit(
     mode = resolve_mode(runtime, runtime_mode, validation)
     runtime = mode == "source"
     lang_keys = list(langs) if langs is not None else list(_LANGS)
+    if python_records is not None:
+        if python_records not in ("stdlib", "yidl"):
+            raise ValueError("python_records must be stdlib or yidl")
+        if "python" not in lang_keys:
+            raise ValueError("Python record backend requires a Python generation target")
     errors = check_rules(schema)
     if errors:
         raise ValueError("; ".join(errors))
@@ -802,7 +809,8 @@ def emit(
         if lang == "java":
             api_kwargs.update(validation=validation, external_types=java_external_types, identity=schema_identity)
         if lang == "python":
-            api_kwargs.update(validation=validation, external_types=python_external_types, identity=schema_identity)
+            api_kwargs.update(validation=validation, external_types=python_external_types, identity=schema_identity,
+                              python_records=python_records or "stdlib")
         api_text = api_fn(schema, **api_kwargs)
         if lang == "python":
             python_texts[f"api.{ext}"] = api_text

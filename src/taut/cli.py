@@ -70,6 +70,7 @@ def _cmd_gen(args: argparse.Namespace) -> int:
         schema, Path(args.out), langs=_split(args.lang), services=services,
         runtime=args.with_runtime, forward_compat=args.forward_compat,
         runtime_mode=next(iter(modes), None), validation=args.with_validation,
+        python_records=args.python_records,
         runtime_bindings=(json.loads(Path(args.runtime_bindings).read_text()) if args.runtime_bindings else None),
         cpp_external_types=(json.loads(Path(args.cpp_external_types).read_text()) if args.cpp_external_types else None),
         swift_external_types=(json.loads(Path(args.swift_external_types).read_text()) if args.swift_external_types else None),
@@ -191,6 +192,8 @@ def main(argv: list[str] | None = None) -> int:
                    help='JSON file path with target-keyed python/rust/java/kotlin/js/typescript/cpp/go/swift bindings (default: canonical owners, descriptor_contract=1, codec_contract=1, codec.v1/descriptors.v1/oneof.v1 capabilities; source_root defaults to target output directory). Keys: owner, source_root, descriptor_contract, codec_contract, capabilities; Python/Rust/Java/JS/TS also accept module; Java accepts optional artifact jar; JS/TS accept optional artifact tgz; TS also validation_module; C++ artifact is a local include/link package directory; Go import_path names the supplied module and artifact optionally names its local directory; Swift module names the shared compiled foundation and artifact optionally names its local module/library directory. Python/Java module=taut; Kotlin packages fixed to taut; Rust module defaults to crate (supplied/source) or taut_foundation (package); JS/TS module selects the actual shared foundation, never installs it')
     g.add_argument("--python-external-types", metavar="JSON_FILE",
                    help="JSON file path mapping schema names to module.Class for independently generated Python dependencies (default: no external mappings); full dependency schema must be present")
+    g.add_argument("--python-records", choices=("stdlib", "yidl"), default=None,
+                   help="Python-only record backend (default: stdlib); yidl uses Taut's freezable decorator and requires compatible yidl-dataclass at application runtime")
     g.add_argument("--forward-compat", action="store_true",
                    help="generated types keep unknown/newer tags and re-encode them (every generated target; required if the IR has extensions; python and typescript always keep them)")
     g.add_argument("--fail-closed", action="store_true",

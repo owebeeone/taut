@@ -155,7 +155,7 @@ def _scalar_matches(kind, value):
     return type(value) is {"str": str, "bool": bool, "bytes": bytes}[kind]
 
 
-def _walk_type(value, t, binding, path, ancestors):
+def _walk_type(value, t, binding, path, ancestors, frozen_containers=False):
     if t.kind == "message":
         if type(value) is not binding.message_classes[t.reference]:
             yield _issue("validation.type_mismatch", path, "expected generated child message")
@@ -164,7 +164,7 @@ def _walk_type(value, t, binding, path, ancestors):
         child_desc = binding.schema.messages[t.reference]
         yield from _walk(value, child_desc, child_binding, path, ancestors, True)
     elif t.kind == "list":
-        if type(value) is not list:
+        if type(value) is not list and not (frozen_containers and type(value) is tuple):
             yield _issue("validation.type_mismatch", path, "expected list")
             return
         if id(value) in ancestors:
@@ -173,11 +173,12 @@ def _walk_type(value, t, binding, path, ancestors):
         ancestors.add(id(value))
         try:
             for i, child in enumerate(value):
-                yield from _walk_type(child, t.element, binding, path + (PathSegment.for_index(i),), ancestors)
+                yield from _walk_type(child, t.element, binding, path + (PathSegment.for_index(i),), ancestors, frozen_containers)
         finally:
             ancestors.remove(id(value))
     elif t.kind == "map":
-        if type(value) is not dict:
+        from .records import FrozenDict
+        if type(value) is not dict and not (frozen_containers and type(value) is FrozenDict):
             yield _issue("validation.type_mismatch", path, "expected map")
             return
         if id(value) in ancestors:
@@ -193,7 +194,7 @@ def _walk_type(value, t, binding, path, ancestors):
         try:
             for encoded, child in sorted(entries, key=lambda pair: pair[0]):
                 keypath = path + (PathSegment.for_key(t.key.kind, encoded),)
-                yield from _walk_type(child, t.value, binding, keypath, ancestors)
+                yield from _walk_type(child, t.value, binding, keypath, ancestors, frozen_containers)
         finally:
             ancestors.remove(id(value))
     elif t.kind == "enum":
@@ -204,6 +205,7 @@ def _walk_type(value, t, binding, path, ancestors):
 
 
 def _walk(value, desc, binding, path, ancestors, recursive):
+    from .records import is_frozen_record
     if id(value) in ancestors:
         yield _issue("validation.ownership_cycle", path, "active ancestor encountered")
         return
@@ -220,7 +222,7 @@ def _walk(value, desc, binding, path, ancestors, recursive):
                     if not group:
                         yield error
                 elif child is not None and not group:
-                    yield from _walk_type(child, f.type, binding, fieldpath, ancestors)
+                    yield from _walk_type(child, f.type, binding, fieldpath, ancestors, is_frozen_record(value))
     finally:
         ancestors.remove(id(value))
 
