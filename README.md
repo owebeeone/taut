@@ -293,6 +293,10 @@ convert lists to tuples and copy maps into read-only `FrozenDict` values.
 Shared child identity is retained. The validator accepts these representations
 after a YIDL record freezes; stdlib records keep their existing type rules.
 Descriptors, codecs and validation reports retain one shared Taut runtime owner.
+Call `record._taut_freeze()` after preparing the record; the operation returns
+`None` and repeated successful calls are harmless. Its reserved prefix protects
+schema field names. Call `record.validate()` separately when generation enabled
+validation; freezing does not require validation to be enabled.
 
 Install `taut-proto[yidl]` in the application's Python environment to select
 `yidl-dataclass>=0.1.2,<0.2`. The base Taut installation remains dependency-free.
