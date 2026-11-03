@@ -17,6 +17,9 @@ EXAMPLE = (
     Path(__file__).resolve().parents[2]
     / "dev-docs/examples/python-oneof/content.taut.py"
 )
+requires_yidl = pytest.mark.skipif(
+    sys.version_info < (3, 12), reason="YIDL records require CPython3.12 or newer"
+)
 
 
 def generated(validation=True):
@@ -40,6 +43,7 @@ def test_default_still_uses_stdlib(validation):
 
 
 @pytest.mark.parametrize("validation", [False, True])
+@requires_yidl
 def test_mutate_repair_then_deep_freeze(validation):
     from taut.records import FrozenDict
 
@@ -85,6 +89,7 @@ def test_mutate_repair_then_deep_freeze(validation):
     )
 
 
+@requires_yidl
 def test_freeze_field_name_does_not_collide():
     mod = types.ModuleType("_record_freeze_field")
     sys.modules[mod.__name__] = mod
@@ -99,6 +104,7 @@ def test_freeze_field_name_does_not_collide():
         value.freeze = 3
 
 
+@requires_yidl
 def test_invalid_draft_snapshot_and_frozen_validation():
     m = generated()
     value = m.Content(m.ContentKind.number, text="wrong")
@@ -118,6 +124,7 @@ def test_invalid_draft_snapshot_and_frozen_validation():
     ]
 
 
+@requires_yidl
 def test_frozen_representations_do_not_weaken_mutable_validation():
     m = generated()
     value = m.Collection((), {})
@@ -131,6 +138,7 @@ def test_frozen_representations_do_not_weaken_mutable_validation():
     assert not default.Collection((), {}).is_valid()
 
 
+@requires_yidl
 def test_recursive_records_and_shared_children():
     m = generated()
     child = m.Tree(None, [])
@@ -141,6 +149,7 @@ def test_recursive_records_and_shared_children():
         child.content = None
 
 
+@requires_yidl
 def test_separately_generated_yidl_child_uses_shared_owner():
     s = load_schema(EXAMPLE)
     child_schema = dataclasses.replace(s, messages={"Content": s.messages["Content"]})
@@ -170,6 +179,7 @@ def test_separately_generated_yidl_child_uses_shared_owner():
         value.content.items = []
 
 
+@requires_yidl
 def test_mixed_backend_child_requires_explicit_regeneration():
     s = load_schema(EXAMPLE)
     child_schema = dataclasses.replace(s, messages={"Content": s.messages["Content"]})
@@ -283,6 +293,7 @@ def test_python_cli_yidl_source_delivery(tmp_path):
     assert "taut_dataclass" in (target / "python/api.py").read_text()
 
 
+@requires_yidl
 def test_incompatible_yidl_runtime_reports_missing_feature(monkeypatch):
     import yidl_dataclass
     from taut.records import taut_dataclass

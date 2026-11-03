@@ -20,6 +20,9 @@ classifiers = [
 ]
 dependencies = []   # stdlib only (hand-rolled deterministic CBOR; no runtime deps)
 
+[project.optional-dependencies]
+yidl = ["yidl-dataclass>=0.1.2,<0.2"]
+
 [project.urls]
 Homepage = "https://github.com/owebeeone/taut"
 Repository = "https://github.com/owebeeone/taut"

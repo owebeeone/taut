@@ -26,6 +26,7 @@ checks = [
     ["cargo", "package", "--manifest-path", "rust/taut-foundation/Cargo.toml", "--allow-dirty"],
     ["uv", "run", "--no-project", "--python", "3.13", "--with", "pytest", "--with", "pytest-xdist",
      "--with", "build", "--with", "twine", "--with", "setuptools>=77", "--with", "setuptools-scm>=8",
+     "--with", "yidl-dataclass>=0.1.2,<0.2",
      "python", "scripts/release_checks.py", "{python_version}"],
 ]
 exact_checks = [
@@ -36,7 +37,13 @@ exact_checks = [
 ]
 github_notes = """taut-proto {python_version}
 
-Immutable descriptors and optional explicit oneof validation now cover all nine
+Adds the Python-only --python-records yidl option with a Taut-owned decorator,
+schema-aware deep freezing and optional yidl-dataclass0.1.2 dependency. Stdlib
+records remain the default and preserve the existing Python baseline. Lists
+become tuples and maps become detached read-only dictionaries after freezing.
+Freezing remains optimistic, irreversible and independent of validation.
+Existing descriptor/runtime ownership and all nine generation targets remain.
+Immutable descriptors and optional explicit oneof validation cover all nine
 generation targets. Runtime selection is explicit: source, package, or the
 legacy supplied-runtime route; generation does not install dependencies.
 Invalid drafts remain mutable and serializable. Virtual oneof selection remains

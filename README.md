@@ -272,9 +272,10 @@ Design notes and the decisions log live in [dev-docs/](dev-docs/).
 ## License
 
 [MIT](LICENSE)
-# Prototype: optional YIDL Python records
 
-The local prototype adds a Python-only record backend selection:
+## Optional YIDL Python records
+
+Select the optional Python record backend when generating code:
 
 ```sh
 tautc gen schema.taut.py --out generated --lang python --python-records yidl --runtime package --with-validation
@@ -293,12 +294,13 @@ Shared child identity is retained. The validator accepts these representations
 after a YIDL record freezes; stdlib records keep their existing type rules.
 Descriptors, codecs and validation reports retain one shared Taut runtime owner.
 
-This prototype requires the companion modified `yidl-dataclass` checkout with
-the `freeze_method` option; public version0.1.1 does not provide that option.
-YIDL currently supports CPython3.12–3.15 subject to its platform/wheel boundary
-(Windows3.15 is not qualified), while the stdlib backend retains Taut's
-existing Python baseline. No mandatory YIDL dependency or published version has
-been changed. A release dependency pin must follow publication of the YIDL API.
+Install `taut-proto[yidl]` in the application's Python environment to select
+`yidl-dataclass>=0.1.2,<0.2`. The base Taut installation remains dependency-free.
+YIDL requires CPython3.12–3.15 subject to its platform/wheel boundary
+(Windows3.15 is not qualified); stdlib records retain Taut's existing Python
+baseline. The compiler does not install dependencies while generating code.
+The method name `_taut_freeze` belongs to Taut's already-reserved `_taut_` namespace,
+so a schema field named `freeze` keeps its ordinary Python and wire names.
 
 Freezing is permanent and optimistic: a callback failure can leave earlier
 children or fields frozen. It does not validate a record automatically, confer
