@@ -305,6 +305,9 @@ YIDL requires CPython3.12–3.15 subject to its platform/wheel boundary
 baseline. The compiler does not install dependencies while generating code.
 The method name `_taut_freeze` belongs to Taut's already-reserved `_taut_` namespace,
 so a schema field named `freeze` keeps its ordinary Python and wire names.
+The YIDL backend does not permit stored fields named `self` or `cls`, or names
+beginning `_y_dc_`. It rejects these with a schema-qualified diagnostic before
+writing output. These names remain legal with the stdlib backend.
 
 Freezing is permanent and optimistic: a callback failure can leave earlier
 children or fields frozen. It does not validate a record automatically, confer

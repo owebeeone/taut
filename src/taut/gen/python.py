@@ -41,6 +41,9 @@ def emit_types(schema, *, validation=False, external_types=None, identity=None, 
         if len(attrs) != len(set(attrs)):
             collisions.append((msg.name, "fields", "schema fields collide after Python keyword escaping"))
         for f in msg.fields:
+            if yidl_records and not f.virtual and (
+                    f.name in ("self", "cls") or f.name.startswith("_y_dc_")):
+                collisions.append((f"{msg.name}.{f.name}", "field", "YIDL record backend reserves this field name"))
             if f.name.startswith("__"):
                 collisions.append((f"{msg.name}.{f.name}", "field", "Python private-name mangling is unsupported"))
                 continue

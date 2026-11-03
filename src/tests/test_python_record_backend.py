@@ -2,6 +2,7 @@
 
 import copy
 import dataclasses
+import json
 import pickle
 import sys
 import types
@@ -11,6 +12,7 @@ from taut.cli import main
 from taut.gen.scaffold import emit, python_api
 from taut.ir.dsl import INT, F, Msg, schema
 from taut.ir.load import load_schema
+from taut.ir.export import schema_json
 from taut.wire import codec, jsoncodec
 
 EXAMPLE = (
@@ -89,17 +91,24 @@ def test_mutate_repair_then_deep_freeze(validation):
     )
 
 
+@pytest.mark.parametrize("validation", [False, True])
 @requires_yidl
-def test_freeze_field_name_does_not_collide():
+def test_freeze_field_name_does_not_collide(validation):
     mod = types.ModuleType("_record_freeze_field")
     sys.modules[mod.__name__] = mod
     exec(
-        python_api(schema(Record=Msg(freeze=F(1, INT))), python_records="yidl"),
+        python_api(
+            schema(Record=Msg(freeze=F(1, INT))),
+            python_records="yidl",
+            validation=validation,
+        ),
         mod.__dict__,
     )
     value = mod.Record(1)
     value.freeze = 2
     value._taut_freeze()
+    if validation:
+        assert value.is_valid()
     with pytest.raises(dataclasses.FrozenInstanceError):
         value.freeze = 3
 
@@ -313,3 +322,60 @@ def test_old_taut_runtime_rejects_yidl_capability(monkeypatch):
     )
     with pytest.raises(taut.contracts.ConfigurationError, match="records.yidl.v1"):
         generated()
+
+
+@pytest.mark.parametrize("name", ["cls", "self", "_y_dc_value"])
+@pytest.mark.parametrize("validation", [False, True])
+@pytest.mark.parametrize("entrypoint", ["programmatic", "cli"])
+def test_yidl_reserved_fields_fail_before_writes_and_stdlib_remains_legal(
+    tmp_path, name, validation, entrypoint
+):
+    s = schema(Record=Msg(**{name: F(1, INT)}))
+    target = tmp_path / "out"
+    ir = tmp_path / "schema.ir.json"
+    ir.write_text(json.dumps(schema_json(s)))
+    flags = ["--with-validation"] if validation else []
+
+    def attempt():
+        if entrypoint == "programmatic":
+            emit(
+                s,
+                target,
+                langs=["python"],
+                runtime_mode="source",
+                python_records="yidl",
+                validation=validation,
+            )
+        else:
+            main(
+                [
+                    "gen",
+                    str(ir),
+                    "--out",
+                    str(target),
+                    "--lang",
+                    "python",
+                    "--python-records",
+                    "yidl",
+                    "--runtime",
+                    "source",
+                    *flags,
+                ]
+            )
+
+    with pytest.raises(ValueError, match="YIDL record backend reserves"):
+        attempt()
+    assert not target.exists()
+    target.mkdir()
+    keeper = target / "handwritten.txt"
+    keeper.write_bytes(b"keep exact bytes")
+    with pytest.raises(ValueError, match="YIDL record backend reserves"):
+        attempt()
+    assert list(target.iterdir()) == [keeper]
+    assert keeper.read_bytes() == b"keep exact bytes"
+
+    module = types.ModuleType("_stdlib_name_" + str(len(sys.modules)))
+    sys.modules[module.__name__] = module
+    exec(python_api(s, validation=validation), module.__dict__)
+    value = module.Record(**{name: 7})
+    assert getattr(value, name) == 7
