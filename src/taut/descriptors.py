@@ -25,7 +25,7 @@ class TypeDescriptor:
     value: TypeDescriptor | None = None
 
     def __post_init__(self):
-        expected = {"int": (), "str": (), "bool": (), "bytes": (), "float": (),
+        expected = {"int": (), "bigint": (), "str": (), "bool": (), "bytes": (), "float": (),
                     "message": ("reference",), "enum": ("reference",),
                     "list": ("element",), "map": ("key", "value")}
         actual = tuple(k for k in ("reference", "element", "key", "value") if getattr(self, k) is not None)
@@ -136,7 +136,7 @@ class SchemaBinding:
         for k in ("message_classes", "enum_classes", "external_bindings"):
             object.__setattr__(self, k, MappingProxyType(dict(getattr(self, k))))
         require_contract(artifact=self.schema.identity, descriptor=self.schema.descriptor_contract_version)
-        if type(self.schema.ir_version) is not int or self.schema.ir_version not in (1, 2, 3):
+        if type(self.schema.ir_version) is not int or self.schema.ir_version not in (1, 2, 3, 4):
             raise ConfigurationError(f"{self.schema.identity}: unsupported IR version {self.schema.ir_version}")
         if set(self.message_classes) != set(self.schema.messages) or set(self.enum_classes) != set(self.schema.enums):
             raise ConfigurationError(f"{self.schema.identity}: incomplete typed bindings; regenerate")

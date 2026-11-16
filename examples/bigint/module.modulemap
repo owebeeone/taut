@@ -1,0 +1,5 @@
+module CustomerBigIntBridge {
+    requires cplusplus
+    header "CustomerBigIntBridge.hpp"
+    export *
+}

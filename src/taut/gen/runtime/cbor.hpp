@@ -4,7 +4,8 @@
 // back through the fail-closed try_decode. Same tiny subset as the Python/TS/Rust
 // codecs (int, bytes, text, array, int-keyed map, bool, null), core-deterministic
 // (shortest ints; maps are emitted in ascending key order by the generator).
-// Encode writes into a fixed Buf, with no heap; host-testable.
+// Encode uses 512 inline bytes and spills to dynamic storage for larger values.
+// Use Buf::encoded_bytes() for complete output; d[] alone is only the inline region.
 //
 // Decode is bounded (D26, TautCheckedDecode.md §3). An array or map has depth one more
 // than the arrays and maps around it, and one deeper than the call's depth bound is
@@ -17,6 +18,7 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -138,11 +140,79 @@ constexpr bool single_exact(double v) {
     return f64_bits(static_cast<double>(static_cast<float>(v))) == bits;
 }
 
+// A serialization carrier, not an arithmetic library. Adapters use logical
+// sign/magnitude; only this carrier knows CBOR's negative argument (-1-x).
+class BigIntValue {
+    bool negative_ = false;
+    std::vector<std::uint8_t> argument_{};
+public:
+    constexpr BigIntValue() = default;
+    constexpr bool is_negative() const noexcept { return negative_; }
+    constexpr std::span<const std::uint8_t> argument() const noexcept { return argument_; }
+    static constexpr BigIntValue from_argument(bool negative, std::span<const std::uint8_t> bytes) {
+        if (!bytes.empty() && bytes.front() == 0) throw std::invalid_argument("noncanonical bigint");
+        BigIntValue result;
+        result.negative_ = negative;
+        result.argument_.assign(bytes.begin(), bytes.end());
+        return result;
+    }
+    static constexpr BigIntValue from_magnitude(bool negative, std::vector<std::uint8_t> bytes) {
+        if ((!bytes.empty() && bytes.front() == 0) || (negative && bytes.empty())) {
+            throw std::invalid_argument("noncanonical sign/magnitude");
+        }
+        if (negative) {
+            for (std::size_t index = bytes.size(); index > 0; --index) {
+                if (bytes[index - 1]-- != 0) break;
+            }
+            if (bytes.front() == 0) bytes.erase(bytes.begin());
+        }
+        return from_argument(negative, bytes);
+    }
+    constexpr std::vector<std::uint8_t> magnitude() const {
+        auto bytes = argument_;
+        if (negative_) {
+            bool carry = true;
+            for (std::size_t index = bytes.size(); index > 0 && carry; --index) {
+                carry = ++bytes[index - 1] == 0;
+            }
+            if (carry) bytes.insert(bytes.begin(), 1);
+        }
+        return bytes;
+    }
+    template<class Adapter> static BigIntValue from(const typename Adapter::value_type& value) {
+        return from_magnitude(Adapter::is_negative(value), Adapter::magnitude(value));
+    }
+    template<class Adapter> typename Adapter::value_type to() const {
+        const auto bytes = magnitude();
+        return Adapter::from_magnitude(negative_, std::span<const std::uint8_t>(bytes));
+    }
+    friend constexpr bool operator==(const BigIntValue&, const BigIntValue&) = default;
+};
+
 struct Buf {
     unsigned char d[512]{};
     std::size_t n{0};
+    std::vector<unsigned char> overflow{};
 
-    constexpr void push(unsigned char b) { d[n++] = b; }
+    constexpr void push(unsigned char b) {
+        if (n < sizeof(d)) d[n] = b;
+        else overflow.push_back(b);
+        ++n;
+    }
+    constexpr unsigned char encoded_byte(std::size_t index) const {
+        return index < sizeof(d) ? d[index] : overflow.at(index - sizeof(d));
+    }
+    constexpr std::vector<unsigned char> encoded_bytes() const {
+        std::vector<unsigned char> bytes;
+        bytes.reserve(n);
+        for (std::size_t index = 0; index < n; ++index) bytes.push_back(encoded_byte(index));
+        return bytes;
+    }
+    constexpr void bigint(const BigIntValue& value) {
+        push(value.is_negative() ? 0xc3 : 0xc2);
+        head(2, value.argument().size());
+        for (auto byte : value.argument()) push(byte);
+    }
 
     constexpr void head(unsigned major, unsigned long long v) {
         unsigned mt = major << 5;
@@ -217,7 +287,7 @@ constexpr bool eq_hex(const Buf& b, std::string_view hex) {
     if (b.n != hex.size() / 2) return false;
     for (std::size_t i = 0; i < b.n; ++i) {
         unsigned char want = static_cast<unsigned char>((hex_nibble(hex[i * 2]) << 4) | hex_nibble(hex[i * 2 + 1]));
-        if (b.d[i] != want) return false;
+        if (b.encoded_byte(i) != want) return false;
     }
     return true;
 }
@@ -225,7 +295,7 @@ constexpr bool eq_hex(const Buf& b, std::string_view hex) {
 constexpr bool eq(const Buf& b, std::string_view bytes) {
     if (b.n != bytes.size()) return false;
     for (std::size_t i = 0; i < b.n; ++i)
-        if (b.d[i] != static_cast<unsigned char>(bytes[i])) return false;
+        if (b.encoded_byte(i) != static_cast<unsigned char>(bytes[i])) return false;
     return true;
 }
 
@@ -253,6 +323,7 @@ enum class DecodeErrorTag {
     WrongType,
     UnknownEnum,
     NonCanonicalInt,
+    NonCanonicalBigInt,
     NegativeMapKey,
     TooDeep,
     TooLarge,
@@ -366,7 +437,7 @@ struct DecodeResult {
 // One decoded item. Its typed reads are the try_ accessors: each is the value or a
 // DecodeError (WrongType, MissingKey), never a default in place of a missing one.
 struct Cbor {
-    enum class K { Int, Bytes, Text, Arr, Map, Bool, Null, Float };
+    enum class K { Int, Bytes, Text, Arr, Map, Bool, Null, Float, BigInt };
     K k{K::Null};
     long long i{0};
     double f{0.0};
@@ -375,6 +446,13 @@ struct Cbor {
     std::vector<std::pair<long long, Cbor>> map{};  // Map (integer keys)
 
     constexpr bool is_null() const { return k == K::Null; }
+    constexpr DecodeResult<BigIntValue> try_bigint() const {
+        if (k != K::BigInt) return DecodeResult<BigIntValue>::fail(DecodeError::wrong_type("bigint"));
+        if (!s.empty() && s.front() == 0) return DecodeResult<BigIntValue>::fail({DecodeErrorTag::NonCanonicalBigInt});
+        std::vector<std::uint8_t> argument;
+        for (char byte : s) argument.push_back(static_cast<std::uint8_t>(static_cast<unsigned char>(byte)));
+        return DecodeResult<BigIntValue>::success(BigIntValue::from_argument(i != 0, argument));
+    }
     constexpr DecodeResult<const Cbor*> try_get(long long key) const {
         if (k != K::Map) return DecodeResult<const Cbor*>::fail(DecodeError::wrong_type("map"));
         for (const auto& kv : map)
@@ -430,7 +508,7 @@ constexpr bool has(std::string_view d, std::size_t off, std::size_t len) {
     return off <= d.size() && len <= d.size() - off;
 }
 
-constexpr DecodeResult<unsigned char> checked_byte_at(std::string_view d, std::size_t off) {
+constexpr DecodeResult<unsigned char> checked_encoded_byte(std::string_view d, std::size_t off) {
     if (!has(d, off, 1)) {
         return DecodeResult<unsigned char>::fail(DecodeError::truncated());
     }
@@ -567,7 +645,7 @@ constexpr bool valid_utf8(std::string_view s) {
 // read, before its first item (CD-B2), so the recursion stops at `limit`.
 constexpr DecodeResult<Cbor> checked_decode_at(std::string_view d, std::size_t& off, std::size_t depth,
                                                std::size_t limit) {
-    auto init_r = checked_byte_at(d, off);
+    auto init_r = checked_encoded_byte(d, off);
     if (!init_r) {
         return DecodeResult<Cbor>::fail(init_r.error);
     }
@@ -576,6 +654,22 @@ constexpr DecodeResult<Cbor> checked_decode_at(std::string_view d, std::size_t& 
     unsigned info = init & 0x1f;
     ++off;
     Cbor c;
+
+    if (major == 6 && (info == 2 || info == 3)) {
+        auto byte = checked_encoded_byte(d, off);
+        if (!byte) return DecodeResult<Cbor>::fail(byte.error);
+        if ((byte.value >> 5) != 2) return DecodeResult<Cbor>::fail(DecodeError::wrong_type("bytes"));
+        ++off;
+        auto length = checked_read_arg(d, off, byte.value & 31);
+        if (!length) return DecodeResult<Cbor>::fail(length.error);
+        if (length.value > d.size() - off) return DecodeResult<Cbor>::fail(DecodeError::truncated());
+        c.s = d.substr(off, static_cast<std::size_t>(length.value));
+        if (!c.s.empty() && c.s.front() == 0) return DecodeResult<Cbor>::fail({DecodeErrorTag::NonCanonicalBigInt});
+        c.k = Cbor::K::BigInt;
+        c.i = info == 3 ? 1 : 0;
+        off += c.s.size();
+        return DecodeResult<Cbor>::success(c);
+    }
 
     if (major == 0) {
         auto v = checked_read_arg(d, off, info);
@@ -758,6 +852,10 @@ constexpr DecodeResult<Cbor> try_decode(std::string_view data, std::size_t max_d
 constexpr void encode_value(Buf& b, const Cbor& c) {
     switch (c.k) {
         case Cbor::K::Int: b.integer(c.i); break;
+        case Cbor::K::BigInt:
+            b.push(c.i != 0 ? 0xc3 : 0xc2);
+            b.bytes(c.s);
+            break;
         case Cbor::K::Bytes: b.bytes(c.s); break;
         case Cbor::K::Text: b.text(c.s); break;
         case Cbor::K::Bool: b.boolean(c.i != 0); break;

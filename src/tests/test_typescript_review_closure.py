@@ -46,8 +46,11 @@ def test_actual_r0_guard_cannot_ignore_selected_namespace(tmp_path,foundation,or
     # The unchanged r0 checker accepts the facade's compatible-looking labels;
     # the new generated return-identity requirement must still reject it.
     run(['node','-e','const x=require('+json.dumps(facade.as_posix())+');if(x.requireFoundation(x)!==undefined)throw Error("not the original void guard");'])
+    validation_facade=tmp_path/'old-validation.cjs'
+    validation_facade.write_text('module.exports=require('+json.dumps((original_r0_owner/'validation.js').as_posix())+');')
+    validation_facade.with_suffix('.d.cts').write_text('export * from '+json.dumps((modern/'validation.js').as_posix())+';\n')
     emit_direct(schema(Item=Msg(value=F(1,STR))),tmp_path/'generated',validation=validation,mode='package',
-                runtime_module=facade.as_posix(),validation_module=(original_r0_owner/'validation.js').as_posix())
+                runtime_module=facade.as_posix(),validation_module=validation_facade.as_posix())
     program=compile_program(tmp_path,'import "./generated/api.ts";throw Error("old guard accepted");',execute=False,name='old-guard-application')
     result=run(['node',program],success=False)
     assert ('valid owner token' if missing_token else 'namespace-checked guard support') in result.stderr

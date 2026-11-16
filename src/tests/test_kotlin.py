@@ -326,6 +326,7 @@ private fun describe(e: DecodeError): String = when (e) {{
     is DecodeError.MissingKey -> "MissingKey;key=" + e.key
     is DecodeError.WrongType -> "WrongType;expected=" + e.expected
     is DecodeError.UnknownEnum -> "UnknownEnum;enum=" + e.enumName + ";value=" + e.value
+    is DecodeError.NonCanonicalBigInt -> "NonCanonicalBigInt"
     is DecodeError.NonCanonicalInt -> "NonCanonicalInt;value=" + e.value
     is DecodeError.NegativeMapKey -> "NegativeMapKey;key=" + e.key
     is DecodeError.TooDeep -> "TooDeep;limit=" + e.limit
@@ -1053,6 +1054,7 @@ DEEP_ROOTS = [("Tree64", "a10181", 64), ("Tree128", "a10181", 128), ("Holds64", 
               ("IntBox", "81", 32)]
 BEYOND_SEED = 0xB3_70_4D
 _SAMPLES = {
+    "bigint": [0, -1, 2**64, -2**128, 2**1024],
     "int": [0, 1, -1, 23, 24, -25, 256, 1 << 40, INT_MIN, INT_MAX],
     "str": ["", "a", "b", "naïve", "\uffff", "\U00010000"],
     "bytes": [b"", b"\x00", b"\xff\x00"],
@@ -1276,6 +1278,7 @@ def test_kotlin_matches_python_beyond_the_corpus(monkeypatch):
         pytest.skip("kotlin is allowlisted (corpus/parity/allowlist.json): its runner is not held "
                     "to the rows")
     rows = list(_beyond_rows())
+    monkeypatch.setattr(parity, "bigint_rows", lambda: [])
     monkeypatch.setattr(parity, "malformed_rows", lambda: rows)
     tool_options = os.environ.get("JAVA_TOOL_OPTIONS", "")
     monkeypatch.setenv("JAVA_TOOL_OPTIONS", f"{tool_options} -Dstdout.encoding=US-ASCII".strip())

@@ -344,7 +344,7 @@ def test_cpp_decode_matches_python_beyond_the_corpus(monkeypatch):
     if not report.available:
         pytest.skip(report.skip_reason)
     assert len(report.results) == \
-        len(parity.int_rows()) + len(corpus) + len(extra) + len(parity.bounds_rows())
+        len(parity.int_rows()) + len(corpus) + len(extra) + len(parity.bounds_rows()) + parity.validate_bigint_vectors()
     failures = [f"{r.name}: {r.detail}" for r in report.failures]
     assert report.green, "\n".join([report.fault, *failures])
 
@@ -359,6 +359,7 @@ def test_cpp_runner_reports_a_row_whose_bytes_do_not_expand_to_its_len_as_untype
     monkeypatch.setattr(parity, "int_rows", lambda: [])
     monkeypatch.setattr(parity, "malformed_rows", lambda: [])
     monkeypatch.setattr(parity, "bounds_rows", lambda: [raw, typed])
+    monkeypatch.setattr(parity, "bigint_rows", lambda: [])
     report = parity_cpp.run()
     if not report.available:
         pytest.skip(report.skip_reason)

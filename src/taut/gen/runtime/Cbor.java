@@ -58,6 +58,7 @@ public final class Cbor {
         WrongType,
         UnknownEnum,
         NonCanonicalInt,
+        NonCanonicalBigInt,
         NegativeMapKey,
         TooDeep,
         TooLarge
@@ -290,6 +291,19 @@ public final class Cbor {
         this.kind = kind; this.i = i; this.d = d; this.s = s; this.b = b; this.arr = arr; this.map = map;
     }
     public static Cbor int_(long n) { return new Cbor(INT, n, 0.0, null, null, null, null); }
+    public static final int BIGINT = 8;
+    public static Cbor bigint(BigInteger value) {
+        boolean negative = value.signum() < 0;
+        BigInteger argument = negative ? value.negate().subtract(BigInteger.ONE) : value;
+        byte[] bytes = argument.signum() == 0 ? new byte[0] : argument.toByteArray();
+        if (bytes.length > 0 && bytes[0] == 0) bytes = java.util.Arrays.copyOfRange(bytes, 1, bytes.length);
+        return new Cbor(BIGINT, negative ? 1 : 0, 0, null, bytes, null, null);
+    }
+    public BigInteger asBigInt() {
+        if (kind != BIGINT) throw DecodeError.wrongType("bigint");
+        BigInteger argument = new BigInteger(1, b);
+        return i != 0 ? argument.negate().subtract(BigInteger.ONE) : argument;
+    }
     public static Cbor float_(double v) { return new Cbor(FLOAT, 0, v, null, null, null, null); }
     public static Cbor text(String s) { return new Cbor(TEXT, 0, 0.0, s, null, null, null); }
     public static Cbor bytes(byte[] b) { return new Cbor(BYTES, 0, 0.0, null, b, null, null); }
@@ -464,6 +478,12 @@ public final class Cbor {
     }
     private static void enc(Cbor c, List<Byte> out) {
         switch (c.kind) {
+            case BIGINT: {
+                out.add((byte)(c.i != 0 ? 0xc3 : 0xc2));
+                head(out, 2, c.b.length);
+                for (byte value : c.b) out.add(value);
+                break;
+            }
             case INT: { if (c.i >= 0) head(out, 0, c.i); else head(out, 1, -1 - c.i); break; }
             case FLOAT: encFloat(c.d, out); break;
             case BYTES: { head(out, 2, c.b.length); for (byte x : c.b) out.add(x); break; }
@@ -598,6 +618,16 @@ public final class Cbor {
         int initial = u(d, off[0]);
         off[0]++;
         int major = initial >> 5, info = initial & 0x1f;
+        if (major == 6 && (info == 2 || info == 3)) {
+            int payload = u(d, off[0]++);
+            if (payload >> 5 != 2) throw DecodeError.wrongType("bytes");
+            int length = readLength(d, off, payload & 31);
+            if (length != 0 && d[off[0]] == 0) throw new DecodeError(
+                DecodeTag.NonCanonicalBigInt, "noncanonical bigint", null, null, null, null, null, null);
+            byte[] bytes = java.util.Arrays.copyOfRange(d, off[0], off[0] + length);
+            off[0] += length;
+            return new Cbor(BIGINT, info == 3 ? 1 : 0, 0, null, bytes, null, null);
+        }
         switch (major) {
             case 0: {
                 long n = readArg(d, off, info);

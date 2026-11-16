@@ -38,6 +38,7 @@ from .shapes import sole_slot
 
 # scalars
 INT = Scalar("int")
+BIGINT = Scalar("bigint")
 STR = Scalar("str")
 BYTES = Scalar("bytes")
 BOOL = Scalar("bool")

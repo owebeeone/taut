@@ -173,7 +173,8 @@ fn describe(e: &DecodeError) -> String {
         | DecodeError::TrailingBytes
         | DecodeError::InvalidUtf8
         | DecodeError::NonIntegerMapKey
-        | DecodeError::IntOverflow => String::new(),
+        | DecodeError::IntOverflow
+        | DecodeError::NonCanonicalBigInt => String::new(),
         DecodeError::UnsupportedInfo(info) => format!(";info={info}"),
         DecodeError::UnsupportedMajor(major) => format!(";major={major}"),
         DecodeError::DuplicateMapKey(key) => format!(";key={key}"),

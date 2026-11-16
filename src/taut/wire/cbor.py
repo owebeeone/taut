@@ -41,6 +41,23 @@ DEFAULT_MAX_DEPTH = 32    # the depth bound where none is given (CD-B1)
 MAX_DEPTH_CEILING = 128   # no call applies a deeper bound (CD-B3)
 
 
+class Bignum:
+    """A tagged arbitrary integer, distinct from the existing i64 CBOR carrier.
+
+    This application profile always tags BIGINT, including small values. The
+    arithmetic value remains a Python int; this wrapper owns wire identity.
+    """
+    __slots__ = ("value",)
+
+    def __init__(self, value: int):
+        if type(value) is not int:
+            raise TypeError("bigint expects an int, not bool or float")
+        self.value = value
+
+    def __eq__(self, other):
+        return isinstance(other, Bignum) and self.value == other.value
+
+
 class DecodeError(ValueError):
     """Typed fail-closed CBOR decode error."""
 
@@ -123,6 +140,13 @@ def _encode(value: Any, out: bytearray) -> None:
         out.append(0xF5)
     elif value is False:
         out.append(0xF4)
+    elif isinstance(value, Bignum):
+        negative = value.value < 0
+        argument = -1 - value.value if negative else value.value
+        magnitude = argument.to_bytes((argument.bit_length() + 7) // 8, "big")
+        out.append(0xC3 if negative else 0xC2)
+        out += _head(2, len(magnitude))
+        out += magnitude
     elif isinstance(value, int):
         if value >= 0:
             out += _head(0, value)
@@ -240,6 +264,19 @@ def _decode(data: bytes, offset: int, depth: int, limit: int) -> tuple[Any, int]
     major = initial >> 5
     info = initial & 0x1F
     offset += 1
+
+    if major == 6 and info in (2, 3):
+        # Only the two shortest-form bignum tags are supported. Other tags
+        # retain UnsupportedMajor and its existing precedence.
+        payload_head = _take(data, offset, 1)[0]
+        if payload_head >> 5 != 2:
+            raise DecodeError("WrongType", expected="bytes")
+        length, offset = _read_arg(data, offset + 1, payload_head & 31)
+        magnitude = _take(data, offset, length)
+        if magnitude and magnitude[0] == 0:
+            raise DecodeError("NonCanonicalBigInt")
+        argument = int.from_bytes(magnitude, "big")
+        return Bignum(-1 - argument if info == 3 else argument), offset + length
 
     if major == 0:
         n, offset = _read_arg(data, offset, info)

@@ -28,9 +28,9 @@ def _type_name(name):
     return '$' + name if name in _KEYWORDS else name
 
 # The names api.js takes from cbor.js, in the order its `require` lists them.
-_IMPORTS = ("CInt", "CFloat", "CText", "CBytes", "CBool", "CArr", "CMap", "CNull", "cget",
+_IMPORTS = ("CInt", "CBigInt", "CFloat", "CText", "CBytes", "CBool", "CArr", "CMap", "CNull", "cget",
             "cgetOrNull", "mapFromCbor", "cmapEntries", "compareCodePoints", "isNull", "expectInt",
-            "expectFloat", "expectText", "expectBytes", "expectBool", "expectArray", "expectMap",
+            "expectBigInt", "expectFloat", "expectText", "expectBytes", "expectBool", "expectArray", "expectMap",
             "enumFromWire", "enumFromCbor", "decode")
 
 RESERVED_FIELD_NAMES = MappingProxyType({
@@ -81,7 +81,7 @@ def _key_order(key: TypeRef) -> str:
 
 def _enc(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
-        return {"int": f"CInt({expr})", "str": f"CText({expr})",
+        return {"int": f"CInt({expr})", "bigint": f"CBigInt({expr})", "str": f"CText({expr})",
                 "bytes": f"CBytes({expr})", "bool": f"CBool({expr})",
                 "float": f"CFloat({expr})"}[t.kind]
     if isinstance(t, EnumRef):
@@ -98,7 +98,7 @@ def _enc(t: TypeRef, expr: str) -> str:
 
 def _dec(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
-        return {"int": f"expectInt({expr})", "str": f"expectText({expr})",
+        return {"int": f"expectInt({expr})", "bigint": f"expectBigInt({expr})", "str": f"expectText({expr})",
                 "bytes": f"expectBytes({expr})", "bool": f"expectBool({expr})",
                 "float": f"expectFloat({expr})"}[t.kind]
     if isinstance(t, EnumRef):

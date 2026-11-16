@@ -39,7 +39,8 @@ from taut.wire import cbor, codec
 INT_ROWS = 11
 MALFORMED_ROWS = 47
 BOUNDS_ROWS = 30
-ALL_ROWS = INT_ROWS + MALFORMED_ROWS + BOUNDS_ROWS
+BIGINT_ROWS = parity.validate_bigint_vectors()
+ALL_ROWS = INT_ROWS + MALFORMED_ROWS + BOUNDS_ROWS + BIGINT_ROWS
 GENERATED = ("rust", "js", "cpp", "swift", "go", "kotlin", "java")
 CONSTANTS_LINE = f"{parity.CONSTANTS}\tdefault_max_depth=32;max_depth_ceiling=128"
 
@@ -909,6 +910,7 @@ def test_the_cpp_runner_describes_an_error_while_its_input_lives(monkeypatch):
     monkeypatch.setattr(parity, "int_rows", lambda: [])
     monkeypatch.setattr(parity, "malformed_rows", lambda: [row])
     monkeypatch.setattr(parity, "bounds_rows", lambda: [])
+    monkeypatch.setattr(parity, "bigint_rows", lambda: [])
     report = parity_cpp.run()
     assert [(r.name, r.status, r.detail) for r in report.results] == [(row["name"], parity.PASS, "")], report.fault
 

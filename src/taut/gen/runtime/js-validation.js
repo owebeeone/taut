@@ -38,6 +38,7 @@ function* groupEvents(value, descriptor, binding, group, path) {
   }
 }
 function scalarMatches(kind,value) {
+  if (kind === "bigint") return typeof value === "bigint";
   if (kind === "int") return typeof value === "bigint" && value >= -(1n<<63n) && value < (1n<<63n);
   if (kind === "float") return typeof value === "number";
   if (kind === "bytes") return value instanceof Uint8Array;

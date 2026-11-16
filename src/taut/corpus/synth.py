@@ -20,6 +20,8 @@ _INTS = (42, -7, 300, 0)
 
 def _synth(schema: Schema, tref: TypeRef, seed: int, stack: tuple[str, ...]) -> Any:
     if isinstance(tref, Scalar):
+        if tref.kind == "bigint":
+            return (0, -1, 2**128, -2**256)[seed % 4]
         if tref.kind == "int":
             return _INTS[seed % len(_INTS)]
         if tref.kind == "str":

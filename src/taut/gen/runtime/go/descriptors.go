@@ -221,7 +221,7 @@ type typeDescriptor struct {
 
 func PrimitiveType(kind string) TypeDescriptor {
 	switch kind {
-	case "int", "str", "bool", "bytes", "float":
+	case "int", "bigint", "str", "bool", "bytes", "float":
 	default:
 		panic("invalid primitive kind: " + kind)
 	}
@@ -512,7 +512,7 @@ type schemaDescriptor struct {
 }
 
 func NewSchemaDescriptor(version int, identity string, messages map[string]MessageDescriptor, enums map[string]EnumDescriptor, options, effective map[string]any) SchemaDescriptor {
-	if version < 1 || version > 3 {
+	if version < 1 || version > 4 {
 		panic("unsupported native IR version")
 	}
 	d := &schemaDescriptor{version, identity, map[string]MessageDescriptor{}, map[string]EnumDescriptor{}, facts(options), effectiveFacts(effective)}

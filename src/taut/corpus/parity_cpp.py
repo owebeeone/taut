@@ -114,8 +114,8 @@ std::string hexof(const taut::Buf& b) {
     static constexpr char digits[] = "0123456789abcdef";
     std::string out;
     for (std::size_t i = 0; i < b.n; ++i) {
-        out.push_back(digits[b.d[i] >> 4]);
-        out.push_back(digits[b.d[i] & 0x0f]);
+        out.push_back(digits[b.encoded_byte(i) >> 4]);
+        out.push_back(digits[b.encoded_byte(i) & 0x0f]);
     }
     return out;
 }
@@ -205,6 +205,7 @@ std::string describe(const taut::DecodeError& e) {
             return "UnknownEnum;enum=" + text(e.enum_name) + ";value=" + std::to_string(e.value);
         case T::NonCanonicalInt:
             return "NonCanonicalInt;value=" + std::to_string(e.unsigned_value);
+        case T::NonCanonicalBigInt: return "NonCanonicalBigInt";
         case T::NegativeMapKey:
             return "NegativeMapKey;key=" + std::to_string(e.key);
         case T::TooDeep:
@@ -239,9 +240,7 @@ Outcome untyped(std::string what) {
 // longer than a taut::Buf allows.
 template <class Encode>
 Outcome decoded(std::size_t input_size, Encode encode) {
-    if (input_size > REENCODE_INPUT_MAX) {
-        return Outcome{"ok", "not re-encoded: input longer than a taut::Buf allows", std::nullopt};
-    }
+    (void)input_size; // Buf spills beyond its inline storage for arbitrary-size BIGINT.
     taut::Buf again;
     encode(again);
     return Outcome{"ok", hexof(again), std::nullopt};

@@ -56,7 +56,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from taut.ir.dsl import (
-    BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, option, schema,
+    BIGINT, BOOL, BYTES, FLOAT, INT, MISSING_OK, STR, Enum, F, List, Map, Msg, Ref, option, schema,
 )
 
 SCHEMA = schema(
@@ -65,6 +65,8 @@ SCHEMA = schema(
         F("n", 1, INT),
         F("by_id", 2, Map(INT, INT)),
         next_id=3),
+    Msg("BigIntBox", F("n", 1, BIGINT), F("maybe", 2, BIGINT, optional=True),
+        F("values", 3, List(BIGINT)), F("by_id", 4, Map(INT, BIGINT)), next_id=5),
     Msg("EnumBox",
         F("mode", 1, Ref("Mode")),
         next_id=2),

@@ -51,10 +51,21 @@ def _method_json(m: MethodDef) -> dict:
     }
 
 
+def uses_bigint(schema: Schema) -> bool:
+    def contains(t):
+        if isinstance(t, Scalar): return t.kind == "bigint"
+        if isinstance(t, ListOf): return contains(t.elem)
+        if isinstance(t, MapOf): return contains(t.key) or contains(t.value)
+        return False
+    return (any(contains(f.type) for m in schema.messages.values() for f in m.fields)
+            or any(contains(t) for s in schema.services.values() for m in s.methods
+                   for _, t in (*m.params, *m.out)))
+
+
 def schema_json(schema: Schema) -> dict:
     # Option maps are copied, so that editing the document leaves the frozen model alone.
     return {
-        "version": 3 if any(f.oneof or f.cases for m in schema.messages.values() for f in m.fields) else IR_VERSION,
+        "version": 4 if uses_bigint(schema) else 3 if any(f.oneof or f.cases for m in schema.messages.values() for f in m.fields) else IR_VERSION,
         "options": dict(schema.options),
         "effective": effective_map(schema),
         "shapes": {name: spec.to_json() for name, spec in SHAPES.items()},

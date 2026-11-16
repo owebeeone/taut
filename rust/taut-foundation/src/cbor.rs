@@ -120,6 +120,7 @@ pub enum DecodeError {
     /// The canonical encoder never emits it, so strict-canonical decode (D2)
     /// rejects it — `decode(bytes)` ok ⇒ `encode(decode(bytes)) == bytes`.
     NonCanonicalInt(u64),
+    NonCanonicalBigInt,
     /// A raw CBOR map key that was a negative integer. Canonical taut field tags
     /// are non-negative, so a negative raw key is out-of-contract (D2). Distinct
     /// from [`DecodeError::NonIntegerMapKey`] (a non-integer key).
@@ -169,6 +170,7 @@ impl DecodeError {
             DecodeError::DuplicateMapKey(_) => "DuplicateMapKey",
             DecodeError::IntOverflow => "IntOverflow",
             DecodeError::NonCanonicalInt(_) => "NonCanonicalInt",
+            DecodeError::NonCanonicalBigInt => "NonCanonicalBigInt",
             DecodeError::NegativeMapKey(_) => "NegativeMapKey",
             DecodeError::MissingKey(_) => "MissingKey",
             DecodeError::WrongType { .. } => "WrongType",
@@ -191,6 +193,7 @@ impl core::fmt::Display for DecodeError {
             DecodeError::DuplicateMapKey(k) => write!(f, "duplicate map key {k}"),
             DecodeError::IntOverflow => write!(f, "integer out of range for target"),
             DecodeError::NonCanonicalInt(v) => write!(f, "non-canonical integer encoding of {v}"),
+            DecodeError::NonCanonicalBigInt => write!(f, "non-canonical bigint magnitude"),
             DecodeError::NegativeMapKey(k) => write!(f, "negative map key {k}"),
             DecodeError::MissingKey(k) => write!(f, "missing map key {k}"),
             DecodeError::WrongType { expected } => write!(f, "expected CBOR {expected}"),
@@ -223,8 +226,70 @@ fn pow2(exp: i32) -> f64 {
     }
 }
 
+/// Replaceable arithmetic binding: magnitudes are minimal unsigned big-endian bytes.
+pub trait BigIntAdapter {
+    type Value;
+    fn is_negative(value: &Self::Value) -> bool;
+    fn magnitude(value: &Self::Value) -> Vec<u8>;
+    fn from_magnitude(negative: bool, bytes: &[u8]) -> Self::Value;
+}
+
+/// Serialization carrier, with no arithmetic-library dependency.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct BigIntValue { negative: bool, argument: Vec<u8> }
+impl BigIntValue {
+    pub fn from_argument(negative: bool, argument: Vec<u8>) -> Result<Self, DecodeError> {
+        if argument.first() == Some(&0) { return Err(DecodeError::NonCanonicalBigInt); }
+        Ok(Self { negative, argument })
+    }
+    pub fn from_magnitude(negative: bool, mut bytes: Vec<u8>) -> Result<Self, DecodeError> {
+        if bytes.first() == Some(&0) || (negative && bytes.is_empty()) {
+            return Err(DecodeError::NonCanonicalBigInt);
+        }
+        if negative {
+            for b in bytes.iter_mut().rev() { if *b != 0 { *b -= 1; break; } *b = 255; }
+            if bytes.first() == Some(&0) { bytes.remove(0); }
+        }
+        Self::from_argument(negative, bytes)
+    }
+    pub fn is_negative(&self) -> bool { self.negative }
+    pub fn argument(&self) -> &[u8] { &self.argument }
+    pub fn magnitude(&self) -> Vec<u8> {
+        let mut b = self.argument.clone();
+        if self.negative {
+            let mut carry = true;
+            for byte in b.iter_mut().rev() {
+                if *byte != 255 { *byte += 1; carry = false; break; } *byte = 0;
+            }
+            if carry { b.insert(0, 1); }
+        }
+        b
+    }
+    pub fn from_adapter<A: BigIntAdapter>(value: &A::Value) -> Result<Self, DecodeError> {
+        Self::from_magnitude(A::is_negative(value), A::magnitude(value))
+    }
+    pub fn to_adapter<A: BigIntAdapter>(&self) -> A::Value {
+        A::from_magnitude(self.negative, &self.magnitude())
+    }
+}
+
+#[cfg(feature = "num-bigint")]
+pub struct NumBigIntAdapter;
+#[cfg(feature = "num-bigint")]
+impl BigIntAdapter for NumBigIntAdapter {
+    type Value = num_bigint::BigInt;
+    fn is_negative(value: &Self::Value) -> bool { value.sign() == num_bigint::Sign::Minus }
+    fn magnitude(value: &Self::Value) -> Vec<u8> {
+        if value.sign() == num_bigint::Sign::NoSign { Vec::new() } else { value.to_bytes_be().1 }
+    }
+    fn from_magnitude(negative: bool, bytes: &[u8]) -> Self::Value {
+        Self::Value::from_bytes_be(if negative { num_bigint::Sign::Minus } else { num_bigint::Sign::Plus }, bytes)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Cbor {
+    BigInt(BigIntValue),
     Int(i64),
     Float(f64),
     Bytes(Vec<u8>),
@@ -286,6 +351,10 @@ impl Cbor {
     /// Integer value. The carrier is `i64` (the frozen wire int subset); an
     /// out-of-subset wire int was already rejected by `dec`, so this never
     /// truncates or widens.
+    pub fn try_bigint(&self) -> Result<BigIntValue, DecodeError> {
+        if let Self::BigInt(value) = self { Ok(value.clone()) }
+        else { Err(DecodeError::WrongType { expected: "bigint" }) }
+    }
     pub fn try_int(&self) -> Result<i64, DecodeError> {
         if let Cbor::Int(n) = self {
             Ok(*n)
@@ -485,6 +554,11 @@ fn enc(v: &Cbor, out: &mut Vec<u8>) {
                 head(out, 1, (-1 - *n) as u64);
             }
         }
+        Cbor::BigInt(value) => {
+            out.push(if value.negative { 0xc3 } else { 0xc2 });
+            head(out, 2, value.argument.len() as u64);
+            out.extend_from_slice(&value.argument);
+        }
         Cbor::Float(x) => enc_float(*x, out),
         Cbor::Bytes(b) => {
             head(out, 2, b.len() as u64);
@@ -618,6 +692,15 @@ fn dec(data: &[u8], off: usize, depth: usize, limit: usize) -> Result<(Cbor, usi
     let major = initial >> 5;
     let info = initial & 0x1f;
     let off = off + 1;
+    if major == 6 && (info == 2 || info == 3) {
+        let h = *data.get(off).ok_or(DecodeError::Truncated)?;
+        if h >> 5 != 2 { return Err(DecodeError::WrongType { expected: "bytes" }); }
+        let (n, body) = read_arg(data, off + 1, h & 31)?;
+        let n = usize::try_from(n).map_err(|_| DecodeError::Truncated)?;
+        let bytes = take(data, body, n)?;
+        let value = BigIntValue::from_argument(info == 3, bytes.to_vec())?;
+        return Ok((Cbor::BigInt(value), body + n));
+    }
     match major {
         0 => {
             let (n, o) = read_arg(data, off, info)?;

@@ -136,6 +136,7 @@ DECODE_TAGS = {
     "WrongType",
     "UnknownEnum",
     "NonCanonicalInt",
+    "NonCanonicalBigInt",
     "NegativeMapKey",
     "TooDeep",
     "TooLarge",
@@ -573,13 +574,30 @@ def malformed_rows() -> list[dict]:
     return _load_json(MALFORMED_VECTORS)["vectors"]
 
 
+def validate_bigint_vectors() -> int:
+    path = PARITY_DIR / "bigint.vectors.json"
+    data = _load_json(path)
+    if data.get("contract") != "taut-codec-parity/bigint/v1":
+        raise ParityValidationError(f"{path}: unsupported bigint corpus contract")
+    names = set()
+    for row in data["vectors"]:
+        if row["name"] in names: raise ParityValidationError("duplicate bigint vector")
+        names.add(row["name"])
+        _check_decode_row(row, parity_schema(), str(path), bounds_file=False)
+    return len(names)
+
+
+def bigint_rows() -> list[dict]:
+    return _load_json(PARITY_DIR / "bigint.vectors.json")["vectors"]
+
+
 def bounds_rows() -> list[dict]:
     return _load_json(BOUNDS_VECTORS)["vectors"]
 
 
 def decode_rows() -> list[dict]:
     """The rows the comparator judges: malformed rows, then bounds rows."""
-    return [*malformed_rows(), *bounds_rows()]
+    return [*malformed_rows(), *bounds_rows(), *bigint_rows()]
 
 
 def segments(row: Mapping[str, Any]) -> list[tuple[str, int]]:
@@ -636,7 +654,7 @@ def fixture_dispatch(schema: Any | None = None) -> Dispatch:
 def write_json_rows(dest: Path, schema: Any | None = None) -> None:
     """For a runner that reads JSON: the three vector files and `dispatch.json`."""
     dispatch = fixture_dispatch(schema)
-    for path in (INT_VECTORS, MALFORMED_VECTORS, BOUNDS_VECTORS):
+    for path in (INT_VECTORS, MALFORMED_VECTORS, BOUNDS_VECTORS, PARITY_DIR / "bigint.vectors.json"):
         (dest / path.name).write_text(path.read_text())
     (dest / "dispatch.json").write_text(
         json.dumps({"messages": list(dispatch.messages), "enums": list(dispatch.enums)}))
@@ -725,7 +743,8 @@ def _row_index() -> dict[str, tuple[str, dict]]:
     """name -> (kind, row), int rows, malformed rows, then bounds rows, in corpus order."""
     index: dict[str, tuple[str, dict]] = {}
     for kind, row in [*((r["kind"], r) for r in int_rows()), *(("malformed", r) for r in malformed_rows()),
-                      *(("bounds", r) for r in bounds_rows())]:
+                      *(("bounds", r) for r in bounds_rows()),
+                      *(("malformed", r) for r in bigint_rows())]:
         if row["name"] in index:
             raise ParityValidationError(f"row name {row['name']!r} appears twice in the corpus")
         index[row["name"]] = (kind, row)
@@ -1059,9 +1078,9 @@ def governed_variants(run: Callable[..., TargetReport],
 
 
 def _summary(reports: dict[str, TargetReport], statuses: list[ParityStatus],
-             int_count: int, mal_count: int, bounds_count: int) -> list[str]:
+             int_count: int, mal_count: int, bounds_count: int, bigint_count: int) -> list[str]:
     lines = [
-        f"int vectors: {int_count}    malformed vectors: {mal_count}    bounds vectors: {bounds_count}",
+        f"int vectors: {int_count}    malformed vectors: {mal_count}    bounds vectors: {bounds_count}    bigint vectors: {bigint_count}",
         "",
         f"{'target':<11} {'status':<12} {'pass':>4} {'fail':>4} {'skip/type':>9}  observed",
     ]
@@ -1132,6 +1151,7 @@ def run_gate(*, target: str | None = None, run_compiled: bool = True,
     int_count = validate_int_vectors()
     mal_count = validate_malformed_vectors()
     bounds_count = validate_bounds_vectors()
+    bigint_count = validate_bigint_vectors()
     statuses = target_statuses()
     allow = {s.target for s in statuses if s.status == "allowlisted"}
     reports = run_targets(wanted, jobs=jobs)
@@ -1139,7 +1159,7 @@ def run_gate(*, target: str | None = None, run_compiled: bool = True,
     violations = governance(reports, allow)
     if require_all:
         violations += unrun(wanted, reports)
-    lines = _summary(reports, statuses, int_count, mal_count, bounds_count)
+    lines = _summary(reports, statuses, int_count, mal_count, bounds_count, bigint_count)
     if violations:
         lines.append("")
         lines.append("GOVERNANCE VIOLATIONS (gate fails):")
@@ -1158,9 +1178,10 @@ def validate_all(*, target: str | None = None) -> list[str]:
     int_count = validate_int_vectors()
     malformed_count = validate_malformed_vectors()
     bounds_count = validate_bounds_vectors()
+    bigint_count = validate_bigint_vectors()
     statuses = [s for s in target_statuses() if s.target in selected]
     lines = [f"int vectors: {int_count}", f"malformed vectors: {malformed_count}",
-             f"bounds vectors: {bounds_count}"]
+             f"bounds vectors: {bounds_count}", f"bigint vectors: {bigint_count}"]
     for status in statuses:
         lines.append(f"{status.target}: {status.status} - {status.reason}")
     return lines

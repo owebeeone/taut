@@ -92,7 +92,7 @@ def emit(schema, *, validation=False, external_types=None, identity=None, forwar
     def mn(name):return '::taut::'+name+'::descriptor'
     def td(t):
         nonlocal count
-        if isinstance(t,Scalar):value='TypeDescriptor{TypeKind::'+{'int':'Int','float':'Float','bool':'Bool','bytes':'Bytes','str':'String'}[t.kind]+'}'
+        if isinstance(t,Scalar):value='TypeDescriptor{TypeKind::'+{'int':'Int','bigint':'BigInt','float':'Float','bool':'Bool','bytes':'Bytes','str':'String'}[t.kind]+'}'
         elif isinstance(t,EnumRef):value='TypeDescriptor{TypeKind::Enum,nullptr,nullptr,nullptr,nullptr,'+en(t.name)+'}'
         elif isinstance(t,MsgRef):value='TypeDescriptor{TypeKind::Message,nullptr,nullptr,nullptr,'+mn(t.name)+'}'
         elif isinstance(t,ListOf):value='TypeDescriptor{TypeKind::List,&'+td(t.elem)+'}'

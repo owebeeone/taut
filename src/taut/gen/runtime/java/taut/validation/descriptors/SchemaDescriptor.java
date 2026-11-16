@@ -16,7 +16,7 @@ public final class SchemaDescriptor {
         this.enums = Snapshots.map(enums);
         this.options = Snapshots.options(options);
         this.effectiveOptions = Snapshots.options(effectiveOptions);
-        if (descriptorContractVersion != 1 || irVersion < 1 || irVersion > 3) throw new taut.validation.ConfigurationException(identity + ": unsupported descriptor/IR contract");
+        if (descriptorContractVersion != 1 || irVersion < 1 || irVersion > 4) throw new taut.validation.ConfigurationException(identity + ": unsupported descriptor/IR contract");
     }
     public int descriptorContractVersion() { return descriptorContractVersion; }
     public int irVersion() { return irVersion; }

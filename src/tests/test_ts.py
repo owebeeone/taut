@@ -860,8 +860,8 @@ def _refused_irs(v2: dict) -> list[dict[str, Any]]:
     depth = "message Tree: effective max_depth must be an integer from 1 to 128"
     length = "the file: effective max_encoded_len must be null or an integer from 1 to 2147483647"
     edits = [
-        ("version 4", lambda ir: ir.update(version=4),
-         "unsupported IR version 4: this runtime reads versions 1, 2 and 3"),
+        ("version 5", lambda ir: ir.update(version=5),
+         "unsupported IR version 5: this runtime reads versions 1, 2, 3 and 4"),
         ("version 0", lambda ir: ir.update(version=0), "unsupported IR version 0"),
         ("version 2.5", lambda ir: ir.update(version=2.5), "unsupported IR version 2.5"),
         ('version "2"', lambda ir: ir.update(version="2"), 'unsupported IR version "2"'),
@@ -1293,7 +1293,7 @@ def test_typescript_parity_runner_speaks_the_bounds_protocol_and_every_row_passe
     assert report.green, "\n".join([report.fault, *(f"{r.name}: {r.detail}" for r in report.failures)])
     kinds = [r.kind for r in report.results]
     assert kinds.count("bounds") == len(parity.bounds_rows())
-    assert kinds.count("malformed") == len(parity.malformed_rows())
+    assert kinds.count("malformed") == len(parity.malformed_rows()) + len(parity.bigint_rows())
 
 
 def test_typescript_parity_runner_reports_an_expansion_that_is_not_len_as_untyped(tmp_path, monkeypatch):

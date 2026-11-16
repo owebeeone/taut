@@ -439,3 +439,15 @@ TypeScript's reusable runtime source is in this repo under
 `src/taut/gen/runtime/typescript/` and can be vendored into generated outputs
 with `--with-runtime`. Other targets can be emitted into caller-owned generated
 output trees and validated against the same corpus.
+
+## Arbitrary-precision fields
+
+Import `BIGINT` from `taut.ir.dsl` and declare `amount=F(1, BIGINT)`. `BIGINT`
+schemas export IR version 4; schemas using only earlier features keep their
+previous IR version. A `BIGINT` is always CBOR-tagged, including zero and small
+values. It is separate from the signed-64-bit `INT` scalar. Optional fields,
+lists and map values support it; map keys do not.
+
+See [the codec contract](CodecContract.md#8-arbitrary-precision-bigint-ir-version-4)
+for the wire format and [adapter examples](../examples/bigint/README.md) for
+replaceable arithmetic bindings.

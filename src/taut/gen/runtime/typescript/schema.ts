@@ -11,10 +11,10 @@
 
 import { DEFAULT_MAX_DEPTH, MAX_DEPTH_CEILING } from "./cbor.ts";
 import { snapshot } from "./snapshots.ts";
-export const SchemaContract = Object.freeze({owner:"taut.typescript.foundation",contract:1,irVersions:Object.freeze([1,2,3])});
+export const SchemaContract = Object.freeze({owner:"taut.typescript.foundation",contract:1,irVersions:Object.freeze([1,2,3,4])});
 
 export type TypeRef =
-  | { k: "scalar"; scalar: "int" | "str" | "bytes" | "bool" | "float" }
+  | { k: "scalar"; scalar: "int" | "bigint" | "str" | "bytes" | "bool" | "float" }
   | { k: "enum"; name: string }
   | { k: "msg"; name: string }
   | { k: "list"; elem: TypeRef }
@@ -120,11 +120,11 @@ function show(value: unknown): string {
   return JSON.stringify(value) ?? "none";
 }
 
-function irVersion(ir: Schema): 1 | 2 | 3 {
+function irVersion(ir: Schema): 1 | 2 | 3 | 4 {
   const version: unknown = ir.version;
-  if (version !== 1 && version !== 2 && version !== 3) {
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4) {
     throw new Error(
-      `unsupported IR version ${show(version)}: this runtime reads versions 1, 2 and 3; ` +
+      `unsupported IR version ${show(version)}: this runtime reads versions 1, 2, 3 and 4; ` +
         "a newer taut wrote this IR, or it is not one",
     );
   }
@@ -159,7 +159,7 @@ function checkedLength(value: unknown, where: string): number | null {
 
 // The effective values of the file or of a message: in version 1 the defaults, as it
 // carries none; in version 2 the ones Python resolved, each known and in range.
-function readEffective(level: { effective?: unknown }, where: string, version: 1 | 2 | 3): Effective {
+function readEffective(level: { effective?: unknown }, where: string, version: 1 | 2 | 3 | 4): Effective {
   const values = level.effective;
   if (version === 1) {
     if (values !== undefined) {
@@ -206,6 +206,10 @@ export class SchemaIndex {
   constructor(schema: Schema) {
     schema=snapshot(schema);
     const version = irVersion(schema);
+    const containsBigInt = (t: TypeRef): boolean => t.k === "scalar" ? t.scalar === "bigint"
+      : t.k === "list" ? containsBigInt(t.elem) : t.k === "map" ? containsBigInt(t.key) || containsBigInt(t.value) : false;
+    if (version < 4 && schema.messages.some(m => m.fields.some(f => containsBigInt(f.type))))
+      throw new Error("bigint requires IR version 4; re-export schema");
     this.#fileEffective = readEffective(schema, "the file", version);
     for (const m of schema.messages) {
       this.#msgs.set(m.name, m);

@@ -70,7 +70,7 @@ or constant, and `to_cbor` names its fields unqualified, where its own `__b` and
 (the second silently: the field encodes the local's value)."""
 
 RESERVED_TYPE_NAMES = MappingProxyType({
-    **dict.fromkeys("Buf Cbor DecodeError DecodeErrorTag DecodeResult HalfNarrow".split(),
+    **dict.fromkeys("Buf Cbor BigIntValue DecodeError DecodeErrorTag DecodeResult HalfNarrow".split(),
                     "a runtime type"),
     **dict.fromkeys("cbor_detail detail".split(), "a runtime namespace"),
     **dict.fromkeys("""encode_value eq eq_hex ext_append_bytes ext_append_float ext_check_tag
@@ -191,7 +191,7 @@ def _base_type(t: TypeRef, ns: str = _NS) -> str:
     """The native type of `t`; `ns` qualifies an enum or message: `::taut::` inside a struct
     (the module docstring), `taut::` in the corpus."""
     if isinstance(t, Scalar):
-        return {"int": "long long", "float": "double", "str": "std::string_view", "bytes": "std::string_view", "bool": "bool"}[t.kind]
+        return {"int": "long long", "bigint": "::taut::BigIntValue", "float": "double", "str": "std::string_view", "bytes": "std::string_view", "bool": "bool"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         if isinstance(t, MsgRef) and t.name in _INDIRECT.get():
             return f"std::shared_ptr<{ns}{t.name}>"
@@ -210,7 +210,7 @@ def _field_type(f) -> str:
 
 def _encode_scalar(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
-        method = {"int": "integer", "float": "float_", "bool": "boolean", "str": "text", "bytes": "bytes"}[t.kind]
+        method = {"int": "integer", "bigint": "bigint", "float": "float_", "bool": "boolean", "str": "text", "bytes": "bytes"}[t.kind]
         return f"{_BUF}.{method}({expr});"
     if isinstance(t, EnumRef):
         return f"{_BUF}.integer(static_cast<long long>({expr}));"
@@ -248,7 +248,7 @@ def _duplicate_key_error(key_type: TypeRef, key: str) -> str:
 
 
 def _try_scalar_method(t: Scalar) -> str:
-    return {"int": "try_int", "float": "try_float", "bool": "try_bool",
+    return {"int": "try_int", "bigint": "try_bigint", "float": "try_float", "bool": "try_bool",
             "str": "try_text", "bytes": "try_bytes"}[t.kind]
 
 

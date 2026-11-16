@@ -257,7 +257,7 @@ func decoded(row decodeRow, data []byte) ([]byte, error) {
 // untyped, so a new tag fails the gate until it is described here.
 func describe(e *taut.DecodeError) (string, bool) {
 	switch e.Tag {
-	case "Truncated", "TrailingBytes", "InvalidUtf8", "NonIntegerMapKey":
+	case "Truncated", "TrailingBytes", "InvalidUtf8", "NonIntegerMapKey", "NonCanonicalBigInt":
 		return e.Tag, true
 	case "UnsupportedInfo":
 		return fmt.Sprintf("%s;info=%d", e.Tag, e.Info), true

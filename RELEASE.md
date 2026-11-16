@@ -121,6 +121,23 @@ package publication and documentation deployment where configured.
   same GitHub Release.
 <!-- gearu:release:end -->
 
+## Bigint minor release candidate
+
+The bigint candidate targets `0.12.0` for `taut-proto`, `taut-foundation`, the
+shape contract and all three shape libraries. Python shape requires
+`taut-proto>=0.12.0,<0.13`; Rust shape requires `taut-foundation` in the
+`0.12` line. Glial's declared registry dependency is `^0.12.0`.
+
+The compatibility manifest remains `candidate` until the coordinated release
+is complete. Python fallback versions record source-export intent; normal Git
+builds still derive their versions from tags. No tag is created by editing these
+files. The new foundation payload needs its own publication before Rust shape
+can resolve its registry dependency. Regenerate registry lockfiles only after
+the required packages exist; do not substitute local paths or invent registry
+checksums in committed locks. Refresh immutable sibling inputs after their
+candidate changes are committed. The historical release records below retain
+their original versions and publication states.
+
 ## taut's checks
 
 The 0.11 train also releases the dependency-free `taut-foundation` Rust crate.
@@ -176,7 +193,7 @@ The gate first collects every case, records IDs and candidate raw-file hashes,
 then verifies the exact platform union and all setup/call/teardown results.
 `TAUT_RELEASE_EVIDENCE_DIR` retains JSON/XML ledgers and logs outside the candidate.
 The eight duplicate `gate` wrappers are recorded separately; the mandatory
-parity command must execute all sixteen variants and all 88 rows per variant.
+parity command must execute all sixteen variants and all 134 rows per variant.
 
 `release-inputs.json` pins the four sibling test inputs. Gearu materializes
 committed clones with LF checkout and frozen TypeScript dependencies; publication

@@ -95,7 +95,7 @@ def test_schema_rejections(case, tmp_path, language):
 
 def test_ir_old_version_cannot_hide_constraints_and_future_rejected():
     doc = schema_json(load_schema(EXAMPLE))
-    for version in (1, 2, 4):
+    for version in (1, 2, 5):
         bad = copy.deepcopy(doc)
         bad["version"] = version
         with pytest.raises(ValueError):

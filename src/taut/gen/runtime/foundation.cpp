@@ -1,3 +1,5 @@
+//go:build ignore
+
 #include "taut/foundation.hpp"
 namespace taut {
 const FoundationContract& foundation_contract() noexcept {

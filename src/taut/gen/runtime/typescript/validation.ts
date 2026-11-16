@@ -18,6 +18,7 @@ function readField(value:unknown,binding:MessageBinding<any>,index:number):unkno
 function primitive(kind:string,value:unknown):boolean {
   switch(kind) {
     case "int":return typeof value==="bigint" && value>=I64_MIN && value<=I64_MAX;
+    case "bigint":return typeof value==="bigint";
     case "float":return typeof value==="number";
     case "str":return typeof value==="string";
     case "bool":return typeof value==="boolean";

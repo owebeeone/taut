@@ -1,0 +1,441 @@
+{
+  "contract": "taut-codec-parity/bigint/v1",
+  "vectors": [
+    {
+      "name": "BI0-raw",
+      "stage": "raw_decode",
+      "bytes": "c240",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI0-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c24002c2400382c240c2400481a2010102c240",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI1-raw",
+      "stage": "raw_decode",
+      "bytes": "c340",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI1-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c34002c241010382c340c241010481a2010102c340",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI2-raw",
+      "stage": "raw_decode",
+      "bytes": "c24105",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI2-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c2410502c341040382c24105c341040481a2010102c24105",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI3-raw",
+      "stage": "raw_decode",
+      "bytes": "c34104",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI3-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c3410402c241050382c34104c241050481a2010102c34104",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI4-raw",
+      "stage": "raw_decode",
+      "bytes": "c2420100",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI4-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c242010002c341ff0382c2420100c341ff0481a2010102c2420100",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI5-raw",
+      "stage": "raw_decode",
+      "bytes": "c3420100",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI5-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c342010002c24201010382c3420100c24201010481a2010102c3420100",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI6-raw",
+      "stage": "raw_decode",
+      "bytes": "c2488000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI6-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c248800000000000000002c3487fffffffffffffff0382c2488000000000000000c3487fffffffffffffff0481a2010102c2488000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI7-raw",
+      "stage": "raw_decode",
+      "bytes": "c3488000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI7-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c348800000000000000002c24880000000000000010382c3488000000000000000c24880000000000000010481a2010102c3488000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI8-raw",
+      "stage": "raw_decode",
+      "bytes": "c248ffffffffffffffff",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI8-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c248ffffffffffffffff02c348fffffffffffffffe0382c248ffffffffffffffffc348fffffffffffffffe0481a2010102c248ffffffffffffffff",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI9-raw",
+      "stage": "raw_decode",
+      "bytes": "c249010000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI9-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c24901000000000000000002c348ffffffffffffffff0382c249010000000000000000c348ffffffffffffffff0481a2010102c249010000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI10-raw",
+      "stage": "raw_decode",
+      "bytes": "c349010000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI10-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c34901000000000000000002c2490100000000000000010382c349010000000000000000c2490100000000000000010481a2010102c349010000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI11-raw",
+      "stage": "raw_decode",
+      "bytes": "c25880ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI11-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c25880ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff02c35880fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0382c25880ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc35880fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0481a2010102c25880ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI12-raw",
+      "stage": "raw_decode",
+      "bytes": "c35881010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI12-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c3588101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002c258810100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010382c35881010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c258810100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010481a2010102c35881010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI13-raw",
+      "stage": "raw_decode",
+      "bytes": "c25904010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI13-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c2590401010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002c3590400ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0382c25904010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c3590400ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0481a2010102c25904010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI14-raw",
+      "stage": "raw_decode",
+      "bytes": "c3590400ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expect": {
+        "accept": true
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI14-typed",
+      "stage": "from_cbor",
+      "bytes": "a401c3590400ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff02c259040101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000382c3590400ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc259040101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000481a2010102c3590400ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad0",
+      "stage": "raw_decode",
+      "bytes": "c2",
+      "expect": {
+        "tag": "Truncated"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad1",
+      "stage": "raw_decode",
+      "bytes": "c241",
+      "expect": {
+        "tag": "Truncated"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad2",
+      "stage": "raw_decode",
+      "bytes": "c201",
+      "expect": {
+        "tag": "WrongType"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad3",
+      "stage": "raw_decode",
+      "bytes": "c281",
+      "expect": {
+        "tag": "WrongType"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad4",
+      "stage": "raw_decode",
+      "bytes": "c24100",
+      "expect": {
+        "tag": "NonCanonicalBigInt"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad5",
+      "stage": "raw_decode",
+      "bytes": "c3420001",
+      "expect": {
+        "tag": "NonCanonicalBigInt"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad6",
+      "stage": "raw_decode",
+      "bytes": "c2580101",
+      "expect": {
+        "tag": "NonCanonicalInt"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad7",
+      "stage": "raw_decode",
+      "bytes": "c24000",
+      "expect": {
+        "tag": "TrailingBytes"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad8",
+      "stage": "raw_decode",
+      "bytes": "a1c2410100",
+      "expect": {
+        "tag": "NonIntegerMapKey"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad9",
+      "stage": "raw_decode",
+      "bytes": "c2ff",
+      "expect": {
+        "tag": "WrongType"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad10",
+      "stage": "raw_decode",
+      "bytes": "c25fffffffffffffffff",
+      "expect": {
+        "tag": "UnsupportedInfo"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad11",
+      "stage": "raw_decode",
+      "bytes": "c25bffffffffffffffff",
+      "expect": {
+        "tag": "Truncated"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-bad12",
+      "stage": "raw_decode",
+      "bytes": "d80240",
+      "expect": {
+        "tag": "UnsupportedMajor"
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-null-optional",
+      "stage": "from_cbor",
+      "bytes": "a401c24002f603800480",
+      "expect": {
+        "accept": true
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-wrong-native-type",
+      "stage": "from_cbor",
+      "bytes": "a4010502f603800480",
+      "expect": {
+        "tag": "WrongType"
+      },
+      "schema": "BigIntBox",
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    },
+    {
+      "name": "BI-too-large",
+      "stage": "raw_decode",
+      "bytes": "c2420100",
+      "expect": {
+        "tag": "TooLarge",
+        "len": 4,
+        "limit": 3
+      },
+      "limits": {
+        "max_encoded_len": 3
+      },
+      "why": "BIGINT application profile: tagged, minimal unsigned argument, exact typed round trip or named rejection."
+    }
+  ]
+}

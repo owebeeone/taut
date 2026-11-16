@@ -67,7 +67,7 @@ def _id(name: str) -> str:
 
 def _kt_ty(t: TypeRef) -> str:
     if isinstance(t, Scalar):
-        return {"int": "Long", "str": "String", "bytes": "ByteArray",
+        return {"int": "Long", "bigint": "BigIntValue", "str": "String", "bytes": "ByteArray",
                 "bool": "Boolean", "float": "Double"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return _id(t.name)
@@ -85,7 +85,7 @@ def _field_type(f: FieldDef) -> str:
 
 def _default(t: TypeRef) -> str:
     if isinstance(t, Scalar):
-        return {"int": "0L", "str": '""', "bytes": "ByteArray(0)",
+        return {"int": "0L", "bigint": "BigIntValue.zero()", "str": '""', "bytes": "ByteArray(0)",
                 "bool": "false", "float": "0.0"}[t.kind]
     if isinstance(t, ListOf):
         return "emptyList()"
@@ -94,7 +94,7 @@ def _default(t: TypeRef) -> str:
 
 def _enc(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
-        return {"int": f"Cbor.int({expr})", "str": f"Cbor.text({expr})",
+        return {"int": f"Cbor.int({expr})", "bigint": f"Cbor.bigint({expr})", "str": f"Cbor.text({expr})",
                 "bytes": f"Cbor.bytes({expr})", "bool": f"Cbor.bool({expr})",
                 "float": f"Cbor.float({expr})"}[t.kind]
     if isinstance(t, EnumRef):
@@ -112,7 +112,7 @@ def _enc(t: TypeRef, expr: str) -> str:
 
 def _dec(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
-        return {"int": f"{expr}.intVal", "str": f"{expr}.textVal",
+        return {"int": f"{expr}.intVal", "bigint": f"{expr}.bigintVal", "str": f"{expr}.textVal",
                 "bytes": f"{expr}.bytesVal", "bool": f"{expr}.boolVal",
                 "float": f"{expr}.floatVal"}[t.kind]
     if isinstance(t, EnumRef):

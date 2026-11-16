@@ -29,7 +29,7 @@ _RUNNER = r'''
 const api = require("./api.js");
 const { DEFAULT_MAX_DEPTH, MAX_DEPTH_CEILING, decode, encode } = require("./cbor.js");
 const intVectors = require("./int.vectors.json").vectors;
-const decodeRows = [...require("./malformed.vectors.json").vectors, ...require("./bounds.vectors.json").vectors];
+const decodeRows = [...require("./malformed.vectors.json").vectors, ...require("./bounds.vectors.json").vectors, ...require("./bigint.vectors.json").vectors];
 const dispatch = require("./dispatch.json");
 const PAYLOAD = ["info", "major", "key", "expected", "enum", "value", "len", "limit"];
 // A raw row's limits, named as the corpus names them, as decode's options (CD-B3).

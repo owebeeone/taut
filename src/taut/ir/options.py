@@ -246,7 +246,7 @@ def nesting(schema: Schema, root: TypeRef) -> int:
 
 # A scalar's shortest canonical encoding: 0, "", b"" and false take one byte; a float's
 # shortest form is a half, f9 and two bytes.
-_SHORTEST_SCALAR = {"int": 1, "str": 1, "bytes": 1, "bool": 1, "float": 3}
+_SHORTEST_SCALAR = {"bigint": 2, "int": 1, "str": 1, "bytes": 1, "bool": 1, "float": 3}
 
 
 def _head_length(n: int) -> int:

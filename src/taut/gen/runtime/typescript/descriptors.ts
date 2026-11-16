@@ -51,7 +51,7 @@ function record<T>(values: Readonly<Record<string,T>>): Readonly<Record<string,T
   return Object.freeze(Object.assign(Object.create(null), values));
 }
 export type TypeDescriptor =
-  | Readonly<{kind: "int" | "str" | "bool" | "bytes" | "float"}>
+  | Readonly<{kind: "int" | "bigint" | "str" | "bool" | "bytes" | "float"}>
   | Readonly<{kind: "message"; binding: () => MessageBinding<any>}>
   | Readonly<{kind: "enum"; enum: () => EnumDescriptor}>
   | Readonly<{kind: "list"; element: TypeDescriptor}>
@@ -156,7 +156,7 @@ export function requireExternal(value:unknown, fingerprint:string, name:string, 
 }
 export function publish(schema:SchemaDescriptor, bindings:readonly MessageBinding<any>[]):void {
   requireFoundation();
-  if (![1,2,3].includes(schema.irVersion)) throw new ConfigurationError("unsupported descriptor IR version");
+  if (![1,2,3,4].includes(schema.irVersion)) throw new ConfigurationError("unsupported descriptor IR version");
   if(bindings.length!==Object.keys(schema.messages).length || Object.values(schema.messages).some(d=>!bindings.some(b=>b.descriptor===d)) ||
       Object.values(schema.enums).some(e=>!(e instanceof EnumDescriptor) || e.owner!==Foundation)) throw new ConfigurationError("incomplete/wrong-category schema descriptor bindings");
   const visited=new Set<MessageDescriptor>();
@@ -169,14 +169,14 @@ export function publish(schema:SchemaDescriptor, bindings:readonly MessageBindin
   }
   effective(schema.effectiveOptions);
   function checkType(t:TypeDescriptor):void {
-    const expected:Record<string,string>={int:"kind",str:"kind",bool:"kind",bytes:"kind",float:"kind",message:"binding,kind",enum:"enum,kind",list:"element,kind",map:"key,kind,value"};
+    const expected:Record<string,string>={int:"kind",bigint:"kind",str:"kind",bool:"kind",bytes:"kind",float:"kind",message:"binding,kind",enum:"enum,kind",list:"element,kind",map:"key,kind,value"};
     if(!t || Object.keys(t).sort().join(",")!==expected[t.kind]) throw new ConfigurationError("invalid type descriptor data");
     switch(t.kind) {
       case "message": if(typeof t.binding!=="function") throw new ConfigurationError("missing typed message link"); check(t.binding()); break;
       case "enum": if (typeof t.enum!=="function" || !(t.enum() instanceof EnumDescriptor) || t.enum().owner!==Foundation) throw new ConfigurationError("invalid enum link/owner"); break;
       case "list": checkType(t.element); break;
       case "map": if (!["str","int","bool"].includes(t.key.kind)) throw new ConfigurationError("invalid map key descriptor"); checkType(t.key);checkType(t.value);break;
-      case "int":case "str":case "bool":case "bytes":case "float":break;
+      case "int":case "bigint":case "str":case "bool":case "bytes":case "float":break;
       default:throw new ConfigurationError("unknown type descriptor");
     }
   }

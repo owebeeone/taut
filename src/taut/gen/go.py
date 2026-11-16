@@ -55,9 +55,9 @@ from ..ir.model import MISSING_OK, EnumRef, FieldDef, ListOf, MapOf, MessageDef,
 from ..ir.options import effective
 from .names import Clash, scope_clashes
 
-_SCALAR_TYPES = {"int": "int64", "str": "string", "bytes": "[]byte", "bool": "bool", "float": "float64"}
-_SCALAR_ENCODERS = {"int": "CInt", "str": "CText", "bytes": "CBytes", "bool": "CBool", "float": "CFloat"}
-_SCALAR_DECODERS = {"int": "TryInt", "str": "TryText", "bytes": "TryBytes", "bool": "TryBool", "float": "TryFloat"}
+_SCALAR_TYPES = {"int": "int64", "bigint": "BigInt", "str": "string", "bytes": "[]byte", "bool": "bool", "float": "float64"}
+_SCALAR_ENCODERS = {"int": "CInt", "bigint": "CBigInt", "str": "CText", "bytes": "CBytes", "bool": "CBool", "float": "CFloat"}
+_SCALAR_DECODERS = {"int": "TryInt", "bigint": "TryBigInt", "str": "TryText", "bytes": "TryBytes", "bool": "TryBool", "float": "TryFloat"}
 _MAP_KEYS = ("int", "str", "bool")
 
 RESERVED_FIELD_NAMES = MappingProxyType({
@@ -68,18 +68,18 @@ RESERVED_FIELD_NAMES = MappingProxyType({
 name, nor two fields of one."""
 
 RESERVED_TYPE_NAMES = MappingProxyType({
-    **dict.fromkeys("Cbor DecodeError ExtTagError KV Kind".split(), "a runtime type"),
-    **dict.fromkeys("""CArr CBool CBytes CFloat CInt CMap CNull CText DuplicateMapKeyError Encode
+    **dict.fromkeys("Cbor DecodeError ExtTagError KV Kind BigInt".split(), "a runtime type"),
+    **dict.fromkeys("""CArr CBool CBytes CFloat CInt CBigInt CMap CNull CText DuplicateMapKeyError Encode
         ExtClear ExtGet ExtSet TryDecode TryDecodeWith UnknownEnumError dec enc enter extHost
         float64ToHalfBits floatBytes halfToFloat64 head negOverflowValue readArg
         roundShiftEven""".split(), "a runtime function"),
     **dict.fromkeys("""BandStart DecodeErrDuplicateMapKey DecodeErrIntOverflow DecodeErrInvalidUtf8
-        DecodeErrMissingKey DecodeErrNegativeMapKey DecodeErrNonCanonicalInt
+        DecodeErrMissingKey DecodeErrNegativeMapKey DecodeErrNonCanonicalInt DecodeErrNonCanonicalBigInt
         DecodeErrNonIntegerMapKey DecodeErrTooDeep DecodeErrTooLarge DecodeErrTrailingBytes
         DecodeErrTruncated DecodeErrUnknownEnum DecodeErrUnsupportedInfo DecodeErrUnsupportedMajor
-        DecodeErrWrongType DefaultMaxDepth KArr KBool KBytes KFloat KInt KMap KNull KText
+        DecodeErrWrongType DefaultMaxDepth KArr KBool KBytes KFloat KInt KBigInt KMap KNull KText
         MaxDepthCeiling maxInt64Uint""".split(), "a runtime constant"),
-    **dict.fromkeys("fmt math sort strconv utf8".split(), "a package the runtime imports"),
+    **dict.fromkeys("fmt math big sort strconv utf8".split(), "a package the runtime imports"),
     **dict.fromkeys("""append bool byte copy error false float32 float64 int int64 iota len make nil
         string true uint uint16 uint32 uint64""".split(), "a predeclared name the code uses"),
     **dict.fromkeys("c data err fv ok v".split(), "a parameter or local that hides the type"),

@@ -198,7 +198,7 @@ def test_smallest_encoding_of_each_shape(tref, length):
 def _minimal(s, tref):
     """The value of `tref` built from each field's shortest canonical value."""
     if isinstance(tref, Scalar):
-        return {"int": 0, "str": "", "bytes": b"", "bool": False, "float": 0.0}[tref.kind]
+        return {"int": 0, "bigint": 0, "str": "", "bytes": b"", "bool": False, "float": 0.0}[tref.kind]
     if isinstance(tref, EnumRef):
         members = s.enums[tref.name].members
         return min(members, key=lambda member: len(cbor.dumps(members[member])))

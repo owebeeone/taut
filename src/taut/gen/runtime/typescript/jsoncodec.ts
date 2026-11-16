@@ -57,6 +57,7 @@ function toJson(schema: SchemaIndex, t: TypeRef, value: Native): JsonValue {
   switch (t.k) {
     case "scalar":
       switch (t.scalar) {
+        case "bigint":
         case "int":
           return String(value); // i64 as string (precision)
         case "bytes":
@@ -117,6 +118,9 @@ function fromJson(schema: SchemaIndex, t: TypeRef, jv: JsonValue): Native {
   switch (t.k) {
     case "scalar":
       switch (t.scalar) {
+        case "bigint":
+          if (typeof jv !== "string" || !/^(0|-?[1-9][0-9]*)$/.test(jv)) throw new TypeError("bigint JSON requires canonical decimal text");
+          return BigInt(jv);
         case "int":
           return intJson(jv);
         case "bytes":

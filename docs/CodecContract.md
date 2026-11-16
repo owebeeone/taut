@@ -9,7 +9,7 @@ enforces it is `taut-codec-parity/i64/v1`.
 
 ## 1. Two invariants
 
-1. **Integers are exactly `i64`.** Every value in `[-2^63, 2^63 - 1]` round-trips unchanged.
+1. **Ordinary `INT` values are exactly `i64`.** Every value in `[-2^63, 2^63 - 1]` round-trips unchanged.
    - A received CBOR int outside that range is `IntOverflow`.
    - A native value outside it is `IntOutOfSubset` on encode. That applies only where a native
      integer can hold it: Python's `int`, and TypeScript's and JavaScript's `bigint`.
@@ -36,14 +36,15 @@ as text:
 | `TrailingBytes` | | bytes after the top-level item |
 | `InvalidUtf8` | | text that is not UTF-8 |
 | `UnsupportedInfo` | `info` | additional info 28-31, or a major-7 value other than false, true, null and the three floats |
-| `UnsupportedMajor` | `major` | major type 6 (tags), whatever its additional info |
+| `UnsupportedMajor` | `major` | major type 6 except the supported one-byte bigint tags `c2` and `c3` |
+| `NonCanonicalBigInt` | | redundant leading zero bytes in a tagged bigint argument |
 | `NonCanonicalInt` | `value` | an argument longer than needed (the raw argument) |
 | `IntOverflow` | `value` | an int outside `i64` (Rust's variant carries no value) |
 | `NonIntegerMapKey` | | a raw map key that is not an int |
 | `NegativeMapKey` | `key` | a raw map key below 0 |
 | `DuplicateMapKey` | `key` | a repeated raw map key or `map<K,V>` key, as text: an int in decimal, a str as itself, a bool as `true` or `false` |
 | `MissingKey` | `key` | an absent field, unless it is `optional=MISSING_OK` |
-| `WrongType` | `expected` | one of `int`, `float`, `bytes`, `text`, `bool`, `array`, `map` |
+| `WrongType` | `expected` | one of `int`, `bigint`, `float`, `bytes`, `text`, `bool`, `array`, `map` |
 | `UnknownEnum` | `enum`, `value` | a value the enum does not name |
 | `TooDeep` | `limit` | an array or map one level deeper than the bound |
 | `TooLarge` | `len`, `limit` | input longer than the length bound |
@@ -56,7 +57,7 @@ Decode reads left to right and reports the first check that fails:
    is read.
 2. **Each item's head.**
    - No byte left is `Truncated`.
-   - Major type 6 is `UnsupportedMajor`.
+   - Major type 6 is `UnsupportedMajor`, except `c2` and `c3` (§8).
    - Unsupported additional info is `UnsupportedInfo`.
    - Missing argument bytes are `Truncated`.
    - A non-minimal argument is `NonCanonicalInt`.
@@ -135,3 +136,38 @@ non-zero fails its target.
 - The delivery-shape packages (`taut-shape-*`) sit above this contract and vendor its runtimes.
 - The legacy codec that D1 retired, `--legacy-codec` and its panicking runtime, is gone as of
   v0.10.0.
+
+## 8. Arbitrary-precision `BIGINT` (IR version 4)
+
+`BIGINT` is a separate scalar; it does not widen `INT`. Its CBOR representation
+is tag 2 (`c2`) for a nonnegative value n, or tag 3 (`c3`) for a negative value
+-1-n, followed by a definite-length byte string containing n as minimal unsigned
+big-endian bytes. Empty bytes encode zero under tag 2 and minus one under tag 3.
+Leading zero bytes are `NonCanonicalBigInt`; a nonminimal byte-string length is
+`NonCanonicalInt`. Missing tag content is `Truncated`; non-byte-string content
+is `WrongType(expected=bytes)`. Other tag heads, including `d8 02`, retain
+`UnsupportedMajor(6)` precedence. A tagged value used as a raw map key is
+`NonIntegerMapKey` after its body has been checked.
+
+This application profile always tags `BIGINT`, including small values, so an
+ordinary CBOR integer is `WrongType(expected=bigint)` in a bigint field and a
+tagged integer is `WrongType(expected=int)` in an `INT` field. This makes typed
+decode/re-encode byte exact. It is an explicit profile over
+[RFC 8949 section 3.4.3](https://www.rfc-editor.org/rfc/rfc8949.html#section-3.4.3),
+whose generic preferred form uses ordinary integer heads for small numbers.
+
+Lists, optional fields and map values support `BIGINT`; schema map keys remain
+`INT`, `STR` or `BOOL`. Existing bounds apply before copying a magnitude. Tag
+content is a byte string, so tags add no container nesting. The JSON profile
+uses canonical decimal strings (`0` or an optional minus and nonzero first
+digit), never floating-point JSON numbers.
+
+Python uses `int`; JavaScript/TypeScript use `bigint`; Java uses `BigInteger`;
+Go uses `math/big.Int`. Generated C++, Rust, Swift and Kotlin fields use a
+`BigIntValue` serialization carrier with replaceable sign/magnitude adapters.
+Kotlin provides the JVM `BigInteger` adapter; Rust's `num-bigint` feature is
+opt-in. Taut has no arithmetic implementation dependency by default. See
+[the adapter examples](../examples/bigint/README.md) for C++ and Swift.
+
+The shared `corpus/parity/bigint.vectors.json` is replayed alongside the frozen
+i64 corpus by `tautc parity --require-all`.

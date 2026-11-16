@@ -12,6 +12,7 @@
 #include <type_traits>
 #include <vector>
 namespace taut {
+class BigIntValue;
 template<class T> class ReadOnlyRange {
   const T* data_ = nullptr;
   std::size_t size_ = 0;
@@ -27,7 +28,7 @@ public:
 };
 // Static metadata is compiler-authored, const-owned storage. No public mutable
 // metadata containers or runtime graph registration are part of this ABI.
-enum class TypeKind { Int, String, Bool, Bytes, Float, Enum, Message, List, Map };
+enum class TypeKind { Int, String, Bool, Bytes, Float, Enum, Message, List, Map, BigInt };
 struct Fact;
 struct FactEntry;
 struct Fact {
@@ -207,6 +208,7 @@ public:
   bool present() const noexcept;
   TypeKind kind() const noexcept;
   long long integer() const noexcept;
+  const BigIntValue& bigint() const noexcept;
   double floating() const noexcept;
   bool boolean() const noexcept;
   std::string_view text() const noexcept;
@@ -270,6 +272,8 @@ template<class T> const ValueOps& operations() noexcept {
       o.kind=TypeKind::Bool; o.boolean=[](const void* p) noexcept { return *Unwrap<T>::get(*static_cast<const T*>(p)); };
     } else if constexpr (std::is_integral_v<U>) {
       o.kind=TypeKind::Int; o.integer=[](const void* p) noexcept { return static_cast<long long>(*Unwrap<T>::get(*static_cast<const T*>(p))); };
+    } else if constexpr (std::is_same_v<U, ::taut::BigIntValue>) {
+      o.kind=TypeKind::BigInt;
     } else if constexpr (std::is_floating_point_v<U>) {
       o.kind=TypeKind::Float; o.floating=[](const void* p) noexcept { return static_cast<double>(*Unwrap<T>::get(*static_cast<const T*>(p))); };
     } else if constexpr (std::is_same_v<U,std::string_view> || std::is_same_v<U,std::string>) {
@@ -294,6 +298,7 @@ template<class T> const ValueOps& operations() noexcept {
 inline bool ValueRef::present() const noexcept { return ops_->present(value_); }
 inline TypeKind ValueRef::kind() const noexcept { return ops_->kind; }
 inline long long ValueRef::integer() const noexcept { return ops_->integer(value_); }
+inline const BigIntValue& ValueRef::bigint() const noexcept { return *static_cast<const BigIntValue*>(ops_->unwrap(value_)); }
 inline double ValueRef::floating() const noexcept { return ops_->floating(value_); }
 inline bool ValueRef::boolean() const noexcept { return ops_->boolean(value_); }
 inline std::string_view ValueRef::text() const noexcept { return ops_->text(value_); }
@@ -309,7 +314,7 @@ struct TypeAncestor {const TypeDescriptor* value;const TypeAncestor* parent;};
 inline void check_type(const TypeDescriptor& type,const TypeAncestor* ancestors=nullptr) {
   for(auto p=ancestors;p;p=p->parent)if(p->value==&type)throw std::logic_error("cyclic C++ collection descriptor configuration; regenerate");
   const TypeAncestor current{&type,ancestors};
-  const bool primitive=type.kind==TypeKind::Int||type.kind==TypeKind::String||type.kind==TypeKind::Bool||type.kind==TypeKind::Bytes||type.kind==TypeKind::Float;
+  const bool primitive=type.kind==TypeKind::BigInt||type.kind==TypeKind::Int||type.kind==TypeKind::String||type.kind==TypeKind::Bool||type.kind==TypeKind::Bytes||type.kind==TypeKind::Float;
   bool valid=false;
   if(primitive)valid=!type.element&&!type.key&&!type.value&&!type.message&&!type.enumeration;
   if(type.kind==TypeKind::Message)valid=type.message&&!type.enumeration&&!type.element&&!type.key&&!type.value&&type.message().descriptor_contract_version()==1;
@@ -355,7 +360,7 @@ inline void check_message(const MessageDescriptor& descriptor) {
 }
 inline void check_binding(const SchemaBinding& binding) {
   const auto& schema=binding.schema();
-  if(schema.descriptor_contract_version!=1 || schema.ir_version<1 || schema.ir_version>3)throw std::logic_error("unsupported C++ schema descriptor/IR version; regenerate");
+  if(schema.descriptor_contract_version!=1 || schema.ir_version<1 || schema.ir_version>4)throw std::logic_error("unsupported C++ schema descriptor/IR version; regenerate");
   const auto& message=binding.descriptor();check_message(message);
   if(binding.fields.size()!=message.fields().size())throw std::logic_error("incomplete C++ typed field binding; regenerate");
   for(std::size_t i=0;i<binding.fields.size();++i)if(bool(binding.fields[i].read)==message.fields()[i].virtual_field())throw std::logic_error("incompatible C++ virtual/value accessor; regenerate");

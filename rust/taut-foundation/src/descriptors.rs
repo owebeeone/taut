@@ -58,6 +58,7 @@ pub type Options = &'static [(&'static str, OptionValue)];
 #[derive(Clone, Copy, Debug)]
 pub enum TypeDescriptor {
     Int,
+    BigInt,
     String,
     Bool,
     Bytes,
@@ -71,6 +72,7 @@ impl TypeDescriptor {
     pub fn kind(&self) -> &'static str {
         match self {
             Self::Int => "int",
+            Self::BigInt => "bigint",
             Self::String => "str",
             Self::Bool => "bool",
             Self::Bytes => "bytes",
@@ -254,6 +256,7 @@ impl MessageDescriptor {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PrimitiveValue<'a> {
     Int(i64),
+    BigInt(&'a super::BigIntValue),
     String(&'a str),
     Bool(bool),
     Bytes(&'a [u8]),

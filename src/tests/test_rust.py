@@ -773,6 +773,7 @@ _TAGGED_ERRORS = {
     "DuplicateMapKey": 'DecodeError::DuplicateMapKey(MapKey::Text("a".to_string()))',
     "IntOverflow": "DecodeError::IntOverflow",
     "NonCanonicalInt": "DecodeError::NonCanonicalInt(5)",
+    "NonCanonicalBigInt": "DecodeError::NonCanonicalBigInt",
     "NegativeMapKey": "DecodeError::NegativeMapKey(-1)",
     "MissingKey": "DecodeError::MissingKey(2)",
     "WrongType": 'DecodeError::WrongType { expected: "map" }',
@@ -1836,6 +1837,7 @@ def test_rust_runner_reports_an_expansion_that_is_not_its_len_as_untyped(monkeyp
     rows = parity.bounds_rows()
     wrong = {**rows[0], "len": rows[0]["len"] + 1}
     monkeypatch.setattr(parity, "bounds_rows", lambda: [wrong, *rows[1:]])
+    monkeypatch.setattr(parity, "bigint_rows", lambda: [])
     report = parity_rust.run()
     assert report.available and not report.fault, report.fault
     judged = {r.name: r for r in report.results if r.kind == "bounds"}

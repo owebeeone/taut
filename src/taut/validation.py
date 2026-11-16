@@ -148,6 +148,8 @@ def _group_events(value, desc, binding, group, path):
 
 
 def _scalar_matches(kind, value):
+    if kind == "bigint":
+        return type(value) is int
     if kind == "int":
         return type(value) is int and cbor.INT_MIN <= value <= cbor.INT_MAX
     if kind == "float":

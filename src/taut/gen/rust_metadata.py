@@ -50,7 +50,7 @@ def options(values):
 
 def type_descriptor(t):
     if isinstance(t, Scalar):
-        return "TypeDescriptor::" + {"int": "Int", "str": "String", "bool": "Bool", "bytes": "Bytes", "float": "Float"}[t.kind]
+        return "TypeDescriptor::" + {"int": "Int", "bigint": "BigInt", "str": "String", "bool": "Bool", "bytes": "Bytes", "float": "Float"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return f"TypeDescriptor::{'Enum' if isinstance(t, EnumRef) else 'Message'}({t.name}::descriptor)"
     if isinstance(t, ListOf):
@@ -190,12 +190,12 @@ def emit_metadata(schema, *, validation=False, external_types=None, identity=Non
             if f.virtual:
                 state = "FieldState::new(false, None)"
             elif isinstance(f.type, Scalar):
-                kind = {'int':'Int','str':'String','bool':'Bool','bytes':'Bytes','float':'Float'}[f.type.kind]
+                kind = {'int':'Int','bigint':'BigInt','str':'String','bool':'Bool','bytes':'Bytes','float':'Float'}[f.type.kind]
                 if f.optional:
-                    expression = 'v' if f.type.kind in ('str','bytes') else '*v'
+                    expression = 'v' if f.type.kind in ('str','bytes','bigint') else '*v'
                     state = f"match &value.{field_id(f.name)} {{ Some(v) => FieldState::from_primitive(PrimitiveValue::{kind}({expression})), None => FieldState::new(false, None) }}"
                 else:
-                    expression = ('&' if f.type.kind in ('str','bytes') else '') + f'value.{field_id(f.name)}'
+                    expression = ('&' if f.type.kind in ('str','bytes','bigint') else '') + f'value.{field_id(f.name)}'
                     state = f"FieldState::from_primitive(PrimitiveValue::{kind}({expression}))"
             else:
                 present = f"value.{field_id(f.name)}.is_some()" if f.optional else "true"

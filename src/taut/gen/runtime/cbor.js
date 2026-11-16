@@ -12,6 +12,7 @@
 // DecodeError, nothing else. The parity corpus pins the two depth numbers to taut's.
 
 const INT = 0, BYTES = 1, TEXT = 2, ARR = 3, MAP = 4, BOOL = 5, NULL = 6, FLOAT = 7;
+const BIGINT = 8;
 
 const INT_MIN = -(1n << 63n);
 const INT_MAX = (1n << 63n) - 1n;
@@ -103,6 +104,10 @@ function rawCMap(m) {
 }
 
 const CInt = (n) => rawCInt(checkI64ForEncode(n));
+const CBigInt = (n) => {
+  if (typeof n !== "bigint") throw new TypeError("BIGINT requires bigint");
+  return {kind: BIGINT, big: n};
+};
 const CFloat = (x) => ({ kind: FLOAT, f: x });
 const CText = (s) => ({ kind: TEXT, s });
 const CBytes = (b) => ({ kind: BYTES, b });
@@ -123,6 +128,7 @@ function expectKind(c, kind, expected) {
 function expectInt(c) {
   return expectKind(c, INT, "int").i;
 }
+function expectBigInt(c) { return expectKind(c, BIGINT, "bigint").big; }
 
 function expectFloat(c) {
   return expectKind(c, FLOAT, "float").f;
@@ -384,6 +390,15 @@ function encode(c) {
 
 function enc(c, out) {
   switch (c.kind) {
+    case BIGINT: {
+      let argument = c.big < 0n ? -1n - c.big : c.big;
+      const bytes = [];
+      while (argument !== 0n) { bytes.push(Number(argument & 255n)); argument >>= 8n; }
+      out.push(c.big < 0n ? 0xc3 : 0xc2);
+      head(out, 2, bytes.length);
+      for (let i = bytes.length - 1; i >= 0; --i) out.push(bytes[i]);
+      break;
+    }
     case INT: {
       const n = checkI64ForEncode(c.i);
       if (n >= 0n) head(out, 0, n);
@@ -555,6 +570,16 @@ function dec(data, off0, depth, limit) {
   }
   const initial = data[off0], major = initial >> 5, info = initial & 0x1f;
   let off = off0 + 1;
+  if (major === 6 && (info === 2 || info === 3)) {
+    requireBytes(data, off, 1);
+    const initial = data[off++];
+    if (initial >> 5 !== 2) wrongType("bytes");
+    const [length, body] = readLength(data, off, initial & 31);
+    if (length !== 0 && data[body] === 0) throw new DecodeError("NonCanonicalBigInt");
+    let argument = 0n;
+    for (let i = body; i < body + length; ++i) argument = (argument << 8n) | BigInt(data[i]);
+    return [CBigInt(info === 3 ? -1n - argument : argument), body + length];
+  }
   switch (major) {
     case 0: {
       const [n, o] = readArg(data, off, info);
@@ -647,6 +672,7 @@ module.exports = {
   DEFAULT_MAX_DEPTH,
   MAX_DEPTH_CEILING,
   CInt,
+  CBigInt,
   CFloat,
   CText,
   CBytes,
@@ -663,6 +689,7 @@ module.exports = {
   compareCodePoints,
   isNull,
   expectInt,
+  expectBigInt,
   expectFloat,
   expectText,
   expectBytes,

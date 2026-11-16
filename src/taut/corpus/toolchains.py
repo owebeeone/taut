@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -51,9 +52,14 @@ def find_node() -> str | None:
 def find_node_for_typescript() -> str | None:
     """node that runs `.ts` directly (`--experimental-strip-types`, node >= 22.6)."""
     node = find_node()
-    if node is None or not _runs([node, "--experimental-strip-types", "-e", ""]):
+    if node is None:
         return None
-    return node
+    # Some distro builds accept the flag but omit the TypeScript subsystem.
+    # Execute a real typed file: an empty JavaScript -e probe misses that case.
+    with tempfile.TemporaryDirectory(prefix="taut-ts-probe-") as tmp:
+        probe = Path(tmp) / "probe.ts"
+        probe.write_text("const value: number = 1; if (value !== 1) throw Error();\n", encoding="utf-8")
+        return node if _runs([node, "--experimental-strip-types", str(probe)]) else None
 
 
 def find_go() -> str | None:

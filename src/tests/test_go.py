@@ -338,6 +338,7 @@ def test_go_runner_reports_an_expansion_whose_length_is_not_len_as_untyped(monke
     torn = {"depth-100000-arrays", "len-8-declared"}
     rows = [{**row, "len": row["len"] + 1} if row["name"] in torn else row for row in parity.bounds_rows()]
     monkeypatch.setattr(parity, "bounds_rows", lambda: rows)
+    monkeypatch.setattr(parity, "bigint_rows", lambda: [])
     report = parity_go.run()
     assert not report.fault, report.fault
     assert {r.name: r.detail.split(" ")[0] for r in report.failures} == {name: "untyped" for name in torn}
@@ -417,6 +418,7 @@ def test_go_raw_decode_matches_python_beyond_the_corpus(monkeypatch):
     rows = [_raw_row(h, want) for h, want in RAW_EDGES]
     monkeypatch.setattr(parity, "malformed_rows", lambda: rows)
     monkeypatch.setattr(parity, "bounds_rows", lambda: [])
+    monkeypatch.setattr(parity, "bigint_rows", lambda: [])
     report = parity_go.run()
     assert report.green, _failures(report)
     assert {r.name for r in report.results if r.kind == "malformed"} == {row["name"] for row in rows}
@@ -598,6 +600,7 @@ def test_go_decodes_and_reencodes_every_shape_at_depth_as_python_does(monkeypatc
     monkeypatch.setattr(parity, "parity_schema", lambda: DEEP_SCHEMA)
     monkeypatch.setattr(parity, "malformed_rows", lambda: rows)
     monkeypatch.setattr(parity, "bounds_rows", lambda: [])
+    monkeypatch.setattr(parity, "bigint_rows", lambda: [])
     report = parity_go.run()
     assert report.green, _failures(report)
     assert {r.name for r in report.results if r.kind == "malformed"} == {row["name"] for row in rows}

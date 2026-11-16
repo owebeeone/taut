@@ -18,6 +18,7 @@ package taut
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"sort"
 	"strconv"
 	"unicode/utf8"
@@ -34,6 +35,7 @@ const (
 	KBool
 	KNull
 	KFloat
+	KBigInt
 )
 
 // KV is one integer-keyed map entry.
@@ -51,6 +53,19 @@ type Cbor struct {
 	Arr  []Cbor
 	Map  []KV
 	F    float64
+	Big  *big.Int
+}
+
+// BigInt is the standard-library arithmetic type. Codec operations copy before
+// applying CBOR's negative offset; they never mutate a caller's integer.
+type BigInt = big.Int
+
+func CBigInt(n BigInt) Cbor { return Cbor{Kind: KBigInt, Big: new(big.Int).Set(&n)} }
+func (c Cbor) TryBigInt() (BigInt, error) {
+	if c.Kind != KBigInt || c.Big == nil {
+		return BigInt{}, &DecodeError{Tag: DecodeErrWrongType, Expected: "bigint"}
+	}
+	return *new(big.Int).Set(c.Big), nil
 }
 
 const (
@@ -59,21 +74,22 @@ const (
 )
 
 const (
-	DecodeErrTruncated        = "Truncated"
-	DecodeErrTrailingBytes    = "TrailingBytes"
-	DecodeErrInvalidUtf8      = "InvalidUtf8"
-	DecodeErrUnsupportedInfo  = "UnsupportedInfo"
-	DecodeErrUnsupportedMajor = "UnsupportedMajor"
-	DecodeErrNonIntegerMapKey = "NonIntegerMapKey"
-	DecodeErrNegativeMapKey   = "NegativeMapKey"
-	DecodeErrIntOverflow      = "IntOverflow"
-	DecodeErrNonCanonicalInt  = "NonCanonicalInt"
-	DecodeErrDuplicateMapKey  = "DuplicateMapKey"
-	DecodeErrMissingKey       = "MissingKey"
-	DecodeErrWrongType        = "WrongType"
-	DecodeErrUnknownEnum      = "UnknownEnum"
-	DecodeErrTooDeep          = "TooDeep"
-	DecodeErrTooLarge         = "TooLarge"
+	DecodeErrTruncated          = "Truncated"
+	DecodeErrTrailingBytes      = "TrailingBytes"
+	DecodeErrInvalidUtf8        = "InvalidUtf8"
+	DecodeErrUnsupportedInfo    = "UnsupportedInfo"
+	DecodeErrUnsupportedMajor   = "UnsupportedMajor"
+	DecodeErrNonIntegerMapKey   = "NonIntegerMapKey"
+	DecodeErrNegativeMapKey     = "NegativeMapKey"
+	DecodeErrIntOverflow        = "IntOverflow"
+	DecodeErrNonCanonicalInt    = "NonCanonicalInt"
+	DecodeErrNonCanonicalBigInt = "NonCanonicalBigInt"
+	DecodeErrDuplicateMapKey    = "DuplicateMapKey"
+	DecodeErrMissingKey         = "MissingKey"
+	DecodeErrWrongType          = "WrongType"
+	DecodeErrUnknownEnum        = "UnknownEnum"
+	DecodeErrTooDeep            = "TooDeep"
+	DecodeErrTooLarge           = "TooLarge"
 )
 
 const maxInt64Uint = uint64(1<<63 - 1)
@@ -252,6 +268,21 @@ func Encode(c Cbor) []byte {
 
 func enc(c Cbor, out *[]byte) {
 	switch c.Kind {
+	case KBigInt:
+		argument := new(big.Int).Set(c.Big)
+		negative := argument.Sign() < 0
+		if negative {
+			argument.Neg(argument)
+			argument.Sub(argument, big.NewInt(1))
+		}
+		if negative {
+			*out = append(*out, 0xc3)
+		} else {
+			*out = append(*out, 0xc2)
+		}
+		bytes := argument.Bytes()
+		head(out, 2, uint64(len(bytes)))
+		*out = append(*out, bytes...)
 	case KInt:
 		if c.I >= 0 {
 			head(out, 0, uint64(c.I))
@@ -495,6 +526,32 @@ func dec(data []byte, off int, depth int, limit int) (Cbor, int, error) {
 	major := initial >> 5
 	info := initial & 0x1f
 	off++
+	if major == 6 && (info == 2 || info == 3) {
+		if off >= len(data) {
+			return Cbor{}, off, &DecodeError{Tag: DecodeErrTruncated}
+		}
+		initial := data[off]
+		off++
+		if initial>>5 != 2 {
+			return Cbor{}, off, &DecodeError{Tag: DecodeErrWrongType, Expected: "bytes"}
+		}
+		length, body, err := readArg(data, off, initial&31)
+		if err != nil {
+			return Cbor{}, body, err
+		}
+		if length > uint64(len(data)-body) {
+			return Cbor{}, body, &DecodeError{Tag: DecodeErrTruncated}
+		}
+		if length != 0 && data[body] == 0 {
+			return Cbor{}, body, &DecodeError{Tag: DecodeErrNonCanonicalBigInt}
+		}
+		argument := new(big.Int).SetBytes(data[body : body+int(length)])
+		if info == 3 {
+			argument.Add(argument, big.NewInt(1))
+			argument.Neg(argument)
+		}
+		return Cbor{Kind: KBigInt, Big: argument}, body + int(length), nil
+	}
 	switch major {
 	case 0:
 		n, o, err := readArg(data, off, info)

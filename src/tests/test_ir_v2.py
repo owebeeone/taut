@@ -246,7 +246,7 @@ def test_version_1_refuses_a_key_version_2_added(where, key):
 
 # --- the version (OPT-I1) ---------------------------------------------------------------------
 
-@pytest.mark.parametrize("version", [0, 4, -1, None, "2", 2.0, True])
+@pytest.mark.parametrize("version", [0, 5, -1, None, "2", 2.0, True])
 def test_load_refuses_unsupported_versions(version):
     ir = schema_json(_job_schema())
     ir["version"] = version

@@ -74,8 +74,8 @@ def _enum_member(name):
 
 def _java_ty(t: TypeRef, boxed: bool = False) -> str:
     if isinstance(t, Scalar):
-        prim = {"int": "long", "str": "String", "bytes": "byte[]", "bool": "boolean", "float": "double"}[t.kind]
-        box = {"int": "Long", "str": "String", "bytes": "byte[]", "bool": "Boolean", "float": "Double"}[t.kind]
+        prim = {"int": "long", "bigint": "java.math.BigInteger", "str": "String", "bytes": "byte[]", "bool": "boolean", "float": "double"}[t.kind]
+        box = {"int": "Long", "bigint": "java.math.BigInteger", "str": "String", "bytes": "byte[]", "bool": "Boolean", "float": "Double"}[t.kind]
         return box if boxed else prim
     if isinstance(t, (EnumRef, MsgRef)):
         return _type_name(t.name)
@@ -99,7 +99,7 @@ def _param(depth: int) -> str:
 
 def _enc(t: TypeRef, expr: str, depth: int = 0) -> str:
     if isinstance(t, Scalar):
-        return {"int": f"Cbor.int_({expr})", "str": f"Cbor.text({expr})",
+        return {"int": f"Cbor.int_({expr})", "bigint": f"Cbor.bigint({expr})", "str": f"Cbor.text({expr})",
                 "bytes": f"Cbor.bytes({expr})", "bool": f"Cbor.bool({expr})",
                 "float": f"Cbor.float_({expr})"}[t.kind]
     if isinstance(t, EnumRef):
@@ -122,7 +122,7 @@ def _enc(t: TypeRef, expr: str, depth: int = 0) -> str:
 
 def _dec(t: TypeRef, expr: str, depth: int = 0) -> str:
     if isinstance(t, Scalar):
-        return {"int": f"{expr}.asInt()", "str": f"{expr}.asText()",
+        return {"int": f"{expr}.asInt()", "bigint": f"{expr}.asBigInt()", "str": f"{expr}.asText()",
                 "bytes": f"{expr}.asBytes()", "bool": f"{expr}.asBool()",
                 "float": f"{expr}.asFloat()"}[t.kind]
     if isinstance(t, EnumRef):

@@ -53,7 +53,7 @@ class TypeDescriptor(val kind: String, message: (() -> MessageDescriptor)? = nul
     init {
         val mask = listOf(message != null, enum != null, element != null, key != null, value != null)
         val expected = when(kind) {
-            "int", "str", "bool", "bytes", "float" -> listOf(false,false,false,false,false)
+            "int", "bigint", "str", "bool", "bytes", "float" -> listOf(false,false,false,false,false)
             "message" -> listOf(true,false,false,false,false)
             "enum" -> listOf(false,true,false,false,false)
             "list" -> listOf(false,false,true,false,false)
@@ -162,7 +162,7 @@ class SchemaDescriptor(val descriptorContractVersion: Int, val irVersion: Int, v
     val effectiveOptions = options(effectiveOptions)
     init {
         Foundation.require(identity, Foundation.owner, descriptorContractVersion, 1, listOf("descriptors.v1"))
-        if (irVersion !in 1..3) throw ConfigurationError("$identity: unsupported IR $irVersion")
+        if (irVersion !in 1..4) throw ConfigurationError("$identity: unsupported IR $irVersion")
         this.messages.values.forEach { it.check() }
         if (this.messages.any { it.key != it.value.name } || this.enums.any { it.key != it.value.name })
             throw ConfigurationError("$identity: inconsistent registry keys")

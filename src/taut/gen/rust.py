@@ -43,7 +43,7 @@ RESERVED_FIELD_NAMES: MappingProxyType[str, str] = MappingProxyType({})
 it declares meets the field (the `wire_` prefix is taut's, `ir/validate.py`)."""
 
 RESERVED_TYPE_NAMES = MappingProxyType({
-    **dict.fromkeys("Cbor DecodeError".split(), "a runtime type"),
+    **dict.fromkeys("Cbor DecodeError BigIntValue".split(), "a runtime type"),
     **dict.fromkeys("Option Result String Vec".split(), "a prelude type the code names"),
     **dict.fromkeys("bool f64 i64 u8 usize".split(), "a primitive type the code names"),
     "std": "the root of the code's `std::` paths",
@@ -62,7 +62,7 @@ def _rust_type(t: TypeRef) -> str:
     # `IntOverflow` rather than wrap it. (A 128-bit int would be a new type, not a
     # widening of `int`.)
     if isinstance(t, Scalar):
-        return {"int": "i64", "str": "String", "bytes": "Vec<u8>",
+        return {"int": "i64", "bigint": "crate::cbor::BigIntValue", "str": "String", "bytes": "Vec<u8>",
                 "bool": "bool", "float": "f64"}[t.kind]
     if isinstance(t, EnumRef):
         return t.name
@@ -78,7 +78,7 @@ def _rust_type(t: TypeRef) -> str:
 def _encode_ref(t: TypeRef, e: str) -> str:
     """Encode a value bound by reference (map iteration gives &K / &V)."""
     if isinstance(t, Scalar):
-        return {"int": f"Cbor::Int(*{e})", "bool": f"Cbor::Bool(*{e})",
+        return {"int": f"Cbor::Int(*{e})", "bigint": f"Cbor::BigInt({e}.clone())", "bool": f"Cbor::Bool(*{e})",
                 "float": f"Cbor::Float(*{e})", "str": f"Cbor::Text({e}.clone())",
                 "bytes": f"Cbor::Bytes({e}.clone())"}[t.kind]
     if isinstance(t, EnumRef):
@@ -106,6 +106,7 @@ def _encode(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {
             "int": f"Cbor::Int({expr})",
+            "bigint": f"Cbor::BigInt({expr}.clone())",
             "str": f"Cbor::Text({expr}.clone())",
             "bytes": f"Cbor::Bytes({expr}.clone())",
             "bool": f"Cbor::Bool({expr})",
@@ -143,6 +144,7 @@ def _decode_try(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {
             "int": f"{expr}.try_int()?",
+            "bigint": f"{expr}.try_bigint()?",
             "str": f"{expr}.try_text()?",
             "bytes": f"{expr}.try_bytes()?",
             "bool": f"{expr}.try_bool()?",

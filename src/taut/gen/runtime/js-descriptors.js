@@ -18,7 +18,7 @@ function snapshot(value) {
 class TypeDescriptor {
   constructor(kind, reference = null, element = null, key = null, value = null) {
     Object.assign(this, {kind, reference, element, key, value});
-    const expected = {int:[], str:[], bool:[], bytes:[], float:[], message:["reference"], enum:["reference"], list:["element"], map:["key","value"]};
+    const expected = {int:[], bigint:[], str:[], bool:[], bytes:[], float:[], message:["reference"], enum:["reference"], list:["element"], map:["key","value"]};
     if (!Object.hasOwn(expected, kind) || JSON.stringify(["reference","element","key","value"].filter(k => this[k] !== null)) !== JSON.stringify(expected[kind])) fail("invalid TypeDescriptor");
     Object.freeze(this);
   }
@@ -55,7 +55,7 @@ class SchemaDescriptor {
 class SchemaBinding {
   constructor(schema, adapters, external = {}) {
     requireContract(schema.identity, undefined, schema.descriptorContractVersion);
-    if (!(schema instanceof SchemaDescriptor) || ![1,2,3].includes(schema.irVersion) || codec.foundationOwner !== ownerToken || codec.foundationCodecContract !== 1) fail("incompatible schema/codec runtime owner/contract; regenerate/rebind");
+    if (!(schema instanceof SchemaDescriptor) || ![1,2,3,4].includes(schema.irVersion) || codec.foundationOwner !== ownerToken || codec.foundationCodecContract !== 1) fail("incompatible schema/codec runtime owner/contract; regenerate/rebind");
     this.schema = schema;
     this.adapters = record(Object.entries(adapters).map(([name,a]) => [name,Object.freeze({type:a.type, read:record(Object.entries(a.read))})]));
     this.external = record(Object.entries(external));

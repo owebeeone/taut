@@ -9,7 +9,7 @@ public final class TypeDescriptor {
     public TypeDescriptor(String kind, String reference, TypeDescriptor element, TypeDescriptor key, TypeDescriptor value,
                           Supplier<MessageDescriptor> message, Supplier<EnumDescriptor> enumeration) {
         this.kind=kind; this.reference=reference; this.element=element; this.key=key; this.value=value; this.message=message; this.enumeration=enumeration;
-        boolean good = ("int str bool bytes float".contains(kind) && kind.matches("int|str|bool|bytes|float") && reference==null && element==null && key==null && value==null && message==null && enumeration==null)
+        boolean good = ("int bigint str bool bytes float".contains(kind) && kind.matches("int|bigint|str|bool|bytes|float") && reference==null && element==null && key==null && value==null && message==null && enumeration==null)
             || ("message".equals(kind) && reference!=null && message!=null && enumeration==null && element==null && key==null && value==null)
             || ("enum".equals(kind) && reference!=null && enumeration!=null && message==null && element==null && key==null && value==null)
             || ("list".equals(kind) && element!=null && reference==null && key==null && value==null && message==null && enumeration==null)

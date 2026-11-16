@@ -65,6 +65,8 @@ def decode_struct(schema: Schema, message: str, struct: Any, *, strict: bool = F
 
 def _to_wire(schema: Schema, tref: TypeRef, value: Any) -> Any:
     if isinstance(tref, Scalar):
+        if tref.kind == "bigint":
+            return cbor.Bignum(value)
         if tref.kind == "float":
             return float(value)
         if tref.kind == "int":
@@ -117,6 +119,10 @@ def _to_wire(schema: Schema, tref: TypeRef, value: Any) -> Any:
 
 def _from_wire(schema: Schema, tref: TypeRef, cv: Any, *, strict: bool = False) -> Any:
     if isinstance(tref, Scalar):
+        if tref.kind == "bigint":
+            if not isinstance(cv, cbor.Bignum):
+                raise DecodeError("WrongType", expected="bigint")
+            return cv.value
         if tref.kind == "int":
             if not isinstance(cv, int) or isinstance(cv, bool):
                 raise DecodeError("WrongType", expected="int")

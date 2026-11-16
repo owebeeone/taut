@@ -34,6 +34,7 @@ public enum CborError: Swift.Error, Equatable, CustomStringConvertible {
     case wrongType(String)
     case unknownEnum(String, Int64)
     case nonCanonicalInt(UInt64)
+    case nonCanonicalBigInt
     case negativeMapKey(Int64)
     /// An array or map deeper than the depth bound; `limit` is the bound applied.
     case tooDeep(limit: Int)
@@ -54,6 +55,7 @@ public enum CborError: Swift.Error, Equatable, CustomStringConvertible {
         case .wrongType: return "WrongType"
         case .unknownEnum: return "UnknownEnum"
         case .nonCanonicalInt: return "NonCanonicalInt"
+        case .nonCanonicalBigInt: return "NonCanonicalBigInt"
         case .negativeMapKey: return "NegativeMapKey"
         case .tooDeep: return "TooDeep"
         case .tooLarge: return "TooLarge"
@@ -84,6 +86,7 @@ public enum CborError: Swift.Error, Equatable, CustomStringConvertible {
             return "WrongType(expected: \(expected))"
         case let .unknownEnum(name, value):
             return "UnknownEnum(enum: \(name), value: \(value))"
+        case .nonCanonicalBigInt: return "NonCanonicalBigInt"
         case let .nonCanonicalInt(value):
             return "NonCanonicalInt(value: \(value))"
         case let .negativeMapKey(key):
@@ -96,7 +99,50 @@ public enum CborError: Swift.Error, Equatable, CustomStringConvertible {
     }
 }
 
+public protocol BigIntAdapter {
+    associatedtype Value
+    static func isNegative(_ value: Value) -> Bool
+    static func magnitude(_ value: Value) -> [UInt8]
+    static func fromMagnitude(negative: Bool, bytes: [UInt8]) -> Value
+}
+
+public struct BigIntValue: Equatable {
+    public let isNegative: Bool
+    public let argument: [UInt8]
+    public static let zero = BigIntValue(negative: false, argument: [])
+    private init(negative: Bool, argument: [UInt8]) { self.isNegative = negative; self.argument = argument }
+    public static func fromArgument(negative: Bool, bytes: [UInt8]) throws -> Self {
+        guard bytes.first != 0 else { throw CborError.nonCanonicalBigInt }
+        return Self(negative: negative, argument: bytes)
+    }
+    public static func fromMagnitude(negative: Bool, bytes: [UInt8]) throws -> Self {
+        guard bytes.first != 0 && !(negative && bytes.isEmpty) else { throw CborError.nonCanonicalBigInt }
+        var b = bytes
+        if negative {
+            for i in b.indices.reversed() { if b[i] != 0 { b[i] -= 1; break }; b[i] = 255 }
+            if b.first == 0 { b.removeFirst() }
+        }
+        return Self(negative: negative, argument: b)
+    }
+    public var magnitude: [UInt8] {
+        var b = argument
+        if isNegative {
+            var carry = true
+            for i in b.indices.reversed() { if b[i] != 255 { b[i] += 1; carry = false; break }; b[i] = 0 }
+            if carry { b.insert(1, at: 0) }
+        }
+        return b
+    }
+    public static func from<A: BigIntAdapter>(_ value: A.Value, using adapter: A.Type) throws -> Self {
+        try fromMagnitude(negative: A.isNegative(value), bytes: A.magnitude(value))
+    }
+    public func value<A: BigIntAdapter>(using adapter: A.Type) -> A.Value {
+        A.fromMagnitude(negative: isNegative, bytes: magnitude)
+    }
+}
+
 public indirect enum Cbor {
+    case bigint(BigIntValue)
     case int(Int64)
     case float(Double)
     case bytes([UInt8])
@@ -129,6 +175,10 @@ public extension Cbor {
         return nil
     }
 
+    func tryBigInt() throws -> BigIntValue {
+        guard case let .bigint(n) = self else { throw CborError.wrongType("bigint") }
+        return n
+    }
     func tryInt() throws -> Int64 {
         guard case let .int(n) = self else {
             throw CborError.wrongType("int")
@@ -261,6 +311,9 @@ private func enc(_ v: Cbor, _ out: inout [UInt8]) {
     switch v {
     case let .int(n):
         if n >= 0 { head(&out, 0, UInt64(n)) } else { head(&out, 1, UInt64(-1 - n)) }
+    case let .bigint(value):
+        out.append(value.isNegative ? 0xc3 : 0xc2)
+        head(&out, 2, UInt64(value.argument.count)); out.append(contentsOf: value.argument)
     case let .float(x): encFloat(x, &out)
     case let .bytes(b): head(&out, 2, UInt64(b.count)); out.append(contentsOf: b)
     case let .text(s): let b = Array(s.utf8); head(&out, 3, UInt64(b.count)); out.append(contentsOf: b)
@@ -403,6 +456,15 @@ private func dec(_ data: [UInt8], _ off0: Int, _ depth: Int, _ limit: Int) throw
     let info = initial & 0x1f
     let off = off0 + 1
 
+    if major == 6 && (info == 2 || info == 3) {
+        try requireBytes(data, off, 1)
+        let h = data[off]
+        guard h >> 5 == 2 else { throw CborError.wrongType("bytes") }
+        let (n, body) = try readArg(data, off + 1, h & 31)
+        let count = try checkedCount(data, body, n)
+        let value = try BigIntValue.fromArgument(negative: info == 3, bytes: Array(data[body..<body + count]))
+        return (.bigint(value), body + count)
+    }
     switch major {
     case 0:
         let (n, o) = try readArg(data, off, info)

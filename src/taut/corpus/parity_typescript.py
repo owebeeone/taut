@@ -147,7 +147,7 @@ for (const row of intVectors) {
     }
   }
 }
-for (const row of [...malformed, ...bounds]) {
+for (const row of [...malformed, ...bounds, ...JSON.parse(readFileSync("bigint.vectors.json", "utf8")).vectors]) {
   let columns: string[];
   try {
     columns = ["ok", bytesToHex(decodeRow(row, rowBytes(row)))];

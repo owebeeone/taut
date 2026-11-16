@@ -170,6 +170,7 @@ private fun describe(e: DecodeError): String = when (e) {
     is DecodeError.WrongType -> "WrongType;expected=${e.expected}"
     is DecodeError.UnknownEnum -> "UnknownEnum;enum=${e.enumName};value=${e.value}"
     is DecodeError.NonCanonicalInt -> "NonCanonicalInt;value=${e.value}"
+    is DecodeError.NonCanonicalBigInt -> "NonCanonicalBigInt"
     is DecodeError.NegativeMapKey -> "NegativeMapKey;key=${e.key}"
     is DecodeError.TooDeep -> "TooDeep;limit=${e.limit}"
     is DecodeError.TooLarge -> "TooLarge;len=${e.len};limit=${e.limit}"

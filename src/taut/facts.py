@@ -42,7 +42,7 @@ def wire_effective(schema, name, *, message=None):
 
 @dataclass(frozen=True)
 class Scalar:
-    kind: str   # 'int' | 'str' | 'bytes' | 'bool' | 'float'
+    kind: str   # 'int' | 'bigint' | 'str' | 'bytes' | 'bool' | 'float'
 
 
 @dataclass(frozen=True)

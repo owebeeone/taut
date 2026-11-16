@@ -42,7 +42,7 @@ where a static member names the type, and a property cannot share its name with 
 field named like a message or enum is `name_clashes`'s."""
 
 RESERVED_TYPE_NAMES = MappingProxyType({
-    **dict.fromkeys("Cbor CborError".split(), "a runtime type"),
+    **dict.fromkeys("Cbor CborError BigIntValue BigIntAdapter".split(), "a runtime type"),
     **dict.fromkeys("""append16 append32 append64 checkExtensionTag checkedCount dec decodeUtf8
         enc encFloat encode enter extClear extGet extSet head hostMap negativeOverflowValue readArg
         requireBytes tryDecode""".split(), "a runtime function"),
@@ -130,7 +130,7 @@ def name_clashes(schema: Schema) -> list[Clash]:
 
 def _swift_ty(t: TypeRef) -> str:
     if isinstance(t, Scalar):
-        return {"int": "Int64", "str": "String", "bytes": "[UInt8]", "bool": "Bool", "float": "Double"}[t.kind]
+        return {"int": "Int64", "bigint": "BigIntValue", "str": "String", "bytes": "[UInt8]", "bool": "Bool", "float": "Double"}[t.kind]
     if isinstance(t, (EnumRef, MsgRef)):
         return t.name
     if isinstance(t, ListOf):
@@ -147,7 +147,7 @@ def _field_type(f: FieldDef) -> str:
 
 def _default(t: TypeRef, schema: Schema) -> str:
     if isinstance(t, Scalar):
-        return {"int": "0", "str": '""', "bytes": "[]", "bool": "false", "float": "0.0"}[t.kind]
+        return {"int": "0", "bigint": "BigIntValue.zero", "str": '""', "bytes": "[]", "bool": "false", "float": "0.0"}[t.kind]
     if isinstance(t, ListOf):
         return "[]"
     if isinstance(t, EnumRef):
@@ -165,6 +165,7 @@ def _encode(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {
             "int": f"Cbor.int({expr})",
+            "bigint": f"Cbor.bigint({expr})",
             "float": f"Cbor.float({expr})",
             "str": f"Cbor.text({expr})",
             "bytes": f"Cbor.bytes({expr})",
@@ -188,6 +189,7 @@ def _decode(t: TypeRef, expr: str) -> str:
     if isinstance(t, Scalar):
         return {
             "int": f"try {expr}.tryInt()",
+            "bigint": f"try {expr}.tryBigInt()",
             "float": f"try {expr}.tryFloat()",
             "str": f"try {expr}.tryText()",
             "bytes": f"try {expr}.tryBytes()",

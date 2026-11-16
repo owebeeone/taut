@@ -32,10 +32,26 @@ from ..facts import EnumRef, ListOf, MapOf, MsgRef, Scalar, Schema, TypeRef
 from . import codec
 
 
+def _bigint_decimal(value: int) -> str:
+    if type(value) is not int:
+        raise TypeError("BIGINT requires an integer")
+    negative = value < 0
+    value = abs(value)
+    chunks = []
+    while value:
+        value, chunk = divmod(value, 10**9)
+        chunks.append(chunk)
+    text = str(chunks.pop()) if chunks else "0"
+    text += "".join(f"{n:09d}" for n in reversed(chunks))
+    return "-" + text if negative else text
+
+
 def _to_json(schema: Schema, tref: TypeRef, value: Any) -> Any:
     if value is None:
         return None
     if isinstance(tref, Scalar):
+        if tref.kind == "bigint":
+            return _bigint_decimal(value)
         if tref.kind == "int":
             return str(value)                          # i64 as string (precision)
         if tref.kind == "bytes":
@@ -82,6 +98,16 @@ def _from_json(schema: Schema, tref: TypeRef, jv: Any) -> Any:
     if jv is None:
         return None
     if isinstance(tref, Scalar):
+        if tref.kind == "bigint":
+            import re
+            if not isinstance(jv, str) or not re.fullmatch(r"0|-?[1-9][0-9]*", jv):
+                raise TypeError("bigint JSON requires canonical decimal text")
+            text = jv.removeprefix("-")
+            n = 0
+            for i in range(0, len(text), 9):
+                chunk = text[i:i+9]
+                n = n * 10**len(chunk) + int(chunk)
+            return -n if jv.startswith("-") else n
         if tref.kind == "int":
             return int(jv)                             # string (or number) -> int
         if tref.kind == "bytes":

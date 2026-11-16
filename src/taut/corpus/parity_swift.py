@@ -226,7 +226,7 @@ func decodeRow(_ row: DecodeRow) throws -> [UInt8] {
 func describe(_ e: CborError) -> String {
     let payload: String
     switch e {
-    case .truncated, .trailingBytes, .invalidUtf8, .nonIntegerMapKey:
+    case .truncated, .trailingBytes, .invalidUtf8, .nonIntegerMapKey, .nonCanonicalBigInt:
         payload = ""
     case let .unsupportedInfo(info):
         payload = ";info=\(info)"

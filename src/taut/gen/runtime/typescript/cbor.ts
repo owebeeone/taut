@@ -16,6 +16,14 @@ export const DEFAULT_MAX_DEPTH = 32;
 export const MAX_DEPTH_CEILING = 128;
 export const CborContract = Object.freeze({owner:"taut.typescript.foundation",contract:1,projection:"typescript.cbor.v1"});
 
+export class CborBigInt {
+  readonly value: bigint;
+  constructor(value: bigint) {
+    if (typeof value !== "bigint") throw new TypeError("BIGINT requires bigint");
+    this.value = value;
+  }
+}
+
 export class CborFloat {
   readonly value: number;
 
@@ -33,6 +41,7 @@ export type CborValue =
   | bigint
   | number
   | CborFloat
+  | CborBigInt
   | string
   | boolean
   | null
@@ -53,6 +62,7 @@ export type DecodeErrorTag =
   | "WrongType"
   | "UnknownEnum"
   | "NonCanonicalInt"
+  | "NonCanonicalBigInt"
   | "NegativeMapKey"
   | "TooDeep"
   | "TooLarge";
@@ -288,6 +298,18 @@ function enc(value: CborValue, out: number[]): void {
     pushShortestFloat(out, value.value);
     return;
   }
+  if (value instanceof CborBigInt) {
+    let argument = value.value < 0n ? -1n - value.value : value.value;
+    const bytes: number[] = [];
+    while (argument !== 0n) {
+      bytes.push(Number(argument & 255n));
+      argument >>= 8n;
+    }
+    out.push(value.value < 0n ? 0xc3 : 0xc2);
+    pushHead(out, 2, bytes.length);
+    for (let i = bytes.length - 1; i >= 0; --i) out.push(bytes[i]);
+    return;
+  }
   if (typeof value === "bigint" || typeof value === "number") {
     const n = checkedInt(value);
     if (n >= 0n) {
@@ -418,6 +440,16 @@ function dec(data: Uint8Array, off: number, depth: number, limit: number): [Cbor
   const major = initial >> 5;
   const info = initial & 0x1f;
   off++;
+  if (major === 6 && (info === 2 || info === 3)) {
+    requireBytes(data, off, 1);
+    const initial = data[off++];
+    if (initial >> 5 !== 2) throw new DecodeError("WrongType", {expected: "bytes"});
+    const [length, body] = readLength(data, off, initial & 31);
+    if (length !== 0 && data[body] === 0) throw new DecodeError("NonCanonicalBigInt");
+    let argument = 0n;
+    for (let i = body; i < body + length; ++i) argument = (argument << 8n) | BigInt(data[i]);
+    return [new CborBigInt(info === 3 ? -1n - argument : argument), body + length];
+  }
   if (major === 0) {
     const [n, o] = readArg(data, off, info);
     if (n > I64_MAX) {

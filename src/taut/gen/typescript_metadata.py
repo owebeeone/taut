@@ -25,7 +25,7 @@ def value(v):
 
 
 def ty(t, message_types=None):
-    if isinstance(t,Scalar): return {'int':'bigint','str':'string','bool':'boolean','bytes':'globalThis.Uint8Array','float':'number'}[t.kind]
+    if isinstance(t,Scalar): return {'int':'bigint','bigint':'bigint','str':'string','bool':'boolean','bytes':'globalThis.Uint8Array','float':'number'}[t.kind]
     if isinstance(t,MsgRef): return (message_types or {}).get(t.name,t.name)
     if isinstance(t,EnumRef): return t.name
     if isinstance(t,ListOf): return f'globalThis.Array<{ty(t.elem,message_types)}>'

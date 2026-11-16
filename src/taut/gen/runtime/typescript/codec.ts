@@ -8,6 +8,7 @@
 
 import {
   CborFloat,
+  CborBigInt,
   DecodeError,
   EncodeError,
   I64_MAX,
@@ -88,6 +89,7 @@ function compareNativeKey(a: Native, b: Native): number {
 function toWire(schema: SchemaIndex, t: TypeRef, value: Native): CborValue {
   switch (t.k) {
     case "scalar":
+      if (t.scalar === "bigint") return new CborBigInt(value);
       if (t.scalar === "int") {
         return intToWire(value);
       }
@@ -159,6 +161,10 @@ function intFromWire(cv: CborValue): bigint {
 function fromWire(schema: SchemaIndex, t: TypeRef, cv: CborValue): Native {
   switch (t.k) {
     case "scalar":
+      if (t.scalar === "bigint") {
+        if (!(cv instanceof CborBigInt)) wrong("bigint");
+        return cv.value;
+      }
       if (t.scalar === "int") {
         return intFromWire(cv);
       }

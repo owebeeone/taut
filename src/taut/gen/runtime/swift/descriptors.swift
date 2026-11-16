@@ -31,7 +31,7 @@ public func confirmFoundation(_ evidence: FoundationEvidence, _ owner: String, _
 
 /// Closed immutable fact values prevent mutable Foundation/Any reference escape.
 public indirect enum MetadataValue: Equatable {
-    case null, bool(Bool), int(Int64), float(Double), string(String), bytes([UInt8])
+    case null, bigint(BigIntValue), bool(Bool), int(Int64), float(Double), string(String), bytes([UInt8])
     case array([MetadataValue]), object([String: MetadataValue])
 }
 private func effectiveFacts(_ facts: [String: MetadataValue]) -> [String: MetadataValue] {
@@ -66,6 +66,7 @@ public struct TypeDescriptor {
     private let storage: Storage
     private init(_ storage: Storage) { self.storage = storage }
     public static let int = Self(.primitive("int"))
+    public static let bigint = Self(.primitive("bigint"))
     public static let str = Self(.primitive("str"))
     public static let bool = Self(.primitive("bool"))
     public static let bytes = Self(.primitive("bytes"))
@@ -248,7 +249,7 @@ public struct SchemaDescriptor {
     public let effectiveOptions: [String: MetadataValue]
     public init(_ irVersion: Int, _ identity: String, _ messages: [String: MessageDescriptor],
                 _ enums: [String: EnumDescriptor], _ options: [String: MetadataValue], _ effectiveOptions: [String: MetadataValue]) {
-        precondition((1...3).contains(irVersion), "unsupported Swift native IR")
+        precondition((1...4).contains(irVersion), "unsupported Swift native IR")
         func check(_ type: TypeDescriptor) {
             switch type.kind {
             case "message":

@@ -9,6 +9,66 @@
 // input bytes `decode` returns a value or throws DecodeError, nothing else.
 package taut
 
+// Arithmetic is replaceable. This boundary is platform-neutral; only the
+// separately named JVM binding below mentions Java's arithmetic class.
+interface BigIntAdapter<T> {
+    fun isNegative(value: T): Boolean
+    fun magnitude(value: T): ByteArray
+    fun fromMagnitude(negative: Boolean, magnitude: ByteArray): T
+}
+
+class BigIntValue private constructor(val negative: Boolean, private val bytes: ByteArray) {
+    fun argument(): ByteArray = bytes.copyOf()
+    fun magnitude(): ByteArray {
+        var result = bytes.copyOf()
+        if (negative) {
+            var carry = true
+            for (i in result.indices.reversed()) {
+                if (!carry) break
+                result[i] = (result[i].toInt() + 1).toByte()
+                carry = result[i] == 0.toByte()
+            }
+            if (carry) result = byteArrayOf(1) + result
+        }
+        return result
+    }
+    fun <T> to(adapter: BigIntAdapter<T>): T = adapter.fromMagnitude(negative, magnitude())
+    override fun equals(other: Any?): Boolean = other is BigIntValue && negative == other.negative && bytes.contentEquals(other.bytes)
+    override fun hashCode(): Int = 31 * negative.hashCode() + bytes.contentHashCode()
+    companion object {
+        fun zero(): BigIntValue = BigIntValue(false, ByteArray(0))
+        fun fromArgument(negative: Boolean, bytes: ByteArray): BigIntValue {
+            require(bytes.isEmpty() || bytes[0] != 0.toByte()) { "noncanonical bigint" }
+            return BigIntValue(negative, bytes.copyOf())
+        }
+        fun fromMagnitude(negative: Boolean, magnitude: ByteArray): BigIntValue {
+            require((magnitude.isEmpty() || magnitude[0] != 0.toByte()) && !(negative && magnitude.isEmpty()))
+            var argument = magnitude.copyOf()
+            if (negative) {
+                for (i in argument.indices.reversed()) {
+                    val before = argument[i]
+                    argument[i] = (before.toInt() - 1).toByte()
+                    if (before != 0.toByte()) break
+                }
+                if (argument[0] == 0.toByte()) argument = argument.copyOfRange(1, argument.size)
+            }
+            return fromArgument(negative, argument)
+        }
+        fun <T> from(value: T, adapter: BigIntAdapter<T>): BigIntValue = fromMagnitude(adapter.isNegative(value), adapter.magnitude(value))
+    }
+}
+
+object JvmBigIntAdapter : BigIntAdapter<java.math.BigInteger> {
+    override fun isNegative(value: java.math.BigInteger): Boolean = value.signum() < 0
+    override fun magnitude(value: java.math.BigInteger): ByteArray {
+        if (value.signum() == 0) return ByteArray(0)
+        val bytes = value.abs().toByteArray()
+        return if (bytes[0] == 0.toByte()) bytes.copyOfRange(1, bytes.size) else bytes
+    }
+    override fun fromMagnitude(negative: Boolean, magnitude: ByteArray): java.math.BigInteger =
+        java.math.BigInteger(if (negative) -1 else 1, magnitude)
+}
+
 // Foundation identity is attached to the canonical codec, not inferred from an
 // unrelated descriptor build label. Old supplied codecs fail to link this ABI.
 object KotlinCodecContract {
@@ -42,6 +102,7 @@ sealed class DecodeError(message: String) : RuntimeException(message) {
     // D2 strictness: a 1/2/4/8-byte argument that fits a shorter form (value is the
     // raw argument), and a map key below zero.
     class NonCanonicalInt(val value: Long) : DecodeError("non-canonical integer encoding of $value")
+    class NonCanonicalBigInt : DecodeError("noncanonical bigint")
     class NegativeMapKey(val key: Long) : DecodeError("negative map key $key")
     // The bounds (CD-E1): an array or map deeper than the depth bound `limit`, the bound
     // applied; and input of `len` bytes, longer than the length bound `limit`.
@@ -62,6 +123,8 @@ class Cbor(
         const val INT = 0; const val BYTES = 1; const val TEXT = 2
         const val ARR = 3; const val MAP = 4; const val BOOL = 5; const val NULL = 6
         const val FLOAT = 7
+        const val BIGINT = 8
+        fun bigint(value: BigIntValue) = Cbor(BIGINT, i = if (value.negative) 1 else 0, b = value.argument())
         fun int(n: Long) = Cbor(INT, i = n)
         fun text(s: String) = Cbor(TEXT, s = s)
         fun bytes(b: ByteArray) = Cbor(BYTES, b = b)
@@ -116,6 +179,10 @@ class Cbor(
     val intVal: Long get() {
         if (kind != INT) throw DecodeError.WrongType("int")
         return i
+    }
+    val bigintVal: BigIntValue get() {
+        if (kind != BIGINT) throw DecodeError.WrongType("bigint")
+        return BigIntValue.fromArgument(i != 0L, b)
     }
     val textVal: String get() {
         if (kind != TEXT) throw DecodeError.WrongType("text")
@@ -265,6 +332,11 @@ fun encode(c: Cbor): ByteArray {
 
 private fun enc(c: Cbor, out: MutableList<Byte>) {
     when (c.kind) {
+        Cbor.BIGINT -> {
+            out.add((if (c.i != 0L) 0xc3 else 0xc2).toByte())
+            head(out, 2, c.b.size.toLong())
+            for (byte in c.b) out.add(byte)
+        }
         Cbor.INT -> encInt(c.i, out)
         Cbor.BYTES -> { head(out, 2, c.b.size.toLong()); for (x in c.b) out.add(x) }
         Cbor.TEXT -> { val bb = c.s.toByteArray(Charsets.UTF_8); head(out, 3, bb.size.toLong()); for (x in bb) out.add(x) }
@@ -400,6 +472,16 @@ private fun dec(data: ByteArray, off0: Int, depth: Int, limit: Int): Pair<Cbor, 
     val major = initial shr 5
     val info = initial and 0x1f
     val off = off0 + 1
+    if (major == 6 && (info == 2 || info == 3)) {
+        ensure(data, off, 1)
+        val payload = u(data, off)
+        if (payload shr 5 != 2) throw DecodeError.WrongType("bytes")
+        val (length, body) = readArg(data, off + 1, payload and 31)
+        val count = lengthArg(data, body, length)
+        if (count != 0 && data[body] == 0.toByte()) throw DecodeError.NonCanonicalBigInt()
+        return Pair(Cbor(Cbor.BIGINT, i = if (info == 3) 1 else 0,
+            b = data.copyOfRange(body, body + count)), body + count)
+    }
     when (major) {
         0 -> { val (n, o) = readArg(data, off, info); return Pair(Cbor.int(positiveInt(n)), o) }
         1 -> { val (n, o) = readArg(data, off, info); return Pair(Cbor.int(negativeInt(n)), o) }

@@ -28,6 +28,9 @@ def emit_types(schema, *, validation=False, external_types=None, identity=None, 
         raise ValueError("python_records must be stdlib or yidl")
     yidl_records = python_records == "yidl"
     required_capabilities = ("descriptors.v1", "codec.v1", "oneof.v1")
+    from ..ir.export import uses_bigint
+    if uses_bigint(schema):
+        required_capabilities += ("bigint.v1",)
     if yidl_records:
         required_capabilities += ("records.yidl.v1",)
     from .scaffold import _py_ty, python_name_clashes, PYTHON_RESERVED_TYPE_NAMES

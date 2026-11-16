@@ -41,7 +41,7 @@ from .model import (
 from .options import OPTIONS, check_value, effective_map
 
 # The IR versions this taut reads (OPT-I1).
-IR_VERSIONS = (1, 2, 3)
+IR_VERSIONS = (1, 2, 3, 4)
 
 # The wire options that Python's runtime codec, `taut.wire`, implements (OPT-F4): both bound its
 # decode (TautCheckedDecode.md). An IR whose `effective` names any other wire option is refused.
@@ -188,6 +188,12 @@ def schema_from_json(data: dict) -> Schema:
     if not isinstance(data, dict):
         raise ValueError(f"a taut IR is a JSON object, not {type(data).__name__}")
     version = _version(data)
+    def has_bigint(value):
+        if isinstance(value, dict):
+            return value.get("k") == "scalar" and value.get("scalar") == "bigint" or any(has_bigint(v) for v in value.values())
+        return isinstance(value, list) and any(has_bigint(v) for v in value)
+    if version < 4 and has_bigint(data):
+        raise ValueError("bigint requires IR version 4; re-export schema")
     v2 = version >= 2
     if version < 3 and any("oneof" in f or "cases" in f for m in data["messages"] for f in m["fields"]):
         raise ValueError("oneof/cases require constraint IR version 3; re-export schema")
