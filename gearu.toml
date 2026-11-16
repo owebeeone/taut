@@ -37,26 +37,12 @@ exact_checks = [
 ]
 github_notes = """taut-proto {python_version}
 
-Adds the BIGINT schema scalar with IR version 4 and deterministic CBOR tags 2/3.
-All nine language codecs support arbitrary-precision values. C++, Rust, Swift
-and Kotlin expose replaceable adapters; ordinary INT stays signed 64-bit.
+Documentation correction: the README now describes the implemented enum-selected
+oneof rules and explicit validation, immutable descriptors and typed field paths,
+and the canonical CBOR/JSON bridge. It distinguishes those features from deferred
+virtual-oneof selection and a network reflection service, and documents JSON's
+unknown-field limitation and bigint representation.
 
-Includes the Python-only --python-records yidl option with a Taut-owned decorator,
-schema-aware deep freezing and optional yidl-dataclass0.1.2 dependency. Stdlib
-records remain the default and preserve the existing Python baseline. Lists
-become tuples and maps become detached read-only dictionaries after freezing.
-Freezing remains optimistic, irreversible and independent of validation.
-Existing descriptor/runtime ownership and all nine generation targets remain.
-Immutable descriptors and optional explicit oneof validation cover all nine
-generation targets. Runtime selection is explicit: source, package, or the
-legacy supplied-runtime route; generation does not install dependencies.
-Invalid drafts remain mutable and serializable. Virtual oneof selection remains
-deferred and incomplete. The enum.case accessor preserves metadata-like enum names.
-
-Migration: regenerate schemas and bind every consumer to one compatible nominal
-runtime owner. Rust package consumers use the new taut-foundation 0.12 crate;
-shape engines remain in their separate libraries. Generated API, ownership,
-native ABI and packaging changes are a pre-1.0 minor change; old source/binary
-compatibility is not universal. BIGINT schemas use IR version 4; readers accept 1..4. Older schemas retain their prior IR version.
-
-Publishing this GitHub Release triggers the PyPI Trusted Publishing workflow."""
+No runtime, wire-format, generated-API or dependency changes. The Rust foundation
+and compatible shape packages remain on their existing 0.12 releases.
+"""

@@ -53,13 +53,21 @@ the rest:
 Because the IR is data — not a Turing-complete program — taut can *diff* two
 versions of a contract and tell you mechanically what broke.
 
-**What taut deliberately doesn't have (yet):** `oneof` types,
-well-known types (`Timestamp`/`Any`/`Duration`), a canonical JSON profile
-(deferred), descriptor/reflection services, and — above all — proto's ecosystem
-maturity, scale hardening, and gRPC's battle-tested multi-language RPC runtime.
-taut is a focused mechanism, not a drop-in protobuf replacement for every use
-case. If you need proto's breadth, use proto; taut is the lighter contract when
-you want ~10% of the load for the parts that actually bite.
+**Available today:** enum-selected `OneOf` / `Case` rules, immutable schema
+descriptors and typed field paths across all nine language targets, plus an
+IR-driven canonical JSON profile through `tautc json`. Oneof validation is an
+explicit operation: drafts remain editable and serializable before validation.
+See the [oneof examples](dev-docs/examples/python-oneof/README.md) and the
+[CBOR/JSON bridge](#tautc--the-reference-codegen-cli). The JSON profile uses
+strings for integers, including arbitrary-precision `BIGINT`, and does not
+preserve unknown/residual fields; use CBOR when those must survive a round trip.
+
+**Current limits:** virtual-oneof selection remains deferred. Taut does not
+bundle protobuf-style well-known types (`Timestamp` / `Any` / `Duration`) or a
+network descriptor/reflection service. It also does not claim protobuf's
+ecosystem maturity, scale hardening, or gRPC's battle-tested multi-language RPC
+runtime. Taut focuses on portable contracts, deterministic encoding and
+transport-independent service bindings.
 
 ## The contract
 
@@ -90,8 +98,8 @@ SCHEMA = schema(
 ```
 
 - **Fields** carry an explicit integer `tag`, a type, and flags (`optional`,
-  `transient`, CRDT `merge`). Types are a closed set: scalars (`int/str/bytes/
-  bool`), enum/message refs, `List`, and `Map` (a key-sorted, deterministic
+  `transient`, CRDT `merge`). Types are a closed set: scalars (`int/bigint/float/
+  str/bytes/bool`), enum/message refs, `List`, and `Map` (a key-sorted, deterministic
   keyed collection — `K` scalar, `V` scalar/enum/message).
 - **Keyword-named enums, messages, fields, `Ref.Name` references, and
   `Params(...)` method params** are preferred. The explicit string forms remain
