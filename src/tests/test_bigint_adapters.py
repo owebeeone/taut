@@ -1,4 +1,5 @@
 """Customer adapter examples and native arithmetic bindings."""
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -24,7 +25,7 @@ def magnitude_rows():
 
 
 def test_cpp_customer_adapter(tmp_path):
-    compiler = shutil.which('c++')
+    compiler = shutil.which('clang++') or shutil.which('c++') or shutil.which('g++')
     if not compiler: pytest.skip('C++ compiler missing')
     rows = ','.join('{'+str(negative).lower()+', {'+','.join(map(str, b))+'}}' for negative,b in magnitude_rows())
     (tmp_path/'taut').mkdir()
@@ -52,8 +53,9 @@ int main() {
     }
 }
 ''')
-    run([compiler,'-std=c++23','-I'+str(RUNTIME),'-I'+str(tmp_path),'-I'+str(EXAMPLE),'main.cpp','-o','test'],tmp_path)
-    run([tmp_path/'test'],tmp_path)
+    binary = tmp_path/('test.exe' if os.name == 'nt' else 'test')
+    run([compiler,'-std=c++23','-I'+str(RUNTIME),'-I'+str(tmp_path),'-I'+str(EXAMPLE),'main.cpp','-o',binary],tmp_path)
+    run([binary],tmp_path)
 
 
 def test_swift_customer_cpp_interop(tmp_path):
@@ -73,8 +75,9 @@ for (negative, bytes) in rows {
     precondition(CustomerBigIntAdapter.magnitude(restored) == bytes)
 }
 ''')
-    run([compiler,'-cxx-interoperability-mode=default','-Xcc','-std=c++23','-I',EXAMPLE,RUNTIME/'cbor.swift',EXAMPLE/'CustomerBigIntAdapter.swift','main.swift','-o','test'],tmp_path)
-    run([tmp_path/'test'],tmp_path)
+    binary = tmp_path/('test.exe' if os.name == 'nt' else 'test')
+    run([compiler,'-cxx-interoperability-mode=default','-Xcc','-std=c++23','-I',EXAMPLE,RUNTIME/'cbor.swift',EXAMPLE/'CustomerBigIntAdapter.swift','main.swift','-o',binary],tmp_path)
+    run([binary],tmp_path)
 
 
 def test_rust_optional_num_bigint_adapter(tmp_path):
@@ -124,7 +127,8 @@ for(byte b:bytes) System.out.printf("%02x",b&255);System.out.println();
         run(['javac','-d','.', 'Cbor.java','Main.java'],tmp_path)
         output=run(['java','-cp','.', 'taut.Main'],tmp_path)
     elif target == 'kotlin':
-        if not shutil.which('kotlinc'): pytest.skip('Kotlin missing')
+        compiler = os.environ.get('KOTLINC') or shutil.which('kotlinc')
+        if not compiler: pytest.skip('Kotlin missing')
         shutil.copyfile(RUNTIME/'cbor.kt',tmp_path/'cbor.kt')
         (tmp_path/'Main.kt').write_text('''package taut
 fun main() {
@@ -137,7 +141,7 @@ check(original.toString()==text)
 println(bytes.joinToString(""){"%02x".format(it.toInt() and 255)})
 }}
 ''')
-        run(['kotlinc','cbor.kt','Main.kt','-include-runtime','-d','main.jar'],tmp_path)
+        run([compiler,'cbor.kt','Main.kt','-include-runtime','-d','main.jar'],tmp_path)
         output=run(['java','-jar','main.jar'],tmp_path)
     elif target == 'go':
         if not shutil.which('go'): pytest.skip('Go missing')

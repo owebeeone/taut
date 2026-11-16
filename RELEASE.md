@@ -128,6 +128,13 @@ shape contract and all three shape libraries. Python shape requires
 `taut-proto>=0.12.0,<0.13`; Rust shape requires `taut-foundation` in the
 `0.12` line. Glial's declared registry dependency is `^0.12.0`.
 
+The 0.12 foundation job in `taut-shape-rs/release.yml` uses GitHub OIDC trusted publishing through
+`rust-lang/crates-io-auth-action`; it does not require a stored registry token.
+Dispatch `release.yml` with `foundation_source_sha`, `foundation_version` and
+`publish_foundation=false` to preflight; set publication true only against the matching
+immutable Taut tag. The initial 0.11 bootstrap credential procedure recorded below
+is historical and is not the authentication route for this candidate.
+
 The compatibility manifest remains `candidate` until the coordinated release
 is complete. Python fallback versions record source-export intent; normal Git
 builds still derive their versions from tags. No tag is created by editing these
