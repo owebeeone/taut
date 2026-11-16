@@ -189,3 +189,23 @@ def test_xdist_and_ledger_work_in_both_plugin_modes_and_reject_each(tmp_path,aut
         with pytest.raises(_script().NotReady): _script().verify_test_coverage(universe,[record])
     else:
         assert len(_script().verify_test_coverage(universe,[record])['covered'])==1
+
+
+@pytest.mark.parametrize("omit_row", [False, True])
+def test_release_parity_ledger_includes_bigint_corpus(monkeypatch, tmp_path, omit_row):
+    from taut.corpus import parity
+    module = _script()
+    expected = len(parity.int_rows()) + len(parity.decode_rows())
+    assert expected > 88
+    def fake_run(command, *, out, env):
+        for name in parity.variants():
+            count = expected - int(omit_row and name == "rust")
+            out.write(f"{name} gated {count} 0 0 GREEN\n")
+    monkeypatch.setattr(module, "run", fake_run)
+    with (tmp_path/"parity.log").open("w") as log:
+        if omit_row:
+            with pytest.raises(module.NotReady, match="coverage ledger is not GREEN"):
+                module.step_parity("0.12.0", tmp_path, log)
+        else:
+            module.step_parity("0.12.0", tmp_path, log)
+            assert len(json.loads((tmp_path/"parity-coverage.json").read_text())) == 16

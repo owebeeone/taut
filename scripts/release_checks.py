@@ -243,9 +243,11 @@ def step_parity(version: str, work: Path, out: IO[str]) -> None:
                 r'^([a-z]+(?:/fc)?)\s+gated\s+(\d+)\s+(\d+)\s+(\d+)\s+GREEN$', text, re.M)}
     required = {'python','typescript','js','rust','cpp','swift','go','kotlin','java'}
     required |= {name+'/fc' for name in required-{'python','typescript'}}
-    if set(rows) != required or any(row['fail'] or row['pass']+row['type_satisfied'] != 88
+    expected_rows = sum(len(json.loads((REPO/'corpus/parity'/f'{name}.vectors.json').read_text())['vectors'])
+                        for name in ('int', 'malformed', 'bounds', 'bigint'))
+    if set(rows) != required or any(row['fail'] or row['pass']+row['type_satisfied'] != expected_rows
                                     for row in rows.values()):
-        raise NotReady('the complete 16-variant, 88-row parity coverage ledger is not GREEN')
+        raise NotReady(f'the complete 16-variant, {expected_rows}-row parity coverage ledger is not GREEN')
     (work/'parity-coverage.json').write_text(json.dumps(rows, indent=2, sort_keys=True)+'\n', encoding='utf-8')
 
 
